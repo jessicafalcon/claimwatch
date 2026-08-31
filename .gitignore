@@ -1,0 +1,21 @@
+# secrets
+.env
+*.pem
+credentials*
+
+# local data — publish aggregates, never the raw corpus
+*.duckdb
+*.duckdb.wal
+data/raw/
+data/corpus/
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# tooling
+.DS_Store
+.idea/
+.vscode/
