@@ -71,7 +71,7 @@ make review-gate SPEC=specs/phase-0a-machinery.md
 | Done-when | Proof |
 |---|---|
 | 1 | `make review-gate` prints `review-gate OK: 5/5 checks` (no SPEC: test, lint, docs, backing, fixtures) / `review-gate OK: 7/7 checks` with SPEC (+ evidence, records) |
-| 2 | `tests/test_review_tools.py::test_spec_outside_specs_is_refused`, `::test_gate_fails_on_a_missing_evidence_test_id`, `::test_gate_fails_on_a_record_file_absent_from_the_diff`, `::test_fixture_change_without_freeze_line_fails`, `::test_cli_refusals_are_one_line_exit_2` |
+| 2 | `tests/test_review_tools.py::test_spec_outside_specs_is_refused`, `::test_gate_fails_on_a_missing_evidence_test_id`, `::test_gate_fails_on_a_record_file_absent_from_the_diff`, `::test_fixture_change_without_freeze_line_fails`, `::test_cli_refusals_are_one_line_exit_2`, `::test_collected_tests_finds_the_suite` |
 | 3 | `tests/test_check_docs.py::test_check_links_reports_a_broken_link_and_anchor`, `::test_check_make_targets_reports_an_unknown_target`, `::test_check_banned_words_reports_each_hit`, `::test_check_glossary_reports_an_eleventh_term`, `::test_check_backlog_count_reports_a_mismatch`, `::test_every_named_make_target_exists_today`; `make check-docs` prints `check-docs OK` |
 | 4 | `tests/test_check_backing.py::test_empty_table_is_ok`, `::test_missing_sql_file_fails`, `::test_tag_outside_the_four_fails`, `::test_measured_without_source_fails`, `::test_orphan_mart_sql_fails`, `::test_pending_row_is_ok_without_source`; `make check-backing` prints `check-backing OK: 0 rows, 0 marts` |
 | 5 | `tests/test_claude_config.py::test_tracked_claude_config_is_prose_and_hook_scripts_only`, `::test_settings_and_mcp_are_gitignored` |

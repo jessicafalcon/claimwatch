@@ -135,7 +135,11 @@ def check_fixtures(spec_text: str | None, diff: set[str]) -> list[str]:
 
 
 def collected_tests(root: Path) -> set[str]:
-    code, out = run(["uv", "run", "pytest", "--collect-only", "-q"], root)
+    # `-o addopts=`: pyproject sets addopts="-q"; a second -q would print only
+    # a count, no node ids (found live in Phase 0a).
+    code, out = run(
+        ["uv", "run", "pytest", "--collect-only", "-q", "-o", "addopts="], root
+    )
     ids: set[str] = set()
     for line in out.splitlines():
         if "::" in line and line.startswith("tests/"):

@@ -127,3 +127,11 @@ def test_cli_refusals_are_one_line_exit_2(argv: list[str]):
     assert res.stdout == ""
     assert len(res.stderr.strip().splitlines()) == 1
     assert "Traceback" not in res.stderr
+
+
+def test_collected_tests_finds_the_suite():
+    """The Evidence check reads real node ids (a bare count would make every
+    Evidence row FAIL — pyproject's addopts="-q" plus -q did exactly that)."""
+    ids = review_gate.collected_tests(ROOT)
+    assert "tests/test_review_tools.py::test_collected_tests_finds_the_suite" in ids
+    assert "tests/test_review_tools.py::test_cli_refusals_are_one_line_exit_2" in ids
