@@ -1,21 +1,35 @@
-# secrets
+# Secrets — never commit. The API key and warehouse credentials live in .env only.
 .env
+.env.*
 *.pem
 credentials*
 
-# local data — publish aggregates, never the raw corpus
+# Data — publish aggregates and code, never the raw corpus (PROJECT_BRIEF §2.5).
+# data/snapshots/ (the weekly public aggregates, Phase 4) is the one tracked
+# subtree; `data/*` (not `data/`) is what lets the negation below work.
+data/*
+!data/snapshots/
 *.duckdb
 *.duckdb.wal
-data/raw/
-data/corpus/
 
-# python
+# Claude Code config is local-only: a tracked settings/.mcp.json would auto-run
+# an inbound branch's hooks or MCP servers for anyone opening the repo
+# (CLAUDE.md → Project tooling). Agent/command prose and hook scripts ARE tracked.
+.claude/settings.json
+.claude/settings.local.json
+.mcp.json
+.claude/scheduled_tasks.lock
+.claude/scheduled_tasks.json
+
+# Python
 __pycache__/
 *.pyc
 .venv/
 venv/
+.pytest_cache/
+.ruff_cache/
 
-# tooling
+# OS / editor
 .DS_Store
 .idea/
 .vscode/

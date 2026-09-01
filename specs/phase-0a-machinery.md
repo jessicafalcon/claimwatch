@@ -1,10 +1,10 @@
-# Phase 0a — Workflow machinery (PROPOSED)
+# Phase 0a — Workflow machinery (APPROVED)
 
 Contract for the `phase-0a-machinery` branch. Source: PROJECT_BRIEF.md §9
 Phase 0, split per `docs/PLAN.md` §5 (approved 2026-09-01): 0a builds the gate,
 0b writes the contracts the gate then checks. Depends on nothing.
 
-**Status: PROPOSED — awaiting approval of this spec.** No runtime dependencies.
+**Status: APPROVED 2026-09-01 — in progress.** No runtime dependencies.
 Dev group only: `pytest`, `ruff`, `pre-commit`. Python 3.12 via `uv`. The ten
 decisions in `docs/PLAN.md` §6 are taken at their stated defaults (recorded in
 `DECISIONS.md` by this phase).
@@ -54,9 +54,9 @@ make review-gate SPEC=specs/phase-0a-machinery.md
    README or `docs/`; the glossary (when it exists) has ≤ 10 terms; the
    "Open BACKLOG rows: **N**" count matches. Each check reports an error on a
    planted violation. *Evidence: row 3.*
-4. **The evidence contract is checked mechanically:** a BACKING row whose SQL
-   file is missing, whose tag is outside the four, or that is Measured or
-   Documented with no source, fails; a `sql/marts/*.sql` no row names fails;
+4. **The evidence contract is checked mechanically:** a non-Pending BACKING
+   row whose SQL file is missing, any row whose tag is outside the four, or a
+   Measured or Documented row with no source, fails; a `sql/marts/*.sql` no row names fails;
    the empty table passes. *Evidence: row 4.*
 5. **Claude Code config tracked in git is prose and hook scripts only:**
    nothing under `.claude/` but `agents/*.md`, `commands/*.md`, `hooks/*.py`
@@ -70,7 +70,7 @@ make review-gate SPEC=specs/phase-0a-machinery.md
 
 | Done-when | Proof |
 |---|---|
-| 1 | `make review-gate` prints `review-gate OK: 4/4 checks` (no SPEC) / `review-gate OK: 6/6 checks` with SPEC |
+| 1 | `make review-gate` prints `review-gate OK: 5/5 checks` (no SPEC: test, lint, docs, backing, fixtures) / `review-gate OK: 7/7 checks` with SPEC (+ evidence, records) |
 | 2 | `tests/test_review_tools.py::test_spec_outside_specs_is_refused`, `::test_gate_fails_on_a_missing_evidence_test_id`, `::test_gate_fails_on_a_record_file_absent_from_the_diff`, `::test_fixture_change_without_freeze_line_fails`, `::test_cli_refusals_are_one_line_exit_2` |
 | 3 | `tests/test_check_docs.py::test_check_links_reports_a_broken_link_and_anchor`, `::test_check_make_targets_reports_an_unknown_target`, `::test_check_banned_words_reports_each_hit`, `::test_check_glossary_reports_an_eleventh_term`, `::test_check_backlog_count_reports_a_mismatch`, `::test_every_named_make_target_exists_today`; `make check-docs` prints `check-docs OK` |
 | 4 | `tests/test_check_backing.py::test_empty_table_is_ok`, `::test_missing_sql_file_fails`, `::test_tag_outside_the_four_fails`, `::test_measured_without_source_fails`, `::test_orphan_mart_sql_fails`, `::test_pending_row_is_ok_without_source`; `make check-backing` prints `check-backing OK: 0 rows, 0 marts` |
@@ -141,7 +141,9 @@ make review-gate SPEC=specs/phase-0a-machinery.md
 - [ ] SPEC.md — none (Phase 0b)
 - [ ] README.md — none (Phase 9; PROJECT_BRIEF.md is the front door until then)
 - [ ] `PROJECT_BRIEF.md` — the one-sentence split pointer in §9
-- [ ] this spec — the "Delivered" paragraph appended at exit
+- [ ] `specs/TEMPLATE.md` — new file
+- [ ] `specs/phase-0a-machinery.md` — this spec; the "Delivered" paragraph
+      appended at exit
 
 ## Threat model (REQUIRED when the phase adds a `make` target that takes a variable, deletes anything, calls a paid API, or touches the network)
 
