@@ -1,0 +1,185 @@
+# Phase 0a — Workflow machinery (PROPOSED)
+
+Contract for the `phase-0a-machinery` branch. Source: PROJECT_BRIEF.md §9
+Phase 0, split per `docs/PLAN.md` §5 (approved 2026-09-01): 0a builds the gate,
+0b writes the contracts the gate then checks. Depends on nothing.
+
+**Status: PROPOSED — awaiting approval of this spec.** No runtime dependencies.
+Dev group only: `pytest`, `ruff`, `pre-commit`. Python 3.12 via `uv`. The ten
+decisions in `docs/PLAN.md` §6 are taken at their stated defaults (recorded in
+`DECISIONS.md` by this phase).
+
+## Why
+
+Every later phase is judged by a command (`make review-gate`) before any agent
+reads it. That command, the docs guard, the evidence-contract guard, the review
+agents and the hook have to exist and be proven on themselves before the first
+contract file or the first line of pipeline code — otherwise Phase 0b's
+SPEC/BACKING are reviewed by opinion, and the brief's rule "done-when is a test
+or make target" cannot hold for them.
+
+## The central constraint
+
+**No pipeline code, no data, no study text lands in this phase.** `BACKING.md`
+is a header and an empty table; `SPEC.md` does not exist yet; `sql/` does not
+exist. The gate must be green on an empty project and red on planted
+violations in throwaway trees.
+
+## DONE command
+
+```
+make review-gate SPEC=specs/phase-0a-machinery.md
+```
+
+- `make test` — the guard pins (`tests/test_review_tools.py`,
+  `tests/test_check_docs.py`, `tests/test_check_backing.py`,
+  `tests/test_makefile.py`, `tests/test_claude_config.py`) green, offline.
+- `ruff check` + `ruff format --check` — read-only lint green.
+- `make check-docs` — links, named targets, banned words, glossary size,
+  BACKLOG count green over CLAUDE.md, README, docs/, DECISIONS, BACKLOG.
+- `make check-backing` — the empty table passes (no rows, no `sql/marts/`).
+- Evidence rows — every test id and target below exists; Record updates —
+  every listed file is in `git diff main...HEAD`.
+
+## Done-when
+
+1. **The offline gate runs green on a clean checkout with no services.**
+   *Evidence: row 1.*
+2. **The gate refuses what it must refuse, in one line, never a traceback:** a
+   SPEC outside `specs/`, a missing Evidence test id, a Record-updates file
+   absent from the diff, a `fixtures/` change with no `Freeze:` line in the
+   spec. *Evidence: row 2.*
+3. **The docs are load-bearing:** every relative link and anchor resolves;
+   every `make` target the docs name exists; no banned word in CLAUDE.md,
+   README or `docs/`; the glossary (when it exists) has ≤ 10 terms; the
+   "Open BACKLOG rows: **N**" count matches. Each check reports an error on a
+   planted violation. *Evidence: row 3.*
+4. **The evidence contract is checked mechanically:** a BACKING row whose SQL
+   file is missing, whose tag is outside the four, or that is Measured or
+   Documented with no source, fails; a `sql/marts/*.sql` no row names fails;
+   the empty table passes. *Evidence: row 4.*
+5. **Claude Code config tracked in git is prose and hook scripts only:**
+   nothing under `.claude/` but `agents/*.md`, `commands/*.md`, `hooks/*.py`
+   is tracked; `.claude/settings*.json` and `.mcp.json` are gitignored.
+   *Evidence: row 5.*
+6. **CI is green on the Phase 0a PR** with SHA-pinned actions, `uv sync
+   --locked`, `permissions: contents: read`, `persist-credentials: false`.
+   *Evidence: row 6 — verified on first push; BACKLOG row until then.*
+
+## Evidence (REQUIRED)
+
+| Done-when | Proof |
+|---|---|
+| 1 | `make review-gate` prints `review-gate OK: 4/4 checks` (no SPEC) / `review-gate OK: 6/6 checks` with SPEC |
+| 2 | `tests/test_review_tools.py::test_spec_outside_specs_is_refused`, `::test_gate_fails_on_a_missing_evidence_test_id`, `::test_gate_fails_on_a_record_file_absent_from_the_diff`, `::test_fixture_change_without_freeze_line_fails`, `::test_cli_refusals_are_one_line_exit_2` |
+| 3 | `tests/test_check_docs.py::test_check_links_reports_a_broken_link_and_anchor`, `::test_check_make_targets_reports_an_unknown_target`, `::test_check_banned_words_reports_each_hit`, `::test_check_glossary_reports_an_eleventh_term`, `::test_check_backlog_count_reports_a_mismatch`, `::test_every_named_make_target_exists_today`; `make check-docs` prints `check-docs OK` |
+| 4 | `tests/test_check_backing.py::test_empty_table_is_ok`, `::test_missing_sql_file_fails`, `::test_tag_outside_the_four_fails`, `::test_measured_without_source_fails`, `::test_orphan_mart_sql_fails`, `::test_pending_row_is_ok_without_source`; `make check-backing` prints `check-backing OK: 0 rows, 0 marts` |
+| 5 | `tests/test_claude_config.py::test_tracked_claude_config_is_prose_and_hook_scripts_only`, `::test_settings_and_mcp_are_gitignored` |
+| 6 | GitHub Actions `ci / lint-test` green on the PR |
+
+## Invariants (REQUIRED)
+
+| Invariant ("for all …, … holds") | Falsified by (scenario test) |
+|---|---|
+| For all SPEC values, the gate acts only on an existing file under `specs/`; nothing else is derived from the value. | `tests/test_review_tools.py::test_spec_outside_specs_is_refused` — `../x`, absolute, a directory, empty |
+| For all user variables of a `make` target, the value reaches Python as ONE single-quoted literal with no shell or make-function expansion, from either origin, and is validated there. | `tests/test_makefile.py::test_user_variable_reaches_python_as_one_literal_from_both_origins` — `"; echo pwned; "`, `$(shell …)`, env vs command line via `make -n` |
+| For all BACKING rows, the tag is one of exactly four; a Measured or Documented row names a source; the SQL file exists. For all `sql/marts/*.sql`, at least one row names it. An empty table with no marts is OK. | `tests/test_check_backing.py::test_tag_outside_the_four_fails`, `::test_measured_without_source_fails`, `::test_missing_sql_file_fails`, `::test_orphan_mart_sql_fails`, `::test_empty_table_is_ok` |
+| For all docs-guard checks, a violating input makes the check report an error (no check is vacuous-green). | `tests/test_check_docs.py::test_check_links_reports_a_broken_link_and_anchor`, `::test_check_make_targets_reports_an_unknown_target`, `::test_check_banned_words_reports_each_hit`, `::test_check_glossary_reports_an_eleventh_term`, `::test_check_backlog_count_reports_a_mismatch` |
+| For all doc citations of a `make` target, the target exists as an exact token in the Makefile; a partial rename fails. | `tests/test_check_docs.py::test_partial_rename_is_a_failure`, `::test_every_named_make_target_exists_today` |
+| For all tracked paths under `.claude/`, the file is agent or command prose or a hook script. | `tests/test_claude_config.py::test_tracked_claude_config_is_prose_and_hook_scripts_only` |
+| For all `fixtures/**` changes on a branch, the spec declares `Freeze:` or the gate FAILs (fixtures are read-only after the phase that froze them). | `tests/test_review_tools.py::test_fixture_change_without_freeze_line_fails` |
+
+## Pinned decisions (do not re-litigate)
+
+- **Gate scripts are stdlib-only and hardened from day one** — spec-path
+  validation, `$(call _Q,$(value VAR))` quoting, `unexport`, one-line
+  refusals with exit 2. Satisfies invariants 1–2. Rejected: a lighter gate
+  that earns hardening incident by incident (the reference's round 1).
+- **No mutation sweep and no round tags** (`docs/PLAN.md` §2). The sweep is a
+  BACKLOG row with the trigger "a bug in `classify/` or `models/` a green
+  suite missed"; `/review-round N` ranges over `main...HEAD` and N is a label.
+  Rejected: copying the reference's 26 KB of tooling before a survivor class
+  exists.
+- **Hook wiring is local-only.** `.claude/hooks/run-tests.py` is tracked;
+  `.claude/settings*.json` and `.mcp.json` are gitignored; a test pins what is
+  tracked. Satisfies invariant 6. Rejected: a committed `settings.json` (it
+  would auto-run an inbound branch's hook for anyone opening the repo).
+- **`check_backing.py` reads the brief's §8 table shape exactly** — columns
+  `Study claim | Mart table | SQL file | Upstream source | Tag`; SQL file is a
+  path under `sql/`; tag ∈ {Measured, Documented, Modeled, Pending}; Pending
+  rows may have an empty source. Satisfies invariant 3. Rejected: a YAML
+  sidecar (two places to keep in step).
+- **Python 3.12 via `uv`, dev dependencies only.** `duckdb` lands in Phase 1,
+  `pyyaml`/`httpx` in Phase 2, `anthropic` in Phase 6, the Snowflake
+  connector in Phase 10. Rejected: installing the whole allowlist up front.
+- **Package and project name `friction_ledger` / "The Friction Ledger"**; the
+  directory `claimwatch` is left alone (PLAN §6.6 default).
+
+## Scope (files)
+
+- `CLAUDE.md` (v0 from PLAN §7), `DECISIONS.md`, `BACKLOG.md`, `BACKING.md`
+  (header + empty table), `PROJECT_BRIEF.md` (one sentence in §9 pointing at
+  the 0a/0b and 5a/5b split in `docs/PLAN.md`), `docs/PLAN.md` (this branch
+  tracks it), `specs/TEMPLATE.md`, `specs/phase-0a-machinery.md`
+- `Makefile` (`setup test lint check-docs check-backing review-gate help`),
+  `pyproject.toml`, `uv.lock`, `.python-version`, `.pre-commit-config.yaml`,
+  `.gitignore`, `.github/workflows/ci.yml`, `.github/pull_request_template.md`
+- `scripts/{review_common,review_gate,check_docs,check_backing}.py`
+- `.claude/agents/{code-reviewer,security-reviewer,functionality-tester,coherence-auditor,study-editor}.md`,
+  `.claude/commands/{review-round,selfcheck,phase-start}.md`,
+  `.claude/hooks/run-tests.py`
+- `tests/{conftest,test_review_tools,test_check_docs,test_check_backing,test_makefile,test_claude_config}.py`
+
+## Record updates (REQUIRED)
+
+- [ ] `DECISIONS.md` — new file: "Decisions still in force", "Process", Phase
+      0a entry (the ten PLAN §6 defaults, each one line)
+- [ ] `BACKLOG.md` — new file: mutation sweep deferred; CI green unverified
+      until first push; naming-the-target check is agent-only
+- [ ] `CLAUDE.md` — new file (v0); Current status; Commands; BACKLOG count
+- [ ] `BACKING.md` — new file: header, §8 rules, empty table
+- [ ] SPEC.md — none (Phase 0b)
+- [ ] README.md — none (Phase 9; PROJECT_BRIEF.md is the front door until then)
+- [ ] `PROJECT_BRIEF.md` — the one-sentence split pointer in §9
+- [ ] this spec — the "Delivered" paragraph appended at exit
+
+## Threat model (REQUIRED when the phase adds a `make` target that takes a variable, deletes anything, calls a paid API, or touches the network)
+
+`review-gate` takes `SPEC` and `BASE`. Nothing in this phase deletes, calls a
+paid API, or touches the network (`make setup`'s `uv sync` is the one download,
+a setup step outside the gate).
+
+| Target | empty | `../x` | `"; ` | env-exported | `$(origin)` | Pinned by |
+|---|---|---|---|---|---|---|
+| `make review-gate SPEC=` | no SPEC → checks a–d only, prints `SKIP evidence, records` | refused, exit 2, one line | one literal argv token; refused as not-a-file; nothing runs | reaches the recipe as one literal, validated in Python like a command-line value | n/a (no CONFIRM in 0a) | `tests/test_makefile.py::test_user_variable_reaches_python_as_one_literal_from_both_origins`, `tests/test_review_tools.py::test_spec_outside_specs_is_refused` |
+| `BASE=` | defaults to `main` | validated `[\w./-]+`, no leading `-`; else refused | one literal; refused | same | n/a | `tests/test_review_tools.py::test_base_is_validated` |
+
+Stated residual: `MAKEFLAGS='SPEC=…'` is a make-level override; the threat
+model is "mistakes, not a user who controls the environment".
+
+## Review & stack risk
+
+- **code-reviewer** (triggered — scripts, tests, Makefile): the guards against
+  CLAUDE.md v0; stdlib-only; one-line refusals; no clock, no network.
+- **security-reviewer** (triggered — CI workflow, `.gitignore`, hook): SHA
+  pins, `--locked`, `contents: read`, `persist-credentials: false`, no secret
+  in any file, `.gitignore` covers `.env*`, `data/`, `*.duckdb`,
+  `.claude/settings*.json`, `.mcp.json`.
+- **functionality-tester** (triggered): the DONE command; plants each
+  violation in a tmp tree and shows the one-line FAIL; runs the hook on a
+  failing test and shows exit 2.
+- **study-editor** (triggered — CLAUDE.md prose): the banned-word list is
+  honoured in the file that states it; the one-line description passes the
+  dinner-table test.
+- **coherence-auditor** at exit: CLAUDE.md Repo map lists only *(Phase N)*
+  dirs; PLAN §2 verdicts match what was built; BACKLOG count.
+- Stack risk: `uv` resolving Python 3.12 on this macOS; ruff and pre-commit
+  versions pinned in lockstep (`pyproject` dev group ↔ `.pre-commit-config`
+  rev). Verify in the first hour.
+
+## Out of scope (deferred, recorded)
+
+- `SPEC.md`, the full `BACKING.md` table, the glossary — Phase 0b.
+- Mutation sweep — BACKLOG row.
+- `weekly.yml` — Phase 4.
+- Any `sql/`, `fixtures/`, `pipeline/` file — Phase 1.
