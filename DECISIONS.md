@@ -39,6 +39,20 @@ place and never deleted.
   row; a "theme share" counts theme rows. This is what a theme chart means.
   ([Brief §5](PROJECT_BRIEF.md); [Phase 0b](#phase-0b))
 
+**Warehouse**
+
+- **One seam knows DuckDB from Snowflake; the SQL is identical for both.**
+  `pipeline/warehouse.py` (`connect`, `run_sql_file`) is the only database-driver
+  import; DuckDB is the permanent path and Snowflake is the Phase-10
+  demonstration (its connector defers, no import in Phase 1). SQL stays ANSI —
+  no reader function, no regex, no clock — which is what keeps it portable.
+  ([PLAN §4.1](docs/PLAN.md); [Phase 1](#phase-1))
+- **Raw is append-only, idempotent on `(source, external_id, content_hash)`;
+  staging keeps the latest capture.** A re-run of an unchanged review inserts
+  nothing, an edited review appends a new row, so "run twice, counts unchanged"
+  holds; `run_id` is stamped in Python (never in SQL) and is in no natural key
+  and no mart. ([PLAN §4 decision 2](docs/PLAN.md); [Phase 1](#phase-1))
+
 **Data**
 
 - **Publish aggregates and code, never the raw review corpus.** The corpus
@@ -232,3 +246,46 @@ accepted (the citation guard strips fenced blocks but not inline code spans,
 count 5 → 6); two spec-sanctioned deferrals accepted (the Phase 5b grain code
 test; the render-time no-number check). The gate stayed 7/7 and the two-round
 cap did not apply (round 1).
+
+### Phase 1
+
+Branch `phase-1-schema`, spec `specs/phase-1-schema.md`. Depends on Phase 0b
+(PR #2) merged. Built the empty warehouse: raw + staging DDL for reviews with
+the four provenance columns, the DuckDB/Snowflake seam, the two frozen fixture
+sets, `tests/pins.py`, and the portability + idempotency guards. No mart, no
+scraper, no model.
+
+- **All 13 marts (and `platform_snapshots`) are deferred to the phases that
+  land their upstreams; Phase 1 builds raw + staging for reviews only.** Every
+  mart depends on data a later phase produces — snapshots (Phase 3), the gated
+  classifier (5b–7), the cost model / simulator (8), or the whole pipeline
+  (Beat 5) — so building any now would either reach into a future phase or fix a
+  table's columns before its subsystem is designed. Every BACKING row stays
+  Pending; `check-backing` sees 19 rows, 0 marts, 0 orphans. **This narrows the
+  brief's Phase 1 "All DDL (raw/staging/marts)" to the layers whose upstream
+  exists.** The narrowing is recorded here and flagged in the spec for the
+  developer's call; PROJECT_BRIEF.md is not silently edited. Rejected: empty
+  mart stubs (assert a schema before its subsystem exists); building the four
+  snapshot marts now (`platform_snapshots` is Phase 3's table — one phase, one
+  diff). `theme_share_by_month` (B2.2, monthly × segment) stays distinct from
+  `theme_share_by_segment` (B2.5).
+- **The warehouse seam and idempotent raw** — promoted to "Decisions still in
+  force" above (Warehouse).
+- **`run_id` is stamped in Python, not SQL; in FIXTURE mode it is the fixture
+  name.** So `sql/` stays clock-free, a changing `run_id` never duplicates a row
+  or moves a number, and the synthetic rebuild is byte-stable, not merely
+  count-stable. Rejected: `run_id` from `now()` in SQL.
+- **The fixture is read in Python (stdlib csv) and inserted with a portable
+  guard** — DuckDB's `read_csv` is dialect-bound, so the load lives in the
+  driver, not in a `sql/` file (no pandas). `insert … select … where not exists`
+  is ANSI.
+- **`sql/raw/` joins `sql/staging/` and `sql/marts/`** as a table-DDL directory
+  (raw table creation is SQL, scanned by the portability guard), added to the
+  Repo map and the SQL-file convention.
+- **One validating CLI behind `make`; `reset` is the only destructive target,
+  gated by `$(origin CONFIRM)`.** `rebuild`/`idempotency-check` take
+  `TARGET`/`FIXTURE` as a closed set validated in Python; an environment
+  `CONFIRM=yes` does not confirm a `reset`. Mirrors the SPEC/BASE shape.
+
+**Gotchas:** none — DuckDB's `create or replace`, `insert … where not exists`
+and `information_schema.tables` behaved as the official docs describe.

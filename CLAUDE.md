@@ -62,7 +62,7 @@ in the middle, and come out on the right as the numbers the study shows.
 - `scripts/` — the offline guards, none a pytest file: `review_gate.py`,
   `check_docs.py`, `check_backing.py`, `review_common.py` (shared).
 - `tests/` — pytest; no services, no network, no API key. `tests/pins.py`
-  *(Phase 1)* holds every pinned number.
+  holds every pinned number.
 - `.claude/` — agents (report-only), commands, the run-tests hook. Settings
   are local-only and gitignored.
 - `.github/workflows/ci.yml` — lint, check-docs, check-backing, test.
@@ -70,10 +70,15 @@ in the middle, and come out on the right as the numbers the study shows.
   `.github/pull_request_template.md` — the PR body.
 - `pyproject.toml`, `uv.lock`, `.python-version`, `.pre-commit-config.yaml` —
   the toolchain (uv, ruff, pytest, pre-commit), versions pinned in lockstep.
-- *(Phase 1)* `sql/staging/`, `sql/marts/` — plain SQL, one file per table;
-  `pipeline/warehouse.py` — the one place that knows DuckDB from Snowflake;
+- `sql/raw/`, `sql/staging/`, `sql/marts/` — plain SQL, one file per table
+  (`sql/marts/` empty until a mart lands in its phase); `pipeline/` —
+  `warehouse.py` (the one place that knows DuckDB from Snowflake), `build.py`
+  (raw→staging→marts), `cli.py`/`__main__.py` (the validating `make` entry),
+  `sql_lint.py` (the portability/clock denylist the tests use).
   `fixtures/synthetic/` — hand-written fake reviews, read-only after Phase 1;
-  `fixtures/anchors/` — the brief's §6 public figures with source URLs.
+  `fixtures/anchors/` — the brief's §6 public figures with source URLs
+  (frozen in Phase 1; first read by `platform_snapshots` in Phase 3). Both
+  carry a `MANIFEST.sha256`.
 - *(Phase 2+)* `ingest/` — scrapers and snapshot capture. *(Phase 5+)*
   `classify/` — `rules.yaml`, `rules.py`, `llm.py` (the ONE model call site),
   `eval/` (the only reader of `labels.csv`). *(Phase 8)* `models/` —
@@ -97,6 +102,14 @@ in the middle, and come out on the right as the numbers the study shows.
   + check-docs + check-backing + fixtures; with SPEC, Evidence ids and
   Record-updates files. One line per check, exit 1 on FAIL, 2 on a refused
   SPEC/BASE. `/review-round N` runs it first.
+- `make rebuild [TARGET=duckdb] [FIXTURE=empty|synthetic]` — build the
+  warehouse from raw (DuckDB; Snowflake defers to Phase 10). `empty` runs it
+  end to end with zero rows; `synthetic` loads the fixture.
+- `make idempotency-check [TARGET=] [FIXTURE=synthetic]` — rebuild twice, diff
+  per-table row counts (the run-twice property as a command).
+- `make reset [TARGET=duckdb]` — DESTRUCTIVE: drop the DuckDB file; needs
+  `CONFIRM=yes` on the command line (`$(origin CONFIRM)`; an environment
+  `CONFIRM=yes` does not count).
 
 ## Deterministic first (the number one rule — brief §2.1)
 
@@ -194,9 +207,10 @@ study names no insurer as its subject.
   `duckdb` (1); `pyyaml`, `httpx` (2); `anthropic` (6);
   `snowflake-connector-python` (10); Airflow and Metabase via Docker only;
   dev: `pytest`, `ruff`, `pre-commit`. Anything else is a STOP-and-ask.
-- SQL: one file per table under `sql/staging/` or `sql/marts/`; the header
-  comment names the grain, the provenance columns and the BACKING rows it
-  feeds; lowercase keywords; no `order by` in a table definition.
+- SQL: one file per table under `sql/raw/`, `sql/staging/` or `sql/marts/`; the
+  header comment names the grain, the provenance columns and the BACKING rows
+  it feeds; lowercase keywords; no `order by` in a table definition; ANSI only
+  (no reader function, no regex, no clock — `pipeline/sql_lint.py` pins it).
 - Secrets: the API key and warehouse credentials live in `.env` only — never
   in a tracked file, never in Actions, never echoed. Refusals print names,
   never values.
@@ -308,9 +322,10 @@ one, and write one sentence in the README about why.
   spec). Commits small, at green states, prefixed `phase-N:`.
 - PR via `gh pr create` when Done-when passes AND verdicts are approved. Body:
   the PR template. Title `Phase N — <name>`.
-- CI runs `make lint`, `make check-docs`, `make check-backing`, `make test`
-  (Phase 1 adds the synthetic rebuild). Mergeable only when CI is green and
-  the surface's agents have run.
+- CI runs `make lint`, `make check-docs`, `make check-backing`, `make test`,
+  `make rebuild FIXTURE=synthetic` and `make idempotency-check` (offline,
+  DuckDB, no key). Mergeable only when CI is green and the surface's agents
+  have run.
 - The developer merges (squash), never Claude. After merge: `git checkout
   main && git pull`.
 - Hotfixes on `fix/<slug>` from main, same rules. Never mix two phases in a
@@ -377,15 +392,18 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 ## Current status
 
-**Phase 0b — Contracts** (`phase-0b-contracts`, spec
-`specs/phase-0b-contracts.md`): built; review round 1 dispositions landed; PR
-open. `SPEC.md` (the five parts
-and the exact chart list, each panel citing its BACKING row id and wearing its
-tag), the full `BACKING.md` table (19 rows, all Pending), the classification
-grain (one row per review × theme) stated in SPEC and the Classification
-contract above, the ten-term glossary, and one new guard — the SPEC ↔ BACKING
-citation check in `check_backing.py`. No pipeline code, no `sql/`, no fixtures.
-Phase 0a merged (PR #1). Next: Phase 1 — schema and the empty warehouse.
+**Phase 1 — Schema and the empty warehouse** (`phase-1-schema`, spec
+`specs/phase-1-schema.md`): built; pre-review. Raw + staging DDL for reviews
+with the four provenance columns (`sql/raw/raw_reviews.sql`,
+`sql/staging/stg_reviews.sql`); the DuckDB/Snowflake seam (`pipeline/`); the two
+frozen fixture sets with MANIFESTs; `tests/pins.py`; the portability/clock and
+idempotency guards; `make rebuild`, `idempotency-check`, `reset`. `make rebuild
+FIXTURE=synthetic && make idempotency-check` is green (raw 40, staging 39).
+**All 13 marts (and `platform_snapshots`) are deferred to the phases that land
+their upstreams — Phase 1 lands no mart, so every BACKING row stays Pending
+(check-backing: 19 rows, 0 marts). This narrows the brief's "All DDL
+(raw/staging/marts)"; recorded in DECISIONS, not applied to the brief.** Phase
+0b merged (PR #2). Next: Phase 2 — one scraper, end to end.
 
 Open BACKLOG rows: **6**.
 
