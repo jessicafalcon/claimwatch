@@ -24,6 +24,12 @@ class AppStoreSource:
     fetchable: bool  # the recorded terms position; False is refused before any request
     terms: str = ""  # why, when not fetchable — a reason, never a name
 
+    def __post_init__(self) -> None:
+        # A recorded position is a reason, not a flag: a source declared not
+        # fetchable without one is a mistake in the declaration, refused here.
+        if not self.fetchable and not self.terms.strip():
+            raise ValueError(f"source {self.name!r}: fetchable=False needs terms")
+
     @property
     def host(self) -> str:
         return FEED_HOST

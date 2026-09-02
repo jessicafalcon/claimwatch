@@ -12,6 +12,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+import pytest
+
 from ingest import politeness
 from ingest.sources import SOURCES, source_names
 
@@ -122,3 +124,18 @@ def test_exactly_one_source_is_declared():
     # The recorded terms position is declared, with its reason (amendment A5).
     assert src.fetchable is False
     assert "robots.txt" in src.terms and "2026-09-02" in src.terms
+
+
+def test_every_non_fetchable_source_states_its_reason():
+    """The property over every declaration, not today's one: fetchable=False
+    implies a non-empty reason; the declaration itself refuses otherwise."""
+    for src in SOURCES:
+        assert src.fetchable or src.terms.strip(), src.name
+    from ingest.sources import AppStoreSource
+
+    with pytest.raises(ValueError, match="needs terms"):
+        AppStoreSource(name="x", app_id=1, country="fr", listing="", fetchable=False)
+    with pytest.raises(ValueError, match="needs terms"):
+        AppStoreSource(
+            name="x", app_id=1, country="fr", listing="", fetchable=False, terms="  "
+        )
