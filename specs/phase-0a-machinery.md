@@ -65,7 +65,7 @@ make review-gate SPEC=specs/phase-0a-machinery.md
    *Evidence: row 5.*
 6. **CI is green on the Phase 0a PR** with SHA-pinned actions, `uv sync
    --locked`, `permissions: contents: read`, `persist-credentials: false`.
-   *Evidence: row 6 — verified on first push; BACKLOG row until then.*
+   *Evidence: row 6 — verified on first push (PR #1, 2026-09-01).*
 
 ## Evidence (REQUIRED)
 
@@ -235,5 +235,5 @@ BACKING rows"), one records-and-voice commit, four BACKLOG rows. 59 tests;
 `make review-gate SPEC=specs/phase-0a-machinery.md` prints `7/7`. Review
 round 2 reported 48 findings, two BLOCKERs, all fixed: a six-row amendment,
 fourteen correctness fixes one per commit, one wording commit, one
-records-and-voice commit (DECISIONS.md has the list). 66 tests. CI green is
-verified on first push (BACKLOG row).
+records-and-voice commit (DECISIONS.md has the list). 66 tests. CI green on
+PR #1's first run; the BACKLOG row is struck.

@@ -380,6 +380,6 @@ CI, the spec template and the four record files. No pipeline code, no data, no
 study text. Next: Phase 0b — `SPEC.md` (five parts, exact chart list, each
 panel citing its BACKING row id), the full `BACKING.md` table, the glossary.
 
-Open BACKLOG rows: **7**.
+Open BACKLOG rows: **6**.
 
 (Update this section at the end of every working day.)
