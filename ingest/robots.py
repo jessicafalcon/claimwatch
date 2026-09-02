@@ -35,9 +35,10 @@ _DIRECTIVE_LINE = re.compile(
 
 
 def _lines(text: str) -> list[str]:
-    """Non-blank lines with comments stripped."""
+    """Non-blank lines with comments stripped; a leading byte-order mark is
+    skipped (RFC 9309 §2.3), not read as part of the first key."""
     out = []
-    for raw in text.splitlines():
+    for raw in text.lstrip("\ufeff").splitlines():
         line = raw.split("#", 1)[0].strip()
         if line:
             out.append(line)

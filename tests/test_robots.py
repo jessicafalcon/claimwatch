@@ -144,3 +144,10 @@ def test_a_non_user_agent_line_ends_the_naming_run():
     honest = "User-agent: *\nUser-agent: googlebot\nAllow: /fr/rss/customerreviews\n"
     assert Robots.parse(star + honest).allows(FEED) is True
     assert Robots.parse(star + fused.replace("Sitemap", "Host")).allows(FEED) is False
+
+
+def test_a_leading_byte_order_mark_is_skipped():
+    """A valid file that starts with a BOM is a robots file, and its rules
+    bind: not a false refusal, not a rule we cannot see."""
+    assert reads_as_robots("\ufeffUser-agent: *\nDisallow:\n") is True
+    assert Robots.parse("\ufeffUser-agent: *\nDisallow: /fr/\n").allows(FEED) is False
