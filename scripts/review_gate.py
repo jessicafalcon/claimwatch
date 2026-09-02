@@ -13,8 +13,9 @@ FAIL, 2 on a refused SPEC/BASE, never a traceback. Run via
                  unless the spec has a `Freeze: fixtures/…` line; with no
                  --spec any fixture change is a FAIL (read-only after the phase
                  that froze them)
-  f. evidence  — (--spec) every `tests/….py::test_x` id the spec names — in
-                 Evidence, Invariants or Threat model — is collected, and every
+  f. evidence  — (--spec) the four REQUIRED sections exist; every
+                 `tests/….py::test_x` id the spec names — in Evidence,
+                 Invariants or Threat model — is collected, and every
                  `make <target>` Evidence names is declared in the Makefile
   g. records   — (--spec) every backticked path on a `- [ ]`/`- [x]` line of
                  the spec's Record updates section is in the diff (FAIL);
@@ -93,6 +94,16 @@ def evidence_ids(spec_text: str) -> tuple[list[str], list[str], list[str]]:
 
 
 NAMED_SECTIONS = ("Evidence", "Invariants", "Threat model")
+# The four sections specs/TEMPLATE.md marks REQUIRED; a missing one is a FAIL.
+REQUIRED_SECTIONS = ("Evidence", "Invariants", "Record updates", "Threat model")
+
+
+def missing_sections(spec_text: str) -> list[str]:
+    return [
+        f"spec has no {h} section (REQUIRED)"
+        for h in REQUIRED_SECTIONS
+        if not section(spec_text, h).strip()
+    ]
 
 
 def named_test_ids(spec_text: str) -> tuple[list[str], list[str]]:
@@ -110,8 +121,9 @@ def named_test_ids(spec_text: str) -> tuple[list[str], list[str]]:
 def check_evidence(
     spec_text: str, collected: set[str], declared: set[str]
 ) -> list[str]:
-    if not section(spec_text, "Evidence").strip():
-        return ["spec has no Evidence section (REQUIRED)"]
+    missing = [m for m in missing_sections(spec_text) if "Record updates" not in m]
+    if missing:
+        return missing  # check_records reports Record updates
     ev_tests, targets, _ = evidence_ids(spec_text)
     tests, errors = named_test_ids(spec_text)
     if not ev_tests and not errors:

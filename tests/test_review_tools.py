@@ -65,6 +65,17 @@ def test_section_matches_heading_prefix():
     assert section(text, "Missing") == ""
 
 
+def _spec(
+    evidence: str, invariants: str = "| i | prose |", threat: str = "None"
+) -> str:
+    """A spec with all four REQUIRED sections; only Evidence varies."""
+    return (
+        f"## Evidence (REQUIRED)\n{evidence}\n## Invariants (REQUIRED)\n{invariants}\n"
+        f"## Record updates (REQUIRED)\n- [ ] README — none\n"
+        f"## Threat model (REQUIRED …)\n{threat}\n"
+    )
+
+
 def test_evidence_ids_continue_the_previous_file():
     spec = (
         "## Evidence (REQUIRED)\n| 1 | `tests/test_a.py::test_x`, `::test_y`; "
@@ -84,10 +95,7 @@ def test_bare_test_id_without_a_file_is_an_error():
     """`::test_y` with no file on its own line is an error; the file context of
     the previous ROW never carries over (a same-named test elsewhere must not
     make it pass)."""
-    spec = (
-        "## Evidence (REQUIRED)\n| 1 | `tests/test_a.py::test_x` |\n"
-        "| 2 | `::test_y` |\n## Next\n"
-    )
+    spec = _spec("| 1 | `tests/test_a.py::test_x` |\n| 2 | `::test_y` |")
     tests, _, errors = review_gate.evidence_ids(spec)
     assert tests == ["tests/test_a.py::test_x"]
     assert errors == ["test id without a file: ::test_y"]
@@ -97,7 +105,7 @@ def test_bare_test_id_without_a_file_is_an_error():
 
 
 def test_gate_fails_on_a_missing_evidence_test_id():
-    spec = "## Evidence (REQUIRED)\n| 1 | `tests/test_a.py::test_x` / `make nope` |\n"
+    spec = _spec("| 1 | `tests/test_a.py::test_x` / `make nope` |")
     errors = review_gate.check_evidence(
         spec, collected={"tests/test_a.py::test_other"}, declared={"test"}
     )
@@ -109,10 +117,10 @@ def test_gate_fails_on_a_missing_evidence_test_id():
 def test_invariant_and_threat_model_ids_are_checked():
     """A test named only in Invariants or Threat model must exist too — an
     invariant with a made-up pin was green before."""
-    spec = (
-        "## Evidence (REQUIRED)\n| 1 | `tests/test_a.py::test_x` |\n"
-        "## Invariants (REQUIRED)\n| inv | `tests/test_b.py::test_ghost` |\n"
-        "## Threat model\n| t | … | `tests/test_c.py::test_phantom` |\n"
+    spec = _spec(
+        "| 1 | `tests/test_a.py::test_x` |",
+        invariants="| inv | `tests/test_b.py::test_ghost` |",
+        threat="| t | … | `tests/test_c.py::test_phantom` |",
     )
     errors = review_gate.check_evidence(spec, {"tests/test_a.py::test_x"}, set())
     assert errors == [
@@ -122,17 +130,39 @@ def test_invariant_and_threat_model_ids_are_checked():
 
 
 def test_gate_fails_on_a_missing_or_empty_required_section():
-    """A spec with no Evidence / Record updates section, or an Evidence section
+    """A spec missing ANY of the four REQUIRED sections, or an Evidence section
     naming no test, must FAIL — never pass because nothing was found."""
-    assert review_gate.check_evidence("## Why\nprose\n", set(), set()) == [
-        "spec has no Evidence section (REQUIRED)"
+    assert review_gate.missing_sections("## Why\nprose\n") == [
+        "spec has no Evidence section (REQUIRED)",
+        "spec has no Invariants section (REQUIRED)",
+        "spec has no Record updates section (REQUIRED)",
+        "spec has no Threat model section (REQUIRED)",
     ]
-    only_targets = "## Evidence (REQUIRED)\n| 1 | `make test` |\n"
+    assert review_gate.check_evidence("## Why\nprose\n", set(), set()) == [
+        "spec has no Evidence section (REQUIRED)",
+        "spec has no Invariants section (REQUIRED)",
+        "spec has no Threat model section (REQUIRED)",
+    ]
+    for gone in ("Invariants", "Threat model"):
+        full = _spec("| 1 | `tests/test_a.py::test_x` |")
+        without = full.replace(f"## {gone}", "## Other")
+        assert review_gate.check_evidence(
+            without, {"tests/test_a.py::test_x"}, set()
+        ) == [f"spec has no {gone} section (REQUIRED)"], gone
+    # present but empty is missing too
+    empty = _spec("| 1 | `tests/test_a.py::test_x` |", invariants="   ")
+    assert review_gate.check_evidence(empty, {"tests/test_a.py::test_x"}, set()) == [
+        "spec has no Invariants section (REQUIRED)"
+    ]
+    only_targets = _spec("| 1 | `make test` |")
     assert review_gate.check_evidence(only_targets, set(), {"test"}) == [
         "Evidence names no test id"
     ]
     fails, warns = review_gate.check_records("## Why\nprose\n", {"CLAUDE.md"})
     assert fails == ["spec has no Record updates section (REQUIRED)"] and warns == []
+    assert (
+        review_gate.missing_sections(_spec("| 1 | `tests/test_a.py::test_x` |")) == []
+    )
 
 
 def test_gate_fails_on_a_record_file_absent_from_the_diff():
