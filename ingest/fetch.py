@@ -133,14 +133,20 @@ def scrape(
     polite = client or PoliteClient(make_client())
     captured_at = stamp()
     capture_dir = cache_root / source.name / captured_at.replace(":", "-")
+    if capture_dir.exists():
+        raise FetchRefused(
+            f"refusing: capture {capture_dir} already exists (same second?)"
+        )
+
+    # Nothing is written until the site has answered: a run refused at the
+    # robots request leaves no directory behind.
+    robots = polite.get(source.robots_url)
     try:
         capture_dir.mkdir(parents=True, exist_ok=False)
     except FileExistsError as exc:
         raise FetchRefused(
             f"refusing: capture {capture_dir} already exists (same second?)"
         ) from exc
-
-    robots = polite.get(source.robots_url)
     (capture_dir / "robots.txt").write_bytes(robots.content)
     if robots.status_code == 200:
         allowed = robots_allows(robots.text, source.page_url(1))

@@ -173,6 +173,21 @@ def test_non_200_is_a_one_line_refusal_with_no_retry(tmp_path):
     assert not (capture / "page-2.json").exists()
 
 
+def test_a_refused_robots_request_leaves_no_capture_directory(tmp_path):
+    """A run that never got an answer from the site writes nothing: no empty
+    capture directory for `read_captures` to step over."""
+
+    def failing(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectTimeout("slow", request=request)
+
+    polite = PoliteClient(
+        make_client(httpx.MockTransport(failing)), sleep=lambda s: None
+    )
+    with pytest.raises(FetchRefused, match="ConnectTimeout"):
+        scrape(SRC, tmp_path, client=polite, stamp=lambda: STAMP)
+    assert not (tmp_path / SRC.name).exists()
+
+
 def test_transport_error_is_a_refusal_not_a_retry():
     calls = 0
 
