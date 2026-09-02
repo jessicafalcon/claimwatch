@@ -46,6 +46,16 @@ def test_missing_header_fails(tmp_path: Path):
     assert check_backing.main(tmp_path) == 1
 
 
+def test_missized_row_is_a_header_error(tmp_path: Path, capsys):
+    root = _root(
+        tmp_path, "| B1 a | m | `sql/marts/m.sql` | https://x | Measured | extra |\n"
+    )
+    rows, errors = check_backing.parse_table((root / "BACKING.md").read_text())
+    assert rows == [] and errors == ["line 7: row has 6 cells, want 5"]
+    assert check_backing.main(root) == 1
+    assert "row has 6 cells, want 5" in capsys.readouterr().out
+
+
 def test_tag_outside_the_four_fails(tmp_path: Path):
     root = _root(
         tmp_path,
