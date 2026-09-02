@@ -228,6 +228,21 @@ def test_fixture_change_without_freeze_line_fails():
     assert review_gate.check_fixtures(None, {"scripts/x.py"}) == []
 
 
+def test_diff_paths_are_read_exactly():
+    """`git diff --name-only` C-quotes non-ASCII paths and a space would split
+    one; `-z` output is read whole so `fixtures/` still matches."""
+    out = 'fixtures/h\u00e9llo.csv\0fixtures/spa ce.csv\0fixtures/we"ird.csv\0'
+    paths = review_gate.diff_paths(out)
+    assert paths == {
+        "fixtures/h\u00e9llo.csv",
+        "fixtures/spa ce.csv",
+        'fixtures/we"ird.csv',
+    }
+    assert all(p.startswith("fixtures/") for p in paths)
+    assert review_gate.diff_paths("") == set()
+    assert len(review_gate.check_fixtures(None, paths)) == 3
+
+
 @pytest.mark.parametrize(
     "argv", [["--spec=../x"], ["--spec=/etc/passwd"], ["--base=-x"]]
 )

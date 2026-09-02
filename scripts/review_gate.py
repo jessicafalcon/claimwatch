@@ -9,7 +9,7 @@ FAIL, 2 on a refused SPEC/BASE, never a traceback. Run via
                  `make lint`, whose ruff-format hook rewrites files)
   c. docs      — `make check-docs`
   d. backing   — `make check-backing`
-  e. fixtures  — `fixtures/**` in `git diff --name-only <base>...HEAD` is a FAIL
+  e. fixtures  — `fixtures/**` in `git diff -z --name-only <base>...HEAD` is a FAIL
                  unless a `Freeze:` line in the spec covers it exactly:
                  `Freeze: fixtures/<name>/` covers that directory and requires
                  its MANIFEST.sha256 in the diff; `Freeze: fixtures/<path>`
@@ -193,6 +193,12 @@ def check_fixtures(spec_text: str | None, diff: set[str]) -> list[str]:
     return errors
 
 
+def diff_paths(out: str) -> set[str]:
+    """Paths from `git diff -z --name-only`: NUL-separated, read whole — a
+    space, a quote or a non-ASCII letter never splits or hides a path."""
+    return {p for p in out.split("\0") if p}
+
+
 def collected_tests(root: Path) -> tuple[int, set[str], str]:
     """(exit code, collected ids, output). A non-zero code means the suite did
     not collect — the caller FAILs evidence explicitly, never via an empty set."""
@@ -236,8 +242,8 @@ def main(argv: list[str] | None = None) -> int:
     code, out = run(["make", "check-backing"], ROOT)
     results.append(("backing", code == 0, tail(out)))
 
-    code, out = run(["git", "diff", "--name-only", f"{base}...HEAD"], ROOT)
-    diff = set(out.split()) if code == 0 else set()
+    code, out = run(["git", "diff", "-z", "--name-only", f"{base}...HEAD"], ROOT)
+    diff = diff_paths(out) if code == 0 else set()
     if code != 0:
         results.append(
             ("fixtures", False, f"git diff {base}...HEAD failed: {tail(out, 3)}")
