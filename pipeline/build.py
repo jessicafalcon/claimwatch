@@ -26,6 +26,7 @@ import tempfile
 from pathlib import Path
 
 from ingest.app_store import read_captures
+from pipeline import warehouse
 from pipeline.warehouse import ROOT, connect
 
 # The closed set of rebuild inputs: the scraper's captures under data/ (the
@@ -136,7 +137,10 @@ def rebuild(
     loads every capture under data/cache (zero captures -> zero rows); `empty`
     runs the pipeline end to end with zero rows; `synthetic` loads the fixture;
     `app-store` loads the frozen sample through the real parser. Capture-fed
-    rows go through the same `load_reviews` guard as the fixture."""
+    rows go through the same `load_reviews` guard as the fixture. With no
+    `database`, each input builds its own file (`warehouse.database_for`)."""
+    if database is None:
+        database = warehouse.database_for(fixture)
     conn = connect(target, database=database)
     try:
         create_raw(conn)
@@ -176,17 +180,21 @@ def idempotency_check(
 
 
 def reset(target: str = "duckdb", *, database: str | Path | None = None) -> list[Path]:
-    """Delete the DuckDB file (and its write-ahead log). The CLI gates this on
-    CONFIRM=yes from the command line; this function does the deletion once
-    confirmed. Returns the files removed."""
+    """Delete the DuckDB files (and their write-ahead logs): with no `database`,
+    every input's file — the real corpus and each fixture's own. The CLI gates
+    this on CONFIRM=yes from the command line; this function does the deletion
+    once confirmed. Returns the files removed."""
     if target != "duckdb":
         raise ValueError(f"reset only handles the DuckDB file, not {target!r}")
-    from pipeline.warehouse import DEFAULT_DB
-
-    db = Path(DEFAULT_DB if database is None else database)
+    dbs = (
+        [warehouse.database_for(f) for f in FIXTURES]
+        if database is None
+        else [Path(database)]
+    )
     removed: list[Path] = []
-    for p in (db, db.with_name(db.name + ".wal")):
-        if p.exists():
-            p.unlink()
-            removed.append(p)
+    for db in dbs:
+        for p in (db, db.with_name(db.name + ".wal")):
+            if p.exists():
+                p.unlink()
+                removed.append(p)
     return removed

@@ -22,6 +22,16 @@ TARGETS = ("duckdb", "snowflake")
 DEFAULT_DB = ROOT / "data" / "friction_ledger.duckdb"
 
 
+def database_for(fixture: str) -> Path:
+    """One file per rebuild input (spec Phase 2, fix amendment A2): the real
+    corpus (`cache`) is `friction_ledger.duckdb`; every other input builds
+    `friction_ledger.<input>.duckdb` beside it, so a fixture's rows can never
+    land in the real database and the counts a rebuild prints are its own."""
+    if fixture == "cache":
+        return DEFAULT_DB
+    return DEFAULT_DB.with_name(f"{DEFAULT_DB.stem}.{fixture}{DEFAULT_DB.suffix}")
+
+
 def connect(target: str = "duckdb", *, database: str | Path | None = None):
     """Open a connection for `target`. DuckDB now; Snowflake defers to Phase 10.
 

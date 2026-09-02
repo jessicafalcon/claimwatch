@@ -26,7 +26,7 @@ from pipeline.build import (
     reset,
 )
 from pipeline.metrics import reviews_per_month
-from pipeline.warehouse import TARGETS, connect
+from pipeline.warehouse import TARGETS, connect, database_for
 
 
 class Refused(Exception):
@@ -71,9 +71,10 @@ def _do_rebuild(args: argparse.Namespace) -> int:
             f"no captures under {shown} — nothing to load from the scraper; "
             "`make scrape CONFIRM=yes` fetches them (developer-run)"
         )
-    for name, n in rebuild(target, fixture).items():
+    db = database_for(fixture)  # one file per input; a fixture never touches the corpus
+    for name, n in rebuild(target, fixture, database=db).items():
         print(f"{name:24} {n}")
-    conn = connect(target)
+    conn = connect(target, database=db)
     try:
         rows = reviews_per_month(conn)
     finally:

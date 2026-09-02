@@ -166,3 +166,32 @@ def test_cli_scrape_keeps_the_host_interval_across_sources(
     assert n == 2 * (1 + 3)  # robots + three sample pages, per source
     assert clock.sleeps == [2.0] * (n - 1)  # including the gap between sources
     assert capsys.readouterr().out.count("scrape: ") == 2
+
+
+def _count(out: str, table: str) -> int:
+    (line,) = [ln for ln in out.splitlines() if ln.startswith(table + " ")]
+    return int(line.split()[-1])
+
+
+def test_each_input_builds_its_own_database(capsys, isolated_paths):
+    """Fix amendment A2: the counts `rebuild FIXTURE=X` prints are X's own. The
+    sample builds beside the corpus, never into it; `synthetic` leaves the
+    corpus file absent; `reset` names every file it removed."""
+    import pipeline.warehouse as warehouse
+
+    corpus = warehouse.DEFAULT_DB
+    assert main(["rebuild", "--fixture=synthetic"]) == 0
+    assert _count(capsys.readouterr().out, "raw_reviews") == 40
+    assert not corpus.exists()
+    assert main(["rebuild", "--fixture=app-store"]) == 0
+    assert _count(capsys.readouterr().out, "raw_reviews") == 8
+    assert main(["rebuild"]) == 0  # the cache, empty here
+    assert _count(capsys.readouterr().out, "raw_reviews") == 0
+    files = {corpus.with_name(f"w.{f}.duckdb") for f in ("synthetic", "app-store")}
+    assert corpus.exists() and all(f.exists() for f in files)
+    assert main(["rebuild", "--fixture=app-store"]) == 0  # again: still 8, not 16
+    assert _count(capsys.readouterr().out, "raw_reviews") == 8
+    assert main(["reset", "--confirm=yes", "--confirm-origin=command line"]) == 0
+    out = capsys.readouterr().out
+    assert not corpus.exists() and not any(f.exists() for f in files)
+    assert all(str(f) in out for f in files | {corpus})
