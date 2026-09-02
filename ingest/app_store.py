@@ -200,11 +200,19 @@ def read_captures(root: Path) -> list[tuple[str, list[dict[str, object]]]]:
     for d in dirs:
         rows: list[dict[str, object]] = []
         for page in capture_pages(d):
-            meta = read_meta(page.with_name(page.name[: -len(".json")] + ".meta.json"))
-            rows.extend(
-                parse_page(
-                    page.read_bytes(), str(meta["source_url"]), str(meta["captured_at"])
+            try:
+                meta = read_meta(
+                    page.with_name(page.name[: -len(".json")] + ".meta.json")
                 )
-            )
+                rows.extend(
+                    parse_page(
+                        page.read_bytes(),
+                        str(meta["source_url"]),
+                        str(meta["captured_at"]),
+                    )
+                )
+            except FeedShapeError as exc:
+                # Which file to fix: the capture directory, then the page's own line.
+                raise FeedShapeError(f"capture {d}: {exc}") from exc
         out.append((d.name, rows))
     return out

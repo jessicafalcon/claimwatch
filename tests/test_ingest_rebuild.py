@@ -198,8 +198,10 @@ def test_refused_page_loads_nothing_from_the_capture(tmp_path):
     del bad["feed"]["entry"][1]["im:rating"]
     page2.write_text(json.dumps(bad, ensure_ascii=False), encoding="utf-8")
     db = tmp_path / "w.duckdb"
-    with pytest.raises(FeedShapeError, match="'im:rating' is missing"):
+    with pytest.raises(FeedShapeError, match="'im:rating' is missing") as exc:
         rebuild("duckdb", "cache", database=db, cache_dir=cache)
+    assert str(exc.value).startswith("capture ") and "2026-09-0" in str(exc.value)
+    assert "\n" not in str(exc.value)
     assert _query(db, "select count(*) from raw_reviews") == [(0,)]
 
 
