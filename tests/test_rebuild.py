@@ -9,7 +9,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pins  # noqa: E402
 
-from pipeline.build import rebuild  # noqa: E402
+from pipeline.build import build_derived, create_raw, rebuild  # noqa: E402
+from pipeline.warehouse import connect  # noqa: E402
+
+_INSERT_RAW = (
+    "insert into raw_reviews (source, external_id, source_url, captured_at, "
+    "run_id, review_date, rating, title, body, content_hash) "
+    "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+)
 
 
 def test_zero_row_rebuild(tmp_path):
@@ -36,3 +43,40 @@ def test_staging_keeps_latest_capture(synthetic_conn):
     captured_at, rating = rows[0]
     assert captured_at == pins.EDITED_REVIEW_LATEST_CAPTURED_AT
     assert rating == pins.EDITED_REVIEW_LATEST_RATING
+
+
+def test_staging_tiebreak_is_deterministic_on_equal_captured_at():
+    """Invariant 3's tiebreak: two captures of one key sharing a captured_at
+    deduplicate to the higher content_hash, whatever the insertion order — so
+    the survivor is a function of the data, not of the physical row order. Drop
+    `content_hash desc` from the dedup and one insertion order changes."""
+    lo = ("00aa", 3, "lower-hash")
+    hi = ("ff99", 4, "higher-hash")
+    for order in ([lo, hi], [hi, lo]):
+        conn = connect("duckdb", database=":memory:")
+        try:
+            create_raw(conn)
+            for content_hash, rating, body in order:
+                conn.execute(
+                    _INSERT_RAW,
+                    [
+                        "oa",
+                        "DUP",
+                        "https://x/",
+                        "2026-05-01T00:00:00",
+                        "t",
+                        "2026-05-01",
+                        rating,
+                        "t",
+                        body,
+                        content_hash,
+                    ],
+                )
+            build_derived(conn)
+            row = conn.execute(
+                "select content_hash, body from stg_reviews "
+                "where source = 'oa' and external_id = 'DUP'"
+            ).fetchone()
+            assert row == ("ff99", "higher-hash"), order
+        finally:
+            conn.close()
