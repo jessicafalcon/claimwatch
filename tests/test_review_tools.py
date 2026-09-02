@@ -119,18 +119,24 @@ def test_gate_fails_on_a_record_file_absent_from_the_diff():
         "## Record updates (REQUIRED)\n"
         "- [ ] `DECISIONS.md` — entry\n"
         "- [x] `CLAUDE.md` — status\n"
+        "- [ ] `docs/PLAN.md` — status; mention `uv` in passing\n"
         "- [ ] README — none\n"
         "## Threat model\n"
     )
     fails, warns = review_gate.check_records(
         spec, diff={"DECISIONS.md", "BACKLOG.md", "scripts/x.py"}
     )
-    assert fails == ["Record updates lists CLAUDE.md but it is not in the diff"]
+    assert fails == [
+        "Record updates lists CLAUDE.md but it is not in the diff",
+        "Record updates lists docs/PLAN.md but it is not in the diff",
+    ]
     assert warns == ["record file in the diff but not listed: BACKLOG.md"]
+    # "README — none" is not a path; neither is `uv`
     assert review_gate.record_paths(spec) == [
         "DECISIONS.md",
         "CLAUDE.md",
-    ]  # "README — none" is not a path
+        "docs/PLAN.md",
+    ]
 
 
 def test_fixture_change_without_freeze_line_fails():

@@ -54,7 +54,14 @@ RECORD_FILES = (
     "BACKING.md",
     "SPEC.md",
     "README.md",
+    "PROJECT_BRIEF.md",
 )
+
+
+def is_record_path(token: str) -> bool:
+    """A backticked token on a checklist line is a record PATH only if it is a
+    record file or lives under specs/ or docs/ — `uv` in prose is not one."""
+    return token in RECORD_FILES or token.startswith(("specs/", "docs/"))
 
 
 def resolve_base(arg: str) -> str:
@@ -116,7 +123,7 @@ def record_paths(spec_text: str) -> list[str]:
     body = section(spec_text, "Record updates")
     paths: list[str] = []
     for line in _RECORD_LINE.findall(body):
-        paths.extend(_TICKED.findall(line))
+        paths.extend(tok for tok in _TICKED.findall(line) if is_record_path(tok))
     return paths
 
 
@@ -134,7 +141,7 @@ def check_records(spec_text: str, diff: set[str]) -> tuple[list[str], list[str]]
     warns = [
         f"record file in the diff but not listed: {p}"
         for p in sorted(diff)
-        if (p in RECORD_FILES or p.startswith("specs/")) and p not in listed
+        if is_record_path(p) and p not in listed
     ]
     return fails, warns
 
