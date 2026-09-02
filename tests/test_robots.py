@@ -151,3 +151,14 @@ def test_a_leading_byte_order_mark_is_skipped():
     bind: not a false refusal, not a rule we cannot see."""
     assert reads_as_robots("\ufeffUser-agent: *\nDisallow:\n") is True
     assert Robots.parse("\ufeffUser-agent: *\nDisallow: /fr/\n").allows(FEED) is False
+
+
+def test_two_crawl_delays_in_one_group_keep_the_longer():
+    assert (
+        Robots.parse("User-agent: *\nCrawl-delay: 30\nCrawl-delay: 1\n").crawl_delay
+        == 30.0
+    )
+    assert (
+        Robots.parse("User-agent: *\nCrawl-delay: 1\nCrawl-delay: 30\n").crawl_delay
+        == 30.0
+    )

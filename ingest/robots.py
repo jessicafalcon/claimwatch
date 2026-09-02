@@ -101,8 +101,8 @@ def _parse_groups(text: str) -> list[_Group]:
                 delay = float(value)
             except ValueError:
                 continue  # not a number: no delay is declared
-            if math.isfinite(delay) and delay >= 0:
-                current.crawl_delay = delay  # inf, nan or negative: none declared
+            if math.isfinite(delay) and delay >= 0:  # inf, nan, negative: none declared
+                current.crawl_delay = max(current.crawl_delay or 0.0, delay)  # longest
     return groups
 
 
