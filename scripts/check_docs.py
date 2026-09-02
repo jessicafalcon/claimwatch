@@ -184,23 +184,27 @@ def check_glossary(files: list[Path], root: Path) -> list[str]:
 
 
 def open_backlog_rows(text: str) -> int:
-    """Table rows whose first cell is not struck through (`~~`). Header and
-    separator rows are skipped."""
+    """Table rows whose first cell is not struck through (`~~`). The header and
+    separator rows are skipped by POSITION (the first two `|` lines of the
+    table), not by what the header says."""
     n = 0
+    seen = 0
     for line in text.splitlines():
         if not line.startswith("|"):
             continue
-        cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if not cells or cells[0] in ("Item", "") or set(cells[0]) <= {"-", ":"}:
+        seen += 1
+        if seen <= 2:
             continue
-        if not cells[0].startswith("~~"):
+        first = line.strip().strip("|").split("|")[0].strip()
+        if not first.startswith("~~"):
             n += 1
     return n
 
 
 def check_backlog_count(claude: Path, backlog: Path) -> list[str]:
-    if not claude.is_file() or not backlog.is_file():
-        return []
+    missing = [p.name for p in (claude, backlog) if not p.is_file()]
+    if missing:
+        return [f"{name}: record file is missing" for name in missing]
     m = _BACKLOG_COUNT.search(claude.read_text(encoding="utf-8"))
     if not m:
         return ["CLAUDE.md: no 'Open BACKLOG rows: **N**' sentence"]

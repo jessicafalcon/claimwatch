@@ -115,6 +115,18 @@ def test_check_backlog_count_reports_a_mismatch(tmp_path: Path):
     assert check_docs.check_backlog_count(claude, backlog) == [
         "CLAUDE.md: no 'Open BACKLOG rows: **N**' sentence"
     ]
+    # the header is skipped by position, not by the word "Item"
+    renamed = backlog.read_text().replace("| Item |", "| Finding |")
+    assert check_docs.open_backlog_rows(renamed) == 2
+    # a missing record file is an error, never a vacuous green
+    backlog.unlink()
+    assert check_docs.check_backlog_count(claude, backlog) == [
+        "BACKLOG.md: record file is missing"
+    ]
+    assert check_docs.check_backlog_count(tmp_path / "nope.md", backlog) == [
+        "nope.md: record file is missing",
+        "BACKLOG.md: record file is missing",
+    ]
 
 
 def test_backlog_count_matches_today():
