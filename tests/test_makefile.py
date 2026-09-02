@@ -85,5 +85,6 @@ def test_help_lists_every_declared_target():
         if line and line[0].islower() and ":" in line and not line.startswith(".")
     ]
     assert declared, "no targets parsed"
+    names = {line.split()[0] for line in out.splitlines() if line.strip()}
     for target in declared:
-        assert target in out, target
+        assert target in names, target
