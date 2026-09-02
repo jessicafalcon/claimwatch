@@ -157,7 +157,9 @@ NOT_ROBOTS = (
     b'<p style="color: red">?</p></html>',
     b'{"error": "not found", "status": 404}',
     b"Service Unavailable",
+    b"Error: 503 backend unavailable",  # colon-bearing, no User-agent line
     b"Disallow: /\n",
+    b"Disallow: /*/rss/*\nUser-agent: *\nDisallow:\n",  # a rule before the first group
 )
 CONTENT_TYPES = ("text/plain; charset=utf-8", "text/html", None)
 

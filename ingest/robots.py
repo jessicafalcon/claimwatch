@@ -46,15 +46,19 @@ def _lines(text: str) -> list[str]:
 
 def reads_as_robots(text: str) -> bool:
     """Whether a 200 body is a robots file, decided by the body alone (A6):
-    every line is directive-shaped, and if any line is a rule there is a
-    `User-agent:` group for it to belong to. An empty body is a robots file
-    with no rules; an HTML or JSON page, a plain-text error, or a rule before
-    any group is not."""
+    every line is directive-shaped; a non-empty body carries a `User-agent:`
+    line unless every line is a `Sitemap:`; and no rule comes before the first
+    `User-agent:`. So an empty body and a sitemap-only body are robots files
+    with no rules, while an HTML or JSON page, a plain-text error (`Error:
+    503`), or a rule before any group is not."""
     lines = _lines(text)
     if not all(_DIRECTIVE_LINE.match(line) for line in lines):
         return False
     keys = [line.partition(":")[0].strip().lower() for line in lines]
-    if any(k in RULE_KEYS for k in keys) and "user-agent" not in keys:
+    if keys and "user-agent" not in keys and any(k != "sitemap" for k in keys):
+        return False
+    first_group = keys.index("user-agent") if "user-agent" in keys else len(keys)
+    if any(k in RULE_KEYS for k in keys[:first_group]):
         return False
     return True
 
