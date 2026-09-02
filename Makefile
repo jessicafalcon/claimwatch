@@ -18,7 +18,7 @@ unexport SPEC BASE
 _Q = '$(subst ','\'',$(1))'
 
 help: ## list the targets
-	@grep -hE '^[a-z][a-z-]*:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-16s %s\n", $$1, $$2}'
+	@grep -hE '^[a-z][a-z0-9-]*:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-16s %s\n", $$1, $$2}'
 
 setup: ## uv sync + pre-commit install
 	uv sync

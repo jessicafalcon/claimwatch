@@ -41,8 +41,6 @@ from review_common import (  # noqa: E402
     make_targets,
 )
 
-LIVING = LIVING_DOCS
-RECORDS = RECORD_DOCS
 PLAN_GLOBS = ("PROJECT_BRIEF.md", "docs/*.md", "specs/*.md")
 TOOLING_GLOB = ".claude/**/*.md"
 COMMAND_GLOB = ".claude/commands/*.md"
@@ -64,7 +62,6 @@ BANNED = (
 GLOSSARY_MAX = 10
 
 _LINK = re.compile(r"\[[^\]]*\]\((?!https?://)(?!mailto:)([^)\s]+)\)")
-_MAKE_TICK = MAKE_TICK
 _MAKE_FENCE_LINE = re.compile(r"^\s*make ([a-z][a-z0-9-]*)", re.M)
 _FENCE = re.compile(r"```.*?```", re.S)
 _HEADING = re.compile(r"^#{1,6}\s+(.*?)\s*$", re.M)
@@ -75,11 +72,11 @@ _GLOSSARY = re.compile(r"^##+ (?:\d+\.\s*)?Glossary.*?$(.*?)(?=^## |\Z)", re.M |
 
 
 def living_files(root: Path) -> list[Path]:
-    return [root / n for n in LIVING if (root / n).is_file()]
+    return [root / n for n in LIVING_DOCS if (root / n).is_file()]
 
 
 def record_files(root: Path) -> list[Path]:
-    return [root / n for n in RECORDS if (root / n).is_file()]
+    return [root / n for n in RECORD_DOCS if (root / n).is_file()]
 
 
 def plan_files(root: Path) -> list[Path]:
@@ -143,7 +140,7 @@ def check_links(files: list[Path], root: Path) -> list[str]:
 def named_targets(text: str) -> set[str]:
     """Targets a doc NAMES: inside backticks, or on a fenced-block command line.
     Prose "make sure" is not a target."""
-    names = set(_MAKE_TICK.findall(text))
+    names = set(MAKE_TICK.findall(text))
     for block in _FENCE.findall(text):
         names.update(_MAKE_FENCE_LINE.findall(block))
     return names

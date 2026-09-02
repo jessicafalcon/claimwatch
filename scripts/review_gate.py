@@ -19,9 +19,10 @@ FAIL, 2 on a refused SPEC/BASE, never a traceback. Run via
                  `tests/….py::test_x` id the spec names — in Evidence,
                  Invariants or Threat model — is collected, and every
                  `make <target>` Evidence names is declared in the Makefile
-  g. records   — (--spec) every backticked path on a `- [ ]`/`- [x]` line of
-                 the spec's Record updates section is in the diff (FAIL);
-                 every record file in the diff NOT on the list is a WARN
+  g. records   — (--spec) every backticked RECORD path (a record file, or a
+                 path under specs/ or docs/) on a `- [ ]`/`- [x]` line of the
+                 spec's Record updates section is in the diff (FAIL); every
+                 record file in the diff NOT on the list is a WARN
 
 Nothing here edits, commits or fixes. Not a pytest file (the run-tests hook)."""
 
@@ -49,7 +50,6 @@ from review_common import (  # noqa: E402
 
 _BASE = re.compile(r"^[\w./-]+$")
 _TEST_ID = re.compile(r"`(tests/[\w/]+\.py)?(::test_\w+)`")
-_MAKE_TICK = MAKE_TICK
 _RECORD_LINE = re.compile(r"^- \[[ x]\] (.*)$", re.M)
 _TICKED = re.compile(r"`([^`\s]+)`")
 # `Freeze: fixtures/<name>/` (a directory) or `Freeze: fixtures/<path>` (one file)
@@ -94,7 +94,7 @@ def evidence_ids(spec_text: str) -> tuple[list[str], list[str], list[str]]:
     """(test ids, make targets, errors) the Evidence section names."""
     body = section(spec_text, "Evidence")
     tests, errors = parse_test_ids(body)
-    return tests, sorted(set(_MAKE_TICK.findall(body))), errors
+    return tests, sorted(set(MAKE_TICK.findall(body))), errors
 
 
 NAMED_SECTIONS = ("Evidence", "Invariants", "Threat model")
