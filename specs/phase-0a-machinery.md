@@ -4,7 +4,7 @@ Contract for the `phase-0a-machinery` branch. Source: PROJECT_BRIEF.md §9
 Phase 0, split per `docs/PLAN.md` §5 (approved 2026-09-01): 0a builds the gate,
 0b writes the contracts the gate then checks. Depends on nothing.
 
-**Status: APPROVED 2026-09-01 — in progress.** No runtime dependencies.
+**Status: APPROVED 2026-09-01 — DELIVERED 2026-09-01, PR open.** No runtime dependencies.
 Dev group only: `pytest`, `ruff`, `pre-commit`. Python 3.12 via `uv`. The ten
 decisions in `docs/PLAN.md` §6 are taken at their stated defaults (recorded in
 `DECISIONS.md` by this phase).
@@ -165,6 +165,8 @@ exists in Phase 0b — `check_docs` skips an absent living doc.
   `.claude/hooks/run-tests.py`
 - `tests/{conftest,test_review_tools,test_check_docs,test_check_backing,test_makefile,test_claude_config}.py`
 
+Freeze: none
+
 ## Record updates (REQUIRED)
 
 - [x] `DECISIONS.md` — new file: "Decisions still in force", "Process", Phase
@@ -189,7 +191,7 @@ a setup step outside the gate).
 
 | Target | empty | `../x` | `"; ` | env-exported | `$(origin)` | Pinned by |
 |---|---|---|---|---|---|---|
-| `make review-gate SPEC=` | no SPEC → checks a–d only, prints `SKIP evidence, records` | refused, exit 2, one line | one literal argv token; refused as not-a-file; nothing runs | reaches the recipe as one literal, validated in Python like a command-line value | n/a (no CONFIRM in 0a) | `tests/test_makefile.py::test_user_variable_reaches_python_as_one_literal_from_both_origins`, `tests/test_review_tools.py::test_spec_outside_specs_is_refused` |
+| `make review-gate SPEC=` | no SPEC → checks a–e only, prints `SKIP evidence, records` | refused, exit 2, one line | one literal argv token; refused as not-a-file; nothing runs | reaches the recipe as one literal, validated in Python like a command-line value | n/a (no CONFIRM in 0a) | `tests/test_makefile.py::test_user_variable_reaches_python_as_one_literal_from_both_origins`, `tests/test_review_tools.py::test_spec_outside_specs_is_refused` |
 | `BASE=` | defaults to `main` | validated `[\w./-]+`, no leading `-`, else refused; a well-formed but unknown or `..`-shaped rev is not refused by Python — git rejects it and the gate prints one FAIL line | one literal; refused | same | n/a | `tests/test_review_tools.py::test_base_is_validated` |
 
 Stated residual: `MAKEFLAGS='SPEC=…'` is a make-level override; the threat
@@ -230,5 +232,8 @@ As planned, plus: a self-check found and fixed one gate bug live (`pytest
 one per commit, four fix amendments (source shape as a closed parse, every
 named test id checked, the Pending exemption in invariant 3, "SPEC.md names
 BACKING rows"), one records-and-voice commit, four BACKLOG rows. 59 tests;
-`make review-gate SPEC=specs/phase-0a-machinery.md` prints `7/7`. CI green is
+`make review-gate SPEC=specs/phase-0a-machinery.md` prints `7/7`. Review
+round 2 reported 48 findings, two BLOCKERs, all fixed: a six-row amendment,
+fourteen correctness fixes one per commit, one wording commit, one
+records-and-voice commit (DECISIONS.md has the list). 66 tests. CI green is
 verified on first push (BACKLOG row).

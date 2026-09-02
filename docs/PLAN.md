@@ -36,7 +36,7 @@ maintenance cost") is the filter below.
 
 | Reference piece | Verdict | For this project | Lands in |
 |---|---|---|---|
-| `CLAUDE.md` skeleton (What / Architecture / Repo map / Commands / Determinism / Contracts / Style / Workflow / Before DONE / Git / Which agents run / Tooling / Status) | **Adapt** | Keep the headings, cap at ~350 lines (0a landed at ~340; the coherence audit reports growth). Rule: `CLAUDE.md` holds rules and an index; command semantics live in `make help` and the README. Brief §2 supplies the content (Deterministic first, Plain English, Provenance, Neutrality). | Phase 0a |
+| `CLAUDE.md` skeleton (What / Architecture / Repo map / Commands / Determinism / Contracts / Style / Workflow / Before DONE / Git / Which agents run / Tooling / Status) | **Adapt** | Keep the headings, cap at ~400 lines (0a landed at ~340, ~390 after two review rounds; the coherence audit reports growth). Rule: `CLAUDE.md` holds rules and an index; command semantics live in `make help` and the README. Brief §2 supplies the content (Deterministic first, Plain English, Provenance, Neutrality). | Phase 0a |
 | `specs/TEMPLATE.md` — Invariants, Evidence, Record updates, Threat model; ONE DONE command; ≤6 done-when items | **Adapt** | Keep all four sections. Threat model narrowed to targets that take a variable, delete, call a paid API, or touch the network (scrapers, LLM, Snowflake). | Phase 0a |
 | `docs/PHASES.md` (separate live plan) | **Drop as a file** | Brief §9 is the phase list; each phase gets a spec in `specs/`; the "Delivered" paragraph is appended to the spec, never to the brief. One numbering, one place. | — |
 | `docs/ARCHITECTURE.md` | **Drop** | Brief §4 + `SPEC.md` + `BACKING.md` are the architecture. A fourth document breaks §2.2. Stack surprises go to a `## Gotchas` section in `DECISIONS.md`. | — |
@@ -48,7 +48,7 @@ maintenance cost") is the filter below.
 | `scripts/mutate.py` — mutation sweep, 4 Python + 2 SQL operators | **Defer (BACKLOG)** | 20 KB whose value showed at the reference's multi-branch SQL and write-back. Our load-bearing logic (rules classifier, cost formulas) is pinned by goldens plus the Phase 8 "code formulas equal displayed numbers" test. Trigger: a bug in `classify/` or `models/` that a green suite missed. | BACKLOG row |
 | `scripts/round_tag.py` + `/review-round N` with local tags | **Adapt, no tags** | `/review-round N`: gate → agents by diff surface → one consolidated table → STOP. Range is always `main...HEAD`; N is a label; "missed in round N−1" labelling works by pasting the previous table into the agent prompt. Solo repo, PR-sized ranges: the tag machinery buys nothing. | Phase 0a |
 | `/selfcheck` | **Adapt** | (a) suite, (b) DONE command, (c) **deterministic-first check** replaces the determinism check: any decision made by a model outside `classify/llm.py`; any `now()`/`current_date` in `sql/`; any number in README/study without a tag; (d) fixtures untouched, (e) divergence, (f) eyeball. | Phase 0a |
-| `.claude/hooks/run-tests.py` (PostToolUse, fail-open, local wiring only) | **Adopt + widen** | As-is, plus react to `.sql` and `.yaml` edits — SQL files and `rules.yaml` are code here. Wiring stays in gitignored `settings.local.json` (the reference's reason holds: a tracked `settings.json` auto-runs an inbound branch's hook). | Phase 0a |
+| `.claude/hooks/run-tests.py` (PostToolUse, fail-open, local wiring only) | **Adopt + widen** | As-is, plus react to `.sql`, `.yaml` and `.yml` edits — SQL files and `rules.yaml` are code here. Wiring stays in gitignored `settings.local.json` (the reference's reason holds: a tracked `settings.json` auto-runs an inbound branch's hook). | Phase 0a |
 | `~/.claude/hooks/block-secrets.py` (user-level, PreToolUse) | **Already wired** | Covers the two secrets this repo will ever have: the LLM API key and Snowflake credentials. Nothing to do. | — |
 | `strategic-compact` skill (user-level) | **Keep** | Phase boundaries are the natural compact points. | — |
 | `code-reviewer` agent | **Adapt** | Project checks replace dbt/GCP ones — see §3. | Phase 0a |
@@ -90,7 +90,7 @@ maintenance cost") is the filter below.
 │   └── phase-start.md           NEW — checkout main, pull, branch, print the spec's Done-when
 │                                      and the BACKING rows in scope; refuse if a spec is missing
 └── hooks/
-    └── run-tests.py             adopted — matcher widened to .py|.sql|.yaml
+    └── run-tests.py             adopted — matcher widened to .py|.sql|.yaml|.yml
 
 scripts/
 ├── check_docs.py       links, make targets, BACKLOG count, banned words, glossary size (no symbol traces — DECISIONS)
@@ -213,9 +213,9 @@ deterministic check's job — the editor reports only what a grep cannot.
 
 ---
 
-## 5. Phase plan — the brief's §9 with two splits
+## 5. Phase plan — the brief's §9 with three splits
 
-The brief's numbering is kept. Two phases are split so each stays under six
+The brief's numbering is kept. Three phases are split so each stays under six
 done-when items and ends in a command; the rest are restated with their DONE
 command and the agents their surface triggers.
 
@@ -228,7 +228,7 @@ the gate, 0b writes the contracts the gate then verifies.
 | Phase | Goal | DONE command (proposed) | Agents by surface |
 |---|---|---|---|
 | **0a — Machinery** | uv + Python 3.12, ruff, pytest, `Makefile` (`setup test lint check-docs check-backing review-gate help`), `scripts/`, CI, hook, the five agents, three commands, `specs/TEMPLATE.md`, `DECISIONS.md` + `BACKLOG.md` opened, `CLAUDE.md` v0 (§2 distilled), `BACKING.md` header + empty table, `.gitignore` merged. Tests pin the guards on throwaway trees. | `make review-gate SPEC=specs/phase-0a-machinery.md` | code-reviewer, functionality-tester, security-reviewer (CI, hook), study-editor (CLAUDE.md prose), coherence-auditor (phase exit) |
-| **0b — Contracts** | `SPEC.md` (five beats, exact chart list, each with tag + BACKING row id), `BACKING.md` full table, `CLAUDE.md` final, glossary (≤ 10). | `make check-docs && make check-backing` green; coherence-auditor pass | coherence-auditor, study-editor |
+| **0b — Contracts** | `SPEC.md` (five beats, exact chart list, each with tag + BACKING row id), `BACKING.md` full table, `CLAUDE.md` final, glossary (≤ 10). | `make review-gate SPEC=specs/phase-0b-contracts.md` (coherence-auditor at exit) | coherence-auditor, study-editor |
 | **1 — Schema and empty warehouse** | DDL raw/staging/marts with provenance columns; `pipeline/warehouse.py`; `make rebuild TARGET=duckdb` runs with zero rows AND with `FIXTURE=synthetic`; `fixtures/` frozen with MANIFEST; `tests/pins.py`; SQL portability test. | `make rebuild FIXTURE=synthetic && make idempotency-check` | code-reviewer, functionality-tester |
 | **2 — One scraper end to end** | App Store review feed (public JSON, ToS-friendly — recommended over Opinion Assurances) → raw → staging → `reviews_per_month` mart. Strict parse of the feed shape. Politeness settings in one place. | `make rebuild` on real rows; `make idempotency-check` | + security-reviewer (network) |
 | **3a — Snapshots + remaining polite sources** | `platform_snapshots` seeded from anchors; Google Play, Opinion Assurances; provenance on every row. | `make idempotency-check` over all sources | + security-reviewer |
@@ -287,15 +287,15 @@ model).
    fetches one or two months, filters to the needed columns, caches under
    `data/`, and records the exact file names and hashes in BACKING. Nothing
    large is committed.
-10. **Naming-the-target check.** A deterministic grep for the studied
-    company's name would put the name in the repo. If wanted: a hashed
+10. **Naming-the-target check.** A deterministic grep for an
+    insurer's name would put that name in the repo. If wanted: a hashed
     denylist (compare `sha256` of lowercased tokens) over `*.py`, `*.sql`,
     `*.md` and commit messages, excluding seed CSVs and URL columns. Otherwise
     leave it to `study-editor`. Your call; default is the agent only.
 
 ---
 
-## 7. Proposed `CLAUDE.md` outline (~350 lines, written in 0a, final in 0b)
+## 7. Proposed `CLAUDE.md` outline (~400 lines, written in 0a, final in 0b)
 
 1. **What this is** — the one-sentence description (dinner-table version) and
    the pointer: brief = what, `SPEC.md` = study structure, `BACKING.md` =

@@ -8,7 +8,9 @@ Contract for the `phase-N-<slug>` branch. Source: PROJECT_BRIEF.md §9 Phase N
 the package and why — the allowlist is in CLAUDE.md → Conventions.>
 
 Four sections marked REQUIRED are mandatory; a spec without them is not
-approvable (CLAUDE.md → Workflow rules). A spec carries at most ~6 done-when
+approvable (CLAUDE.md → Workflow rules). The status line moves `PROPOSED` →
+`APPROVED <date> — in progress` → `APPROVED <date> — DELIVERED <date>, PR
+open` when the Delivered paragraph is appended (`/phase-start` reads it). A spec carries at most ~6 done-when
 items — split larger scope into sub-phases (5a/5b), each from this template.
 
 ## Why

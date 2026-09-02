@@ -61,10 +61,11 @@ When invoked:
 - **Neutrality in code.** An insurer named as the target of the study in a
   comment, identifier, docstring or commit message (data rows and source URLs
   are data — fine). Hand prose to `study-editor`.
-- **Dependency allowlist** (CLAUDE.md → Conventions): `duckdb`, `pyyaml`,
-  `httpx`, `anthropic`, `snowflake-connector-python`, dev `pytest`/`ruff`/
-  `pre-commit`, stdlib. Anything else is a finding: new packages need
-  explicit approval.
+- **Dependency allowlist** (CLAUDE.md → Conventions), gated by phase:
+  `duckdb` from Phase 1, `pyyaml` and `httpx` from Phase 2, `anthropic` from
+  Phase 6, `snowflake-connector-python` from Phase 10, dev `pytest`/`ruff`/
+  `pre-commit`, stdlib. Anything else, or an allowed package before its
+  phase, is a finding: new packages need explicit approval.
 - **Fixtures are read-only.** After Phase 1, any diff touching `fixtures/`
   is a BLOCKER unless the spec pins a `Freeze: fixtures/<name>/` line and the
   diff carries that directory's new MANIFEST.

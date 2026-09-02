@@ -71,6 +71,9 @@ Agents:  <list>
   no code to review or run; the gate already checked links, targets, banned
   words, BACKING rows.
 - **Mixed**: the union.
+- **Phase exit** (the spec carries a Delivered paragraph, or the developer
+  says this round is the exit review): also **coherence-auditor** over the
+  whole repo, whatever the surface (CLAUDE.md's table, last row).
 
 All agents are report-only — no Write/Edit, do not grant more. Each prompt
 contains:

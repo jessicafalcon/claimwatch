@@ -22,6 +22,18 @@ place and never deleted.
 - **No dbt, no ORM, no vector store, no cloud VMs.** At ~8 SQL files plain
   SQL is clearer than a framework; knowing when not to use a tool is part of
   the study. ([Brief §2.2](PROJECT_BRIEF.md))
+- **No pandas on a pipeline path.** SQL does the work; Python glues with
+  DuckDB and stdlib `csv`/`json`, so every transformation is a query anyone
+  can re-run. ([PLAN §4.9](docs/PLAN.md); [Phase 0a](#phase-0a))
+- **The held-out split is `sha256(review_id) % 5`, never random.** The eval
+  set is the same on every machine and every run. ([PLAN §4](docs/PLAN.md);
+  [Phase 0a](#phase-0a))
+- **Pattern-matching lives in `rules.yaml` and Python, never in SQL.** SQL that
+  carries no regex carries no dialect, which is what keeps it portable.
+  ([PLAN §4.10](docs/PLAN.md); [Phase 0a](#phase-0a))
+- **Formulas are data.** `models/cost_model.py::FORMULAS` is the only place a
+  formula is written; the study renders from it and a test pins the outputs.
+  ([PLAN §4](docs/PLAN.md); [Phase 0a](#phase-0a))
 
 **Data**
 
@@ -125,9 +137,10 @@ Also decided in this phase: Python 3.12 via `uv`, dev dependencies only
 (`pytest`, `ruff`, `pre-commit`); `duckdb` lands in Phase 1. The distribution
 name in `pyproject.toml` is `friction-ledger` (what PEP 503 normalizes to); the
 importable package, when one exists, is `friction_ledger`. CLAUDE.md landed at
-~340 lines against PLAN's ~250: the five contracts, the agents table and the
-tooling index each earn their lines, so the cap is restated as ~350 and the
-coherence audit reports growth. `check_backing.py`
+~340 lines against PLAN's ~250, and review rounds 1–2 took it to ~390
+(plain-layer openers, two writing rules): the five contracts, the agents table
+and the tooling index each earn their lines, so the cap is restated as ~400 and
+the coherence audit reports growth. `check_backing.py`
 lets a **Pending** row name a SQL file not built yet — the brief writes BACKING
 before code, so every row starts Pending and flips when its mart lands;
 requiring the file for Pending rows would make Phase 0b un-passable. The
@@ -149,3 +162,27 @@ stated, `# v4.4.0`); four BACKLOG rows (link-check edge cases, a second
 BACKING table, the render-time Pending check, label arity). One process
 lesson: a test helper that piped pytest through `tail` hid a red suite for two
 commits; commits are gated on pytest's own exit code since.
+
+**Review round 2 (2026-09-01).** The same five agents on `main...HEAD`: 48
+findings, two BLOCKERs (the source shape accepted any backticked text; only two
+of the four REQUIRED sections were checked for presence). Correctness findings
+sat both inside round-1 fixes and on code round 1 had left untouched, so the
+two-round cap did not fire; the source shape was re-implemented once against
+its invariant (closed at both ends: URL, link to a URL, two-segment dataset
+name) rather than patched. Dispositions: a six-row amendment (source shape,
+row ids checked, four REQUIRED sections, `Freeze:` grants exactly, diff paths
+read whole with `-z`, `.claude/**/*.md` a document class); fourteen fixes one
+per commit (the BACKLOG count no longer vacuous or keyed on the word "Item",
+fenced headings are not anchors, `slug()` emits one hyphen per space — the
+accepted BACKLOG row's trigger fired —, `.gitignore` covers `.env*`, the hook's
+four open exits named and its timeout tested, `UV_OFFLINE=1` under every test,
+Evidence rows 1 and 6 pinned, three survived mutations pinned); one wording
+commit; this records-and-voice commit (CLAUDE.md opens with the customer, the
+Architecture gets a plain sentence, two writing rules — hypothesis not
+verdict, name the sampling bias — join Writing rules, "beats" is glossed
+once, BACKING.md's rules block and Tag column are glossed, the brief's
+provenance columns match the code's four, PLAN's three splits and four hook
+suffixes, `/review-round` gains the phase-exit branch, the repo description
+passes the dinner-table test). One process lesson, repeated: a commit helper
+that piped pytest through `tail` hid a red suite for two commits; both were
+folded before push and the helper checks pytest's exit code directly.

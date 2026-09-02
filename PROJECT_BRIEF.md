@@ -169,7 +169,7 @@ friction-ledger/
 
 ### 4.3 Cross-cutting trust layer (properties, not a box)
 
-- **Idempotency:** every task re-runs without duplicating. Raw is append-only with provenance columns (source, url, captured_at). Staging dedupes on natural keys. Verify by running twice and diffing row counts.
+- **Idempotency:** every task re-runs without duplicating. Raw is append-only with provenance columns (source, source_url, captured_at, run_id). Staging dedupes on natural keys. Verify by running twice and diffing row counts.
 - **Contracts:** lightweight checks between layers — row counts reconcile, ratings within 1–5, no future dates — failing loudly in the DAG, never silently in a chart.
 - **Lineage:** BACKING.md maps every study claim to its SQL file and source; Metabase drill-throughs make the map clickable.
 

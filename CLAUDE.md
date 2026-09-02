@@ -2,12 +2,12 @@
 
 ## What this is
 
-A public-data study of why health-insurance refunds get stuck, where every
-chart drills down to its raw evidence, every formula is printed next to its
-output, and every assumption is either sourced or clearly labeled as a guess.
 We read what customers of French digital-first health insurers say in public
-reviews, count what they complain about, and work out what a wrongly blocked
-refund costs. The study tells it in five parts.
+reviews about refunds that get stuck, count what they complain about, and work
+out what a wrongly blocked refund costs. The study tells it in five parts.
+Every chart can be opened down to the reviews behind it, every formula is
+printed next to its result, and every assumption is either sourced or clearly
+labeled as a guess.
 
 How this is built: reviews are scraped, cleaned and tagged by theme (rules
 first; a language model only for what rules could not decide, checked against
@@ -16,12 +16,15 @@ turn the counts into euros; the study is a Metabase dashboard, a static HTML
 page and the README.
 
 Read in this order: `PROJECT_BRIEF.md` (what we build and why — the master
-document), `SPEC.md` (the frozen study structure — Phase 0b), `BACKING.md`
-(the evidence contract: claim → table → SQL → source → tag), this file (how we
-work), then the active spec in `specs/`. `docs/PLAN.md` is how this workflow
+document), `SPEC.md` (the study's structure: the five parts and every chart,
+settled in Phase 0b), `BACKING.md` (the evidence contract: claim → table → SQL
+→ source → tag), this file (how we work), then the active spec in `specs/`. `docs/PLAN.md` is how this workflow
 was designed; `DECISIONS.md` is the why-not-X log.
 
 ## Architecture
+
+Reviews and public data come in on the left, get cleaned and tagged by theme
+in the middle, and come out on the right as the numbers the study shows.
 
 ```
  Review platforms      Open health data      Company disclosures
@@ -48,7 +51,8 @@ was designed; `DECISIONS.md` is the why-not-X log.
 ## Repo map
 
 - `PROJECT_BRIEF.md` — the master document. `SPEC.md` *(Phase 0b)* — the five
-  beats and the exact chart list, each with its tag and BACKING row.
+  parts of the study (called *beats* in the row ids `B<beat>.<n>`) and the
+  exact chart list, each with its tag and BACKING row.
   `BACKING.md` — the evidence contract (§8 of the brief); `make check-backing`
   enforces it. `DECISIONS.md`, `BACKLOG.md` — the records.
 - `docs/PLAN.md` — the design of this workflow: adopt/adapt/drop verdicts on
@@ -103,10 +107,10 @@ narrow place and never trusted on its own. The rules:
 - A language model is called from exactly one module: `classify/llm.py`. It
   sees only what `rules.yaml` could not decide. Nowhere else, for nothing else.
 - The model's output is never trusted by default: it passes the eval gate
-  (scored on the eval set — reviews labeled by hand and kept aside — for how
-  often each theme label is right and how many true cases it catches; the
-  scores land in the `classifier_quality` mart and are displayed in the study)
-  before any chart uses it.
+  before any chart uses it. The gate scores it on the eval set (reviews labeled
+  by hand and kept aside) for how often each theme label is right and how many
+  true cases it catches, and writes the scores to the `classifier_quality`
+  mart, which the study displays.
 - **The no-key run is green.** Delete the API key: the pipeline still runs
   end to end, ambiguous reviews are `unclassified`, and the study shows them
   as a gray "not yet classified" band rather than hiding them. A test proves
@@ -126,8 +130,8 @@ narrow place and never trusted on its own. The rules:
 
 Five promises the code keeps, each checked by a test or a guard: every number
 says where it came from; every claim has an evidence row; the classifier can
-only answer from a fixed list; the same SQL runs on both databases; no insurer
-is the target.
+only answer from a fixed list; the same SQL runs on both databases; and the
+study names no insurer as its subject.
 
 - **Provenance.** Every raw row carries `source`, `source_url`, `captured_at`,
   `run_id`. Every displayed number carries exactly one tag: Measured,
@@ -159,9 +163,14 @@ is the target.
 - One glossary, ten terms max, one sentence each with an everyday example.
 - Every number in prose wears its tag. No live counters: a "Day N since…"
   figure is frozen at the last publicly confirmed date and says so.
-- `SPEC.md` is a living document: it names BACKING rows (`B<beat>.<n>`), never
-  a `make` target that does not exist yet; the not-yet-built paths live in
-  BACKING's Pending rows.
+- Hypothesis, not verdict: the study tests whether held-claim complaints are
+  growing; no sentence assumes the answer before its chart shows it, and a
+  chart that refutes it is published as-is.
+- Name the sampling bias beside the chart it affects: unsolicited review
+  platforms are negatively self-selected, and the rating-trend panel says so.
+- `SPEC.md` describes what exists (a living doc to `make check-docs`): it names
+  BACKING rows (`B<beat>.<n>`), never a `make` target that does not exist yet;
+  the not-yet-built paths live in BACKING's Pending rows.
 - Banned words, checked by `make check-docs` over CLAUDE.md, README, SPEC,
   BACKING and `study/` (this fenced block is the one place they may appear):
 
@@ -224,7 +233,7 @@ one, and write one sentence in the README about why.
   rows, append the "Delivered" paragraph to the spec.
 - Stack surprises: check official docs before working around; log under
   DECISIONS.md → Gotchas.
-- Do not add a feature that surfaces in none of the five beats.
+- Do not add a feature that surfaces in none of the five parts.
 - Destructive commands (dropping a DuckDB file, truncating a table): only via
   a `make` target that prompts unless `CONFIRM=yes` is given on the command
   line — tested with `$(origin CONFIRM)`.
@@ -331,7 +340,9 @@ fixed in the main session or explicitly accepted — never auto-fixed.
   `.sql`, `.yaml` or `.yml` edit in this repo, runs pytest and blocks on red;
   "no tests collected" is a skip. It runs the checked-out branch's tests on
   your machine with your HOME; the reduced environment keeps environment
-  credentials out of the suite and nothing else. Before letting Claude edit on
+  credentials out of the suite and nothing else (the hook's alone: the gate and
+  CI run the suite with the full environment; Phase 6's no-key test is the
+  durable guard). Before letting Claude edit on
   an inbound branch, read its diff of `.claude/hooks/`, `tests/conftest.py`,
   `pyproject.toml` and `Makefile` — the hook fires before any review round.
   Wiring is local-only by design: copy into the gitignored
@@ -363,10 +374,10 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 ## Current status
 
 **Phase 0a — Workflow machinery** (`phase-0a-machinery`, spec
-`specs/phase-0a-machinery.md`): built; review round 1 dispositions landed;
-PR pending. The gate, the three guards, five agents, three commands, the hook,
+`specs/phase-0a-machinery.md`): built; review rounds 1 and 2 dispositions
+landed; PR open. The gate, the three guards, five agents, three commands, the hook,
 CI, the spec template and the four record files. No pipeline code, no data, no
-study text. Next: Phase 0b — `SPEC.md` (five beats, exact chart list, each
+study text. Next: Phase 0b — `SPEC.md` (five parts, exact chart list, each
 panel citing its BACKING row id), the full `BACKING.md` table, the glossary.
 
 Open BACKLOG rows: **7**.
