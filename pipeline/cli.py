@@ -20,7 +20,7 @@ from ingest.politeness import ALLOWED_HOSTS, MAX_PAGES
 from ingest.sources import SOURCES, by_name, source_names
 from pipeline.build import (
     DEFAULT_CACHE,
-    FIXTURES,
+    INPUTS,
     capture_root,
     idempotency_check,
     rebuild,
@@ -62,26 +62,26 @@ def _prompt(question: str, refusal: str) -> bool:
 
 def _do_rebuild(args: argparse.Namespace) -> int:
     target = resolve_choice(args.target, TARGETS, "duckdb")
-    fixture = resolve_choice(args.fixture, FIXTURES, "cache")
-    root = capture_root(fixture)
-    if fixture == "cache" and not (root and has_pages(root)):
+    rows = resolve_choice(args.rows, INPUTS, "captured")
+    root = capture_root(rows)
+    if rows == "captured" and not (root and has_pages(root)):
         shown = DEFAULT_CACHE.relative_to(DEFAULT_CACHE.parents[2])
         print(
             f"no captures under {shown} — nothing to load from the scraper; "
             "`make scrape CONFIRM=yes` fetches them (developer-run)"
         )
-    db = database_for(fixture)  # one file per input; a fixture never touches the corpus
-    for name, n in rebuild(target, fixture, database=db).items():
+    db = database_for(rows)  # one file per input; a sample never touches the corpus
+    for name, n in rebuild(target, rows, database=db).items():
         print(f"{name:24} {n}")
     conn = connect(target, database=db)
     try:
-        rows = reviews_per_month(conn)
+        months = reviews_per_month(conn)
     finally:
         conn.close()
     print("reviews per month (stg_reviews, by the review's own date):")
-    for source, month, n in rows:
+    for source, month, n in months:
         print(f"  {source:14} {month}  {n}")
-    if not rows:
+    if not months:
         print("  (none)")
     return 0
 
@@ -129,8 +129,8 @@ def _do_scrape(args: argparse.Namespace) -> int:
 
 def _do_idempotency(args: argparse.Namespace) -> int:
     target = resolve_choice(args.target, TARGETS, "duckdb")
-    fixture = resolve_choice(args.fixture, FIXTURES, "synthetic")
-    ok, first, second = idempotency_check(target, fixture)
+    rows = resolve_choice(args.rows, INPUTS, "synthetic")
+    ok, first, second = idempotency_check(target, rows)
     for name in sorted(set(first) | set(second)):
         a, b = first.get(name), second.get(name)
         flag = "" if a == b else "  <- CHANGED"
@@ -167,7 +167,7 @@ def main(argv: list[str] | None = None) -> int:
     for name in ("rebuild", "idempotency-check"):
         p = sub.add_parser(name, add_help=False)
         p.add_argument("--target", default="")
-        p.add_argument("--fixture", default="")
+        p.add_argument("--rows", default="")
     p = sub.add_parser("reset", add_help=False)
     p.add_argument("--target", default="")
     p.add_argument("--confirm", default="")

@@ -16,7 +16,7 @@
 # `$(origin CONFIRM)` to Python, which confirms only on `command line`; the
 # network `scrape` is gated the same way (developer-run, never by an agent)
 # (specs/TEMPLATE.md → Threat model; pinned by tests/test_makefile.py).
-unexport SPEC BASE TARGET FIXTURE CONFIRM SOURCE
+unexport SPEC BASE TARGET ROWS CONFIRM SOURCE
 _Q = '$(subst ','\'',$(1))'
 
 help: ## list the targets
@@ -41,11 +41,11 @@ check-backing: ## BACKING rows ↔ sql/marts files ↔ tags ↔ sources ↔ SPEC
 review-gate: ## offline gate [SPEC=specs/<f>.md] [BASE=main]; /review-round runs it first
 	uv run python scripts/review_gate.py $(if $(value SPEC),--spec=$(call _Q,$(value SPEC)),) --base=$(call _Q,$(if $(value BASE),$(value BASE),main))
 
-rebuild: ## build the warehouse from raw [TARGET=duckdb] [FIXTURE=cache|empty|synthetic|app-store]
-	uv run python -m pipeline rebuild --target=$(call _Q,$(value TARGET)) --fixture=$(call _Q,$(value FIXTURE))
+rebuild: ## build the warehouse from raw [TARGET=duckdb] [ROWS=captured|none|synthetic|samples]
+	uv run python -m pipeline rebuild --target=$(call _Q,$(value TARGET)) --rows=$(call _Q,$(value ROWS))
 
-idempotency-check: ## rebuild twice, diff per-table row counts (run-twice property)
-	uv run python -m pipeline idempotency-check --target=$(call _Q,$(value TARGET)) --fixture=$(call _Q,$(value FIXTURE))
+idempotency-check: ## rebuild twice, diff per-table row counts (run-twice property) [ROWS=synthetic]
+	uv run python -m pipeline idempotency-check --target=$(call _Q,$(value TARGET)) --rows=$(call _Q,$(value ROWS))
 
 reset: ## DESTRUCTIVE drop every DuckDB file (the corpus and one per fixture) — needs CONFIRM=yes on the command line
 	uv run python -m pipeline reset --target=$(call _Q,$(value TARGET)) --confirm=$(call _Q,$(value CONFIRM)) --confirm-origin=$(call _Q,$(origin CONFIRM))

@@ -15,7 +15,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from review_common import make_targets  # noqa: E402
 
-from pipeline.build import FIXTURES  # noqa: E402
+from pipeline.build import INPUTS  # noqa: E402
 from pipeline.cli import Refused, confirmed, resolve_choice  # noqa: E402
 from pipeline.warehouse import TARGETS  # noqa: E402
 
@@ -24,7 +24,7 @@ SCRUB = (
     "SPEC",
     "BASE",
     "TARGET",
-    "FIXTURE",
+    "ROWS",
     "CONFIRM",
     "SOURCE",
     "MAKEFLAGS",
@@ -118,40 +118,41 @@ def test_make_targets_ignores_variable_assignments(tmp_path: Path):
 
 
 def test_rebuild_variables_are_a_closed_set():
-    """TARGET/FIXTURE validate against a closed set; a value is never a path, so
+    """TARGET/ROWS validate against a closed set; a value is never a path, so
     `../x` or a metacharacter is just a name not in the set."""
     assert resolve_choice("", TARGETS, "duckdb") == "duckdb"  # empty -> default
     assert resolve_choice("duckdb", TARGETS, "duckdb") == "duckdb"
-    # Phase 2: the closed set of rebuild inputs; `make rebuild` defaults to the
-    # scraper's captures (`cache`), the offline proof is `app-store`.
-    assert FIXTURES == ("cache", "empty", "synthetic", "app-store")
-    assert resolve_choice("", FIXTURES, "cache") == "cache"
-    assert resolve_choice("synthetic", FIXTURES, "cache") == "synthetic"
-    assert resolve_choice("app-store", FIXTURES, "cache") == "app-store"
-    assert resolve_choice("empty", FIXTURES, "cache") == "empty"
+    # Phase 3a: the closed set of rebuild inputs, named by what they are;
+    # `make rebuild` defaults to the scraper's captures, CI runs the samples.
+    assert INPUTS == ("captured", "none", "synthetic", "samples")
+    assert resolve_choice("", INPUTS, "captured") == "captured"
+    assert resolve_choice("synthetic", INPUTS, "captured") == "synthetic"
+    assert resolve_choice("samples", INPUTS, "captured") == "samples"
+    assert resolve_choice("none", INPUTS, "captured") == "none"
+    for old in ("cache", "empty", "app-store"):  # Phase 2's names are gone
+        with pytest.raises(Refused):
+            resolve_choice(old, INPUTS, "captured")
     for bad in BAD_VALUES:
         with pytest.raises(Refused):
             resolve_choice(bad, TARGETS, "duckdb")
 
 
 def test_idempotency_check_variables_are_a_closed_set():
-    assert resolve_choice("", FIXTURES, "synthetic") == "synthetic"  # its default
-    assert resolve_choice("empty", FIXTURES, "synthetic") == "empty"
+    assert resolve_choice("", INPUTS, "synthetic") == "synthetic"  # its default
+    assert resolve_choice("none", INPUTS, "synthetic") == "none"
     for bad in BAD_VALUES:
         with pytest.raises(Refused):
-            resolve_choice(bad, FIXTURES, "synthetic")
+            resolve_choice(bad, INPUTS, "synthetic")
 
 
-def test_fixture_outside_the_set_is_refused():
+def test_rows_outside_the_set_is_refused():
     for bad in ("../x", "prod", '"; rm -rf', "SYNTHETIC", "fixtures/app-store"):
         with pytest.raises(Refused):
-            resolve_choice(bad, FIXTURES, "empty")
+            resolve_choice(bad, INPUTS, "none")
 
 
 @pytest.mark.parametrize("target", ["rebuild", "idempotency-check"])
-@pytest.mark.parametrize(
-    "var, flag", [("TARGET", "--target"), ("FIXTURE", "--fixture")]
-)
+@pytest.mark.parametrize("var, flag", [("TARGET", "--target"), ("ROWS", "--rows")])
 def test_pipeline_variables_reach_python_as_one_literal(target, var, flag):
     """Whatever the origin, the recipe carries the UNEXPANDED value as one
     single-quoted token — no shell, no make function runs."""

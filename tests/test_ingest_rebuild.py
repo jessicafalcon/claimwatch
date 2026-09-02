@@ -47,7 +47,7 @@ def _query(db: Path, sql: str):
 
 
 def test_rebuild_from_sample_matches_pins(tmp_path):
-    counts = rebuild("duckdb", "app-store", database=tmp_path / "w.duckdb")
+    counts = rebuild("duckdb", "samples", database=tmp_path / "w.duckdb")
     assert counts == {
         "raw_reviews": pins.APP_STORE_SAMPLE_RAW_ROWS,
         "stg_reviews": pins.APP_STORE_SAMPLE_STG_ROWS,
@@ -63,7 +63,7 @@ def test_rebuild_from_sample_matches_pins(tmp_path):
 
 def test_reviews_per_month_matches_pins(tmp_path):
     db = tmp_path / "w.duckdb"
-    rebuild("duckdb", "app-store", database=db)
+    rebuild("duckdb", "samples", database=db)
     conn = connect("duckdb", database=db)
     try:
         assert tuple(reviews_per_month(conn)) == pins.APP_STORE_SAMPLE_REVIEWS_PER_MONTH
@@ -102,7 +102,7 @@ def test_read_captures_orders_captures_then_pages_then_items():
 
 
 def test_second_rebuild_from_captures_adds_no_rows():
-    ok, first, second = idempotency_check("duckdb", "app-store")
+    ok, first, second = idempotency_check("duckdb", "samples")
     assert ok and first == second
     assert first["raw_reviews"] == pins.APP_STORE_SAMPLE_RAW_ROWS
 
@@ -114,7 +114,7 @@ def test_second_capture_of_unchanged_pages_adds_no_rows(tmp_path):
     _capture(cache, "2026-09-01T08-00-00", "2026-09-01T08:00:00")
     _capture(cache, "2026-09-08T08-00-00", "2026-09-08T08:00:00")
     db = tmp_path / "w.duckdb"
-    counts = rebuild("duckdb", "cache", database=db, cache_dir=cache)
+    counts = rebuild("duckdb", "captured", database=db, cache_dir=cache)
     assert counts == {
         "raw_reviews": pins.APP_STORE_SAMPLE_RAW_ROWS,
         "stg_reviews": pins.APP_STORE_SAMPLE_STG_ROWS,
@@ -136,7 +136,7 @@ def test_edited_review_in_a_later_capture_appends_one_row(tmp_path):
 
     _capture(cache, "2026-09-08T08-00-00", "2026-09-08T08:00:00", edit=edit)
     db = tmp_path / "w.duckdb"
-    counts = rebuild("duckdb", "cache", database=db, cache_dir=cache)
+    counts = rebuild("duckdb", "captured", database=db, cache_dir=cache)
     assert counts == {
         "raw_reviews": pins.APP_STORE_SAMPLE_RAW_ROWS + 1,
         "stg_reviews": pins.APP_STORE_SAMPLE_STG_ROWS,
@@ -151,7 +151,7 @@ def test_reviews_per_month_is_stable_across_rebuilds(tmp_path):
     db = tmp_path / "w.duckdb"
     seen = []
     for run_id in ("run-a", "run-b", "run-c"):
-        rebuild("duckdb", "app-store", database=db, run_id=run_id)
+        rebuild("duckdb", "samples", database=db, run_id=run_id)
         conn = connect("duckdb", database=db)
         try:
             seen.append(reviews_per_month(conn))
@@ -179,7 +179,7 @@ def test_rebuild_from_captures_is_byte_stable_under_a_moving_clock(
     rows = []
     for name in ("a", "b"):
         db = tmp_path / f"{name}.duckdb"
-        rebuild("duckdb", "app-store", database=db)
+        rebuild("duckdb", "samples", database=db)
         rows.append(
             _query(db, "select * from raw_reviews order by external_id, content_hash")
         )
@@ -199,7 +199,7 @@ def test_refused_page_loads_nothing_from_the_capture(tmp_path):
     page2.write_text(json.dumps(bad, ensure_ascii=False), encoding="utf-8")
     db = tmp_path / "w.duckdb"
     with pytest.raises(FeedShapeError, match="'im:rating' is missing") as exc:
-        rebuild("duckdb", "cache", database=db, cache_dir=cache)
+        rebuild("duckdb", "captured", database=db, cache_dir=cache)
     assert str(exc.value).startswith("capture ") and "2026-09-0" in str(exc.value)
     assert "\n" not in str(exc.value)
     assert _query(db, "select count(*) from raw_reviews") == [(0,)]
@@ -252,7 +252,7 @@ def test_meta_value_outside_the_declared_shape_refuses_the_capture(
         read_captures(cache)
     db = tmp_path / "w.duckdb"
     with pytest.raises(FeedShapeError):
-        rebuild("duckdb", "cache", database=db, cache_dir=cache)
+        rebuild("duckdb", "captured", database=db, cache_dir=cache)
     assert _query(db, "select count(*) from raw_reviews") == [(0,)]
 
 
@@ -271,6 +271,6 @@ def test_meta_with_an_extra_key_is_refused(tmp_path):
 
 def test_zero_captures_is_zero_rows_not_an_error(tmp_path):
     counts = rebuild(
-        "duckdb", "cache", database=tmp_path / "w.duckdb", cache_dir=tmp_path / "no"
+        "duckdb", "captured", database=tmp_path / "w.duckdb", cache_dir=tmp_path / "no"
     )
     assert counts == {"raw_reviews": 0, "stg_reviews": 0}

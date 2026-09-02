@@ -10,10 +10,10 @@ from pipeline.build import reset
 from pipeline.cli import main
 
 
-def test_cli_refuses_bad_fixture_with_exit_2(capsys):
+def test_cli_refuses_bad_rows_with_exit_2(capsys):
     """A refused value goes all the way through main(): exit 2, one line on
     stderr, nothing built."""
-    code = main(["rebuild", "--fixture=../x"])
+    code = main(["rebuild", "--rows=../x"])
     assert code == 2
     err = capsys.readouterr().err
     assert err.startswith("refusing:") and err.count("\n") <= 1
@@ -70,7 +70,7 @@ def isolated_paths(tmp_path, monkeypatch):
 def test_rebuild_defaults_to_the_cache_and_says_when_it_is_empty(
     isolated_paths, capsys
 ):
-    """`make rebuild` with no FIXTURE is the real run: zero captures -> zero rows
+    """`make rebuild` with no ROWS is the real run: zero captures -> zero rows
     and a one-line hint, never an error (a fresh clone)."""
     assert main(["rebuild"]) == 0
     out = capsys.readouterr().out
@@ -83,7 +83,7 @@ def test_rebuild_defaults_to_the_cache_and_says_when_it_is_empty(
 def test_rebuild_from_the_sample_prints_the_metric(isolated_paths, capsys):
     from tests import pins
 
-    assert main(["rebuild", "--fixture=app-store"]) == 0
+    assert main(["rebuild", "--rows=samples"]) == 0
     out = capsys.readouterr().out
     assert f"{'raw_reviews':24} {pins.APP_STORE_SAMPLE_RAW_ROWS}" in out
     assert "reviews per month" in out
@@ -180,22 +180,22 @@ def _count(out: str, table: str) -> int:
 
 
 def test_each_input_builds_its_own_database(capsys, isolated_paths):
-    """Fix amendment A2: the counts `rebuild FIXTURE=X` prints are X's own. The
+    """Fix amendment A2: the counts `rebuild ROWS=X` prints are X's own. The
     sample builds beside the corpus, never into it; `synthetic` leaves the
     corpus file absent; `reset` names every file it removed."""
     import pipeline.warehouse as warehouse
 
     corpus = warehouse.DEFAULT_DB
-    assert main(["rebuild", "--fixture=synthetic"]) == 0
+    assert main(["rebuild", "--rows=synthetic"]) == 0
     assert _count(capsys.readouterr().out, "raw_reviews") == 40
     assert not corpus.exists()
-    assert main(["rebuild", "--fixture=app-store"]) == 0
+    assert main(["rebuild", "--rows=samples"]) == 0
     assert _count(capsys.readouterr().out, "raw_reviews") == 8
     assert main(["rebuild"]) == 0  # the cache, empty here
     assert _count(capsys.readouterr().out, "raw_reviews") == 0
-    files = {corpus.with_name(f"w.{f}.duckdb") for f in ("synthetic", "app-store")}
+    files = {corpus.with_name(f"w.{f}.duckdb") for f in ("synthetic", "samples")}
     assert corpus.exists() and all(f.exists() for f in files)
-    assert main(["rebuild", "--fixture=app-store"]) == 0  # again: still 8, not 16
+    assert main(["rebuild", "--rows=samples"]) == 0  # again: still 8, not 16
     assert _count(capsys.readouterr().out, "raw_reviews") == 8
     assert main(["reset", "--confirm=yes", "--confirm-origin=command line"]) == 0
     out = capsys.readouterr().out
@@ -216,7 +216,7 @@ def test_a_malformed_stored_page_is_a_one_line_refusal_from_rebuild(
     d = isolated_paths / "x" / "2026-09-01T08-00-00"
     shutil.copytree(sample, d)
     (d / "page-1.json").write_text('{"feed": {"entry": [{"id": "no label"}]}}')
-    for argv in (["rebuild"], ["idempotency-check", "--fixture=cache"]):
+    for argv in (["rebuild"], ["idempotency-check", "--rows=captured"]):
         assert main(argv) == 2
         err = capsys.readouterr().err
         assert err.startswith("refusing:") and err.count("\n") == 1

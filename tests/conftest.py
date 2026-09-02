@@ -1,4 +1,4 @@
-"""Session-wide guards: the make user-variables (SPEC, BASE, TARGET, FIXTURE,
+"""Session-wide guards: the make user-variables (SPEC, BASE, TARGET, ROWS,
 CONFIRM, SOURCE) and MAKEFLAGS are scrubbed so the Makefile-invoking tests
 (tests/test_makefile.py) see a clean environment; UV_OFFLINE=1 is set so a test
 that spawns `uv run` (the gate, `make test`) can never resolve or download; and
@@ -24,7 +24,7 @@ def _scrub_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
         "SPEC",
         "BASE",
         "TARGET",
-        "FIXTURE",
+        "ROWS",
         "CONFIRM",
         "SOURCE",
         "MAKEFLAGS",

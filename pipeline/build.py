@@ -13,7 +13,7 @@ so a re-run of an unchanged review inserts nothing and an edited review (new
 fingerprint) appends a new row; staging keeps the latest capture. `run_id` is
 stamped here in Python (never in SQL — no clock on the data path) and is in no
 natural key and no mart, so a changing `run_id` never duplicates a row or moves a
-number; in FIXTURE mode it is the fixture name and in cache mode the capture
+number; for a fixture input it is the input name and for captures the capture
 id, making every rebuild from the same input byte-stable, not merely
 count-stable. A rebuild reads captures from disk and never imports the fetcher:
 no network on the data path."""
@@ -29,10 +29,11 @@ from ingest.app_store import read_captures
 from pipeline import warehouse
 from pipeline.warehouse import ROOT, connect
 
-# The closed set of rebuild inputs: the scraper's captures under data/ (the
-# real run, the default), nothing, the synthetic fixture, or the frozen
-# App Store sample read as a capture (the offline proof of the parser path).
-FIXTURES = ("cache", "empty", "synthetic", "app-store")
+# The closed set of rebuild inputs, named by what they are (`ROWS=`, spec
+# Phase 3a, pinned decision 5): the scraper's captures under data/ (the real
+# run, the default), nothing, the synthetic fixture, or the frozen samples
+# read as captures (the offline proof of every parser path).
+INPUTS = ("captured", "none", "synthetic", "samples")
 DEFAULT_CACHE = ROOT / "data" / "cache" / "app-store"  # gitignored (data/*)
 SAMPLE_CAPTURE = ROOT / "fixtures" / "app-store"
 _SEP = "\x1f"  # unit separator — cannot appear in the CSV content fields
@@ -114,45 +115,44 @@ def table_counts(conn) -> dict[str, int]:
     return {n: conn.execute(f"select count(*) from {n}").fetchone()[0] for n in names}
 
 
-def capture_root(fixture: str, cache_dir: str | Path | None = None) -> Path | None:
-    """Where a capture-fed rebuild reads from: `cache` -> data/cache/app-store
-    (or `cache_dir`), `app-store` -> the frozen sample (or `cache_dir`); the
+def capture_root(rows: str, cache_dir: str | Path | None = None) -> Path | None:
+    """Where a capture-fed rebuild reads from: `captured` -> data/cache/app-store
+    (or `cache_dir`), `samples` -> the frozen sample (or `cache_dir`); the
     other inputs read no capture."""
-    if fixture == "cache":
+    if rows == "captured":
         return Path(cache_dir) if cache_dir is not None else DEFAULT_CACHE
-    if fixture == "app-store":
+    if rows == "samples":
         return Path(cache_dir) if cache_dir is not None else SAMPLE_CAPTURE
     return None
 
 
 def rebuild(
     target: str = "duckdb",
-    fixture: str = "empty",
+    rows: str = "none",
     *,
     database: str | Path | None = None,
     run_id: str | None = None,
     cache_dir: str | Path | None = None,
 ) -> dict[str, int]:
-    """Build the warehouse from raw and return the per-table row counts. `cache`
-    loads every capture under data/cache (zero captures -> zero rows); `empty`
-    runs the pipeline end to end with zero rows; `synthetic` loads the fixture;
-    `app-store` loads the frozen sample through the real parser. Capture-fed
-    rows go through the same `load_reviews` guard as the fixture. With no
-    `database`, each input builds its own file (`warehouse.database_for`)."""
+    """Build the warehouse from raw and return the per-table row counts.
+    `captured` loads every capture under data/cache (zero captures -> zero
+    rows); `none` runs the pipeline end to end with zero rows; `synthetic`
+    loads the fixture; `samples` loads the frozen samples through the real
+    parsers. Capture-fed rows go through the same `load_reviews` guard as the
+    fixture. With no `database`, each input builds its own file
+    (`warehouse.database_for`)."""
     if database is None:
-        database = warehouse.database_for(fixture)
+        database = warehouse.database_for(rows)
     conn = connect(target, database=database)
     try:
         create_raw(conn)
-        if fixture == "synthetic":
+        if rows == "synthetic":
             load_reviews(conn, read_fixture("synthetic"), run_id or "synthetic")
-        root = capture_root(fixture, cache_dir)
+        root = capture_root(rows, cache_dir)
         if root is not None:
-            for capture_id, rows in read_captures(root):
-                stamp = run_id or (
-                    "app-store" if fixture == "app-store" else capture_id
-                )
-                load_reviews(conn, rows, f"app-store:{stamp}")
+            for capture_id, parsed in read_captures(root):
+                stamp = run_id or ("app-store" if rows == "samples" else capture_id)
+                load_reviews(conn, parsed, f"app-store:{stamp}")
         build_derived(conn)
         return table_counts(conn)
     finally:
@@ -161,7 +161,7 @@ def rebuild(
 
 def idempotency_check(
     target: str = "duckdb",
-    fixture: str = "synthetic",
+    rows: str = "synthetic",
     *,
     cache_dir: str | Path | None = None,
 ) -> tuple[bool, dict[str, int], dict[str, int]]:
@@ -170,12 +170,8 @@ def idempotency_check(
     throwaway file so it depends on no prior state and touches no working db."""
     with tempfile.TemporaryDirectory() as tmp:
         db = Path(tmp) / "idempotency.duckdb"
-        first = rebuild(
-            target, fixture, database=db, run_id="run-1", cache_dir=cache_dir
-        )
-        second = rebuild(
-            target, fixture, database=db, run_id="run-2", cache_dir=cache_dir
-        )
+        first = rebuild(target, rows, database=db, run_id="run-1", cache_dir=cache_dir)
+        second = rebuild(target, rows, database=db, run_id="run-2", cache_dir=cache_dir)
     return first == second, first, second
 
 
@@ -187,7 +183,7 @@ def reset(target: str = "duckdb", *, database: str | Path | None = None) -> list
     if target != "duckdb":
         raise ValueError(f"reset only handles the DuckDB file, not {target!r}")
     dbs = (
-        [warehouse.database_for(f) for f in FIXTURES]
+        [warehouse.database_for(r) for r in INPUTS]
         if database is None
         else [Path(database)]
     )
