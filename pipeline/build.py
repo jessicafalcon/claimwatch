@@ -56,13 +56,13 @@ def _sql_files(stage: str) -> list[Path]:
 
 def create_raw(conn) -> None:
     for path in _sql_files("raw"):
-        conn.execute(path.read_text(encoding="utf-8"))
+        warehouse.run_sql_file(conn, path)
 
 
 def build_derived(conn) -> None:
     for stage in ("staging", "marts"):
         for path in _sql_files(stage):
-            conn.execute(path.read_text(encoding="utf-8"))
+            warehouse.run_sql_file(conn, path)
 
 
 def read_fixture(name: str) -> list[dict[str, str]]:
