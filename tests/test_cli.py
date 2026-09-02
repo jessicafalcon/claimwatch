@@ -195,3 +195,23 @@ def test_each_input_builds_its_own_database(capsys, isolated_paths):
     out = capsys.readouterr().out
     assert not corpus.exists() and not any(f.exists() for f in files)
     assert all(str(f) in out for f in files | {corpus})
+
+
+def test_a_malformed_stored_page_is_a_one_line_refusal_from_rebuild(
+    capsys, isolated_paths
+):
+    """Fix amendment A3: a hand-corrupted page-1.json under the cache makes
+    `rebuild` and `idempotency-check` print one line naming the page and the
+    field, exit 2, no traceback."""
+    import shutil
+    from pathlib import Path
+
+    sample = Path(__file__).resolve().parent.parent / "fixtures" / "app-store"
+    d = isolated_paths / "x" / "2026-09-01T08-00-00"
+    shutil.copytree(sample, d)
+    (d / "page-1.json").write_text('{"feed": {"entry": [{"id": "no label"}]}}')
+    for argv in (["rebuild"], ["idempotency-check", "--fixture=cache"]):
+        assert main(argv) == 2
+        err = capsys.readouterr().err
+        assert err.startswith("refusing:") and err.count("\n") == 1
+        assert "page=1/json" in err and "field" in err

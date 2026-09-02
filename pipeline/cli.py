@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import sys
 
+from ingest.app_store import FeedShapeError
 from ingest.politeness import ALLOWED_HOSTS, MAX_PAGES
 from ingest.sources import SOURCES, by_name, source_names
 from pipeline.build import (
@@ -185,4 +186,9 @@ def main(argv: list[str] | None = None) -> int:
         return dispatch[args.command](args)
     except Refused as exc:
         print(str(exc), file=sys.stderr)
+        return 2
+    except FeedShapeError as exc:
+        # A stored capture that is not the declared shape (hand-edited, or a
+        # parser tightened since it was written): one line, never a traceback.
+        print(f"refusing: {exc}", file=sys.stderr)
         return 2

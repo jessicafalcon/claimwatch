@@ -111,9 +111,17 @@ def polite_client() -> PoliteClient:
 
 
 def _write_page(
-    capture_dir: Path, page: int, response: httpx.Response, captured_at: str
+    capture_dir: Path,
+    page: int,
+    response: httpx.Response,
+    captured_at: str,
+    *,
+    refused: bool = False,
 ) -> None:
-    (capture_dir / f"page-{page}.json").write_bytes(response.content)
+    """A page the strict parser accepted is `page-<n>.json`; one it refused is
+    kept as evidence under `page-<n>.refused.json`, a name no rebuild loads."""
+    name = f"page-{page}.refused.json" if refused else f"page-{page}.json"
+    (capture_dir / name).write_bytes(response.content)
     meta = {
         "source_url": str(response.request.url),
         "captured_at": captured_at,
@@ -133,8 +141,10 @@ def scrape(
 ) -> tuple[Path, int]:
     """Fetch one source's feed into a new capture directory. Returns the
     directory and the number of pages written. Refuses (one line) on an
-    unfilled source, a robots disallow, or any non-200; pages already written
-    stay — each is a complete, honest capture of what the site served."""
+    unfilled source, a robots disallow, any non-200, or a page that is not the
+    declared shape; pages already written stay — each is a complete, honest
+    capture of what the site served — and a refused page is kept under a name
+    a rebuild never loads."""
     if source.app_id == 0:
         raise FetchRefused(
             f"refusing: source {source.name!r} has no app_id — "
@@ -181,12 +191,13 @@ def scrape(
         response = polite.get(url)
         if response.status_code != 200:
             raise FetchRefused(f"refusing: {url} returned {response.status_code}")
-        _write_page(capture_dir, page, response, captured_at)
-        written += 1
         try:
             rows = parse_page(response.content, url, captured_at)
         except FeedShapeError as exc:
+            _write_page(capture_dir, page, response, captured_at, refused=True)
             raise FetchRefused(f"refusing: {exc}") from exc
+        _write_page(capture_dir, page, response, captured_at)
+        written += 1
         if not rows:
             break  # the end of the feed
     return capture_dir, written

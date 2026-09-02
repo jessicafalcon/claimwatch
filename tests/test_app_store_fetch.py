@@ -11,6 +11,7 @@ from pathlib import Path
 import httpx
 import pytest
 
+from ingest.app_store import read_captures
 from ingest.fetch import FetchRefused, PoliteClient, make_client, scrape
 from ingest.politeness import MAX_PAGES, USER_AGENT
 from ingest.sources import AppStoreSource
@@ -251,7 +252,11 @@ def test_unfilled_source_is_refused_before_any_request(tmp_path):
     assert not (tmp_path / "blank").exists()
 
 
-def test_a_malformed_page_is_kept_but_the_run_is_refused(tmp_path):
+def test_a_malformed_page_is_kept_under_a_name_no_rebuild_loads(tmp_path):
+    """Fix amendment A3: the page is archived as evidence, the run is refused,
+    and a later rebuild over the capture loads nothing from it and refuses
+    nothing — no poison page."""
+
     def bad_page(request: httpx.Request) -> httpx.Response:
         if request.url.path == "/robots.txt":
             return httpx.Response(200, text="User-agent: *\nDisallow:\n")
@@ -263,7 +268,10 @@ def test_a_malformed_page_is_kept_but_the_run_is_refused(tmp_path):
     with pytest.raises(FetchRefused, match="'entry' is dict, not a list"):
         scrape(SRC, tmp_path, client=polite, stamp=lambda: STAMP)
     capture = tmp_path / SRC.name / STAMP.replace(":", "-")
-    assert (capture / "page-1.json").exists()  # evidence of what was served
+    assert (capture / "page-1.refused.json").exists()  # evidence of what was served
+    assert not (capture / "page-1.json").exists()
+    assert (capture / "page-1.meta.json").exists()
+    assert read_captures(tmp_path) == []
 
 
 def test_an_existing_capture_directory_is_a_refusal_not_a_traceback(tmp_path):
