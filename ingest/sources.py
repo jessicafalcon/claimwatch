@@ -40,7 +40,7 @@ class AppStoreSource:
 # The studied segment's first app. `app_id` is filled by the developer at build
 # (it is a number in a data declaration, not a name — CLAUDE.md -> Neutrality).
 SOURCES: tuple[AppStoreSource, ...] = (
-    AppStoreSource(name="fr-digital-first", app_id=0, country="fr"),
+    AppStoreSource(name="fr-digital-first", app_id=1277025964, country="fr"),
 )
 
 
