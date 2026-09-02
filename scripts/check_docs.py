@@ -3,18 +3,23 @@
 (CI runs it too). Not a pytest file, so a docs-only edit does not re-trigger
 the suite.
 
-Five checks. Three document classes:
+Five checks. Four document classes:
   LIVING  — CLAUDE.md, README.md, SPEC.md, BACKING.md: describe what exists.
   RECORDS — DECISIONS.md, BACKLOG.md: history; may name targets not built.
   PLANS   — PROJECT_BRIEF.md, docs/*.md, specs/*.md: describe what will exist.
+  TOOLING — .claude/**/*.md: links checked like any class; `make` targets
+            checked in commands/ (run today) but not agents/ (they describe
+            the whole project's lifecycle, future targets included); banned
+            words never (an agent names one to flag it).
 
   1. Links/anchors — every relative markdown link in ANY class points at a real
      file inside the repo, and a `#anchor` resolves to a heading there.
-  2. Make targets — every `make <target>` a LIVING doc names exists in the
-     Makefile as an exact token (a partial rename FAILS).
+  2. Make targets — every `make <target>` a LIVING doc or a command names
+     exists in the Makefile as an exact token (a partial rename FAILS).
   3. Banned words — none of BANNED appears as a whole word in a LIVING doc or
-     under study/, outside fenced code blocks (the one place the list itself
-     may be written down). PROJECT_BRIEF.md §2.3 + the reference's style rule.
+     under study/ (`*.md` and the `*.html` export), outside fenced code blocks
+     (the one place the list itself may be written down). PROJECT_BRIEF.md
+     §2.3 + the reference's style rule.
   4. Glossary — the `## Glossary` section of any LIVING doc has ≤ 10 terms
      (top-level `- **term**` bullets). Absent → OK.
   5. BACKLOG count — CLAUDE.md's "Open BACKLOG rows: **N**" equals the
@@ -39,7 +44,9 @@ from review_common import (  # noqa: E402
 LIVING = LIVING_DOCS
 RECORDS = RECORD_DOCS
 PLAN_GLOBS = ("PROJECT_BRIEF.md", "docs/*.md", "specs/*.md")
-STUDY_GLOB = "study/**/*.md"
+TOOLING_GLOB = ".claude/**/*.md"
+COMMAND_GLOB = ".claude/commands/*.md"
+STUDY_GLOBS = ("study/**/*.md", "study/**/*.html")
 
 BANNED = (
     "orchestration",
@@ -82,8 +89,19 @@ def plan_files(root: Path) -> list[Path]:
     return out
 
 
+def tooling_files(root: Path) -> list[Path]:
+    return sorted(p for p in root.glob(TOOLING_GLOB) if p.is_file())
+
+
+def command_files(root: Path) -> list[Path]:
+    return sorted(p for p in root.glob(COMMAND_GLOB) if p.is_file())
+
+
 def study_files(root: Path) -> list[Path]:
-    return sorted(p for p in root.glob(STUDY_GLOB) if p.is_file())
+    out: list[Path] = []
+    for g in STUDY_GLOBS:
+        out.extend(sorted(p for p in root.glob(g) if p.is_file()))
+    return out
 
 
 def slug(heading: str) -> str:
@@ -218,9 +236,11 @@ def check_backlog_count(claude: Path, backlog: Path) -> list[str]:
 
 def main(root: Path = ROOT) -> int:
     living = living_files(root)
+    tooling = tooling_files(root)
+    every = living + record_files(root) + plan_files(root) + tooling
     checks = [
-        ("links", check_links(living + record_files(root) + plan_files(root), root)),
-        ("make targets", check_make_targets(living, root)),
+        ("links", check_links(every, root)),
+        ("make targets", check_make_targets(living + command_files(root), root)),
         ("banned words", check_banned_words(living + study_files(root), root)),
         ("glossary", check_glossary(living, root)),
         ("BACKLOG count", check_backlog_count(root / "CLAUDE.md", root / "BACKLOG.md")),
