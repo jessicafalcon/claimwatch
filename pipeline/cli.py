@@ -62,7 +62,9 @@ def _do_idempotency(args: argparse.Namespace) -> int:
 
 
 def _do_reset(args: argparse.Namespace) -> int:
-    target = resolve_choice(args.target, TARGETS, "duckdb")
+    # reset handles only the DuckDB file; TARGET=snowflake is refused with one
+    # line here, not a traceback from reset() downstream.
+    target = resolve_choice(args.target, ("duckdb",), "duckdb")
     if not confirmed(args.confirm, args.confirm_origin):
         if sys.stdin.isatty():
             reply = input("Drop the DuckDB file? This deletes data. [y/N] ")
