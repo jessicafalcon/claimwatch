@@ -121,6 +121,8 @@ def _decimal(
     """An optional decimal inside [lo, hi] (hi None = unbounded); empty -> None."""
     if value == "":
         return None
+    if not re.fullmatch(r"[0-9]{1,6}(\.[0-9]{1,6})?", value):  # bounded, digits only
+        raise _refuse_row(where, line, field, f"is not a number: {value!r}")
     try:
         number = Decimal(value)
     except InvalidOperation as exc:
@@ -131,7 +133,7 @@ def _decimal(
 
 
 def _count(value: str, *, where: str, line: int, field: str) -> int:
-    if not re.fullmatch(r"[0-9]+", value):
+    if not re.fullmatch(r"[0-9]{1,12}", value):  # bounded: never a traceback
         raise _refuse_row(
             where, line, field, f"is not a non-negative integer: {value!r}"
         )

@@ -153,3 +153,16 @@ def test_sample_is_obviously_fake_and_nameless():
     assert doc["author"]["name"] == "developer-placeholder"
     assert "fictive" in doc["name"] and "example.fictional.app" in PAGE_URL
     assert "reviewer-placeholder" in html
+
+
+def test_an_absurdly_long_digit_string_refuses_not_tracebacks():
+    """Round 1, security-reviewer #2: a 5,000-digit count or rating is outside
+    the shape and refuses through PageShapeError; it never reaches int()."""
+    doc = _block()
+    doc["aggregateRating"]["ratingCount"] = "9" * 5000
+    with pytest.raises(PageShapeError, match="'ratingCount'"):
+        parse(_with_block(doc), PAGE_URL, CAPTURED, SRC)
+    doc = _block()
+    doc["aggregateRating"]["ratingValue"] = "4." + "9" * 5000
+    with pytest.raises(PageShapeError, match="'ratingValue'"):
+        parse(_with_block(doc), PAGE_URL, CAPTURED, SRC)

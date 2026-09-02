@@ -28,8 +28,13 @@ EXTENSION = "html"
 SAMPLE_PLATFORM = "google-play"  # the frozen sample is written in that store's shape
 SAMPLE_HOST = "play.google.com"
 SAMPLE_DIR = ROOT / "fixtures" / "listings"
-_NUMBER = re.compile(r"^[0-9]+(\.[0-9]+)?$")
-_DIGITS = re.compile(r"^[0-9]+$")
+# Bounded runs: a rating has at most two digits before the point and at most
+# thirty-two after (a store prints fifteen); a count has at most twelve digits.
+# A longer string is outside the shape and refuses; it never reaches int() or
+# Decimal(), whose own limits would surface as a traceback (round 1,
+# security-reviewer #2).
+_NUMBER = re.compile(r"^[0-9]{1,2}(\.[0-9]{1,32})?$")
+_DIGITS = re.compile(r"^[0-9]{1,12}$")
 _PLACES = Decimal("0.001")
 
 

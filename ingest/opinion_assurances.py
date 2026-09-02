@@ -256,7 +256,7 @@ def _snapshot_row(
     aggregate: dict[str, str | None], page_url: str, captured_at: str, source: Source
 ) -> dict[str, object]:
     value = aggregate.get("ratingValue")
-    if value is None or not re.fullmatch(r"[0-9]+(\.[0-9]+)?", value):
+    if value is None or not re.fullmatch(r"[0-9]{1,2}(\.[0-9]{1,32})?", value):
         raise refuse(page_url, None, "ratingValue", f"is not a number: {value!r}")
     try:
         rating = Decimal(value).quantize(_PLACES, rounding=ROUND_HALF_EVEN)
@@ -267,7 +267,7 @@ def _snapshot_row(
     if not Decimal(0) <= rating <= Decimal(5):
         raise refuse(page_url, None, "ratingValue", f"is outside 0..5: {value!r}")
     count = aggregate.get("ratingCount")
-    if count is None or not re.fullmatch(r"[0-9]+", count):
+    if count is None or not re.fullmatch(r"[0-9]{1,12}", count):
         raise refuse(
             page_url, None, "ratingCount", f"is not a non-negative integer: {count!r}"
         )

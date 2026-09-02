@@ -313,3 +313,9 @@ def test_author_markup_without_itemscope_is_still_never_read(markup):
         rows[1]["body"] == parse(_page(1), PAGE_URL, CAPTURED, SRC).reviews[1]["body"]
     )
     assert "reviewer-placeholder-9" not in rows[1]["body"]
+
+
+def test_an_absurdly_long_count_refuses_not_tracebacks():
+    html = _page(1).replace('content="512"', 'content="' + "9" * 5000 + '"')
+    with pytest.raises(PageShapeError, match="'ratingCount'"):
+        parse(html, PAGE_URL, CAPTURED, SRC)

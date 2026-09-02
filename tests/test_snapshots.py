@@ -238,9 +238,15 @@ def test_manual_file_columns_are_exactly_the_declared_eight(tmp_path):
         ("rating", "four", "not a number"),
         ("review_count", "-1", "not a non-negative integer"),
         ("review_count", "", "not a non-negative integer"),
+        ("review_count", "9" * 5000, "not a non-negative integer"),
+        ("rating", "4." + "9" * 5000, "not a number"),
         ("one_star_share", "1.5", "outside the range"),
         ("response_rate", "82", "outside the range"),
-        ("response_delay_days", "-1", "outside the range"),
+        (
+            "response_delay_days",
+            "-1",
+            "not a number",
+        ),  # digits only: a sign is outside the shape
         ("read_from", "memory", "must be the word 'page'"),
     ],
 )
