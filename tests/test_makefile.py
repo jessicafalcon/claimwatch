@@ -32,20 +32,24 @@ def _make_n(target: str, cmdline: dict[str, str], env: dict[str, str]) -> str:
     return res.stdout
 
 
+@pytest.mark.parametrize("var, flag", [("SPEC", "--spec"), ("BASE", "--base")])
 @pytest.mark.parametrize(
     "value", ['"; echo pwned; "', "$(shell echo pwned)", "../x", "a'b"]
 )
-def test_user_variable_reaches_python_as_one_literal_from_both_origins(value: str):
-    """Whatever the origin, the recipe carries the UNEXPANDED value as one
-    single-quoted token (`'` → `'\\''`) — no shell, no make function runs."""
+def test_user_variable_reaches_python_as_one_literal_from_both_origins(
+    var: str, flag: str, value: str
+):
+    """For EVERY user variable, whatever the origin, the recipe carries the
+    UNEXPANDED value as one single-quoted token (`'` → `'\\''`) — no shell, no
+    make function runs."""
     quoted = "'" + value.replace("'", "'\\''") + "'"
     for origin in ("cmdline", "env"):
         out = _make_n(
             "review-gate",
-            {"SPEC": value} if origin == "cmdline" else {},
-            {"SPEC": value} if origin == "env" else {},
+            {var: value} if origin == "cmdline" else {},
+            {var: value} if origin == "env" else {},
         )
-        assert f"--spec={quoted}" in out, (origin, out)
+        assert f"{flag}={quoted}" in out, (var, origin, out)
         assert "pwned" not in out.replace(value, "")  # nothing expanded or ran
 
 
