@@ -49,7 +49,9 @@ NO_FILE = frozenset({"", "—"})  # the one declared spelling of "no SQL file ye
 _SEP = re.compile(r":?-+:?")  # one separator cell: ---, :---, ---:, :---:
 _ROW_ID = re.compile(r"^(B\d+\.\d+) ")  # `B<beat>.<n> ` opens every claim cell
 _CITE = re.compile(r"\bB\d+\.\d+\b")  # a `B<beat>.<n>` token SPEC.md cites
-_FENCE = re.compile(r"```.*?```", re.S)  # a fenced block: an example B-id is not a citation
+_FENCE = re.compile(
+    r"```.*?```", re.S
+)  # a fenced block: an example B-id is not a citation
 # One source part, whole-cell anchored: a URL, a markdown link TO a URL, or a
 # backticked dataset name (two or more lowercase segments — `tbd` is not one).
 _URL = r"https?://\S+"
@@ -170,7 +172,8 @@ def check_citations(rows: list[Row], root: Path) -> list[str]:
     cited = set(_CITE.findall(_FENCE.sub("", spec.read_text(encoding="utf-8"))))
     defined = {rid for r in rows if (rid := row_id(r.claim))}
     return [
-        f"SPEC.md cites {b}, which is not a BACKING row" for b in sorted(cited - defined)
+        f"SPEC.md cites {b}, which is not a BACKING row"
+        for b in sorted(cited - defined)
     ] + [
         f"BACKING row {b} is cited by no SPEC.md panel or sentence"
         for b in sorted(defined - cited)
