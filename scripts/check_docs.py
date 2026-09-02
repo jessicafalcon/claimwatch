@@ -87,14 +87,16 @@ def study_files(root: Path) -> list[Path]:
 
 
 def slug(heading: str) -> str:
-    """GitHub-style anchor: strip backticks/punctuation, lowercase, spaces → `-`."""
+    """GitHub's anchor rule: drop backticks and punctuation (hyphens stay),
+    lowercase, then ONE hyphen per space — `# A — B` → `a--b`, as on GitHub."""
     h = heading.replace("`", "")
     h = re.sub(r"[^\w\s-]", "", h).strip().lower()
-    return re.sub(r"\s+", "-", h)
+    return h.replace(" ", "-")
 
 
 def anchors(text: str) -> set[str]:
-    return {slug(h) for h in _HEADING.findall(text)}
+    """Headings outside fenced blocks (a `# comment` in a fence is not one)."""
+    return {slug(h) for h in _HEADING.findall(_FENCE.sub("", text))}
 
 
 def check_links(files: list[Path], root: Path) -> list[str]:

@@ -15,16 +15,24 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def test_check_links_reports_a_broken_link_and_anchor(tmp_path: Path):
-    (tmp_path / "b.md").write_text("# B\n\n## Real `heading` here\n")
+    (tmp_path / "b.md").write_text(
+        "# B\n\n## Real `heading` here\n\n### 2.1 Deterministic first — always\n"
+        "```\n# not a heading, a comment in a fence\n```\n"
+    )
     (tmp_path / "a.md").write_text(
         "# A\n[ok](b.md) [ok2](b.md#real-heading-here) [broken](missing.md) "
         "[anchor](b.md#nope) [web](https://example.com) [self](#a) [same](#local)\n"
+        "[punct](b.md#21-deterministic-first--always) "
+        "[punct-wrong](b.md#21-deterministic-first-always) "
+        "[fenced](b.md#not-a-heading-a-comment-in-a-fence)\n"
     )
     errors = check_docs.check_links([tmp_path / "a.md"], tmp_path)
     assert errors == [
         "a.md: broken link: missing.md",
         "a.md: missing anchor #nope in b.md",
         "a.md: missing anchor #local in a.md",
+        "a.md: missing anchor #21-deterministic-first-always in b.md",
+        "a.md: missing anchor #not-a-heading-a-comment-in-a-fence in b.md",
     ]
 
 
