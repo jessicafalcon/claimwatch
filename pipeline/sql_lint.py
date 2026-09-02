@@ -28,8 +28,6 @@ NONPORTABLE = (
     "read_parquet",
     "read_json",
     "regexp",
-    " like ",
-    "similar to",
     "summarize",
     "unpivot",
     "list_value",
@@ -46,14 +44,23 @@ CLOCK = (
 )
 
 
+# Pattern matching by keyword: matched as whole words, so `like(`, `like` before
+# a newline or a tab, and `LIKE` are caught alike and `unlike_count` is not
+# (round 1, code-reviewer on the spaced needle).
+PATTERN_WORDS = (r"\blike\b", r"\bsimilar\s+to\b")
+
+
 def _scan(text: str, needles: tuple[str, ...]) -> list[str]:
     body = _COMMENT.sub("", text).lower()
     return [n for n in needles if n in body]
 
 
 def find_nonportable(text: str) -> list[str]:
-    """DuckDB-only / non-portable forms present in `text` (comments stripped)."""
-    return _scan(text, NONPORTABLE)
+    """DuckDB-only / non-portable forms and pattern keywords present in `text`
+    (comments stripped)."""
+    body = _COMMENT.sub("", text).lower()
+    words = [w for w in PATTERN_WORDS if re.search(w, body)]
+    return _scan(text, NONPORTABLE) + words
 
 
 def find_clock(text: str) -> list[str]:
