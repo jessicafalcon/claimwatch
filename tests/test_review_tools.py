@@ -83,6 +83,20 @@ def test_gate_fails_on_a_missing_evidence_test_id():
     assert review_gate.check_evidence(spec, {"tests/test_a.py::test_x"}, {"nope"}) == []
 
 
+def test_gate_fails_on_a_missing_or_empty_required_section():
+    """A spec with no Evidence / Record updates section, or an Evidence section
+    naming no test, must FAIL — never pass because nothing was found."""
+    assert review_gate.check_evidence("## Why\nprose\n", set(), set()) == [
+        "spec has no Evidence section (REQUIRED)"
+    ]
+    only_targets = "## Evidence (REQUIRED)\n| 1 | `make test` |\n"
+    assert review_gate.check_evidence(only_targets, set(), {"test"}) == [
+        "Evidence names no test id"
+    ]
+    fails, warns = review_gate.check_records("## Why\nprose\n", {"CLAUDE.md"})
+    assert fails == ["spec has no Record updates section (REQUIRED)"] and warns == []
+
+
 def test_gate_fails_on_a_record_file_absent_from_the_diff():
     spec = (
         "## Record updates (REQUIRED)\n"

@@ -82,7 +82,11 @@ def evidence_ids(spec_text: str) -> tuple[list[str], list[str]]:
 def check_evidence(
     spec_text: str, collected: set[str], declared: set[str]
 ) -> list[str]:
+    if not section(spec_text, "Evidence").strip():
+        return ["spec has no Evidence section (REQUIRED)"]
     tests, targets = evidence_ids(spec_text)
+    if not tests:
+        return ["Evidence names no test id"]
     errors = [
         f"Evidence names a test that does not exist: {t}"
         for t in tests
@@ -108,6 +112,8 @@ def record_paths(spec_text: str) -> list[str]:
 def check_records(spec_text: str, diff: set[str]) -> tuple[list[str], list[str]]:
     """(FAILs, WARNs): listed-but-absent is a FAIL; a record file in the diff
     but off the list is a WARN."""
+    if not section(spec_text, "Record updates").strip():
+        return ["spec has no Record updates section (REQUIRED)"], []
     listed = set(record_paths(spec_text))
     fails = [
         f"Record updates lists {p} but it is not in the diff"
