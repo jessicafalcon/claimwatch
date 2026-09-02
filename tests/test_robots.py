@@ -207,3 +207,28 @@ def test_pattern_matching_and_precedence(robots: str, allowed: bool):
     """The rules of the game, pinned on their own: `*`, the `$` anchor,
     longest match wins, Allow wins a tie."""
     assert Robots.parse(robots).allows(FEED) is allowed
+
+
+def test_a_pathological_pattern_matches_in_linear_time():
+    """Phase 3a, pinned decision 6: thirty wildcards against a long path that
+    does not match answer in milliseconds (the regex form took seconds at
+    seven stars), and the verdicts of the matching table are unchanged."""
+    import time
+
+    from ingest.robots import _matches
+
+    pattern = "/" + "a*" * 30 + "b"
+    path = "/" + "a" * 300
+    t0 = time.perf_counter()
+    assert _matches(pattern, path) is False
+    assert _matches(pattern + "$", path) is False
+    assert _matches("/" + "a*" * 30, path) is True
+    assert time.perf_counter() - t0 < 0.05
+    # the four forms of the table, on their own
+    assert _matches("/fr/rss/", "/fr/rss/x") is True  # prefix
+    assert _matches("/fr/rss/$", "/fr/rss/x") is False  # anchored: exact only
+    assert _matches("/fr/rss/$", "/fr/rss/") is True
+    assert _matches("/*/rss/*", "/fr/rss/customerreviews") is True
+    assert _matches("/*json$", "/fr/rss/page=1/json") is True
+    assert _matches("/*json$", "/fr/rss/page=1/json?x") is False
+    assert _matches("", "/anything") is True  # an empty pattern is a prefix of all
