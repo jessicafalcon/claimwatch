@@ -132,8 +132,9 @@ make rebuild FIXTURE=synthetic && make idempotency-check
   B4.2); `pipeline_row_counts` B5.2 on the whole pipeline (Beat 5). Building any
   now either reaches into a future phase or fixes a table's columns before its
   subsystem is designed. All BACKING rows stay Pending; `check-backing` sees 0
-  marts, 0 orphans. **This narrows the brief's "All DDL (raw/staging/marts)" to
-  the layers whose upstream exists — flagged for your approval below.** Rejected:
+  marts, 0 orphans. **This narrowed the brief's "All DDL (raw/staging/marts)" to
+  the layers whose upstream exists; on the developer's call (2026-09-02)
+  PROJECT_BRIEF.md §9 Phase 1 was reworded to match.** Rejected:
   empty mart stubs (assert a schema before the subsystem exists, against
   invariants-before-mechanisms); building the four snapshot marts now
   (`platform_snapshots` is Phase 3's table — one phase, one diff).
@@ -230,8 +231,9 @@ Freeze: fixtures/anchors/
 - [ ] BACKING — none (Phase 1 lands no mart; every row stays Pending)
 - [ ] SPEC — none (no chart or beat changed)
 - [ ] README — none (Phase 9; PROJECT_BRIEF.md is the front door until then)
-- [ ] PROJECT_BRIEF — none (the "All DDL" narrowing is flagged in this spec for
-      your call, not silently edited into the master doc)
+- [x] `PROJECT_BRIEF.md` — §9 Phase 1 reworded to "raw and staging DDL in this
+      phase; each mart lands with its upstream" (developer's call, 2026-09-02;
+      the "All DDL" narrowing this spec flagged)
 
 ## Threat model (REQUIRED when the phase adds a `make` target that takes a variable, deletes anything, calls a paid API, or touches the network)
 
@@ -316,9 +318,10 @@ is green; `make review-gate SPEC=specs/phase-1-schema.md` prints 7/7; 93 tests.
 
 **All 13 marts (and `platform_snapshots`) are deferred to the phases that land
 their upstreams — Phase 1 lands no mart, so every BACKING row stays Pending
-(check-backing: 19 rows, 0 marts).** This narrows the brief's Phase 1 "All DDL
-(raw/staging/marts)"; recorded in DECISIONS.md and flagged here, PROJECT_BRIEF.md
-left unedited pending the developer's call.
+(check-backing: 19 rows, 0 marts).** This narrowed the brief's Phase 1 "All DDL
+(raw/staging/marts)"; recorded in DECISIONS.md, and on the developer's call
+(2026-09-02) PROJECT_BRIEF.md §9 Phase 1 was reworded to match ("raw and staging
+DDL in this phase; each mart lands with its upstream").
 
 Review round 1 (five agents; security-reviewer and study-editor pass,
 functionality-tester works, code-reviewer 3 / coherence-auditor coherent) reported

@@ -261,10 +261,11 @@ scraper, no model.
   classifier (5b–7), the cost model / simulator (8), or the whole pipeline
   (Beat 5) — so building any now would either reach into a future phase or fix a
   table's columns before its subsystem is designed. Every BACKING row stays
-  Pending; `check-backing` sees 19 rows, 0 marts, 0 orphans. **This narrows the
+  Pending; `check-backing` sees 19 rows, 0 marts, 0 orphans. **This narrowed the
   brief's Phase 1 "All DDL (raw/staging/marts)" to the layers whose upstream
-  exists.** The narrowing is recorded here and flagged in the spec for the
-  developer's call; PROJECT_BRIEF.md is not silently edited. Rejected: empty
+  exists.** On the developer's call (2026-09-02) PROJECT_BRIEF.md §9 Phase 1 was
+  reworded to match ("raw and staging DDL in this phase; each mart lands with its
+  upstream"), rather than leaving the brief and the phase disagreeing. Rejected: empty
   mart stubs (assert a schema before its subsystem exists); building the four
   snapshot marts now (`platform_snapshots` is Phase 3's table — one phase, one
   diff). `theme_share_by_month` (B2.2, monthly × segment) stays distinct from

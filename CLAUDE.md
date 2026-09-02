@@ -403,8 +403,8 @@ idempotency guards; `make rebuild`, `idempotency-check`, `reset`. `make rebuild
 FIXTURE=synthetic && make idempotency-check` is green (raw 40, staging 39).
 **All 13 marts (and `platform_snapshots`) are deferred to the phases that land
 their upstreams — Phase 1 lands no mart, so every BACKING row stays Pending
-(check-backing: 19 rows, 0 marts). This narrows the brief's "All DDL
-(raw/staging/marts)"; recorded in DECISIONS, not applied to the brief.** Phase
+(check-backing: 19 rows, 0 marts). This narrowed the brief's "All DDL
+(raw/staging/marts)"; PROJECT_BRIEF.md §9 reworded to match (developer's call).** Phase
 0b merged (PR #2). Next: Phase 2 — one scraper, end to end.
 
 Open BACKLOG rows: **6**.
