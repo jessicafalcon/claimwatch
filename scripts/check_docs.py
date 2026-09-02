@@ -57,6 +57,8 @@ _FENCE = re.compile(r"```.*?```", re.S)
 _HEADING = re.compile(r"^#{1,6}\s+(.*?)\s*$", re.M)
 _BACKLOG_COUNT = re.compile(r"Open BACKLOG rows: \*\*(\d+)\*\*")
 _TERM = re.compile(r"^- \*\*", re.M)
+# `## Glossary`, `## 11. Glossary (…)`, `### Glossary` — the brief numbers its headings.
+_GLOSSARY = re.compile(r"^##+ (?:\d+\.\s*)?Glossary.*?$(.*?)(?=^## |\Z)", re.M | re.S)
 
 
 def living_files(root: Path) -> list[Path]:
@@ -151,19 +153,24 @@ def check_banned_words(files: list[Path], root: Path) -> list[str]:
     return errors
 
 
-def glossary_terms(text: str) -> int | None:
-    """Number of `- **term**` bullets under `## Glossary`; None if no glossary."""
-    m = re.search(r"^## Glossary.*?$(.*?)(?=^## |\Z)", text, re.M | re.S)
-    if not m:
-        return None
-    return len(_TERM.findall(m.group(1)))
+def glossary_section(text: str) -> str | None:
+    """Body of the glossary section; None if the doc has no glossary."""
+    m = _GLOSSARY.search(text)
+    return m.group(1) if m else None
 
 
 def check_glossary(files: list[Path], root: Path) -> list[str]:
     errors: list[str] = []
     for f in files:
-        n = glossary_terms(f.read_text(encoding="utf-8"))
-        if n is not None and n > GLOSSARY_MAX:
+        body = glossary_section(f.read_text(encoding="utf-8"))
+        if body is None:
+            continue
+        n = len(_TERM.findall(body))
+        if n == 0 and body.strip():
+            errors.append(
+                f"{f.relative_to(root)}: glossary has no `- **term**` bullets"
+            )
+        elif n > GLOSSARY_MAX:
             errors.append(
                 f"{f.relative_to(root)}: glossary has {n} terms (max {GLOSSARY_MAX})"
             )

@@ -78,6 +78,24 @@ def test_check_glossary_reports_an_eleventh_term(tmp_path: Path):
     ]
 
 
+def test_check_glossary_reports_a_numbered_heading_and_unrecognised_shape(
+    tmp_path: Path,
+):
+    """The brief numbers its headings (`## 11. Glossary (…)`); a glossary written
+    as a table counts zero bullets and must not pass as empty."""
+    eleven = "".join(f"- **term{i}** — one sentence.\n" for i in range(11))
+    (tmp_path / "num.md").write_text(f"## 11. Glossary (keep to ~10 terms)\n\n{eleven}")
+    (tmp_path / "table.md").write_text(
+        "## Glossary\n\n| term | meaning |\n|---|---|\n| claim | a request |\n"
+    )
+    assert check_docs.check_glossary([tmp_path / "num.md"], tmp_path) == [
+        "num.md: glossary has 11 terms (max 10)"
+    ]
+    assert check_docs.check_glossary([tmp_path / "table.md"], tmp_path) == [
+        "table.md: glossary has no `- **term**` bullets"
+    ]
+
+
 def test_check_backlog_count_reports_a_mismatch(tmp_path: Path):
     backlog = tmp_path / "BACKLOG.md"
     backlog.write_text(
