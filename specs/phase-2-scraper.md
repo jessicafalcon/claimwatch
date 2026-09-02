@@ -67,6 +67,12 @@ deleted. The DONE command is the real parser over the frozen capture, offline
 — the same path CI runs. The real-rows proof moves to the first source whose
 robots allows it (Phase 3a).
 
+Amended 2026-09-02 (fix amendment A7, exit audit, approved). Done-when items 3
+and 4 still said "real rows" after A1 moved the DONE command; they now say
+what the phase proves — rows from a capture, the frozen sample being one — and
+the real-rows proof moves to Phase 3a with the DONE command. PROJECT_BRIEF.md
+§9 Phase 2 was reworded to match on the developer's call (DECISIONS → Phase 2).
+
 - `make rebuild FIXTURE=app-store` — the frozen capture is parsed strictly,
   loaded into `raw_reviews` through Phase 1's guard, `stg_reviews` is rebuilt,
   and the per-table counts are printed followed by the reviews-per-month
@@ -80,7 +86,7 @@ robots allows it (Phase 3a).
   rebuild FIXTURE=synthetic && make idempotency-check` (Phase 1's DONE
   command, unchanged: raw 40 / staging 39); `make rebuild FIXTURE=empty`;
   `make test`; `make check-backing` (19 rows, 0 marts); `make check-docs`
-  (BACKLOG count 12).
+  (BACKLOG count 14).
 
 ## Done-when
 
@@ -98,14 +104,17 @@ robots allows it (Phase 3a).
    item and the field; nothing partial is loaded. A well-formed item maps to
    exactly the eight raw columns; the `author` fields are never read. *Evidence:
    row 2.*
-3. **`make rebuild` produces real rows and the metric through Phase 1's path.**
-   Cached captures (or the frozen sample under `FIXTURE=app-store`) reach
-   `raw_reviews` via the unchanged `load_reviews` guard, `stg_reviews` dedups
-   them, and `reviews_per_month` is printed and pinned; `sql/` gains no file.
-   *Evidence: row 3.*
-4. **Idempotency holds on real rows.** A second rebuild from the same captures,
-   and a second capture of unchanged pages at a later `captured_at`, add no raw
-   row; the metric is identical run to run. *Evidence: row 4.*
+3. **`make rebuild` produces rows from a capture and the metric through Phase
+   1's path.** The frozen sample under `FIXTURE=app-store`, and any capture
+   under `data/cache/` (the default), reach `raw_reviews` via the unchanged
+   `load_reviews` guard, `stg_reviews` dedups them, and `reviews_per_month` is
+   printed and pinned; `sql/` gains no file. *(A7: was "real rows"; that proof
+   moves to Phase 3a with the DONE command.)* *Evidence: row 3.*
+4. **Idempotency holds on captured rows.** A second rebuild from the same
+   captures, and a second capture of unchanged pages at a later `captured_at`,
+   add no raw row; the metric is identical run to run — proven on the frozen
+   sample and on captures the tests write, not yet on a live one. *(A7: was
+   "real rows".)* *Evidence: row 4.*
 5. **No clock, no network on the data path.** `captured_at` is stamped in
    Python at fetch and read back from the capture at rebuild; `review_date` is
    the item's own date; the metric query passes the clock and portability
@@ -359,7 +368,10 @@ snapshot commit.
 - **Politeness knobs live in `ingest/politeness.py`; `ingest/fetch.py` is the
   only `httpx` import; every capture is archived byte-exact.** Constants:
   `MIN_INTERVAL_S = 2.0` per host, `USER_AGENT` naming the project and its
-  repository, `TIMEOUT_S`, `MAX_PAGES = 10`, `ALLOWED_HOSTS = ("itunes.apple.com",)`.
+  repository, `TIMEOUT_S`, `MAX_PAGES = 10`, `ALLOWED_HOSTS = ("itunes.apple.com",)`,
+  and `MAX_CRAWL_DELAY_S = 60.0` — a Crawl-delay above it is a one-line
+  refusal, never a day-long sleep (pinned in `tests/test_app_store_fetch.py`;
+  written here at the exit audit, which found the pin without a record).
   The fetcher reads `robots.txt` before the first feed request and checks
   every page's address against it with `ingest/robots.py` (RFC 9309: `*`, `$`,
   longest match wins, Crawl-delay honoured — fix amendment A1 replaced the
@@ -480,28 +492,32 @@ Freeze: fixtures/app-store/
 
 ## Record updates (REQUIRED)
 
-- [ ] `DECISIONS.md` — Phase 2 entry: the App Store feed as the one source and
+- [x] `DECISIONS.md` — Phase 2 entry: the App Store feed as the one source and
       its terms position (under "Scrape politely"), the strict parser and the
       page-as-unit refusal, the capture archive layout, the widened `FIXTURE`
       set with `cache` as default, the metric-as-query (with the brief-narrowing
       note), the `fixtures/app-store/` freeze; Gotchas from the first-hour
-      checks; no supersede pointers
-- [ ] `BACKLOG.md` — one row opened: "`reviews_per_month` is a query in
+      checks; no supersede pointers; at exit, A7 and the audit's corrections
+- [x] `BACKLOG.md` — one row opened: "`reviews_per_month` is a query in
       `pipeline/metrics.py`, not a mart" — trigger: B5.2 `pipeline_row_counts`
-      lands (Beat 5): fold the query into the mart, delete `metrics.py`, strike
-- [ ] `CLAUDE.md` — Current status; Commands (`scrape`; `rebuild`'s `FIXTURE`
+      lands (Beat 5): fold the query into the mart, delete `metrics.py`, strike.
+      Review rounds opened five more; the exit audit two (the capture path is
+      hardwired to one platform; the frozen `robots.txt` is read by nothing),
+      both triggered on Phase 3a
+- [x] `CLAUDE.md` — Current status; Commands (`scrape`; `rebuild`'s `FIXTURE`
       set and default; `idempotency-check`'s set); Repo map (`ingest/` now
       exists — fetcher, parser, sources, politeness; `fixtures/app-store/`;
       `pipeline/metrics.py`); Conventions allowlist unchanged (`httpx` was
-      pre-approved); BACKLOG count 6 → 12
-- [ ] `pyproject.toml`, `uv.lock` — `httpx` pinned
-- [ ] `specs/phase-2-scraper.md` — this spec; the "Delivered" paragraph at exit
-- [ ] BACKING — none (no mart lands; every row stays Pending; 0 orphans)
-- [ ] SPEC — none (no chart or beat changed)
-- [ ] README — none (Phase 9; PROJECT_BRIEF.md is the front door until then)
-- [ ] PROJECT_BRIEF — none unless the developer chooses to reword §9 Phase 2
-      ("one trivial mart" → "one queryable metric"), as for Phase 1; then
-      checked here
+      pre-approved); BACKLOG count 6 → 14
+- [x] `pyproject.toml`, `uv.lock` — `httpx` pinned
+- [x] `specs/phase-2-scraper.md` — this spec; the "Delivered" paragraph at exit
+- [x] BACKING — none (no mart lands; every row stays Pending; 0 orphans)
+- [x] SPEC — none (no chart or beat changed)
+- [x] README — none (Phase 9; PROJECT_BRIEF.md is the front door until then)
+- [x] PROJECT_BRIEF — §9 Phase 2 reworded on the developer's call at the exit
+      audit (2026-09-02), as for Phase 1: "one queryable metric", and a
+      Done-when in the frozen-sample form with real rows moved to Phase 3
+- [x] `docs/PLAN.md` — §5 rows 1 and 2 corrected in place at the exit audit
 
 ## Threat model (REQUIRED when the phase adds a `make` target that takes a variable, deletes anything, calls a paid API, or touches the network)
 
@@ -571,7 +587,7 @@ coherence-auditor at exit.
   reconcile (0 marts, all Pending); the Repo map marks `ingest/` as existing
   and `classify/`, `models/`, `study/`, `dags/` as future; no stale "Phase 2
   will…" sentence; the brief-narrowing (metric, not mart) is recorded in
-  DECISIONS, not silently applied; the BACKLOG count is 12; the "Scrape
+  DECISIONS, not silently applied; the BACKLOG count is 14; the "Scrape
   politely" decision now names this source's terms position.
 - Stack risk — verified by the developer by hand in the first hour, in a
   browser, before any code (an agent runs no fetch): (1) `itunes.apple.com/robots.txt`
@@ -590,7 +606,10 @@ coherence-auditor at exit.
 - A second source — Google Play and Opinion Assurances (Phase 3a),
   Trustpilot (Phase 3b); `platform_snapshots` and its four marts (Phase 3a).
 - Per-review segment attribution (which app, digital-first or traditional):
-  Phase 3a's table, keyed on `source_url`; noted there, not a BACKLOG row.
+  Phase 3a's table, joined on `source_url` by exact value (the declared feed
+  address per source) or on a column written in Python — never by a pattern
+  over the URL, which the Portability contract keeps out of SQL; noted there,
+  not a BACKLOG row.
 - The weekly scheduled scrape (Phase 4) — it will call `make scrape
   CONFIRM=yes` from the workflow's command line.
 - `reviews_per_month` as a mart — folded into B5.2 `pipeline_row_counts` when

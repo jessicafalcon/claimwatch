@@ -385,8 +385,10 @@ mart, no model.
   `sql/marts/` file would be an orphan under BACKING.md's rule; it surfaces in
   Beat 5 through B5.2 `pipeline_row_counts` (BACKLOG row). **This narrows the
   brief's Phase 2 "one trivial mart (reviews per month)" to the brief's own
-  Done-when wording, "one queryable metric"; whether PROJECT_BRIEF.md §9 is
-  reworded is the developer's call, as in Phase 1.** Rejected: a new BACKING
+  Done-when wording, "one queryable metric".** On the developer's call at the
+  exit audit (2026-09-02) PROJECT_BRIEF.md §9 Phase 2 was reworded to match,
+  as Phase 1's was, together with its Done-when (the exit-audit entry
+  below). Rejected: a new BACKING
   row (a new study claim needs a SPEC.md panel); flipping B5.2 early with a
   partial mart.
 - **Review round 1 (2026-09-02) — four fix amendments, approved and built:**
@@ -448,5 +450,29 @@ mart, no model.
   rebuild never loads `httpx`; the test suite blocks every socket (conftest).
 - **`httpx` added (pre-approved); `pyyaml` deferred** to `rules.yaml` (5b) —
   nothing in Phase 2 needs YAML.
+- **Exit audit (2026-09-02) — amendment A7 and three record corrections,
+  approved and built.** A7: Done-when items 3 and 4 still said "real rows"
+  after A1 moved the DONE command to the frozen sample; they now say what the
+  phase proves (rows from a capture, the sample being one) and the real-rows
+  proof moves to Phase 3a. **This narrows the brief's Phase 2 Done-when,
+  "`make rebuild` produces real rows"; on the developer's call PROJECT_BRIEF.md
+  §9 Phase 2 was reworded to match** — the frozen-sample form, with real rows
+  landing in Phase 3 from the first source whose robots file allows its feed —
+  so Phase 3's "all sources land with provenance" no longer assumes Phase 2
+  landed one. The corrections: `pipeline/build.py` now runs every SQL file
+  through `warehouse.run_sql_file`, the seam this file, PLAN §4.1 and Phase
+  1's Delivered name (it had no caller since Phase 1); `MAX_CRAWL_DELAY_S =
+  60.0` (a host asking for a longer wait is a one-line refusal, not a day-long
+  sleep) is written into the spec's politeness decision — it had a pin and no
+  record; `docs/PLAN.md` §5 rows 1 and 2 are corrected in place (raw and
+  staging DDL only; the feed's host disallows the path, the metric is a query,
+  the DONE command is the sample form). Two BACKLOG rows opened for Phase 3a:
+  the capture path is hardwired to one platform, and the frozen `robots.txt`
+  is permissive and read by nothing. CLAUDE.md stands at 443 lines
+  against the ~400 cap after the status paragraph was cut back to the plain
+  layer — reported, as the cap asks. Rejected: leaving the brief and the phase
+  disagreeing (the Phase 1 precedent went the other way); dropping
+  `run_sql_file` from the four records instead of calling it (the seam is the
+  design; the bypass was the drift).
 
 **Gotchas:** the live feed is unverified at build — see Gotchas above.

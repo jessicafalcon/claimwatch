@@ -426,31 +426,18 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 ## Current status
 
 **Phase 2 — One scraper, end to end** (`phase-2-scraper`, spec
-`specs/phase-2-scraper.md`): built; review rounds 1 to 4 done, their fixes
-and the six amendments they produced (A1–A6, DECISIONS → Phase 2) in. We can
-now collect published reviews from an app store politely and count how many
+`specs/phase-2-scraper.md`): built; review rounds 1 to 4 and the exit audit
+done, their fixes and amendments A1–A7 in (DECISIONS → Phase 2). We can now
+collect published reviews from an app store politely and count how many
 arrive each month, but the one source we tried asks crawlers not to read its
 review feed, so the counts so far come from a hand-written sample and the
-first real rows wait for a source that allows us. The collector reads the
-site's robots file first and checks every page against it, waits at least two
-seconds between requests (longer if the site asks, up to a minute), says who
-it is, and saves each page exactly as it arrived; the reviewer's name is never
-read. **How this works:** `ingest/` (`robots.py` our own robots.txt matcher,
-`politeness.py` how long we wait and who we say we are, `fetch.py` the only
-`httpx` import) parses the declared shape strictly into Phase 1's eight raw
-columns through the unchanged `load_reviews` guard; each rebuild input builds
-its own database file. `make rebuild` defaults to the captures and prints
-reviews per month (a pinned query in `pipeline/metrics.py`, not a mart). **The
-first live run (2026-09-02) found that the host's robots.txt disallows the
-feed path for every crawler and that the stdlib parser had missed the wildcard
-rule; the capture was deleted and the matcher replaced (DECISIONS → Gotchas
-and the terms position). The DONE command is the frozen-sample form, `make
-rebuild FIXTURE=app-store && make idempotency-check FIXTURE=app-store` (raw 8 /
-staging 8); the synthetic line stays green (raw 40 / staging 39).** Phase 1
-merged (PR #3). Next: the coherence audit, the Delivered paragraph, the PR;
-then Phase 3a — snapshots and the remaining polite sources, starting with one
-whose robots file lets us read its reviews.
+first real rows wait for a source that allows us (Phase 3a). The DONE
+command is `make rebuild FIXTURE=app-store && make idempotency-check
+FIXTURE=app-store` (raw 8 / staging 8); Phase 1's line stays green (raw 40 /
+staging 39). Phase 1 merged (PR #3). Next: the Phase 2 PR; then Phase 3a —
+snapshots and the remaining polite sources, starting with one whose robots
+file lets us read its reviews.
 
-Open BACKLOG rows: **12**.
+Open BACKLOG rows: **14**.
 
 (Update this section at the end of every working day.)
