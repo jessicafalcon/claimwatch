@@ -100,6 +100,30 @@ mechanism's kind or the contract, written before any fix was implemented:
 | **Pending exemption (invariant 3 reworded).** The file-exists clause holds for non-Pending rows; every given path still resolves under `sql/`. The code, BACKING.md and DECISIONS already stated this; the spec was the outlier. | `tests/test_check_backing.py::test_pending_row_is_ok_without_source`, `::test_sql_path_traversal_is_refused` |
 | **SPEC.md names BACKING rows, never `make` targets** (a rule, not code): SPEC.md stays a LIVING doc whose every `make` mention must exist; a chart says which BACKING row backs it, and BACKING's Pending rows carry the not-yet-built paths. Recorded in CLAUDE.md → Writing rules and DECISIONS.md. | `tests/test_check_docs.py::test_every_named_make_target_exists_today` (SPEC.md is in LIVING) |
 
+**Amendment (review round 2, 2026-09-01)** — six dispositions that change a
+mechanism's kind or the contract, written before any fix was implemented:
+
+| Invariant ("for all …, … holds") | Falsified by (scenario test) |
+|---|---|
+| **Source shape, closed at both ends (restates amendment row 1).** For all Measured or Documented rows, every `;`-separated part of the source cell is exactly one of: a URL `https?://…` with no whitespace; a markdown link whose destination is such a URL; a backticked dataset name of two or more lowercase segments joined by `-`, `_`, `.` or `/` (`open-damir-2026-01`, `fixtures/anchors/seed.csv`). Nothing trails a part. So `` `TBD` ``, `[x](javascript:…)`, `[a](../x)`, a blank backtick and "URL then prose" are all refused — the shape is the rule, not a list of bad cases. The SQL-file cell's "no file yet" spelling is likewise declared: blank or `—`, nothing else. | `tests/test_check_backing.py::test_measured_without_source_fails`, `::test_source_shapes_accepted` |
+| **Every row carries its id.** For all BACKING rows, the claim cell starts with `B<beat>.<n>` followed by a space; a row without it is a FAIL (the id is what SPEC.md cites, so it is checked, not asserted). | `tests/test_check_backing.py::test_claim_without_row_id_fails` |
+| **Every REQUIRED section is present (restates amendment row 2).** For all four sections the template marks REQUIRED — Evidence, Invariants, Record updates, Threat model — a missing one is a FAIL, never silence. | `tests/test_review_tools.py::test_gate_fails_on_a_missing_or_empty_required_section` |
+| **A `Freeze:` line grants exactly what it names.** For all `fixtures/**` changes, a `Freeze: fixtures/<name>/` line (trailing slash) covers that directory and requires `fixtures/<name>/MANIFEST.sha256` in the diff; a `Freeze: fixtures/<path>` line covers that one file; a path named in the line never widens to its parent. | `tests/test_review_tools.py::test_fixture_change_without_freeze_line_fails` |
+| **Diff paths are read exactly.** For all paths `git diff` reports, the gate reads each one whole (`-z`, split on NUL), so a path with a space, a quote or a non-ASCII letter still matches `fixtures/` and the record list. | `tests/test_review_tools.py::test_diff_paths_are_read_exactly` |
+| **Tracked prose under `.claude/` is a document class.** For all `.claude/**/*.md`, every relative link resolves and every `make` target named exists — the same checks as a living doc, minus banned words and the glossary (an agent may name a banned word to flag it). | `tests/test_check_docs.py::test_every_named_make_target_exists_today`, `::test_tooling_prose_is_checked` |
+
+Also restored in this round, mechanism unchanged in kind: the BACKLOG count
+check errors (never returns green) when a record file is absent and skips the
+header row by position, not by the word "Item"; `anchors()` strips fenced
+blocks before reading headings; the hook names all four fail-open exits in its
+header and reads its timeout from `RUN_TESTS_TIMEOUT` (digits only, else 120 s)
+so the blocking branch is tested; the study glob covers `study/**/*.html`;
+`.gitignore` covers `.env*`; every test runs with `UV_OFFLINE=1` so no test can
+download; a new test pins the gate's printed line per check (Evidence row 1)
+and one pins `ci.yml`'s SHA pins, read-only token and `--locked` (row 6).
+Amendment row 4 above (SPEC.md names BACKING rows) is vacuous until `SPEC.md`
+exists in Phase 0b — `check_docs` skips an absent living doc.
+
 ## Pinned decisions (do not re-litigate)
 
 - **Gate scripts are stdlib-only and hardened from day one** — spec-path
