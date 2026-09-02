@@ -90,14 +90,22 @@ def check_sources(rows: list[Row]) -> list[str]:
 
 
 def check_sql_files(rows: list[Row], root: Path) -> list[str]:
+    """Every given path RESOLVES under `sql/` (no `..`, no symlink out); a
+    non-Pending row's file exists. A Pending row may name a file not built yet."""
+    sql_root = (root / "sql").resolve()
     errors: list[str] = []
     for r in rows:
-        if r.tag == "Pending":
-            continue
         path = _bare(r.sql_file)
         if path in EMPTY:
-            errors.append(f"line {r.line}: {r.tag} row names no SQL file")
-        elif not path.startswith("sql/") or not (root / path).is_file():
+            if r.tag != "Pending":
+                errors.append(f"line {r.line}: {r.tag} row names no SQL file")
+            continue
+        target = (root / path).resolve()
+        if sql_root not in target.parents:
+            errors.append(
+                f"line {r.line}: SQL path does not resolve under sql/: {path}"
+            )
+        elif r.tag != "Pending" and not target.is_file():
             errors.append(f"line {r.line}: SQL file not found under sql/: {path}")
     return errors
 

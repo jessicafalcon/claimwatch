@@ -82,8 +82,23 @@ def test_missing_sql_file_fails(tmp_path: Path):
     (root / "scripts" / "x.sql").write_text("select 1\n")
     assert check_backing.check_sql_files(_rows(root), root) == [
         "line 7: SQL file not found under sql/: sql/marts/missing.sql",
-        "line 8: SQL file not found under sql/: scripts/x.sql",
+        "line 8: SQL path does not resolve under sql/: scripts/x.sql",
         "line 9: Modeled row names no SQL file",
+    ]
+
+
+def test_sql_path_traversal_is_refused(tmp_path: Path):
+    """`sql/../x` starts with `sql/` as a string but leaves sql/ once resolved;
+    refused for every tag, Pending included (the path is checked, not the file)."""
+    root = _root(
+        tmp_path,
+        "| B1 a | m | `sql/../pyproject.toml` | https://x | Measured |\n"
+        "| B2 b | m | `sql/../later.sql` | — | Pending |\n",
+    )
+    (root / "pyproject.toml").write_text("[project]\n")
+    assert check_backing.check_sql_files(_rows(root), root) == [
+        "line 7: SQL path does not resolve under sql/: sql/../pyproject.toml",
+        "line 8: SQL path does not resolve under sql/: sql/../later.sql",
     ]
 
 
