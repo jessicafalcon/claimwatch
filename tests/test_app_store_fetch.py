@@ -83,6 +83,36 @@ def test_robots_disallow_refuses_before_any_feed_request(tmp_path):
     assert not list(capture.glob("page-*"))
 
 
+def test_the_live_hosts_wildcard_rule_refuses_before_any_feed_request(tmp_path):
+    """The rule the host publishes (`Disallow: /*/rss/*`), against the path the
+    fetcher asks for: refused after robots.txt, no feed page requested."""
+    server = Served(robots="User-agent: *\nDisallow: /*/rss/*\n")
+    with pytest.raises(FetchRefused, match="robots.txt disallows"):
+        scrape(SRC, tmp_path, client=_polite(server, Clock()), stamp=lambda: STAMP)
+    assert server.urls() == ["https://itunes.apple.com/robots.txt"]
+
+
+def test_every_page_is_checked_against_robots_before_its_own_request(tmp_path):
+    """Page 1 allowed, page 2 disallowed: page 1 is fetched and kept, page 2
+    is never asked for."""
+    server = Served(robots="User-agent: *\nDisallow: /*/page=2/*\n")
+    with pytest.raises(FetchRefused, match="disallows .*page=2/json"):
+        scrape(SRC, tmp_path, client=_polite(server, Clock()), stamp=lambda: STAMP)
+    assert server.urls() == ["https://itunes.apple.com/robots.txt", SRC.page_url(1)]
+    capture = tmp_path / SRC.name / STAMP.replace(":", "-")
+    assert (capture / "page-1.json").exists()
+
+
+def test_a_longer_crawl_delay_lengthens_the_wait_and_a_shorter_one_does_not(tmp_path):
+    server, clock = Served(robots="User-agent: *\nDisallow:\nCrawl-delay: 5\n"), Clock()
+    scrape(SRC, tmp_path / "a", client=_polite(server, clock), stamp=lambda: STAMP)
+    assert clock.sleeps == [5.0] * (len(server.requests) - 1)
+    short = "User-agent: *\nDisallow:\nCrawl-delay: 0.1\n"
+    server, clock = Served(robots=short), Clock()
+    scrape(SRC, tmp_path / "b", client=_polite(server, clock), stamp=lambda: STAMP)
+    assert clock.sleeps == [2.0] * (len(server.requests) - 1)
+
+
 def test_robots_error_status_is_a_refusal_and_404_is_not(tmp_path):
     with pytest.raises(FetchRefused, match="robots.txt returned 503"):
         scrape(

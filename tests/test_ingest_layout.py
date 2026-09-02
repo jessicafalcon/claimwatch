@@ -67,6 +67,14 @@ def test_politeness_knobs_live_in_one_module():
     assert politeness.ALLOWED_HOSTS == ("itunes.apple.com",)
 
 
+def test_the_stdlib_robots_parser_is_not_used():
+    """Fix amendment A1: robots.txt is matched by `ingest/robots.py` (RFC 9309)
+    and nowhere else; the prefix-only stdlib parser is absent from the repo."""
+    assert _lines_matching(r"robotparser") == {}
+    hits = _lines_matching(r"^\s*from ingest\.robots import|^\s*import ingest\.robots")
+    assert set(hits) == {"ingest/fetch.py"}, hits
+
+
 def test_pipeline_never_imports_the_fetcher_at_module_level():
     """A rebuild reads captures from disk; the fetcher is loaded only inside the
     `scrape` command, so `make rebuild` never touches `httpx` or the network."""

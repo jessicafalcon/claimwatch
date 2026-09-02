@@ -3,8 +3,10 @@
 test, or a rebuild.
 
 httpx is a small HTTP client; the manners are ours, from `politeness.py`: read
-`robots.txt` first and stop on a disallow, send the identifying User-Agent,
-keep >= MIN_INTERVAL_S between requests to a host, contact only ALLOWED_HOSTS,
+`robots.txt` first (matched by `robots.py`, RFC 9309) and check every page's
+address against it before that page is asked for, send the identifying
+User-Agent, keep >= MIN_INTERVAL_S between requests to a host (more if the
+robots file asks for a longer Crawl-delay), contact only ALLOWED_HOSTS,
 make one request per page with no retry, and never use a proxy (`trust_env=
 False` ignores HTTP(S)_PROXY). Every page is archived byte-exact under the
 capture directory with its provenance beside it, so a rebuild reads no clock
@@ -18,7 +20,6 @@ from __future__ import annotations
 
 import json
 import time
-import urllib.robotparser
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -34,6 +35,7 @@ from ingest.politeness import (
     TIMEOUT_S,
     USER_AGENT,
 )
+from ingest.robots import Robots
 from ingest.sources import AppStoreSource
 
 
@@ -74,6 +76,12 @@ class PoliteClient:
         self._sleep = sleep
         self._clock = clock
         self._last: dict[str, float] = {}
+        self._interval: dict[str, float] = {}  # per host, never below the minimum
+
+    def raise_interval(self, host: str, seconds: float) -> None:
+        """A host's Crawl-delay lengthens our wait for that host; it never
+        shortens it below MIN_INTERVAL_S."""
+        self._interval[host] = max(self._interval.get(host, MIN_INTERVAL_S), seconds)
 
     def close(self) -> None:
         self._client.close()
@@ -84,7 +92,7 @@ class PoliteClient:
             raise FetchRefused(f"refusing: host {host!r} is not in {ALLOWED_HOSTS}")
         last = self._last.get(host)
         if last is not None:
-            wait = MIN_INTERVAL_S - (self._clock() - last)
+            wait = self._interval.get(host, MIN_INTERVAL_S) - (self._clock() - last)
             if wait > 0:
                 self._sleep(wait)
         try:
@@ -100,13 +108,6 @@ def polite_client() -> PoliteClient:
     """The one client for a whole `make scrape`: every source in the run shares
     its per-host clock, so two sources on one host are still >= 2 s apart."""
     return PoliteClient(make_client())
-
-
-def robots_allows(text: str, url: str) -> bool:
-    """stdlib robots parsing; our product token is what the file is matched on."""
-    rp = urllib.robotparser.RobotFileParser()
-    rp.parse(text.splitlines())
-    return rp.can_fetch(USER_AGENT, url)
 
 
 def _write_page(
@@ -164,17 +165,19 @@ def scrape(
         ) from exc
     (capture_dir / "robots.txt").write_bytes(robots.content)
     if robots.status_code == 200:
-        allowed = robots_allows(robots.text, source.page_url(1))
+        rules = Robots.parse(robots.text)
     elif robots.status_code == 404:
-        allowed = True  # no robots file: nothing is disallowed
+        rules = Robots.permissive()  # no robots file: nothing is disallowed
     else:
         raise FetchRefused(f"refusing: robots.txt returned {robots.status_code}")
-    if not allowed:
-        raise FetchRefused(f"refusing: robots.txt disallows {source.page_url(1)}")
+    if rules.crawl_delay is not None:
+        polite.raise_interval(source.host, rules.crawl_delay)
 
     written = 0
     for page in range(1, MAX_PAGES + 1):
         url = source.page_url(page)
+        if not rules.allows(url):  # every page's own address, before its request
+            raise FetchRefused(f"refusing: robots.txt disallows {url}")
         response = polite.get(url)
         if response.status_code != 200:
             raise FetchRefused(f"refusing: {url} returned {response.status_code}")
