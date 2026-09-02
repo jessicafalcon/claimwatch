@@ -80,7 +80,7 @@ robots allows it (Phase 3a).
   rebuild FIXTURE=synthetic && make idempotency-check` (Phase 1's DONE
   command, unchanged: raw 40 / staging 39); `make rebuild FIXTURE=empty`;
   `make test`; `make check-backing` (19 rows, 0 marts); `make check-docs`
-  (BACKLOG count 9).
+  (BACKLOG count 12).
 
 ## Done-when
 
@@ -201,8 +201,8 @@ fetcher writes `page-<n>.json` before parsing it, so one shape change leaves a
 poison page that breaks every later `make rebuild` with a traceback until it is
 deleted by hand. New kind: the fetcher parses first and writes a refused page
 as `page-<n>.refused.json` beside its meta (evidence kept, never loaded);
-`_do_rebuild` turns a `FeedShapeError` from a stored capture into `Refused`
-(one line naming capture, page, item and field, exit 2). Pinned by: a fetch
+the CLI's `main` turns a `FeedShapeError` from a stored capture into the same
+one-line refusal as a `Refused` (naming capture, page, item and field, exit 2). Pinned by: a fetch
 that meets a malformed page leaves `page-1.refused.json` and no `page-1.json`,
 and a rebuild over that capture loads zero rows from it without refusing; a
 hand-corrupted `page-1.json` makes `main(["rebuild"])` return 2 with one
@@ -345,12 +345,15 @@ snapshot commit.
 
 New code:
 - `ingest/__init__.py`; `ingest/sources.py` — the closed tuple of declared
-  sources (`AppStoreSource(name, app_id, country)`), one entry; `ingest/politeness.py`
-  — the knobs, one place; `ingest/fetch.py` — the only `httpx` import:
+  sources (`AppStoreSource(name, app_id, country, listing)`), one entry;
+  `ingest/politeness.py` — the knobs, one place; `ingest/robots.py` — the
+  robots.txt matcher (RFC 9309; amendment A1); `ingest/fetch.py` — the only `httpx` import:
   robots check, spaced requests, byte-exact capture with meta; `ingest/app_store.py`
   — `parse_page` (strict, `FeedShapeError`) and `read_captures(cache_dir)`
   (captures → raw-shape dicts, in capture then page then item order).
 - `pipeline/metrics.py` — `REVIEWS_PER_MONTH` and `reviews_per_month(conn)`.
+- `pipeline/warehouse.py` — `database_for(fixture)`: one file per rebuild input
+  (amendment A2).
 - `pipeline/build.py` — `FIXTURES` widened to the four inputs; `rebuild` gains
   `cache_dir` and the capture-fed branch (calls `read_captures`, then the
   unchanged `load_reviews`); `run_id` from capture ids. `pipeline/cli.py` —
@@ -366,7 +369,8 @@ New fixture (frozen this phase):
   `robots.txt` (a permissive sample), `MANIFEST.sha256`.
 
 New tests:
-- `tests/test_app_store_parser.py`, `tests/test_app_store_fetch.py`,
+- `tests/test_robots.py` (amendment A1); `tests/test_app_store_parser.py`,
+  `tests/test_app_store_fetch.py`,
   `tests/test_ingest_rebuild.py`, `tests/test_ingest_layout.py`,
   `tests/test_offline.py`; `tests/conftest.py` gains the autouse `_no_network`
   fixture (every `socket` connect raises) and scrubs `SOURCE`; `tests/pins.py`
@@ -395,7 +399,7 @@ Freeze: fixtures/app-store/
       set and default; `idempotency-check`'s set); Repo map (`ingest/` now
       exists — fetcher, parser, sources, politeness; `fixtures/app-store/`;
       `pipeline/metrics.py`); Conventions allowlist unchanged (`httpx` was
-      pre-approved); BACKLOG count 6 → 9
+      pre-approved); BACKLOG count 6 → 12
 - [ ] `pyproject.toml`, `uv.lock` — `httpx` pinned
 - [ ] `specs/phase-2-scraper.md` — this spec; the "Delivered" paragraph at exit
 - [ ] BACKING — none (no mart lands; every row stays Pending; 0 orphans)
@@ -473,7 +477,7 @@ coherence-auditor at exit.
   reconcile (0 marts, all Pending); the Repo map marks `ingest/` as existing
   and `classify/`, `models/`, `study/`, `dags/` as future; no stale "Phase 2
   will…" sentence; the brief-narrowing (metric, not mart) is recorded in
-  DECISIONS, not silently applied; the BACKLOG count is 9; the "Scrape
+  DECISIONS, not silently applied; the BACKLOG count is 12; the "Scrape
   politely" decision now names this source's terms position.
 - Stack risk — verified by the developer by hand in the first hour, in a
   browser, before any code (an agent runs no fetch): (1) `itunes.apple.com/robots.txt`

@@ -145,7 +145,8 @@ def _do_reset(args: argparse.Namespace) -> int:
     target = resolve_choice(args.target, ("duckdb",), "duckdb")
     if not confirmed(args.confirm, args.confirm_origin):
         ok = _prompt(
-            "Drop the DuckDB file? This deletes data. [y/N] ",
+            "Drop every DuckDB file (the corpus and one per fixture)? "
+            "This deletes data. [y/N] ",
             "reset: refusing — pass CONFIRM=yes on the command line "
             "(an environment CONFIRM=yes does not count)",
         )
