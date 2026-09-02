@@ -71,12 +71,12 @@ make review-gate SPEC=specs/phase-0a-machinery.md
 
 | Done-when | Proof |
 |---|---|
-| 1 | `make review-gate` prints `review-gate OK: 5/5 checks` (no SPEC: test, lint, docs, backing, fixtures) / `review-gate OK: 7/7 checks` with SPEC (+ evidence, records) |
+| 1 | `make review-gate` prints `review-gate OK: 5/5 checks` (no SPEC: test, lint, docs, backing, fixtures) / `review-gate OK: 7/7 checks` with SPEC (+ evidence, records); the printed shape is pinned by `tests/test_review_tools.py::test_gate_prints_one_line_per_check_and_the_total` |
 | 2 | `tests/test_review_tools.py::test_spec_outside_specs_is_refused`, `::test_gate_fails_on_a_missing_evidence_test_id`, `::test_gate_fails_on_a_record_file_absent_from_the_diff`, `::test_fixture_change_without_freeze_line_fails`, `::test_cli_refusals_are_one_line_exit_2`, `::test_collected_tests_finds_the_suite`, `::test_make_review_gate_refuses_end_to_end` |
 | 3 | `tests/test_check_docs.py::test_check_links_reports_a_broken_link_and_anchor`, `::test_check_make_targets_reports_an_unknown_target`, `::test_check_banned_words_reports_each_hit`, `::test_check_glossary_reports_an_eleventh_term`, `::test_check_backlog_count_reports_a_mismatch`, `::test_every_named_make_target_exists_today`; `make check-docs` prints `check-docs OK` |
 | 4 | `tests/test_check_backing.py::test_empty_table_is_ok`, `::test_missing_sql_file_fails`, `::test_tag_outside_the_four_fails`, `::test_measured_without_source_fails`, `::test_orphan_mart_sql_fails`, `::test_pending_row_is_ok_without_source`; `make check-backing` prints `check-backing OK: 0 rows, 0 marts` |
 | 5 | `tests/test_claude_config.py::test_tracked_claude_config_is_prose_and_hook_scripts_only`, `::test_settings_and_mcp_are_gitignored` |
-| 6 | GitHub Actions `ci / lint-test` green on the PR |
+| 6 | GitHub Actions `ci / lint-test` green on the PR; the workflow's SHA pins, read-only token, `persist-credentials: false` and `--locked` are pinned offline by `tests/test_claude_config.py::test_ci_workflow_is_pinned_and_read_only` |
 
 ## Invariants (REQUIRED)
 
@@ -110,7 +110,7 @@ mechanism's kind or the contract, written before any fix was implemented:
 | **Every REQUIRED section is present (restates amendment row 2).** For all four sections the template marks REQUIRED — Evidence, Invariants, Record updates, Threat model — a missing one is a FAIL, never silence. | `tests/test_review_tools.py::test_gate_fails_on_a_missing_or_empty_required_section` |
 | **A `Freeze:` line grants exactly what it names.** For all `fixtures/**` changes, a `Freeze: fixtures/<name>/` line (trailing slash) covers that directory and requires `fixtures/<name>/MANIFEST.sha256` in the diff; a `Freeze: fixtures/<path>` line covers that one file; a path named in the line never widens to its parent. | `tests/test_review_tools.py::test_fixture_change_without_freeze_line_fails` |
 | **Diff paths are read exactly.** For all paths `git diff` reports, the gate reads each one whole (`-z`, split on NUL), so a path with a space, a quote or a non-ASCII letter still matches `fixtures/` and the record list. | `tests/test_review_tools.py::test_diff_paths_are_read_exactly` |
-| **Tracked prose under `.claude/` is a document class.** For all `.claude/**/*.md`, every relative link resolves and every `make` target named exists — the same checks as a living doc, minus banned words and the glossary (an agent may name a banned word to flag it). | `tests/test_check_docs.py::test_every_named_make_target_exists_today`, `::test_tooling_prose_is_checked` |
+| **Tracked prose under `.claude/` is a document class.** For all `.claude/**/*.md`, every relative link resolves; for all `.claude/commands/*.md`, every `make` target named exists (a command runs today; an agent describes the whole lifecycle, future targets included). No banned-word or glossary check there (an agent names a banned word to flag it). | `tests/test_check_docs.py::test_every_named_make_target_exists_today`, `::test_tooling_prose_is_checked` |
 
 Also restored in this round, mechanism unchanged in kind: the BACKLOG count
 check errors (never returns green) when a record file is absent and skips the

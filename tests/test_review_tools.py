@@ -259,6 +259,53 @@ def test_cli_refusals_are_one_line_exit_2(argv: list[str]):
     assert "Traceback" not in res.stderr
 
 
+def test_gate_prints_one_line_per_check_and_the_total(monkeypatch, tmp_path: Path):
+    """Evidence row 1: the printed shape — `ok   <check>` per check and
+    `review-gate OK: 7/7 checks` with a SPEC, `5/5` without — pinned with every
+    subprocess stubbed green (the real gate runs `make test`, which is this suite)."""
+    spec = tmp_path / "specs" / "s.md"
+    spec.parent.mkdir()
+    spec.write_text(_spec("| 1 | `tests/test_a.py::test_x` |"))
+    monkeypatch.setattr(review_gate, "ROOT", tmp_path)
+    monkeypatch.setattr(review_gate, "run", lambda cmd, cwd: (0, ""))
+    monkeypatch.setattr(review_gate, "make_targets", lambda root: set())
+    monkeypatch.setattr(
+        review_gate,
+        "collected_tests",
+        lambda root: (0, {"tests/test_a.py::test_x"}, ""),
+    )
+    monkeypatch.setattr(review_gate, "resolve_spec", lambda arg, root=None: spec)
+    import io
+    from contextlib import redirect_stdout
+
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        assert review_gate.main(["--spec=specs/s.md"]) == 0
+    lines = buf.getvalue().splitlines()
+    assert lines == [
+        "ok   test",
+        "ok   lint",
+        "ok   docs",
+        "ok   backing",
+        "ok   fixtures",
+        "ok   evidence",
+        "ok   records",
+        "review-gate OK: 7/7 checks",
+    ]
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        assert review_gate.main([]) == 0
+    assert buf.getvalue().splitlines() == [
+        "SKIP evidence, records (no SPEC)",
+        "ok   test",
+        "ok   lint",
+        "ok   docs",
+        "ok   backing",
+        "ok   fixtures",
+        "review-gate OK: 5/5 checks",
+    ]
+
+
 def test_collected_tests_finds_the_suite():
     """The Evidence check reads real node ids (a bare count would make every
     Evidence row FAIL — pyproject's addopts="-q" plus -q did exactly that)."""

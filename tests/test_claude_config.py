@@ -70,3 +70,16 @@ def test_every_agent_is_report_only():
             t.strip() for t in tools.group(1).split(",")
         }, name
 
+
+def test_ci_workflow_is_pinned_and_read_only():
+    """Evidence row 6, the half that needs no push: every action is SHA-pinned,
+    the token is read-only, checkout keeps no credentials, uv syncs --locked."""
+    ci = (ROOT / ".github" / "workflows" / "ci.yml").read_text()
+    uses = re.findall(r"uses:\s*(\S+)", ci)
+    assert uses and all(
+        re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", u) for u in uses
+    ), uses
+    assert re.search(r"^permissions:\n  contents: read$", ci, re.M)
+    assert "persist-credentials: false" in ci
+    assert "uv sync --locked" in ci
+    assert "secrets." not in ci
