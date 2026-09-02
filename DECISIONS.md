@@ -75,11 +75,12 @@ place and never deleted.
     `Disallow: /*/rss/*`).** The first live run fetched one capture before
     the matcher was corrected (see Gotchas); that capture and its database
     were deleted the same day. The source stays declared as a data point (id
-    and listing address) with `fetchable=False` and this reason as its
-    `terms`, so the fetcher refuses it before any request whatever the host's
-    file says on a later day (amendment A5); the fallback is the
-    manual snapshot path above (Phase 3a's `platform_snapshots`), never a
-    different User-Agent or a "syndication feeds don't count" reading.
+    and listing address) but marked not to fetch — `fetchable=False`, with
+    this reason recorded as its `terms` — so the fetcher refuses it before
+    any request, even if the host's file reads differently on a later day
+    (amendment A5); the fallback is the manual snapshot path above (Phase
+    3a's `platform_snapshots`), never a different User-Agent or a
+    "syndication feeds don't count" reading.
     ([Phase 2](#phase-2))
 - **A scraped page is parsed strictly to a declared shape; the page is the
   unit of refusal.** A feed item missing or mis-typing a required field, a
@@ -400,13 +401,17 @@ mart, no model.
   parser's output (a denylist of paths — the kind change is the fix);
   truncating raw on rebuild (raw is append-only; separate files keep both
   properties); dropping refused pages (the evidence is the point).
-- **Review round 2 (2026-09-02) — amendment A5, approved and built:** a 200
-  for `robots.txt` is a robots file only if `text/plain` or carrying a
-  directive line (an HTML catch-all page is a refusal, never permission);
+- **Review round 2 (2026-09-02) — amendment A5, approved and built:** we
+  treat a reply as the site's rules file only when it looks like one — plain
+  text, or carrying a rule line; a decorated error page that answers "OK" is
+  a refusal, never permission (round 3 tightened this further: A6);
   `AppStoreSource` carries `fetchable` and `terms`, so a recorded terms
   position is declared in code and refused before any request rather than
-  inferred from a live fetch; our robots group is selected by substring of
-  the full User-Agent. Rejected: trusting any 200 (the round 1 failure class
+  inferred from a live fetch; we pick the block of rules written for our
+  crawler by looking for its name inside the whole User-Agent line, so a
+  version suffix no longer drops us into the catch-all block (A6 narrows
+  the match and keeps the catch-all block in force beside ours). Rejected:
+  trusting any 200 (the round 1 failure class
   again); keeping the position only in this file (a robots hiccup would
   silently re-enable the fetch); exact token equality (a group written for us
   with a version suffix fell through to `*`, permissively).
