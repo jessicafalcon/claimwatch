@@ -140,3 +140,29 @@ def test_cli_scrape_refuses_an_unfilled_source_before_any_request(capsys, monkey
     assert code == 2
     err = capsys.readouterr().err
     assert "has no app_id" in err
+
+
+def test_cli_scrape_keeps_the_host_interval_across_sources(
+    capsys, monkeypatch, isolated_paths
+):
+    """Two declared sources on one host in one run: the first request of the
+    second source waits the full two seconds after the last of the first. One
+    client, one per-host clock, for the whole `make scrape`."""
+    import ingest.fetch as fetch
+    from ingest.sources import AppStoreSource
+    from pipeline import cli
+    from tests.test_app_store_fetch import Clock, Served, _polite
+
+    server, clock = Served(), Clock()
+    monkeypatch.setattr(fetch, "polite_client", lambda: _polite(server, clock))
+    two = (
+        AppStoreSource(name="one", app_id=1, country="fr"),
+        AppStoreSource(name="two", app_id=2, country="fr"),
+    )
+    monkeypatch.setattr(cli, "SOURCES", two)
+    code = main(["scrape", "--confirm=yes", "--confirm-origin=command line"])
+    assert code == 0
+    n = len(server.requests)
+    assert n == 2 * (1 + 3)  # robots + three sample pages, per source
+    assert clock.sleeps == [2.0] * (n - 1)  # including the gap between sources
+    assert capsys.readouterr().out.count("scrape: ") == 2

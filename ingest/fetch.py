@@ -75,6 +75,9 @@ class PoliteClient:
         self._clock = clock
         self._last: dict[str, float] = {}
 
+    def close(self) -> None:
+        self._client.close()
+
     def get(self, url: str) -> httpx.Response:
         host = urlsplit(url).hostname or ""
         if host not in ALLOWED_HOSTS:
@@ -91,6 +94,12 @@ class PoliteClient:
         finally:
             self._last[host] = self._clock()
         return response
+
+
+def polite_client() -> PoliteClient:
+    """The one client for a whole `make scrape`: every source in the run shares
+    its per-host clock, so two sources on one host are still >= 2 s apart."""
+    return PoliteClient(make_client())
 
 
 def robots_allows(text: str, url: str) -> bool:
@@ -130,7 +139,13 @@ def scrape(
             f"refusing: source {source.name!r} has no app_id — "
             "fill it in ingest/sources.py"
         )
-    polite = client or PoliteClient(make_client())
+    if client is None:
+        own = polite_client()
+        try:
+            return scrape(source, cache_root, client=own, stamp=stamp)
+        finally:
+            own.close()
+    polite = client
     captured_at = stamp()
     capture_dir = cache_root / source.name / captured_at.replace(":", "-")
     if capture_dir.exists():

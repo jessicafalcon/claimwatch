@@ -108,14 +108,19 @@ def _do_scrape(args: argparse.Namespace) -> int:
         )
         if not ok:
             return 2
-    from ingest.fetch import FetchRefused, scrape  # the only network import path
+    # the only network import path
+    from ingest.fetch import FetchRefused, polite_client, scrape
 
-    for source in chosen:
-        try:
-            capture_dir, pages = scrape(source, DEFAULT_CACHE)
-        except FetchRefused as exc:
-            raise Refused(str(exc)) from exc
-        print(f"scrape: {source.name}: {pages} page(s) -> {capture_dir}")
+    polite = polite_client()  # one client, one per-host clock, for every source
+    try:
+        for source in chosen:
+            try:
+                capture_dir, pages = scrape(source, DEFAULT_CACHE, client=polite)
+            except FetchRefused as exc:
+                raise Refused(str(exc)) from exc
+            print(f"scrape: {source.name}: {pages} page(s) -> {capture_dir}")
+    finally:
+        polite.close()
     return 0
 
 
