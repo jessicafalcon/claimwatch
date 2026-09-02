@@ -278,9 +278,10 @@ refusal like the 503 branch. The status and content-type are archived as
 proceeded.
 (b) *Our group never displaces the catch-all group.* The groups written for us
 are those whose non-empty User-agent value is a case-insensitive substring of
-our product token (`friction-ledger`) or has it as a substring (so
-`friction-ledger`, `friction-ledger/0.1`, `FRICTION-LEDGER`, `friction` all
-select; `study`, `github`, `ai`, `f` and `0.1` do not); `*` applies as well,
+our product token (`friction-ledger`) at least three characters long, or has
+the token as a substring (so `friction-ledger`, `friction-ledger/0.1`,
+`FRICTION-LEDGER`, `friction` all select; `study`, `github`, `ai`, `f` and
+`0.1` do not — a one- or two-letter value is noise, not a name); `*` applies as well,
 always. A path is allowed only if both verdicts allow it; the Crawl-delay is
 the longer of the two. An over-broad selector can therefore only tighten.
 (c) *No caller decides which rules bind us.* `Robots.parse(text)` reads the

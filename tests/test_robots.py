@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import pytest
 
-from ingest.robots import Robots, looks_like_robots
+from ingest.robots import PRODUCT_TOKEN, Robots, reads_as_robots
 from ingest.sources import AppStoreSource
 
 FEED = AppStoreSource(
@@ -29,14 +29,44 @@ def test_the_live_hosts_wildcard_rule_disallows_the_feed_path():
         ("Friction-Ledger", True),
         ("FRICTION-LEDGER", True),
         ("friction-ledger/0.1", True),  # our full product token with version
-        ("friction", True),  # a shorter substring: erring inclusive errs restrictive
+        ("friction", True),  # a substring of our token: written for us, tightens
         ("other-bot", False),
+        # substrings of the rest of the User-Agent are NOT us (A6): a group
+        # written for someone else must not become ours
+        ("study", False),
+        ("github", False),
+        ("ai", False),
+        ("f", False),  # a one-letter substring of our token is noise, not a name
+        ("fr", False),
+        ("fri", True),  # three characters of our token: written for us, tightens
+        ("0.1", False),
         ("", False),  # an empty value selects nothing
     ],
 )
-def test_our_group_is_any_whose_value_is_a_substring_of_our_user_agent(agent, selected):
+def test_our_group_is_named_by_our_product_token_only(agent, selected):
     text = f"User-agent: {agent}\nDisallow: /\n\nUser-agent: *\nDisallow:\n"
     assert Robots.parse(text).allows(FEED) is (not selected)
+    assert PRODUCT_TOKEN == "friction-ledger"
+
+
+@pytest.mark.parametrize("agent", ["study", "ai", "f", "0.1", "friction-ledger"])
+def test_no_group_can_loosen_what_the_catch_all_denies(agent):
+    """A6: `*` applies beside ours, always. A foreign-but-similar group with no
+    rules, or our own group allowing everything, leaves `*`'s Disallow in force;
+    a wide selector can only tighten."""
+    empty_group = f"User-agent: *\nDisallow: /\n\nUser-agent: {agent}\nDisallow:\n"
+    assert Robots.parse(empty_group).allows(FEED) is False
+    allow_all = f"User-agent: *\nDisallow: /\n\nUser-agent: {agent}\nAllow: /\n"
+    assert Robots.parse(allow_all).allows(FEED) is False
+
+
+def test_crawl_delay_is_the_longer_of_ours_and_the_catch_alls():
+    ours = "User-agent: friction-ledger\nCrawl-delay: {a}\n"
+    star = "User-agent: *\nCrawl-delay: {b}\n"
+    assert Robots.parse(star.format(b=10) + ours.format(a=2)).crawl_delay == 10.0
+    assert Robots.parse(star.format(b=2) + ours.format(a=10)).crawl_delay == 10.0
+    foreign = "User-agent: study\nCrawl-delay: 99\n"
+    assert Robots.parse(foreign + star.format(b=3)).crawl_delay == 3.0
 
 
 @pytest.mark.parametrize(
@@ -44,37 +74,28 @@ def test_our_group_is_any_whose_value_is_a_substring_of_our_user_agent(agent, se
     [
         ("User-agent: *\nDisallow:\n", True),
         ("# only a comment\nSitemap: https://h/s.xml\n", True),
-        ("crawl-delay: 5", True),
+        ("User-agent: *\ncrawl-delay: 5", True),
+        (
+            "Host: example.org\nUser-agent: *\nDisallow: /a\n",
+            True,
+        ),  # unknown key, right shape
+        ("", True),  # an empty file: no rules
+        ("   \n# nothing but a comment\n", True),
         ("<!doctype html><html><body>Not found</body></html>", False),
-        ("", False),
+        ('<html><a href="https://x/y">x</a><p style="color: red">e</p></html>', False),
+        ('{"error": "not found", "status": 404}', False),
+        ("Service Unavailable", False),
+        ("Disallow: /\n", False),  # a rule before any group: nothing to belong to
+        ("<html><body><pre>  Disallow: /</pre></body></html>", False),
         ("User-agent *\n", False),  # no colon: not a directive line
+        (
+            "User-agent: *\nDisallow: /\n<script>x</script>\n",
+            False,
+        ),  # one bad line spoils it
     ],
 )
-def test_looks_like_robots_wants_at_least_one_directive_line(body, is_robots):
-    assert looks_like_robots(body) is is_robots
-
-
-@pytest.mark.parametrize(
-    ("robots", "allowed"),
-    [
-        ("User-agent: *\nDisallow:\n", True),  # empty Disallow: nothing disallowed
-        ("User-agent: *\nDisallow: /fr/rss/\n", False),  # plain prefix
-        ("User-agent: *\nDisallow: /fr/rss/$\n", True),  # anchored: exact path
-        ("User-agent: *\nDisallow: /*/customerreviews/\n", False),  # inner wildcard
-        ("User-agent: *\nDisallow: /*json$\n", False),  # wildcard then anchor
-        ("User-agent: *\nDisallow: /\nAllow: /fr/rss/\n", True),  # longer wins
-        ("User-agent: *\nAllow: /\nDisallow: /fr/rss/\n", False),  # longer wins
-        ("User-agent: *\nAllow: /fr/rss/\nDisallow: /fr/rss/\n", True),  # tie: Allow
-        ("User-agent: other-bot\nDisallow: /\n", True),  # someone else's group
-        ("User-agent: Friction-Ledger\nDisallow: /\nUser-agent: *\nDisallow:\n", False),
-        ("User-agent: *\nDisallow: /\nUser-agent: friction-ledger\nAllow: /\n", True),
-        ("Disallow: /\n", True),  # a rule before any group applies to no one
-        ("", True),  # an empty file
-        ("# comment only\n\nSitemap: https://x/s.xml\n", True),
-    ],
-)
-def test_matching_and_group_selection(robots: str, allowed: bool):
-    assert Robots.parse(robots).allows(FEED) is allowed
+def test_reads_as_robots_is_decided_by_the_body_alone(body, is_robots):
+    assert reads_as_robots(body) is is_robots
 
 
 def test_consecutive_user_agent_lines_form_one_group():

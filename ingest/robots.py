@@ -1,5 +1,5 @@
-"""robots.txt, matched the way the standard says (RFC 9309), in one small place
-(spec Phase 2, fix amendment A1; invariant 5).
+"""robots.txt, matched the way the standard says (RFC 9309) and then some, in
+one small place (spec Phase 2, amendments A1, A5, A6; invariant 5).
 
 A robots file is a site's list of what it asks crawlers not to fetch. It is
 groups of rules: each group names the crawlers it applies to (`User-agent:`)
@@ -9,11 +9,13 @@ may use `*` for "anything" and a trailing `$` for "ends here", and when two
 rules match the same path the longer one wins. A rule like `Disallow: /*/rss/*`
 therefore covers `/fr/rss/…`, which a prefix-only matcher does not see.
 
-This module parses the file into groups, picks the groups written for us — any
-whose User-agent value is a substring of our full User-Agent (else the `*`
-group; no group means nothing is disallowed) — matches patterns
-with `*` and `$`, lets the longest match win and `Allow` win a tie, and reports
-the group's `Crawl-delay` so the fetcher can wait longer than its own minimum.
+The invariant this module serves (A6): a feed request is made only if the body
+reads as a robots file on its own terms, and the path is allowed by BOTH the
+groups written for us and the catch-all `*` group. So: `reads_as_robots`
+decides from the body alone whether there is a file to obey (an error page
+served with a 200 is not one); the groups written for us are those naming our
+product token (or a substring of it); `*` applies as well, always, so a wide
+selector can only ever tighten; the Crawl-delay is the longer of the two.
 Nothing here fetches; the fetcher hands it the text it archived."""
 
 from __future__ import annotations
@@ -25,7 +27,36 @@ from urllib.parse import urlsplit
 
 from ingest.politeness import USER_AGENT
 
-DIRECTIVES = ("user-agent", "allow", "disallow", "crawl-delay", "sitemap")
+PRODUCT_TOKEN = USER_AGENT.split("/", 1)[0].lower()  # "friction-ledger"
+RULE_KEYS = ("allow", "disallow")
+_DIRECTIVE_LINE = re.compile(
+    r"^[A-Za-z-]+\s*:"
+)  # `<key>: <value>`, letter-or-hyphen key
+
+
+def _lines(text: str) -> list[str]:
+    """Non-blank lines with comments stripped."""
+    out = []
+    for raw in text.splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if line:
+            out.append(line)
+    return out
+
+
+def reads_as_robots(text: str) -> bool:
+    """Whether a 200 body is a robots file, decided by the body alone (A6):
+    every line is directive-shaped, and if any line is a rule there is a
+    `User-agent:` group for it to belong to. An empty body is a robots file
+    with no rules; an HTML or JSON page, a plain-text error, or a rule before
+    any group is not."""
+    lines = _lines(text)
+    if not all(_DIRECTIVE_LINE.match(line) for line in lines):
+        return False
+    keys = [line.partition(":")[0].strip().lower() for line in lines]
+    if any(k in RULE_KEYS for k in keys) and "user-agent" not in keys:
+        return False
+    return True
 
 
 @dataclass
@@ -39,9 +70,8 @@ def _parse_groups(text: str) -> list[_Group]:
     groups: list[_Group] = []
     current: _Group | None = None
     naming = False  # inside a run of consecutive User-agent lines
-    for raw in text.splitlines():
-        line = raw.split("#", 1)[0].strip()
-        if not line or ":" not in line:
+    for line in _lines(text):
+        if ":" not in line:
             continue
         key, _, value = line.partition(":")
         key, value = key.strip().lower(), value.strip()
@@ -53,7 +83,7 @@ def _parse_groups(text: str) -> list[_Group]:
             naming = True
         elif current is None:
             continue  # a rule before any group applies to no one
-        elif key in ("allow", "disallow"):
+        elif key in RULE_KEYS:
             naming = False
             if value:  # an empty `Disallow:` is "nothing disallowed": no rule
                 current.rules.append((key == "allow", value))
@@ -68,35 +98,24 @@ def _parse_groups(text: str) -> list[_Group]:
     return groups
 
 
-def looks_like_robots(text: str) -> bool:
-    """At least one recognised directive line: what makes a 200 body a robots
-    file rather than a catch-all page served with a 200 (amendment A5)."""
-    for raw in text.splitlines():
-        line = raw.split("#", 1)[0].strip()
-        key, sep, _ = line.partition(":")
-        if sep and key.strip().lower() in DIRECTIVES:
-            return True
-    return False
+def _names_us(agent: str) -> bool:
+    """A value that is our product token, has it as a substring
+    (`friction-ledger/0.1`), or is a substring of it at least three characters
+    long (`friction`; a one- or two-letter value is noise, not a name). Never
+    `*`, never the empty value. Selecting too widely only tightens (see
+    `Robots.allows`), so the leniency costs nothing."""
+    if not agent or agent == "*":
+        return False
+    return PRODUCT_TOKEN in agent or (len(agent) >= 3 and agent in PRODUCT_TOKEN)
 
 
-def _select(groups: list[_Group], user_agent: str) -> _Group | None:
-    """The groups written for us — a non-empty User-agent value that is a
-    substring of our full User-Agent, case-insensitively — merged; else the
-    `*` groups; else none. Erring inclusive errs restrictive."""
-    ours = user_agent.lower()
-    for match in (
-        lambda g: any(a and a in ours for a in g.agents),
-        lambda g: "*" in g.agents,
-    ):
-        chosen = [g for g in groups if match(g)]
-        if chosen:
-            merged = _Group()
-            for g in chosen:
-                merged.rules.extend(g.rules)
-                if g.crawl_delay is not None:  # several declared: the longest wait
-                    merged.crawl_delay = max(merged.crawl_delay or 0.0, g.crawl_delay)
-            return merged
-    return None
+def _merge(groups: list[_Group]) -> _Group:
+    merged = _Group()
+    for g in groups:
+        merged.rules.extend(g.rules)
+        if g.crawl_delay is not None:  # several declared: the longest wait
+            merged.crawl_delay = max(merged.crawl_delay or 0.0, g.crawl_delay)
+    return merged
 
 
 def _matches(pattern: str, path: str) -> bool:
@@ -109,34 +128,47 @@ def _matches(pattern: str, path: str) -> bool:
     return re.match(rx + ("$" if anchored else ""), path) is not None
 
 
+def _allowed(rules: tuple[tuple[bool, str], ...], path: str) -> bool:
+    best: tuple[int, bool] | None = None
+    for allow, pattern in rules:
+        if _matches(pattern, path):
+            key = (len(pattern), allow)  # longest wins; on a tie Allow wins
+            if best is None or key > best:
+                best = key
+    return True if best is None else best[1]
+
+
 @dataclass(frozen=True)
 class Robots:
-    """The verdict-giver for one host's robots.txt as it applies to us."""
+    """The verdict-giver for one host's robots.txt as it applies to us: the
+    rules written for us and the catch-all rules, both consulted."""
 
-    rules: tuple[tuple[bool, str], ...]
+    ours: tuple[tuple[bool, str], ...]
+    everyone: tuple[tuple[bool, str], ...]
     crawl_delay: float | None
 
     @classmethod
-    def parse(cls, text: str, user_agent: str = USER_AGENT) -> Robots:
-        group = _select(_parse_groups(text), user_agent)
-        if group is None:
-            return cls((), None)
-        return cls(tuple(group.rules), group.crawl_delay)
+    def parse(cls, text: str) -> Robots:
+        """Which rules bind us is decided here, from the file and our product
+        token — never by a caller."""
+        groups = _parse_groups(text)
+        ours = _merge([g for g in groups if any(_names_us(a) for a in g.agents)])
+        everyone = _merge([g for g in groups if "*" in g.agents])
+        delays = [d for d in (ours.crawl_delay, everyone.crawl_delay) if d is not None]
+        return cls(
+            tuple(ours.rules), tuple(everyone.rules), max(delays) if delays else None
+        )
 
     @classmethod
     def permissive(cls) -> Robots:
         """No robots file (404): nothing is disallowed."""
-        return cls((), None)
+        return cls((), (), None)
 
     def allows(self, url: str) -> bool:
+        """Allowed only if both the rules written for us and the catch-all
+        rules allow it: a group written for us can tighten `*`, never loosen it."""
         parts = urlsplit(url)
         path = parts.path or "/"
         if parts.query:
             path += "?" + parts.query
-        best: tuple[int, bool] | None = None
-        for allow, pattern in self.rules:
-            if _matches(pattern, path):
-                key = (len(pattern), allow)  # longest wins; on a tie Allow wins
-                if best is None or key > best:
-                    best = key
-        return True if best is None else best[1]
+        return _allowed(self.ours, path) and _allowed(self.everyone, path)

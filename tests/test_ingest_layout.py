@@ -85,6 +85,12 @@ def test_the_stdlib_robots_parser_is_not_used():
     assert _lines_matching(r"robotparser") == {}
     hits = _lines_matching(r"^\s*from ingest\.robots import|^\s*import ingest\.robots")
     assert set(hits) == {"ingest/fetch.py"}, hits
+    # A6: which rules bind us is never a caller's value — parse takes the text only.
+    import inspect
+
+    from ingest.robots import Robots
+
+    assert list(inspect.signature(Robots.parse).parameters) == ["text"]
 
 
 def test_pipeline_never_imports_the_fetcher_at_module_level():

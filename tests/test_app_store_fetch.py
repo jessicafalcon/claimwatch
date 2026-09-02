@@ -134,38 +134,83 @@ def test_a_crawl_delay_above_the_ceiling_is_a_one_line_refusal(tmp_path):
     assert clock.sleeps == []
 
 
-def test_a_200_that_is_not_a_robots_file_is_a_refusal_not_permission(tmp_path):
-    """Amendment A5(a): an HTML catch-all page served with a 200 for robots.txt
-    is refused before any feed request — a rule we cannot see is never
-    permission. A body that reads as a robots file is accepted whatever its
-    content-type; an empty text/plain body is a robots file with no rules."""
+class _RobotsAs:
+    """A server whose robots.txt answer has a chosen body and content-type;
+    feed pages come from the sample. Logs every request."""
 
-    def html(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, html="<!doctype html><html><body>?</body></html>")
+    def __init__(self, body: bytes, content_type: str | None) -> None:
+        self.body, self.content_type = body, content_type
+        self.urls: list[str] = []
 
-    polite = PoliteClient(make_client(httpx.MockTransport(html)), sleep=lambda s: None)
-    with pytest.raises(FetchRefused, match="not a robots file") as exc:
-        scrape(SRC, tmp_path / "a", client=polite, stamp=lambda: STAMP)
-    assert "text/html" in str(exc.value) and "\n" not in str(exc.value)
-
-    def octet(request: httpx.Request) -> httpx.Response:
+    def __call__(self, request: httpx.Request) -> httpx.Response:
+        self.urls.append(str(request.url))
         if request.url.path == "/robots.txt":
-            return httpx.Response(
-                200,
-                content=b"User-agent: *\nDisallow:\n",
-                headers={"content-type": "application/octet-stream"},
+            headers = (
+                {} if self.content_type is None else {"content-type": self.content_type}
             )
+            return httpx.Response(200, content=self.body, headers=headers)
         return httpx.Response(200, content=(SAMPLE / "page-3.json").read_bytes())
 
-    polite = PoliteClient(make_client(httpx.MockTransport(octet)), sleep=lambda s: None)
-    _, pages = scrape(SRC, tmp_path / "b", client=polite, stamp=lambda: STAMP)
+
+NOT_ROBOTS = (
+    b'<!doctype html><html><a href="https://x/y">x</a>'
+    b'<p style="color: red">?</p></html>',
+    b'{"error": "not found", "status": 404}',
+    b"Service Unavailable",
+    b"Disallow: /\n",
+)
+CONTENT_TYPES = ("text/plain; charset=utf-8", "text/html", None)
+
+
+@pytest.mark.parametrize("content_type", CONTENT_TYPES)
+@pytest.mark.parametrize("body", NOT_ROBOTS)
+def test_a_200_whose_body_is_not_a_robots_file_refuses_before_any_feed_request(
+    tmp_path, body, content_type
+):
+    """A6: the body alone decides; the content-type is recorded, never trusted.
+    An HTML page (with colons in it), a JSON error, a plain-text error and a
+    rule before any group each refuse under text/plain, text/html and no
+    content-type alike, with only /robots.txt requested."""
+    server = _RobotsAs(body, content_type)
+    polite = PoliteClient(
+        make_client(httpx.MockTransport(server)), sleep=lambda s: None
+    )
+    with pytest.raises(FetchRefused, match="body is not a robots file") as exc:
+        scrape(SRC, tmp_path, client=polite, stamp=lambda: STAMP)
+    assert "\n" not in str(exc.value)
+    assert server.urls == ["https://itunes.apple.com/robots.txt"]
+    capture = tmp_path / SRC.name / STAMP.replace(":", "-")
+    meta = json.loads((capture / "robots.meta.json").read_text())
+    assert meta == {"status": 200, "content_type": content_type or ""}
+    assert (capture / "robots.txt").read_bytes() == body
+
+
+@pytest.mark.parametrize("content_type", CONTENT_TYPES)
+@pytest.mark.parametrize(
+    "body", [b"", b"Sitemap: https://h/s.xml\n", b"User-agent: *\nDisallow:\n"]
+)
+def test_a_body_that_reads_as_a_robots_file_is_obeyed_whatever_its_content_type(
+    tmp_path, body, content_type
+):
+    """An empty file, a sitemap-only file and an allow-all file are robots files
+    with no rule against us, under any content-type or none."""
+    server = _RobotsAs(body, content_type)
+    polite = PoliteClient(
+        make_client(httpx.MockTransport(server)), sleep=lambda s: None
+    )
+    _, pages = scrape(SRC, tmp_path, client=polite, stamp=lambda: STAMP)
     assert pages == 1
 
-    server = Served(robots="")  # text/plain, empty: nothing disallowed
-    _, pages = scrape(
-        SRC, tmp_path / "c", client=_polite(server, Clock()), stamp=lambda: STAMP
+
+def test_a_foreign_group_cannot_loosen_the_catch_all_in_the_fetcher(tmp_path):
+    """End to end: `*` disallows the feed, a `study` group says nothing; the
+    fetch is refused after robots.txt with no feed request (A6)."""
+    server = Served(
+        robots="User-agent: *\nDisallow: /*/rss/*\n\nUser-agent: study\nDisallow:\n"
     )
-    assert pages == pins.APP_STORE_SAMPLE_PAGES
+    with pytest.raises(FetchRefused, match="robots.txt disallows"):
+        scrape(SRC, tmp_path, client=_polite(server, Clock()), stamp=lambda: STAMP)
+    assert server.urls() == ["https://itunes.apple.com/robots.txt"]
 
 
 def test_a_source_declared_not_fetchable_is_refused_before_any_request(tmp_path):
@@ -250,6 +295,8 @@ def test_pages_are_archived_byte_exact_with_meta(tmp_path):
             "status": 200,
         }
     assert (capture / "robots.txt").read_text() == server.robots
+    robots_meta = json.loads((capture / "robots.meta.json").read_text())
+    assert robots_meta == {"status": 200, "content_type": "text/plain; charset=utf-8"}
 
 
 def test_stops_at_the_end_of_the_feed_and_never_beyond_max_pages(tmp_path):

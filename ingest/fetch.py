@@ -36,7 +36,7 @@ from ingest.politeness import (
     TIMEOUT_S,
     USER_AGENT,
 )
-from ingest.robots import Robots, looks_like_robots
+from ingest.robots import Robots, reads_as_robots
 from ingest.sources import AppStoreSource
 
 
@@ -180,14 +180,22 @@ def scrape(
             f"refusing: capture {capture_dir} already exists (same second?)"
         ) from exc
     (capture_dir / "robots.txt").write_bytes(robots.content)
+    content_type = robots.headers.get("content-type", "")
+    (capture_dir / "robots.meta.json").write_text(  # why the run proceeded (A6)
+        json.dumps(
+            {"status": robots.status_code, "content_type": content_type}, indent=2
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     if robots.status_code == 200:
-        # A 200 is a robots file only if it says so (text/plain) or reads as one;
-        # a catch-all page served with a 200 is a refusal, never permission.
-        ctype = robots.headers.get("content-type", "").split(";")[0].strip().lower()
-        if ctype != "text/plain" and not looks_like_robots(robots.text):
+        # The body alone decides whether this is a robots file; the content-type
+        # is recorded, never trusted. An error page served with a 200 is a
+        # refusal, never permission (A6).
+        if not reads_as_robots(robots.text):
             raise FetchRefused(
-                f"refusing: robots.txt returned 200 but is not a robots file "
-                f"(content-type {ctype or 'none'!r})"
+                f"refusing: robots.txt returned 200 but its body is not a robots file "
+                f"(content-type {content_type.split(';')[0].strip() or 'none'!r})"
             )
         rules = Robots.parse(robots.text)
     elif robots.status_code == 404:
