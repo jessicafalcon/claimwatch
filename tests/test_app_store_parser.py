@@ -112,6 +112,7 @@ def test_rating_outside_1_to_5_is_refused(label):
         "2026-01-18",  # a date alone: the declared shape is a timestamp with offset
         "2026-01-18T09:15:00",  # no offset
         "18/01/2026 09:15",
+        "20260118T091500+00:00",  # basic ISO form: parses, first ten chars are no date
     ],
 )
 def test_malformed_timestamp_is_refused(label):
