@@ -26,9 +26,16 @@ def main() -> None:
     except (json.JSONDecodeError, UnicodeDecodeError, OSError):
         sys.exit(0)
 
-    ti = data.get("tool_input", {}) or {}
-    fp = ti.get("file_path", "") or ""
-    if not fp.lower().endswith(CODE_SUFFIXES):
+    # The event is an input this repo does not own: parse it to the one shape
+    # we act on (a dict with a dict tool_input carrying a str file_path) and
+    # fail OPEN on anything else — never a traceback.
+    if not isinstance(data, dict):
+        sys.exit(0)
+    ti = data.get("tool_input")
+    if not isinstance(ti, dict):
+        sys.exit(0)
+    fp = ti.get("file_path")
+    if not isinstance(fp, str) or not fp.lower().endswith(CODE_SUFFIXES):
         sys.exit(0)  # not code — skip silently; only "tests green" means "ran"
 
     root = os.environ.get("CLAUDE_PROJECT_DIR", "")
@@ -45,12 +52,12 @@ def main() -> None:
 
     venv_pytest = os.path.join(".venv", "bin", "pytest")
     if os.path.exists(venv_pytest):
-        cmd = [venv_pytest, "-q"]
+        cmd = [venv_pytest]  # pyproject already sets addopts="-q"
     else:
         from shutil import which
 
         if which("pytest"):
-            cmd = ["pytest", "-q"]
+            cmd = ["pytest"]
         else:
             print(
                 "[run-tests] pytest not found yet — run `make setup`.", file=sys.stderr

@@ -73,7 +73,15 @@ def test_non_code_and_outside_files_are_skipped(tmp_path: Path):
 
 def test_malformed_input_fails_open(tmp_path: Path):
     p = _project(tmp_path, RED)
-    for bad in ("not json", ""):
+    shapes = (
+        "not json",
+        "",
+        json.dumps([1, 2]),
+        json.dumps({"tool_input": "a string"}),
+        json.dumps({"tool_input": {"file_path": 7}}),
+        json.dumps({"tool_input": {}}),
+    )
+    for bad in shapes:
         res = _hook(bad, p)
         assert res.returncode == 0 and "Traceback" not in res.stderr, bad
     assert _hook(_event(p), None).returncode == 0  # no CLAUDE_PROJECT_DIR
