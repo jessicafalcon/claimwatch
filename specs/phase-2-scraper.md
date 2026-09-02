@@ -56,30 +56,31 @@ agent.
 ## DONE command
 
 ```
-make rebuild && make idempotency-check FIXTURE=cache
+make rebuild FIXTURE=app-store && make idempotency-check FIXTURE=app-store
 ```
 
-Precondition: `data/cache/app-store/` holds at least one capture, written by
-the developer's `make scrape CONFIRM=yes` (the one network step of the phase,
-~11 requests, ~25 s). The agents and CI run the same path offline on the frozen
-sample: `make rebuild FIXTURE=app-store && make idempotency-check
-FIXTURE=app-store`.
+Amended 2026-09-02 (fix amendment A1, approved). It was `make rebuild && make
+idempotency-check FIXTURE=cache` over a live capture. The first live run showed
+the host's `robots.txt` disallows the feed path for every crawler, so a capture
+of this source cannot be the phase's proof; that capture and its database were
+deleted. The DONE command is the real parser over the frozen capture, offline
+— the same path CI runs. The real-rows proof moves to the first source whose
+robots allows it (Phase 3a).
 
-- `make rebuild` — with no `FIXTURE`, the real run: every cached capture under
-  `data/cache/app-store/` is parsed strictly, loaded into `raw_reviews` through
-  Phase 1's guard, `stg_reviews` is rebuilt, and the per-table counts are
-  printed followed by the reviews-per-month table. Offline: it reads the cache,
-  never the network. Zero captures → zero rows (a fresh clone behaves as in
-  Phase 1, with a one-line hint to run `make scrape`).
-- `make idempotency-check FIXTURE=cache` — rebuilds twice from the same
-  captures into a throwaway database and diffs per-table counts: the run-twice
-  property on real rows.
-- Also green: `make rebuild FIXTURE=synthetic && make idempotency-check`
-  (Phase 1's DONE command, unchanged: raw 40 / staging 39); `make rebuild
-  FIXTURE=empty` (the explicit zero-row run); `make rebuild FIXTURE=app-store`
-  (the frozen sample through the real parser — the `tests/pins.py` sample
-  counts and months; CI runs it); `make test`; `make check-backing` (19 rows,
-  0 marts); `make check-docs` (BACKLOG count 7).
+- `make rebuild FIXTURE=app-store` — the frozen capture is parsed strictly,
+  loaded into `raw_reviews` through Phase 1's guard, `stg_reviews` is rebuilt,
+  and the per-table counts are printed followed by the reviews-per-month
+  table: raw 8 / staging 8, three months (`tests/pins.py`). Each input builds
+  its own database file (A2), so the counts are the sample's own.
+- `make idempotency-check FIXTURE=app-store` — rebuilds twice from the same
+  capture into a throwaway database and diffs per-table counts.
+- Also green: `make rebuild` (the default, `cache`: every capture under
+  `data/cache/app-store/` through the same path; zero captures → zero rows
+  with a one-line hint) and `make idempotency-check FIXTURE=cache`; `make
+  rebuild FIXTURE=synthetic && make idempotency-check` (Phase 1's DONE
+  command, unchanged: raw 40 / staging 39); `make rebuild FIXTURE=empty`;
+  `make test`; `make check-backing` (19 rows, 0 marts); `make check-docs`
+  (BACKLOG count 9).
 
 ## Done-when
 
@@ -124,7 +125,7 @@ FIXTURE=app-store`.
 | 1 | `tests/test_app_store_fetch.py::test_robots_disallow_refuses_before_any_feed_request`, `::test_every_request_carries_the_identifying_user_agent`, `::test_consecutive_requests_are_spaced_two_seconds`, `::test_pages_are_archived_byte_exact_with_meta`, `::test_non_200_is_a_one_line_refusal_with_no_retry`; `tests/test_makefile.py::test_scrape_requires_command_line_confirm`, `::test_scrape_source_is_a_closed_set`; `tests/test_ingest_layout.py::test_politeness_knobs_live_in_one_module` |
 | 2 | `tests/test_app_store_parser.py::test_well_formed_item_maps_to_the_eight_raw_columns`, `::test_missing_required_field_refuses_the_page` (parametrized over every required field), `::test_mistyped_field_refuses_the_page`, `::test_rating_outside_1_to_5_is_refused`, `::test_malformed_timestamp_is_refused`, `::test_refusal_names_page_item_and_field`, `::test_author_fields_are_never_read` |
 | 3 | `make rebuild` prints per-table counts and the `reviews_per_month` table; `tests/test_ingest_rebuild.py::test_rebuild_from_sample_matches_pins`, `::test_reviews_per_month_matches_pins`; code-reviewer confirms `load_reviews` is unchanged and `sql/` gains no file; functionality-tester runs the DONE command |
-| 4 | `make idempotency-check FIXTURE=cache` prints every count unchanged; `tests/test_ingest_rebuild.py::test_second_rebuild_from_captures_adds_no_rows`, `::test_second_capture_of_unchanged_pages_adds_no_rows`, `::test_edited_review_in_a_later_capture_appends_one_row`, `::test_reviews_per_month_is_stable_across_rebuilds` |
+| 4 | `make idempotency-check FIXTURE=app-store` prints every count unchanged (and `FIXTURE=cache` on zero captures); `tests/test_ingest_rebuild.py::test_second_rebuild_from_captures_adds_no_rows`, `::test_second_capture_of_unchanged_pages_adds_no_rows`, `::test_edited_review_in_a_later_capture_appends_one_row`, `::test_reviews_per_month_is_stable_across_rebuilds` |
 | 5 | `tests/test_ingest_rebuild.py::test_rebuild_from_captures_is_byte_stable_under_a_moving_clock`; `tests/test_sql_portable.py::test_metric_query_is_portable_and_clock_free`; `tests/test_ingest_layout.py::test_httpx_is_imported_only_by_the_fetcher`; `tests/test_offline.py::test_socket_connect_is_blocked_in_the_suite` |
 | 6 | `tests/test_ingest_layout.py::test_exactly_one_source_is_declared`; `tests/test_fixtures_frozen.py::test_manifests_match` (extended to `fixtures/app-store/`); `tests/test_app_store_parser.py::test_sample_is_obviously_fake_and_nameless`; security-reviewer confirms no real review or name in a tracked file and `data/cache/` is gitignored |
 
@@ -173,7 +174,10 @@ the real-rows proof moves to the first source whose robots allows it (Phase
 3a), the 2026-09-02 capture and the working database built from it are
 deleted, and DECISIONS records the disallow under the terms position. The app
 id stays a sourced data point only if a source URL is recorded beside it
-(code-reviewer #7); otherwise it returns to 0.
+(code-reviewer #7); otherwise it returns to 0. *Decided 2026-09-02:* all of
+the above; the id stays with its listing address beside it; study-editor's
+`FIXTURE` → `ROWS` rename is deferred to a BACKLOG row (it touches the DONE
+command and every doc).
 
 **A2 — one database file per input; a fixture can never land in the real
 corpus** (code-reviewer #3, functionality-tester #3). Restores invariant 3 as
@@ -264,8 +268,11 @@ snapshot commit.
   only `httpx` import; every capture is archived byte-exact.** Constants:
   `MIN_INTERVAL_S = 2.0` per host, `USER_AGENT` naming the project and its
   repository, `TIMEOUT_S`, `MAX_PAGES = 10`, `ALLOWED_HOSTS = ("itunes.apple.com",)`.
-  The fetcher reads `robots.txt` with stdlib `urllib.robotparser` before the
-  first feed request and refuses on disallow; it sleeps to honour the interval;
+  The fetcher reads `robots.txt` before the first feed request and checks
+  every page's address against it with `ingest/robots.py` (RFC 9309: `*`, `$`,
+  longest match wins, Crawl-delay honoured — fix amendment A1 replaced the
+  stdlib parser, which matches prefixes only on 3.12); it sleeps to honour the
+  interval;
   it makes at most one request per page with no retry (a non-200 or timeout is
   a one-line refusal, the developer re-runs); it never sets a proxy and never
   varies the User-Agent. Each run writes one capture:
@@ -388,7 +395,7 @@ Freeze: fixtures/app-store/
       set and default; `idempotency-check`'s set); Repo map (`ingest/` now
       exists — fetcher, parser, sources, politeness; `fixtures/app-store/`;
       `pipeline/metrics.py`); Conventions allowlist unchanged (`httpx` was
-      pre-approved); BACKLOG count 6 → 7
+      pre-approved); BACKLOG count 6 → 9
 - [ ] `pyproject.toml`, `uv.lock` — `httpx` pinned
 - [ ] `specs/phase-2-scraper.md` — this spec; the "Delivered" paragraph at exit
 - [ ] BACKING — none (no mart lands; every row stays Pending; 0 orphans)
@@ -466,7 +473,7 @@ coherence-auditor at exit.
   reconcile (0 marts, all Pending); the Repo map marks `ingest/` as existing
   and `classify/`, `models/`, `study/`, `dags/` as future; no stale "Phase 2
   will…" sentence; the brief-narrowing (metric, not mart) is recorded in
-  DECISIONS, not silently applied; the BACKLOG count is 7; the "Scrape
+  DECISIONS, not silently applied; the BACKLOG count is 9; the "Scrape
   politely" decision now names this source's terms position.
 - Stack risk — verified by the developer by hand in the first hour, in a
   browser, before any code (an agent runs no fetch): (1) `itunes.apple.com/robots.txt`

@@ -89,7 +89,9 @@ in the middle, and come out on the right as the numbers the study shows.
   exactly as they arrived, with each page's address and time beside it and the
   robots file they were checked against. `politeness.py` (the good manners of
   a fetch in one place: read robots.txt first, say who we are, wait between
-  requests), `sources.py` (the declared sources, a closed set), `app_store.py`
+  requests), `robots.py` (the robots.txt matcher, RFC 9309: `*`, `$`, longest
+  match wins, Crawl-delay), `sources.py` (the declared sources, a closed set;
+  each a sourced data point — id and listing address, never a name), `app_store.py`
   (the strict parser to the raw shape; reads captures back), `fetch.py` (the
   only `httpx` import; writes captures under `data/cache/`). *(Phase 3)*
   snapshot capture and the other sources. *(Phase 5+)*
@@ -117,20 +119,25 @@ in the middle, and come out on the right as the numbers the study shows.
   SPEC/BASE. `/review-round N` runs it first.
 - `make rebuild [TARGET=duckdb] [FIXTURE=cache|empty|synthetic|app-store]` —
   build the warehouse from raw (DuckDB; Snowflake defers to Phase 10) and print
-  reviews per month. The default, `cache`, loads every capture under
+  reviews per month. Each input builds its own database file, so a fixture
+  never lands in the corpus. The default, `cache`, loads every capture under
   `data/cache/app-store/` (with no capture it loads nothing and says so); `empty`
   runs it end to end with zero rows; `synthetic` loads the fixture;
-  `app-store` runs the frozen sample through the real parser (CI does).
+  `app-store` runs the frozen sample through the real parser (CI does; the
+  Phase 2 DONE command).
 - `make idempotency-check [TARGET=] [FIXTURE=synthetic]` — rebuild twice, diff
   per-table row counts (the run-twice property as a command); same `FIXTURE`
   values as `rebuild`, but this one defaults to `synthetic`; pass
   `FIXTURE=cache` to prove it on real rows.
 - `make scrape [SOURCE=<declared name>]` — NETWORK, developer-run, never by an
   agent: fetch the declared source's public review feed into a new capture
-  under `data/cache/`, robots.txt first, ≥ 2 s apart, identifying User-Agent,
-  no proxy, no retry. Needs `CONFIRM=yes` on the command line (`$(origin
-  CONFIRM)`, as `reset`); refuses a source whose app id is not filled in.
-- `make reset [TARGET=duckdb]` — DESTRUCTIVE: drop the DuckDB file; needs
+  under `data/cache/`, robots.txt first and every page checked against it,
+  ≥ 2 s apart (more if the site asks), identifying User-Agent, no proxy, no
+  retry. Needs `CONFIRM=yes` on the command line (`$(origin CONFIRM)`, as
+  `reset`); refuses a source whose app id is not filled in, and one whose feed
+  path robots.txt disallows.
+- `make reset [TARGET=duckdb]` — DESTRUCTIVE: drop the DuckDB files (the
+  corpus and each fixture's own); needs
   `CONFIRM=yes` on the command line (`$(origin CONFIRM)`; an environment
   `CONFIRM=yes` does not count).
 
@@ -416,22 +423,31 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 ## Current status
 
 **Phase 2 — One scraper, end to end** (`phase-2-scraper`, spec
-`specs/phase-2-scraper.md`): built on the frozen sample; pre-review. `ingest/`
-fetches the App Store customer-reviews feed politely (robots.txt first, ≥ 2 s,
-identifying User-Agent, allowlisted host, no proxy, no retry) into byte-exact
-captures under `data/cache/`, and parses the declared shape strictly into
-Phase 1's eight raw columns through the unchanged `load_reviews` guard; the
-page is the unit of refusal and the reviewer's name is never read. `make
-rebuild` now defaults to the captures and prints reviews per month (a pinned
-query in `pipeline/metrics.py`, not a mart — check-backing stays 19 rows, 0
-marts). `make rebuild FIXTURE=app-store && make idempotency-check
-FIXTURE=app-store` is green (raw 8 / staging 8, three months); the synthetic
-line stays green (raw 40 / staging 39). **The live feed has not been fetched
-yet: the developer fills the app id in `ingest/sources.py`, runs `make scrape
-CONFIRM=yes`, then the DONE command; the feed's real shape is confirmed by that
-first run (DECISIONS → Gotchas).** Phase 1 merged (PR #3). Next: review round
-1, then Phase 3a — snapshots and the remaining polite sources.
+`specs/phase-2-scraper.md`): built; review round 1 done, its fixes and the
+four approved amendments (A1–A4) in; round 2 next. We can now collect
+published reviews from one app store politely and count how many arrive each
+month. The collector reads the site's robots file first and checks every page
+against it, waits at least two seconds between requests (longer if the site
+asks), says who it is, and saves each page exactly as it arrived; the
+reviewer's name is never read. **How this works:** `ingest/` (`robots.py` our
+RFC 9309 matcher, `politeness.py` the knobs, `fetch.py` the only `httpx`
+import) parses the declared shape strictly into Phase 1's eight raw columns
+through the unchanged `load_reviews` guard; the page is the unit of refusal, a
+refused page is archived under a name no rebuild loads, and each rebuild input
+builds its own database file. `make rebuild` defaults to the captures and
+prints reviews per month (a pinned query in `pipeline/metrics.py`, not a mart
+— check-backing stays 19 rows, 0 marts). **The first live run (2026-09-02)
+found that the host's robots.txt disallows the feed path for every crawler
+and that the stdlib parser had missed the wildcard rule. The capture was
+deleted, the matcher replaced (A1), and the DONE command is now the
+frozen-sample form, `make rebuild FIXTURE=app-store && make idempotency-check
+FIXTURE=app-store` (raw 8 / staging 8, three months). The real-rows proof
+moves to the first robots-allowed source in Phase 3a; this source stays
+declared as a data point (DECISIONS → terms position).** The synthetic line
+stays green (raw 40 / staging 39). Phase 1 merged (PR #3). Next: review round
+2 (scoped to the fixes), coherence audit, Delivered paragraph, PR; then Phase
+3a — snapshots and the remaining polite sources.
 
-Open BACKLOG rows: **7**.
+Open BACKLOG rows: **9**.
 
 (Update this section at the end of every working day.)

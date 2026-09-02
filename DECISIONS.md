@@ -70,7 +70,15 @@ place and never deleted.
     the manners above and `robots.txt` read first; a disallow, a block or a
     non-200 stops the run with one line and no retry. The pages are archived
     under gitignored `data/` and never published; the reviewer's name is never
-    read into the warehouse. ([Phase 2](#phase-2))
+    read into the warehouse. **Position as of 2026-09-02: the host's
+    `robots.txt` disallows the feed path for every crawler (`User-agent: *`,
+    `Disallow: /*/rss/*`).** The first live run fetched one capture before
+    the matcher was corrected (see Gotchas); that capture and its database
+    were deleted the same day. The source stays declared as a data point (id
+    and listing address) and the fetcher refuses it; the fallback is the
+    manual snapshot path above (Phase 3a's `platform_snapshots`), never a
+    different User-Agent or a "syndication feeds don't count" reading.
+    ([Phase 2](#phase-2))
 - **A scraped page is parsed strictly to a declared shape; the page is the
   unit of refusal.** A feed item missing or mis-typing a required field, a
   rating outside 1–5 or a non-ISO timestamp refuses the whole page, naming
@@ -136,14 +144,24 @@ place and never deleted.
 
 Each entry: the surprise, the official-docs check, what we did.
 
-- **Phase 2 — the live feed is unverified at build.** An agent runs no fetch,
-  so the build session could not check `itunes.apple.com/robots.txt`, the
-  feed's field names, whether a one-review page returns `entry` as an object
-  rather than a list, or what a page past the last returns. The parser
-  implements the shape the spec declares; the developer's first `make scrape
-  CONFIRM=yes` is the check. A mismatch is a one-line `FeedShapeError` naming
-  the field, and the fix is a declared, tested widening — recorded here when
-  it happens.
+- **Phase 2 — the live feed, checked by the first run (2026-09-02).** An agent
+  runs no fetch, so the build session could not check the feed; the developer's
+  first `make scrape CONFIRM=yes` was the check. Result: the field names match
+  the declared shape (8 pages, 316 items, every page parsed, no widening
+  needed); the feed ended at page 8 with an empty page, which the fetcher
+  treats as the end.
+- **Phase 2 — Python 3.12's `urllib.robotparser` matches prefixes only.** The
+  same run read the host's `robots.txt`, which carries `Disallow: /*/rss/*`
+  under `User-agent: *`, and passed it: the stdlib parser on the pinned
+  interpreter ignores `*` and `$` (RFC 9309 wildcard support arrived in
+  3.14), so a rule written with a wildcard is invisible to it, and the spec's
+  own disallow test used a plain prefix, so the suite could not catch it.
+  Official-docs check: the 3.12 `urllib.robotparser` page describes no
+  pattern syntax. What we did: fix amendment A1 — our own matcher in
+  `ingest/robots.py`, checked for every page, pinned by the real rule against
+  the real path; the disallowed capture and its database were deleted; the
+  DONE command moved to the frozen-sample form; the terms position above
+  records the disallow.
 
 ## Appendix — by phase
 
@@ -368,6 +386,18 @@ mart, no model.
   reworded is the developer's call, as in Phase 1.** Rejected: a new BACKING
   row (a new study claim needs a SPEC.md panel); flipping B5.2 early with a
   partial mart.
+- **Review round 1 (2026-09-02) — four fix amendments, approved and built:**
+  A1 robots matched by `ingest/robots.py` (RFC 9309) for every page, with
+  Crawl-delay raising the per-host wait — the stdlib parser is gone; A2 one
+  database file per rebuild input (`warehouse.database_for`), so a fixture
+  never lands in the corpus and `reset` drops the closed set; A3 a page the
+  strict parser refuses is archived as `page-<n>.refused.json` (kept, never
+  loaded) and a malformed stored page is a one-line refusal from `rebuild`;
+  A4 capture meta parsed strictly (`captured_at` a real instant, `source_url`
+  https on an allowed host, `status` 200). Rejected: patching the stdlib
+  parser's output (a denylist of paths — the kind change is the fix);
+  truncating raw on rebuild (raw is append-only; separate files keep both
+  properties); dropping refused pages (the evidence is the point).
 - **The sample is a new frozen fixture, `fixtures/app-store/`,** hand-written
   in the feed's exact shape (placeholder author labels, bodies marked
   fictional, app id 0): a real captured page would publish raw corpus and
