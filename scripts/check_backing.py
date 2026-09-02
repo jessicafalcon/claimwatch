@@ -9,7 +9,9 @@ BACKING.md (PROJECT_BRIEF.md §8) has one table, one row per study claim:
 Rules checked, one line per check:
   1. Header — the table's five columns start with exactly those five words.
   2. Tags — every row's Tag is one of Measured, Documented, Modeled, Pending.
-  3. Sources — a Measured or Documented row names an upstream source.
+  3. Sources — a Measured or Documented row names a source of the declared
+     shape: a URL, a markdown link, or a backticked dataset name; several
+     separated by `;`. `TBD`, `?`, `—` or prose is not a source.
   4. SQL files — a non-Pending row's SQL file exists and lives under `sql/`.
      A Pending row may point at a file not built yet (the tag says so: the
      brief writes BACKING before code; a row flips Pending → Measured/Modeled
@@ -35,6 +37,8 @@ TAGS = frozenset({"Measured", "Documented", "Modeled", "Pending"})
 NEEDS_SOURCE = frozenset({"Measured", "Documented"})
 EMPTY = {"", "—", "-", "n/a"}
 _SEP = re.compile(r":?-+:?")  # one separator cell: ---, :---, ---:, :---:
+# One source: a URL, a markdown link, or a backticked dataset name.
+_SOURCE_PART = re.compile(r"^(https?://\S+|\[[^\]]+\]\(\S+\)|`[^`]+`)$")
 
 
 @dataclass(frozen=True)
@@ -89,11 +93,19 @@ def check_tags(rows: list[Row]) -> list[str]:
     ]
 
 
+def source_ok(cell: str) -> bool:
+    """Every `;`-separated part matches one declared shape; an empty cell or a
+    placeholder of any spelling does not."""
+    parts = [part.strip() for part in cell.split(";")]
+    return bool(cell.strip()) and all(_SOURCE_PART.match(part) for part in parts)
+
+
 def check_sources(rows: list[Row]) -> list[str]:
     return [
-        f"line {r.line}: {r.tag} row has no upstream source"
+        f"line {r.line}: {r.tag} row has no source of the declared shape "
+        "(URL, markdown link, or `dataset`)"
         for r in rows
-        if r.tag in NEEDS_SOURCE and _bare(r.source) in EMPTY
+        if r.tag in NEEDS_SOURCE and not source_ok(r.source)
     ]
 
 

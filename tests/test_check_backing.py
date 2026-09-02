@@ -81,17 +81,40 @@ def test_tag_outside_the_four_fails(tmp_path: Path):
 
 
 def test_measured_without_source_fails(tmp_path: Path):
+    """A source is a declared shape, not 'anything but a known placeholder':
+    `TBD` and `?` fail exactly like `—` and empty; Modeled needs none."""
     root = _root(
         tmp_path,
         "| B1 a | m | `sql/marts/m.sql` | — | Measured |\n"
         "| B2 b | m | `sql/marts/m.sql` |  | Documented |\n"
-        "| B3 c | m | `sql/marts/m.sql` | — | Modeled |\n",
+        "| B3 c | m | `sql/marts/m.sql` | TBD | Measured |\n"
+        "| B4 d | m | `sql/marts/m.sql` | ? | Documented |\n"
+        "| B5 e | m | `sql/marts/m.sql` | see the brief | Measured |\n"
+        "| B6 f | m | `sql/marts/m.sql` | — | Modeled |\n",
         ("m.sql",),
     )
+    msg = "row has no source of the declared shape (URL, markdown link, or `dataset`)"
     assert check_backing.check_sources(_rows(root)) == [
-        "line 7: Measured row has no upstream source",
-        "line 8: Documented row has no upstream source",
+        f"line 7: Measured {msg}",
+        f"line 8: Documented {msg}",
+        f"line 9: Measured {msg}",
+        f"line 10: Documented {msg}",
+        f"line 11: Measured {msg}",
     ]
+
+
+def test_source_shapes_accepted(tmp_path: Path):
+    root = _root(
+        tmp_path,
+        "| B1 a | m | `sql/marts/m.sql` | https://example.org/p?x=1 | Measured |\n"
+        "| B2 b | m | `sql/marts/m.sql` | [profile](https://example.org/p) "
+        "| Documented |\n"
+        "| B3 c | m | `sql/marts/m.sql` | `open-damir-2026-01` | Measured |\n"
+        "| B4 d | m | `sql/marts/m.sql` | https://a.example; https://b.example "
+        "| Measured |\n",
+        ("m.sql",),
+    )
+    assert check_backing.check_sources(_rows(root)) == []
 
 
 def test_missing_sql_file_fails(tmp_path: Path):
