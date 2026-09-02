@@ -20,7 +20,7 @@ class AppStoreSource:
     name: str  # the SOURCE value and the capture directory; letters, digits, '-'
     app_id: int  # 0 = not filled in yet; the fetcher refuses it
     country: str  # two-letter storefront code
-    listing: str = ""  # where the id came from: the store listing, by id only
+    listing: str  # where the id came from: the store listing, by id only
 
     @property
     def host(self) -> str:

@@ -18,7 +18,12 @@ from ingest.sources import AppStoreSource
 from tests import pins
 
 SAMPLE = Path(__file__).resolve().parent.parent / "fixtures" / "app-store"
-SRC = AppStoreSource(name="test-source", app_id=1, country="fr")
+SRC = AppStoreSource(
+    name="test-source",
+    app_id=1,
+    country="fr",
+    listing="https://apps.apple.com/fr/app/id1",
+)
 STAMP = "2026-09-02T10:00:00"
 
 
@@ -259,7 +264,7 @@ def test_host_outside_the_allowlist_is_refused_before_any_request():
 
 def test_unfilled_source_is_refused_before_any_request(tmp_path):
     server = Served()
-    unfilled = AppStoreSource(name="blank", app_id=0, country="fr")
+    unfilled = AppStoreSource(name="blank", app_id=0, country="fr", listing="")
     with pytest.raises(FetchRefused, match="has no app_id"):
         scrape(unfilled, tmp_path, client=_polite(server, Clock()), stamp=lambda: STAMP)
     assert server.requests == []

@@ -134,7 +134,7 @@ def test_cli_scrape_refuses_an_unfilled_source_before_any_request(capsys, monkey
     from ingest.sources import AppStoreSource
     from pipeline import cli
 
-    blank = AppStoreSource(name="blank", app_id=0, country="fr")
+    blank = AppStoreSource(name="blank", app_id=0, country="fr", listing="")
     monkeypatch.setattr(cli, "SOURCES", (blank,))
     code = main(["scrape", "--confirm=yes", "--confirm-origin=command line"])
     assert code == 2
@@ -156,8 +156,8 @@ def test_cli_scrape_keeps_the_host_interval_across_sources(
     server, clock = Served(), Clock()
     monkeypatch.setattr(fetch, "polite_client", lambda: _polite(server, clock))
     two = (
-        AppStoreSource(name="one", app_id=1, country="fr"),
-        AppStoreSource(name="two", app_id=2, country="fr"),
+        AppStoreSource(name="one", app_id=1, country="fr", listing="https://a/id1"),
+        AppStoreSource(name="two", app_id=2, country="fr", listing="https://a/id2"),
     )
     monkeypatch.setattr(cli, "SOURCES", two)
     code = main(["scrape", "--confirm=yes", "--confirm-origin=command line"])

@@ -9,7 +9,7 @@ import pytest
 from ingest.robots import PRODUCT_TOKEN, Robots
 from ingest.sources import AppStoreSource
 
-FEED = AppStoreSource(name="t", app_id=1, country="fr").page_url(1)
+FEED = AppStoreSource(name="t", app_id=1, country="fr", listing="").page_url(1)
 LIVE_FILE = "User-agent: *\nDisallow: /*/rss/*\n\nUser-agent: Googlebot\nDisallow:\n"
 
 
