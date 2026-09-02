@@ -140,6 +140,89 @@ FIXTURE=app-store`.
 | 6. For all modules in the repo, `httpx` is imported only by `ingest/fetch.py`, and the politeness knobs are defined only in `ingest/politeness.py`; for all tests, no socket connection is opened. | `tests/test_ingest_layout.py::test_httpx_is_imported_only_by_the_fetcher`, `::test_politeness_knobs_live_in_one_module`, `tests/test_offline.py::test_socket_connect_is_blocked_in_the_suite` — a planted `socket.create_connection` raises |
 | 7. For all sources, exactly one is declared in Phase 2, and for all tracked files, none holds a reviewer's name or a real review: `fixtures/app-store/` is hand-written and matches its MANIFEST. | `tests/test_ingest_layout.py::test_exactly_one_source_is_declared`, `tests/test_fixtures_frozen.py::test_manifests_match`, `tests/test_app_store_parser.py::test_sample_is_obviously_fake_and_nameless` |
 
+### Fix amendments — review round 1 (2026-09-02)
+
+Each paragraph names the invariant it restores and changes the KIND of a
+mechanism, never its list. Committed alone; implemented only after approval.
+
+**A1 — robots.txt is matched by our own RFC 9309 matcher, for every page,
+and Crawl-delay is honoured** (security-reviewer #1 #2 #4, code-reviewer #1).
+Restores invariant 5: "the host's `robots.txt` was read first and allowed the
+path". The stdlib parser is the wrong kind: on Python 3.12 it matches prefixes
+only and silently ignores wildcards, so the live host's rule `Disallow:
+/*/rss/*` under `User-agent: *` was read and passed, and the 2026-09-02 capture
+was fetched from a path the site disallows. New kind: a small matcher in
+`ingest/robots.py` that parses the file into groups, picks the group whose
+product token is a case-insensitive substring of ours (else `*`), matches
+`Allow`/`Disallow` patterns with `*` and `$`, lets the longest match win and
+`Allow` win a tie, and returns the group's `Crawl-delay` so the per-host
+interval becomes `max(MIN_INTERVAL_S, delay)`. Every page URL is checked before
+its own request. Pinned by: the archived real rule against the real feed path
+refuses; `Allow: /fr/rss/$` beats `Disallow: /fr/rss/`; page 1 allowed and page
+2 disallowed stops after page 1; a `Crawl-delay: 5` yields 5 s sleeps; the
+matcher is the only robots code (`urllib.robotparser` is grepped absent).
+*Consequence, for decision:* this source refuses under the corrected matcher,
+so the DONE command's precondition (a capture of it) can no longer be met
+honestly. The spec's own disposition (Review & stack risk, item 1) and PLAN
+§6.2 apply: the fallback is a manually captured snapshot (rating, count, URL,
+date) tagged Measured, which is Phase 3a's `platform_snapshots` path, never a
+different User-Agent or a "syndication feeds don't count" reading. Proposed:
+the DONE command becomes `make rebuild FIXTURE=app-store && make
+idempotency-check FIXTURE=app-store` (the real parser on the frozen capture),
+the real-rows proof moves to the first source whose robots allows it (Phase
+3a), the 2026-09-02 capture and the working database built from it are
+deleted, and DECISIONS records the disallow under the terms position. The app
+id stays a sourced data point only if a source URL is recorded beside it
+(code-reviewer #7); otherwise it returns to 0.
+
+**A2 — one database file per input; a fixture can never land in the real
+corpus** (code-reviewer #3, functionality-tester #3). Restores invariant 3 as
+the DONE command reads it: the counts `make rebuild FIXTURE=X` prints are the
+counts of X. Today every input appends into `data/friction_ledger.duckdb`, so
+CI's `FIXTURE=app-store` after `synthetic` prints 48, and the sample's eight
+fake rows sit in the real database under the same `source` slug,
+distinguishable only by `run_id`. New kind: `warehouse.py` derives the file
+from the input — `friction_ledger.duckdb` for `cache`, `friction_ledger.
+<fixture>.duckdb` for `empty|synthetic|app-store` — and `reset` drops that
+closed set. Raw stays append-only within a file (a second `cache` rebuild
+still adds no row). Pinned by: `main(["rebuild", "--fixture=app-store"])` then
+`main(["rebuild"])` on a temp `data/` prints 8 and 0; a `synthetic` rebuild
+leaves the `cache` file absent; `reset` names every file it removed.
+
+**A3 — a page the strict parser refuses is archived under a name a rebuild
+never loads; a malformed stored page is a one-line refusal** (code-reviewer
+#4, functionality-tester #2). Restores invariant 1 ("nothing from that page is
+loaded") together with the CLI's contract ("never a traceback"). Today the
+fetcher writes `page-<n>.json` before parsing it, so one shape change leaves a
+poison page that breaks every later `make rebuild` with a traceback until it is
+deleted by hand. New kind: the fetcher parses first and writes a refused page
+as `page-<n>.refused.json` beside its meta (evidence kept, never loaded);
+`_do_rebuild` turns a `FeedShapeError` from a stored capture into `Refused`
+(one line naming capture, page, item and field, exit 2). Pinned by: a fetch
+that meets a malformed page leaves `page-1.refused.json` and no `page-1.json`,
+and a rebuild over that capture loads zero rows from it without refusing; a
+hand-corrupted `page-1.json` makes `main(["rebuild"])` return 2 with one
+stderr line and no traceback.
+
+**A4 — capture meta is parsed strictly to its declared shape** (code-reviewer
+#5, functionality-tester #1). Restores the Provenance contract for the row's
+own columns: `read_meta` checks the key set and two `isinstance`s, so
+`captured_at: ""`, `"yesterday"`, an empty `source_url` or `status: 500` load
+silently, and `captured_at` is staging's dedup sort key. New kind: a strict
+parse — `captured_at` must be exactly `YYYY-MM-DDTHH:MM:SS` (what the fetcher
+writes), `source_url` an `https` URL whose host is in `ALLOWED_HOSTS`, `status`
+the integer 200 — any other value refuses the capture with the file and field
+named. `status` thereby becomes a guard rather than a decoration (code-reviewer
+#11). Pinned by: one parametrized test over each bad value.
+
+*Not amended, disposed as fixes or accepted:* page order past page-9, the
+literal 2 s pin, the whole-repo layout grep, no directory before robots
+answers, one client per run (five fix commits, one finding each); `sleep`
+as an injectable seam on `PoliteClient` is accepted — the constant is pinned
+`>= 2.0` and the spacing test pins the literal; health details in review
+bodies (security-reviewer #6) become a BACKLOG row triggered by Phase 4's
+snapshot commit.
+
 ## Pinned decisions (do not re-litigate)
 
 - **The one source is the App Store customer-reviews feed (public JSON), for
