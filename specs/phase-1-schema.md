@@ -6,7 +6,7 @@ Phase-0 decisions in §4 (1 warehouse seam, 2 idempotent raw, 8 synthetic
 fixture + real anchors, 9 no pandas, 10 regex in Python). Depends on
 `phase-0b-contracts` merged (PR #2).
 
-**Status: APPROVED 2026-09-01 — in progress.** One dependency change:
+**Status: APPROVED 2026-09-01 — DELIVERED 2026-09-02, pre-PR.** One dependency change:
 `duckdb` (pre-approved for Phase 1, CLAUDE.md → Conventions). No pandas on any
 pipeline path; anything beyond `duckdb` is a STOP-and-ask.
 
@@ -297,3 +297,35 @@ study-editor, and coherence-auditor at exit.**
   static portability denylist.
 - Hand labels, `classified_reviews`, the cost model, the study export — Phases
   5–9.
+
+## Delivered (2026-09-02, pre-PR)
+
+As specified: the empty warehouse for reviews. `pipeline/warehouse.py` is the
+one seam (`connect`, `run_sql_file`) — DuckDB now, Snowflake a lazy Phase-10
+error with no import; `sql/raw/raw_reviews.sql` and `sql/staging/stg_reviews.sql`
+carry the four provenance columns, append-only raw keyed `(source, external_id,
+content_hash)`, staging deduped to the latest `captured_at` (ties by
+`content_hash`), ANSI-only and clock-free; `pipeline/build.py` runs
+raw→staging→marts (marts empty) and loads the fixture in Python with a portable
+idempotent guard, `run_id` stamped in Python; `pipeline/cli.py` validates
+`TARGET`/`FIXTURE` against a closed set and gates `reset` on `$(origin CONFIRM)`;
+`pipeline/sql_lint.py` is the portability/clock denylist. `fixtures/synthetic/`
+(40 reviews, raw 40 / staging 39) and `fixtures/anchors/` (§6 aggregates) are
+frozen with MANIFESTs. `make rebuild FIXTURE=synthetic && make idempotency-check`
+is green; `make review-gate SPEC=specs/phase-1-schema.md` prints 7/7; 93 tests.
+
+**All 13 marts (and `platform_snapshots`) are deferred to the phases that land
+their upstreams — Phase 1 lands no mart, so every BACKING row stays Pending
+(check-backing: 19 rows, 0 marts).** This narrows the brief's Phase 1 "All DDL
+(raw/staging/marts)"; recorded in DECISIONS.md and flagged here, PROJECT_BRIEF.md
+left unedited pending the developer's call.
+
+Review round 1 (five agents; security-reviewer and study-editor pass,
+functionality-tester works, code-reviewer 3 / coherence-auditor coherent) reported
+11 findings, no BLOCKER. Dispositions: two correctness fixes one per commit (the
+staging `content_hash` tiebreak pinned by a both-orders test restoring invariant
+3; `reset` refusing a non-duckdb TARGET with a one-line refusal, not a traceback);
+one coverage-tests commit (rating span, `reset()` deletion scope, `main()` exit-2);
+one record/wording commit (zero-row phrasing, the stale `ci.yml` one-liner, the
+spec title). Two optional voice suggestions declined (no regression). The
+two-round cap did not apply.
