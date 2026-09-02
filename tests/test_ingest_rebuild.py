@@ -222,6 +222,10 @@ def test_missing_or_malformed_meta_is_refused(tmp_path):
         ("captured_at", ""),
         ("captured_at", "yesterday"),
         ("captured_at", "2026-09-01 08:00:00"),
+        (
+            "captured_at",
+            "2026-9-1T8:0:0",
+        ),  # parses, but not the canonical form we write
         ("captured_at", "2025-13-40T00:00:00"),
         ("captured_at", 20260901),
         ("source_url", ""),
@@ -250,6 +254,19 @@ def test_meta_value_outside_the_declared_shape_refuses_the_capture(
     with pytest.raises(FeedShapeError):
         rebuild("duckdb", "cache", database=db, cache_dir=cache)
     assert _query(db, "select count(*) from raw_reviews") == [(0,)]
+
+
+def test_meta_with_an_extra_key_is_refused(tmp_path):
+    """Exactly the three fields: a fourth refuses the capture (a superset check
+    would let an unknown field ride along unexamined)."""
+    cache = tmp_path / "cache"
+    d = _capture(cache, "2026-09-01T08-00-00", "2026-09-01T08:00:00")
+    meta_path = d / "page-1.meta.json"
+    meta = json.loads(meta_path.read_text())
+    meta["extra"] = 1
+    meta_path.write_text(json.dumps(meta))
+    with pytest.raises(FeedShapeError, match="meta must have exactly"):
+        read_captures(cache)
 
 
 def test_zero_captures_is_zero_rows_not_an_error(tmp_path):
