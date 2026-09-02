@@ -158,7 +158,9 @@ def check_fixtures(spec_text: str | None, diff: set[str]) -> list[str]:
     return errors
 
 
-def collected_tests(root: Path) -> set[str]:
+def collected_tests(root: Path) -> tuple[int, set[str], str]:
+    """(exit code, collected ids, output). A non-zero code means the suite did
+    not collect — the caller FAILs evidence explicitly, never via an empty set."""
     # `-o addopts=`: pyproject sets addopts="-q"; a second -q would print only
     # a count, no node ids (found live in Phase 0a).
     code, out = run(
@@ -169,7 +171,7 @@ def collected_tests(root: Path) -> set[str]:
         if "::" in line and line.startswith("tests/"):
             file, _, rest = line.partition("::")
             ids.add(f"{file}::{rest.split('[')[0].split('::')[-1]}")
-    return ids
+    return code, ids, out
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -210,8 +212,14 @@ def main(argv: list[str] | None = None) -> int:
         results.append(("fixtures", not errs, "\n".join(errs)))
 
     if spec_text is not None:
-        errs = check_evidence(spec_text, collected_tests(ROOT), make_targets(ROOT))
-        results.append(("evidence", not errs, "\n".join(errs)))
+        code, ids, out = collected_tests(ROOT)
+        if code != 0:
+            results.append(
+                ("evidence", False, "pytest --collect-only failed:\n" + tail(out))
+            )
+        else:
+            errs = check_evidence(spec_text, ids, make_targets(ROOT))
+            results.append(("evidence", not errs, "\n".join(errs)))
         fails, warns = check_records(spec_text, diff)
         results.append(
             ("records", not fails, "\n".join(fails + [f"WARN {w}" for w in warns]))
