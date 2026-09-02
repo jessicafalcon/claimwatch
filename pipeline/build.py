@@ -4,8 +4,9 @@ docs/PLAN.md §4 decision 2). The stages:
   create_raw   -> run every sql/raw/*.sql (`create table if not exists`)
   load_reviews -> insert each row only if (source, external_id, content_hash)
                   is unseen; the rows come from the fixture (stdlib csv, no
-                  pandas) or from the scraper's captures (ingest.app_store's
-                  strict parser) — the SAME guard for both (Phase 2)
+                  pandas) or from the scraper's captures, each declared
+                  source's through its declared parser (Phase 3a) — the SAME
+                  guard for all
   build_derived-> run sql/staging/*.sql then sql/marts/*.sql (`create or replace`)
 
 Idempotency: raw is append-only keyed on the natural key + a content fingerprint,
@@ -25,7 +26,8 @@ import hashlib
 import tempfile
 from pathlib import Path
 
-from ingest.app_store import read_captures
+from ingest.captures import parser_module, read_captures
+from ingest.sources import PARSERS, SOURCES, Source, sample_source
 from pipeline import warehouse
 from pipeline.warehouse import ROOT, connect
 
@@ -34,8 +36,6 @@ from pipeline.warehouse import ROOT, connect
 # run, the default), nothing, the synthetic fixture, or the frozen samples
 # read as captures (the offline proof of every parser path).
 INPUTS = ("captured", "none", "synthetic", "samples")
-DEFAULT_CACHE = ROOT / "data" / "cache" / "app-store"  # gitignored (data/*)
-SAMPLE_CAPTURE = ROOT / "fixtures" / "app-store"
 _SEP = "\x1f"  # unit separator — cannot appear in the CSV content fields
 # The content fields whose hash is the fingerprint (provenance is excluded, so a
 # re-capture of the same review at a new time is NOT a new row).
@@ -115,15 +115,32 @@ def table_counts(conn) -> dict[str, int]:
     return {n: conn.execute(f"select count(*) from {n}").fetchone()[0] for n in names}
 
 
-def capture_root(rows: str, cache_dir: str | Path | None = None) -> Path | None:
-    """Where a capture-fed rebuild reads from: `captured` -> data/cache/app-store
-    (or `cache_dir`), `samples` -> the frozen sample (or `cache_dir`); the
-    other inputs read no capture."""
+def captures_for(
+    rows: str, cache_root: str | Path | None = None
+) -> list[tuple[Source, Path, str]]:
+    """What a capture-fed rebuild reads: for `captured`, every declared source
+    with a parser and its cache directory under the cache root (the one
+    binding in `ingest/sources.py`, or `cache_root` in tests); for `samples`,
+    every parser's frozen sample under its sample declaration. The third
+    element is the `run_id` prefix. The other inputs read no capture."""
     if rows == "captured":
-        return Path(cache_dir) if cache_dir is not None else DEFAULT_CACHE
+        from ingest import sources  # the module attribute, so tests can redirect it
+
+        root = Path(cache_root) if cache_root is not None else sources.CACHE_ROOT
+        return [
+            (s, root / s.platform / s.name, f"{s.platform}/{s.name}")
+            for s in SOURCES
+            if s.parser is not None
+        ]
     if rows == "samples":
-        return Path(cache_dir) if cache_dir is not None else SAMPLE_CAPTURE
-    return None
+        out = []
+        for parser in PARSERS:
+            src = sample_source(parser)
+            out.append(
+                (src, parser_module(parser).SAMPLE_DIR, f"sample:{src.platform}")
+            )
+        return out
+    return []
 
 
 def rebuild(
@@ -148,11 +165,10 @@ def rebuild(
         create_raw(conn)
         if rows == "synthetic":
             load_reviews(conn, read_fixture("synthetic"), run_id or "synthetic")
-        root = capture_root(rows, cache_dir)
-        if root is not None:
-            for capture_id, parsed in read_captures(root):
-                stamp = run_id or ("app-store" if rows == "samples" else capture_id)
-                load_reviews(conn, parsed, f"app-store:{stamp}")
+        for source, root, prefix in captures_for(rows, cache_dir):
+            for capture_id, parsed in read_captures(root, source):
+                stamp = prefix if rows == "samples" else f"{prefix}/{capture_id}"
+                load_reviews(conn, parsed.reviews, run_id or stamp)
         build_derived(conn)
         return table_counts(conn)
     finally:

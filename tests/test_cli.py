@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import pytest
 
+from ingest.sources import app_store_source, by_name
 from pipeline.build import reset
 from pipeline.cli import main
 
@@ -56,14 +57,12 @@ def test_cli_reset_refuses_non_duckdb_target(capsys):
 def isolated_paths(tmp_path, monkeypatch):
     """The CLI's working database and capture cache, redirected to a temp dir so
     a test never touches data/."""
-    import pipeline.build as build
-    import pipeline.cli as cli
+    import ingest.sources as sources
     import pipeline.warehouse as warehouse
 
     monkeypatch.setattr(warehouse, "DEFAULT_DB", tmp_path / "w.duckdb")
-    cache = tmp_path / "data" / "cache" / "app-store"
-    monkeypatch.setattr(build, "DEFAULT_CACHE", cache)
-    monkeypatch.setattr(cli, "DEFAULT_CACHE", cache)
+    cache = tmp_path / "data" / "cache"
+    monkeypatch.setattr(sources, "CACHE_ROOT", cache)  # the one binding
     return cache
 
 
@@ -74,7 +73,7 @@ def test_rebuild_defaults_to_the_cache_and_says_when_it_is_empty(
     and a one-line hint, never an error (a fresh clone)."""
     assert main(["rebuild"]) == 0
     out = capsys.readouterr().out
-    assert "no captures under data/cache/app-store" in out
+    assert "no captures under data/cache" in out
     assert "make scrape CONFIRM=yes" in out
     assert f"{'raw_reviews':24} 0" in out
     assert "(none)" in out
@@ -98,7 +97,10 @@ def test_rebuild_from_captures_under_the_cache(isolated_paths, capsys):
     from tests import pins
 
     sample = Path(__file__).resolve().parent.parent / "fixtures" / "app-store"
-    shutil.copytree(sample, isolated_paths / "src" / "2026-09-01T08-00-00")
+    feed = by_name("fr-digital-first")  # a capture lives under platform/name
+    shutil.copytree(
+        sample, isolated_paths / feed.platform / feed.name / "2026-09-01T08-00-00"
+    )
     assert main(["rebuild"]) == 0
     out = capsys.readouterr().out
     assert "no captures" not in out
@@ -131,17 +133,16 @@ def test_cli_scrape_refuses_an_unfilled_source_before_any_request(capsys, monkey
     """Confirmed on the command line but the source has no app id: the fetcher
     refuses before a request (a socket would raise here). The unfilled source
     is patched in, so the test holds whatever id the developer has declared."""
-    from ingest.sources import AppStoreSource
     from pipeline import cli
 
-    blank = AppStoreSource(
+    blank = app_store_source(
         name="blank", app_id=0, country="fr", listing="", fetchable=True
     )
     monkeypatch.setattr(cli, "SOURCES", (blank,))
     code = main(["scrape", "--confirm=yes", "--confirm-origin=command line"])
     assert code == 2
     err = capsys.readouterr().err
-    assert "has no app_id" in err
+    assert "has no page address" in err
 
 
 def test_cli_scrape_keeps_the_host_interval_across_sources(
@@ -151,17 +152,16 @@ def test_cli_scrape_keeps_the_host_interval_across_sources(
     second source waits the full two seconds after the last of the first. One
     client, one per-host clock, for the whole `make scrape`."""
     import ingest.fetch as fetch
-    from ingest.sources import AppStoreSource
     from pipeline import cli
     from tests.test_app_store_fetch import Clock, Served, _polite
 
     server, clock = Served(), Clock()
     monkeypatch.setattr(fetch, "polite_client", lambda: _polite(server, clock))
     two = (
-        AppStoreSource(
+        app_store_source(
             name="one", app_id=1, country="fr", listing="https://a/id1", fetchable=True
         ),
-        AppStoreSource(
+        app_store_source(
             name="two", app_id=2, country="fr", listing="https://a/id2", fetchable=True
         ),
     )
@@ -213,7 +213,8 @@ def test_a_malformed_stored_page_is_a_one_line_refusal_from_rebuild(
     from pathlib import Path
 
     sample = Path(__file__).resolve().parent.parent / "fixtures" / "app-store"
-    d = isolated_paths / "x" / "2026-09-01T08-00-00"
+    feed = by_name("fr-digital-first")
+    d = isolated_paths / feed.platform / feed.name / "2026-09-01T08-00-00"
     shutil.copytree(sample, d)
     (d / "page-1.json").write_text('{"feed": {"entry": [{"id": "no label"}]}}')
     for argv in (["rebuild"], ["idempotency-check", "--rows=captured"]):
@@ -229,7 +230,8 @@ def test_a_capture_holding_only_refused_pages_still_gets_the_no_captures_hint(
     """The hint and the reader share one rule for what a page is: a directory
     with only page-1.refused.json (a run refused at page 1) loads nothing and
     says so, rather than printing zero rows with no explanation."""
-    d = isolated_paths / "x" / "2026-09-01T08-00-00"
+    feed = by_name("fr-digital-first")
+    d = isolated_paths / feed.platform / feed.name / "2026-09-01T08-00-00"
     d.mkdir(parents=True)
     (d / "page-1.refused.json").write_text("{}")
     (d / "page-1.meta.json").write_text("{}")
@@ -240,10 +242,17 @@ def test_a_capture_holding_only_refused_pages_still_gets_the_no_captures_hint(
 
 
 def test_cli_scrape_on_the_declared_source_refuses_before_the_network(capsys):
-    """`make scrape CONFIRM=yes` today, on the real declaration: one line, exit
-    2, and no socket (the suite would raise on one). The terms position holds
-    without a request."""
-    code = main(["scrape", "--confirm=yes", "--confirm-origin=command line"])
+    """`make scrape CONFIRM=yes SOURCE=<the feed>` today, on the real
+    declaration: one line, exit 2, and no socket (the suite would raise on
+    one). The terms position holds without a request."""
+    code = main(
+        [
+            "scrape",
+            "--source=fr-digital-first",
+            "--confirm=yes",
+            "--confirm-origin=command line",
+        ]
+    )
     assert code == 2
     err = capsys.readouterr().err
     assert err.startswith("refusing:") and "not fetchable" in err
@@ -256,14 +265,13 @@ def test_cli_scrape_reports_each_refused_source_and_fetches_the_rest(
     """A declared not-fetchable source is one stderr line; the next source is
     still fetched; the exit code says something was refused."""
     import ingest.fetch as fetch
-    from ingest.sources import AppStoreSource
     from pipeline import cli
     from tests.test_app_store_fetch import Clock, Served, _polite
 
     server, clock = Served(), Clock()
     monkeypatch.setattr(fetch, "polite_client", lambda: _polite(server, clock))
     two = (
-        AppStoreSource(
+        app_store_source(
             name="no",
             app_id=1,
             country="fr",
@@ -271,7 +279,9 @@ def test_cli_scrape_reports_each_refused_source_and_fetches_the_rest(
             fetchable=False,
             terms="asked",
         ),
-        AppStoreSource(name="yes", app_id=2, country="fr", listing="", fetchable=True),
+        app_store_source(
+            name="yes", app_id=2, country="fr", listing="", fetchable=True
+        ),
     )
     monkeypatch.setattr(cli, "SOURCES", two)
     code = main(["scrape", "--confirm=yes", "--confirm-origin=command line"])

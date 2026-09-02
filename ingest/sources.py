@@ -1,64 +1,216 @@
-"""The declared sources — a closed tuple (spec Phase 2, pinned decision 1).
-`make scrape SOURCE=<name>` validates against these names and never treats a
-value as a path. Phase 2 declares exactly one; Phase 3a adds the rest.
+"""The declared sources — a closed tuple (spec Phase 2, pinned decision 1;
+Phase 3a, pinned decision 3). Each thing we read from is declared once, here:
+which platform, which host, which parser reads its pages, which page addresses
+it has (the closed set a row's `source_url` can take), which cache directory
+its captures go to, which profile / segment / channel its rows belong to, and
+whether its site lets us fetch it. Every other module reads those facts from
+the declaration; none knows a platform by name.
 
-An app and a country are a sourced data point (the way `fixtures/anchors/`
-carries platform URLs), never a name in prose. The developer fills `app_id`
-before the first live fetch; a source left at 0 is refused before any request."""
+An app, a storefront or a profile is a sourced data point. Where an address
+spells the brand (a store package id, a profile path) it sits in this file and
+nowhere else (decision D1): no prose, comment, commit, test name or fixture
+repeats it. A source declared not fetchable states its reason — the robots rule
+or the terms clause, with the date it was read — and is refused before any
+request, whatever its robots file says on a later day."""
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
+from pathlib import Path
 
+from ingest.politeness import MAX_PAGES
+
+ROOT = Path(__file__).resolve().parent.parent
+# The one binding of the cache root (closes the BACKLOG row "DEFAULT_CACHE is
+# bound in two modules"): a source's captures live under
+# CACHE_ROOT / <platform> / <source name> / <captured_at>/ — gitignored (data/*).
+CACHE_ROOT = ROOT / "data" / "cache"
+
+SEGMENTS = ("digital-first", "traditional", "digital-challenger")
+CHANNELS = ("invited", "unsolicited")
+ORIGINS = ("anchor", "manual", "fetch")  # how a snapshot row came to be
+# The parsers, by module name under `ingest/` — a closed set; each module
+# exposes parse(), EXTENSION, SAMPLE_PLATFORM, SAMPLE_HOST, SAMPLE_DIR.
+PARSERS = ("app_store", "listing")
+SAMPLE = "sample"  # the name and attribution of a frozen sample's declaration
+
+_SLUG = re.compile(r"^[a-z0-9-]+$")
+_DATE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
 FEED_HOST = "itunes.apple.com"
 
 
 @dataclass(frozen=True)
-class AppStoreSource:
-    """One app's public customer-reviews feed on one country storefront."""
+class Source:
+    """One thing we read from, declared in full."""
 
     name: str  # the SOURCE value and the capture directory; letters, digits, '-'
-    app_id: int  # 0 = not filled in yet; the fetcher refuses it
-    country: str  # two-letter storefront code
-    listing: str  # where the id came from: the store listing, by id only
+    platform: str  # the `source` column: app-store, google-play, opinion-assurances
+    host: str  # the only host this source's pages live on
+    parser: str | None  # one of PARSERS; None = snapshots hand-entered only
+    pages: tuple[str, ...]  # every page address, in order; () = not filled in yet
+    profile: str  # whose figures these are: the studied insurer or a peer
+    segment: str  # SEGMENTS
+    channel: str  # CHANNELS
+    listing: str  # the address the id or figure is read from (D1: here only)
     fetchable: bool  # the recorded terms position; False is refused before any request
-    terms: str = ""  # why, when not fetchable — a reason, never a name
+    terms: str = ""  # why, when not fetchable — a reason and a date, never a name
+    declared_on: str = ""  # YYYY-MM-DD the declaration was recorded
 
     def __post_init__(self) -> None:
-        # A recorded position is a reason, not a flag: a source declared not
-        # fetchable without one is a mistake in the declaration, refused here.
+        if not _SLUG.match(self.name) or not _SLUG.match(self.platform):
+            raise ValueError(f"source {self.name!r}: name and platform are slugs")
+        if self.parser is not None and self.parser not in PARSERS:
+            raise ValueError(
+                f"source {self.name!r}: parser {self.parser!r} not in {PARSERS}"
+            )
+        if len(self.pages) > MAX_PAGES:
+            raise ValueError(
+                f"source {self.name!r}: {len(self.pages)} pages > {MAX_PAGES}"
+            )
         if not self.fetchable and not self.terms.strip():
             raise ValueError(f"source {self.name!r}: fetchable=False needs terms")
-
-    @property
-    def host(self) -> str:
-        return FEED_HOST
+        if self.fetchable and self.parser is None:
+            raise ValueError(f"source {self.name!r}: a fetchable source needs a parser")
+        if self.name != SAMPLE and (
+            self.segment not in SEGMENTS or self.channel not in CHANNELS
+        ):
+            raise ValueError(
+                f"source {self.name!r}: segment in {SEGMENTS} and channel in {CHANNELS}"
+            )
+        if self.declared_on and not _DATE.match(self.declared_on):
+            raise ValueError(f"source {self.name!r}: declared_on is YYYY-MM-DD")
 
     def page_url(self, page: int) -> str:
-        """The feed address for one page — also the row's `source_url`."""
-        return (
-            f"https://{FEED_HOST}/{self.country}/rss/customerreviews/"
-            f"id={self.app_id}/sortBy=mostRecent/page={page}/json"
-        )
+        """The address of page `page` (1-based) — also the row's `source_url`."""
+        return self.pages[page - 1]
 
     @property
     def robots_url(self) -> str:
-        return f"https://{FEED_HOST}/robots.txt"
+        return f"https://{self.host}/robots.txt"
+
+    @property
+    def cache_dir(self) -> Path:
+        return CACHE_ROOT / self.platform / self.name
 
 
-# The studied segment's first app: a sourced data point (the id and the listing
-# it was read from, by id only — a number and an address, never a name;
-# CLAUDE.md -> Neutrality). Filled 2026-09-02. Its terms position is declared
-# here (DECISIONS -> terms position): the host's robots.txt disallows the feed
-# path, so `fetchable=False` and the fetcher refuses it before any request.
-SOURCES: tuple[AppStoreSource, ...] = (
-    AppStoreSource(
+def app_store_source(
+    name: str,
+    app_id: int,
+    country: str,
+    listing: str,
+    fetchable: bool,
+    terms: str = "",
+    *,
+    profile: str = "fr-digital-first",
+    segment: str = "digital-first",
+    channel: str = "invited",
+    declared_on: str = "",
+) -> Source:
+    """An app's public customer-reviews feed on one storefront (Phase 2's
+    shape): ten pages at most, the feed's own cap. An app id of 0 is a source
+    not filled in yet — no page address, refused before any request."""
+    pages = tuple(
+        f"https://{FEED_HOST}/{country}/rss/customerreviews/"
+        f"id={app_id}/sortBy=mostRecent/page={n}/json"
+        for n in range(1, 11)
+    )
+    return Source(
+        name=name,
+        platform="app-store",
+        host=FEED_HOST,
+        parser="app_store",
+        pages=pages if app_id else (),
+        profile=profile,
+        segment=segment,
+        channel=channel,
+        listing=listing,
+        fetchable=fetchable,
+        terms=terms,
+        declared_on=declared_on,
+    )
+
+
+def sample_source(parser: str) -> Source:
+    """The declaration a frozen sample is read under (`ROWS=samples`): its
+    profile, segment and channel are the literal `sample` — labels that exist
+    only in the samples database — and it is never fetched."""
+    from ingest.captures import parser_module  # the closed-set lookup
+
+    mod = parser_module(parser)
+    return Source(
+        name=SAMPLE,
+        platform=mod.SAMPLE_PLATFORM,
+        host=mod.SAMPLE_HOST,
+        parser=parser,
+        pages=(),
+        profile=SAMPLE,
+        segment=SAMPLE,
+        channel=SAMPLE,
+        listing="",
+        fetchable=False,
+        terms="a frozen sample, read from fixtures/, never fetched",
+        declared_on="2026-09-01",
+    )
+
+
+# The studied insurer's sources, each a sourced data point (an id and the
+# address it was read from — never a name in prose; CLAUDE.md -> Neutrality;
+# D1). Positions as checked on 2026-09-02 (DECISIONS -> Scrape politely).
+SOURCES: tuple[Source, ...] = (
+    # The App Store customer-reviews feed (Phase 2): the host's robots.txt
+    # disallows the feed path for every crawler, so it is refused before any
+    # request.
+    app_store_source(
         name="fr-digital-first",
         app_id=1277025964,
         country="fr",
         listing="https://apps.apple.com/fr/app/id1277025964",
         fetchable=False,
         terms="robots.txt disallows /*/rss/* for every crawler (2026-09-02)",
+        declared_on="2026-09-02",
+    ),
+    # The Google Play listing: allowed by the host's robots.txt (the catch-all
+    # group disallows `/_`, `/store/getreviews` and `/store/xhr`, not the
+    # details page) and by Google's terms, which forbid automated access only
+    # where it breaches robots.txt. Its JSON-LD block carries the aggregate
+    # rating. Its reviews load through the disallowed `/_` call and are never
+    # fetched.
+    Source(
+        name="fr-digital-first-google-play-listing",
+        platform="google-play",
+        host="play.google.com",
+        parser="listing",
+        pages=(
+            "https://play.google.com/store/apps/details?id=com.alanmobile&hl=fr&gl=FR",
+        ),
+        profile="fr-digital-first",
+        segment="digital-first",
+        channel="invited",
+        listing="https://play.google.com/store/apps/details?id=com.alanmobile&hl=fr",
+        fetchable=True,
+        declared_on="2026-09-02",
+    ),
+    # The App Store listing: allowed by robots.txt, forbidden by Apple's
+    # website terms of use ("Your Use of the Site": no robot, spider,
+    # page-scrape or automated means to access or copy the site). Its figures
+    # are read by hand and entered in data/snapshots/manual_snapshots.csv.
+    Source(
+        name="fr-digital-first-app-store-listing",
+        platform="app-store",
+        host="apps.apple.com",
+        parser=None,
+        pages=(),
+        profile="fr-digital-first",
+        segment="digital-first",
+        channel="invited",
+        listing="https://apps.apple.com/fr/app/id1277025964",
+        fetchable=False,
+        terms=(
+            "Apple website terms of use, 'Your Use of the Site': no robot, spider,"
+            " page-scrape or automated means to access or copy the site (2026-09-02)"
+        ),
+        declared_on="2026-09-02",
     ),
 )
 
@@ -67,8 +219,12 @@ def source_names() -> tuple[str, ...]:
     return tuple(s.name for s in SOURCES)
 
 
-def by_name(name: str) -> AppStoreSource:
+def by_name(name: str) -> Source:
     for s in SOURCES:
         if s.name == name:
             return s
     raise KeyError(name)
+
+
+def fetchable_sources(sources: tuple[Source, ...] = SOURCES) -> tuple[Source, ...]:
+    return tuple(s for s in sources if s.fetchable)

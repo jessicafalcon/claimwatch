@@ -11,14 +11,14 @@ from pathlib import Path
 import httpx
 import pytest
 
-from ingest.app_store import read_captures
+from ingest.captures import read_captures
 from ingest.fetch import FetchRefused, PoliteClient, make_client, scrape
 from ingest.politeness import MAX_PAGES, USER_AGENT
-from ingest.sources import AppStoreSource
+from ingest.sources import app_store_source, by_name
 from tests import pins
 
 SAMPLE = Path(__file__).resolve().parent.parent / "fixtures" / "app-store"
-SRC = AppStoreSource(
+SRC = app_store_source(
     name="test-source",
     app_id=1,
     country="fr",
@@ -26,6 +26,7 @@ SRC = AppStoreSource(
     fetchable=True,
 )
 STAMP = "2026-09-02T10:00:00"
+CAPTURE = Path(SRC.platform) / SRC.name / STAMP.replace(":", "-")  # under a cache root
 
 
 class Served:
@@ -85,7 +86,7 @@ def test_robots_disallow_refuses_before_any_feed_request(tmp_path):
     with pytest.raises(FetchRefused, match="robots.txt disallows"):
         scrape(SRC, tmp_path, client=_polite(server, Clock()), stamp=lambda: STAMP)
     assert server.urls() == ["https://itunes.apple.com/robots.txt"]
-    capture = tmp_path / SRC.name / STAMP.replace(":", "-")
+    capture = tmp_path / CAPTURE
     assert (capture / "robots.txt").read_text() == server.robots
     assert not list(capture.glob("page-*"))
 
@@ -106,7 +107,7 @@ def test_every_page_is_checked_against_robots_before_its_own_request(tmp_path):
     with pytest.raises(FetchRefused, match="disallows .*page=2/json"):
         scrape(SRC, tmp_path, client=_polite(server, Clock()), stamp=lambda: STAMP)
     assert server.urls() == ["https://itunes.apple.com/robots.txt", SRC.page_url(1)]
-    capture = tmp_path / SRC.name / STAMP.replace(":", "-")
+    capture = tmp_path / CAPTURE
     assert (capture / "page-1.json").exists()
 
 
@@ -181,7 +182,7 @@ def test_a_200_whose_body_is_not_a_robots_file_refuses_before_any_feed_request(
         scrape(SRC, tmp_path, client=polite, stamp=lambda: STAMP)
     assert "\n" not in str(exc.value)
     assert server.urls == ["https://itunes.apple.com/robots.txt"]
-    capture = tmp_path / SRC.name / STAMP.replace(":", "-")
+    capture = tmp_path / CAPTURE
     meta = json.loads((capture / "robots.meta.json").read_text())
     assert meta == {"status": 200, "content_type": content_type or ""}
     assert (capture / "robots.txt").read_bytes() == body
@@ -219,14 +220,12 @@ def test_a_source_declared_not_fetchable_is_refused_before_any_request(tmp_path)
     """Amendment A5(b): the recorded terms position lives in the declaration;
     the declared source refuses with its reason, whatever robots.txt would say
     today, and nothing is asked of the site."""
-    from ingest.sources import SOURCES
-
-    (declared,) = SOURCES
+    declared = by_name("fr-digital-first")
     server = Served()
     with pytest.raises(FetchRefused, match="not fetchable — robots.txt disallows"):
         scrape(declared, tmp_path, client=_polite(server, Clock()), stamp=lambda: STAMP)
     assert server.requests == []
-    assert not (tmp_path / declared.name).exists()
+    assert not (tmp_path / declared.platform).exists()
 
 
 def test_robots_error_status_is_a_refusal_and_404_is_not(tmp_path):
@@ -284,7 +283,7 @@ def test_pages_are_archived_byte_exact_with_meta(tmp_path):
     capture, pages = scrape(
         SRC, tmp_path, client=_polite(server, Clock()), stamp=lambda: STAMP
     )
-    assert capture == tmp_path / SRC.name / STAMP.replace(":", "-")
+    assert capture == tmp_path / CAPTURE
     assert pages == pins.APP_STORE_SAMPLE_PAGES
     for n in range(1, pages + 1):
         assert (capture / f"page-{n}.json").read_bytes() == (
@@ -316,7 +315,7 @@ def test_non_200_is_a_one_line_refusal_with_no_retry(tmp_path):
     assert "\n" not in str(exc.value)
     assert server.urls().count(SRC.page_url(2)) == 1  # asked once, never again
     assert SRC.page_url(3) not in server.urls()
-    capture = tmp_path / SRC.name / STAMP.replace(":", "-")
+    capture = tmp_path / CAPTURE
     assert (capture / "page-1.json").exists()  # what was served stays
     assert not (capture / "page-2.json").exists()
 
@@ -333,7 +332,7 @@ def test_a_refused_robots_request_leaves_no_capture_directory(tmp_path):
     )
     with pytest.raises(FetchRefused, match="ConnectTimeout"):
         scrape(SRC, tmp_path, client=polite, stamp=lambda: STAMP)
-    assert not (tmp_path / SRC.name).exists()
+    assert not (tmp_path / SRC.platform).exists()
 
 
 def test_transport_error_is_a_refusal_not_a_retry():
@@ -362,13 +361,13 @@ def test_host_outside_the_allowlist_is_refused_before_any_request():
 
 def test_unfilled_source_is_refused_before_any_request(tmp_path):
     server = Served()
-    unfilled = AppStoreSource(
+    unfilled = app_store_source(
         name="blank", app_id=0, country="fr", listing="", fetchable=True
     )
-    with pytest.raises(FetchRefused, match="has no app_id"):
+    with pytest.raises(FetchRefused, match="has no page address"):
         scrape(unfilled, tmp_path, client=_polite(server, Clock()), stamp=lambda: STAMP)
     assert server.requests == []
-    assert not (tmp_path / "blank").exists()
+    assert not (tmp_path / "app-store").exists()
 
 
 def test_a_malformed_page_is_kept_under_a_name_no_rebuild_loads(tmp_path):
@@ -386,18 +385,18 @@ def test_a_malformed_page_is_kept_under_a_name_no_rebuild_loads(tmp_path):
     )
     with pytest.raises(FetchRefused, match="'entry' is dict, not a list"):
         scrape(SRC, tmp_path, client=polite, stamp=lambda: STAMP)
-    capture = tmp_path / SRC.name / STAMP.replace(":", "-")
+    capture = tmp_path / CAPTURE
     assert (capture / "page-1.refused.json").exists()  # evidence of what was served
     assert not (capture / "page-1.json").exists()
     assert (capture / "page-1.meta.json").exists()
-    assert read_captures(tmp_path) == []
+    assert read_captures(tmp_path, SRC) == []
 
 
 def test_an_existing_capture_directory_is_a_refusal_not_a_traceback(tmp_path):
     """Two runs stamped in the same second would share a directory; the second
     refuses with one line and asks nothing of the site."""
     server = Served()
-    (tmp_path / SRC.name / STAMP.replace(":", "-")).mkdir(parents=True)
+    (tmp_path / CAPTURE).mkdir(parents=True)
     with pytest.raises(FetchRefused, match="already exists"):
         scrape(SRC, tmp_path, client=_polite(server, Clock()), stamp=lambda: STAMP)
     assert server.requests == []

@@ -20,35 +20,29 @@ The declared shape:
 `author`, `im:version`, `im:voteSum`, `link` are never read: the raw shape has
 no column for a reviewer's name, and none enters the warehouse.
 
-Captures are read back by `read_captures`: `page-<n>.json` is the body as
-served, `page-<n>.meta.json` beside it carries the provenance stamped at fetch
-(`source_url`, `captured_at`, `status`) — a rebuild reads no clock."""
+Captures are read back by `ingest/captures.py` through `parse()` (Phase 3a):
+`page-<n>.json` is the body as served, `page-<n>.meta.json` beside it carries
+the provenance stamped at fetch — a rebuild reads no clock."""
 
 from __future__ import annotations
 
 import json
 import re
 from datetime import datetime
-from pathlib import Path
-from urllib.parse import urlsplit
 
-from ingest.politeness import ALLOWED_HOSTS
+from ingest.parsed import PageShapeError, Parsed, refuse
+from ingest.sources import ROOT, Source
 
 SOURCE = "app-store"  # the platform slug, as in fixtures/anchors/
+EXTENSION = "json"
+SAMPLE_PLATFORM = SOURCE
+SAMPLE_HOST = "itunes.apple.com"
+SAMPLE_DIR = ROOT / "fixtures" / "app-store"
 RATING_MIN, RATING_MAX = 1, 5
 _DIGITS = re.compile(r"^[0-9]+$")
-_PAGE = re.compile(r"^page-([0-9]+)\.json$")
-META_FIELDS = ("source_url", "captured_at", "status")
-_STAMP = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$")
 
-
-class FeedShapeError(ValueError):
-    """The page is not the declared shape; nothing from it is loaded."""
-
-
-def _refuse(page_url: str, item_id: str | None, field: str, why: str) -> FeedShapeError:
-    where = f"item {item_id!r}" if item_id is not None else "page"
-    return FeedShapeError(f"{page_url}: {where}: field {field!r} {why}")
+FeedShapeError = PageShapeError  # the Phase 2 name; one refusal class for every parser
+_refuse = refuse
 
 
 def _label(item: object, field: str, page_url: str, item_id: str | None) -> str:
@@ -95,13 +89,15 @@ def _review_date(label: str, page_url: str, item_id: str) -> str:
     return date
 
 
-def parse_item(item: object, page_url: str, captured_at: str) -> dict[str, object]:
+def parse_item(
+    item: object, page_url: str, captured_at: str, platform: str = SOURCE
+) -> dict[str, object]:
     """One feed item -> one raw-shape row, or a refusal."""
     item_id = _label(item, "id", page_url, None)
     if not _DIGITS.match(item_id):
         raise _refuse(page_url, item_id, "id", "is not a digit string")
     return {
-        "source": SOURCE,
+        "source": platform,
         "external_id": item_id,
         "source_url": page_url,
         "captured_at": captured_at,
@@ -117,7 +113,7 @@ def parse_item(item: object, page_url: str, captured_at: str) -> dict[str, objec
 
 
 def parse_page(
-    body: bytes | str, page_url: str, captured_at: str
+    body: bytes | str, page_url: str, captured_at: str, platform: str = SOURCE
 ) -> list[dict[str, object]]:
     """A feed page -> raw-shape rows. Refuses the whole page on the first item
     that is not the declared shape; an absent `entry` is the end of the feed."""
@@ -135,84 +131,9 @@ def parse_page(
         raise _refuse(
             page_url, None, "entry", f"is {type(entries).__name__}, not a list"
         )
-    return [parse_item(item, page_url, captured_at) for item in entries]
+    return [parse_item(item, page_url, captured_at, platform) for item in entries]
 
 
-def read_meta(path: Path) -> dict[str, object]:
-    """`page-<n>.meta.json`, strictly (fix amendment A4): exactly the three
-    provenance fields, each in the shape the fetcher writes — `captured_at` a
-    real `YYYY-MM-DDTHH:MM:SS` instant (it is staging's dedup sort key),
-    `source_url` an https address on an allowed host, `status` the integer 200.
-    Anything else refuses the capture with the file and field named."""
-    try:
-        meta = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as exc:
-        raise FeedShapeError(f"{path}: meta is missing or not JSON") from exc
-    if not isinstance(meta, dict) or set(meta) != set(META_FIELDS):
-        raise FeedShapeError(f"{path}: meta must have exactly {META_FIELDS}")
-    stamp = meta["captured_at"]
-    if not isinstance(stamp, str) or not _STAMP.match(stamp):
-        raise FeedShapeError(f"{path}: field 'captured_at' is not YYYY-MM-DDTHH:MM:SS")
-    try:
-        datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%S")
-    except ValueError as exc:
-        raise FeedShapeError(
-            f"{path}: field 'captured_at' is not a real instant"
-        ) from exc
-    url = meta["source_url"]
-    parts = urlsplit(url) if isinstance(url, str) else None
-    if parts is None or parts.scheme != "https" or parts.hostname not in ALLOWED_HOSTS:
-        raise FeedShapeError(
-            f"{path}: field 'source_url' is not an https address on {ALLOWED_HOSTS}"
-        )
-    status = meta["status"]
-    if type(status) is not int or status != 200:
-        raise FeedShapeError(f"{path}: field 'status' is not 200")
-    return meta
-
-
-def capture_pages(capture_dir: Path) -> list[Path]:
-    """The `page-<n>.json` files of one capture, in page order."""
-    pages = []
-    for p in capture_dir.iterdir():
-        m = _PAGE.match(p.name)
-        if m:
-            pages.append((int(m.group(1)), p))
-    return [p for _, p in sorted(pages)]
-
-
-def has_pages(root: Path) -> bool:
-    """Whether anything under `root` is a page a rebuild would load — the same
-    rule `read_captures` applies, so a refused page (`page-<n>.refused.json`)
-    counts for neither."""
-    return root.is_dir() and any(_PAGE.match(p.name) for p in root.rglob("page-*.json"))
-
-
-def read_captures(root: Path) -> list[tuple[str, list[dict[str, object]]]]:
-    """Every capture under `root` -> [(capture_id, rows)], captures in name
-    order, pages in page order, items in feed order. A capture is any directory
-    holding `page-<n>.json` files; `root` itself may be one (the fixture). A
-    missing root is zero captures, not an error (a fresh clone)."""
-    if not root.is_dir():
-        return []
-    dirs = sorted({p.parent for p in root.rglob("page-*.json") if _PAGE.match(p.name)})
-    out: list[tuple[str, list[dict[str, object]]]] = []
-    for d in dirs:
-        rows: list[dict[str, object]] = []
-        for page in capture_pages(d):
-            try:
-                meta = read_meta(
-                    page.with_name(page.name[: -len(".json")] + ".meta.json")
-                )
-                rows.extend(
-                    parse_page(
-                        page.read_bytes(),
-                        str(meta["source_url"]),
-                        str(meta["captured_at"]),
-                    )
-                )
-            except FeedShapeError as exc:
-                # Which file to fix: the capture directory, then the page's own line.
-                raise FeedShapeError(f"capture {d}: {exc}") from exc
-        out.append((d.name, rows))
-    return out
+def parse(body: bytes | str, page_url: str, captured_at: str, source: Source) -> Parsed:
+    """The uniform parser entry point (Phase 3a): a feed page -> review rows."""
+    return Parsed(reviews=parse_page(body, page_url, captured_at, source.platform))

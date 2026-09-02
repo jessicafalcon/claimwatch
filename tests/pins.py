@@ -49,3 +49,19 @@ APP_STORE_SAMPLE_FIRST_ROW = {
     "rating": 1,
     "title": "Exemple: encore un document",
 }
+
+# fixtures/listings/: one hand-written listing page whose JSON-LD block carries
+# an aggregateRating; read under the sample declaration (Phase 3a).
+LISTING_SAMPLE_CAPTURED_AT = "2026-09-01T09:00:00"
+LISTING_SAMPLE_ROW = {
+    "source": "google-play",
+    "profile": "sample",
+    "segment": "sample",
+    "channel": "sample",
+    "origin": "fetch",
+    "rating": "4.123",  # the page's 4.123456789, kept to three places
+    "review_count": 1234,
+    "source_url": "https://play.google.com/store/apps/details"
+    "?id=example.fictional.app&hl=fr&gl=FR",
+    "captured_at": LISTING_SAMPLE_CAPTURED_AT,
+}

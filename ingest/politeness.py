@@ -22,8 +22,11 @@ USER_AGENT = (
 # One request's connect+read budget; a timeout is a refusal, not a retry.
 TIMEOUT_S = 20.0
 
-# The App Store feed serves at most ten pages per app and country.
-MAX_PAGES = 10
+# The most pages one source may declare (spec Phase 3a, D6): the App Store
+# feed's own cap is ten; a review profile with fourteen pages of forty reviews
+# fits; a profile with thousands of reviews is cut off here — the most recent
+# pages, one request every two seconds, about two minutes at most.
+MAX_PAGES = 60
 
 # A host may ask for a longer wait than ours (robots.txt Crawl-delay) and we
 # obey it up to this ceiling; a host asking for more than a minute between
@@ -31,5 +34,7 @@ MAX_PAGES = 10
 MAX_CRAWL_DELAY_S = 60.0
 
 # The only hosts the fetcher will ever contact; a URL elsewhere is refused
-# before any request.
-ALLOWED_HOSTS = ("itunes.apple.com",)
+# before any request. A test pins that every fetchable declared source's host
+# is here; a capture's meta is checked against its source's declared host, not
+# this list, so shrinking it never unloads a legitimately captured row.
+ALLOWED_HOSTS = ("itunes.apple.com", "play.google.com", "www.opinion-assurances.fr")

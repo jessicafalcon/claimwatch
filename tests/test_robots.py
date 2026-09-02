@@ -7,9 +7,9 @@ from __future__ import annotations
 import pytest
 
 from ingest.robots import PRODUCT_TOKEN, Robots, reads_as_robots
-from ingest.sources import AppStoreSource
+from ingest.sources import app_store_source
 
-FEED = AppStoreSource(
+FEED = app_store_source(
     name="t", app_id=1, country="fr", listing="", fetchable=True
 ).page_url(1)
 LIVE_FILE = "User-agent: *\nDisallow: /*/rss/*\n\nUser-agent: Googlebot\nDisallow:\n"

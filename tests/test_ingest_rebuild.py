@@ -12,19 +12,24 @@ from pathlib import Path
 
 import pytest
 
-from ingest.app_store import FeedShapeError, capture_pages, read_captures
+from ingest.app_store import FeedShapeError
+from ingest.captures import capture_pages, read_captures
+from ingest.sources import by_name, sample_source
 from pipeline.build import idempotency_check, rebuild
 from pipeline.metrics import reviews_per_month
 from pipeline.warehouse import connect
 from tests import pins
 
 SAMPLE = Path(__file__).resolve().parent.parent / "fixtures" / "app-store"
+FEED = by_name("fr-digital-first")  # the declared feed source; captures live under it
+FEED_DIR = Path(FEED.platform) / FEED.name
+SAMPLE_SRC = sample_source("app_store")
 
 
 def _capture(root: Path, capture_id: str, captured_at: str, edit=None) -> Path:
-    """Copy the sample into `root/<capture_id>` with its meta re-stamped; `edit`
-    may mutate page 1's document before it is written."""
-    d = root / capture_id
+    """Copy the sample into `root/<platform>/<source>/<capture_id>` with its meta
+    re-stamped; `edit` may mutate page 1's document before it is written."""
+    d = root / FEED_DIR / capture_id
     shutil.copytree(SAMPLE, d)
     for meta in d.glob("page-*.meta.json"):
         m = json.loads(meta.read_text())
@@ -57,7 +62,7 @@ def test_rebuild_from_sample_matches_pins(tmp_path):
         "select distinct source, run_id, captured_at from raw_reviews",
     )
     assert rows == [
-        ("app-store", "app-store:app-store", pins.APP_STORE_SAMPLE_CAPTURED_AT)
+        ("app-store", "sample:app-store", pins.APP_STORE_SAMPLE_CAPTURED_AT)
     ]
 
 
@@ -86,19 +91,21 @@ def test_pages_beyond_nine_are_read_in_numeric_order(tmp_path):
         }
         (d / f"page-{n}.meta.json").write_text(json.dumps(meta))
     expected = [f"page-{n}.json" for n in range(1, 11)]
-    assert [p.name for p in capture_pages(d)] == expected
-    ((_, rows),) = read_captures(d)
+    assert [p.name for p in capture_pages(d, "json")] == expected
+    ((_, parsed),) = read_captures(d, SAMPLE_SRC)
+    rows = parsed.reviews
     seen = [int(r["source_url"].rsplit("page=", 1)[1].split("/")[0]) for r in rows]
     assert seen == sorted(seen) and seen[-1] == 10
 
 
 def test_read_captures_orders_captures_then_pages_then_items():
-    ((capture_id, rows),) = read_captures(SAMPLE)
-    assert capture_id == "app-store"
+    ((capture_id, parsed),) = read_captures(SAMPLE, SAMPLE_SRC)
+    rows = parsed.reviews
+    assert capture_id == "app-store" and parsed.snapshots == []
     assert len(rows) == sum(pins.APP_STORE_SAMPLE_ITEMS_ON_PAGES)  # before dedup
     assert rows[0]["external_id"] == pins.APP_STORE_SAMPLE_FIRST_ROW["external_id"]
     assert [r["source_url"][-6] for r in rows] == ["1"] * 6 + ["2"] * 3
-    assert read_captures(Path("/nonexistent/cache")) == []
+    assert read_captures(Path("/nonexistent/cache"), SAMPLE_SRC) == []
 
 
 def test_second_rebuild_from_captures_adds_no_rows():
@@ -123,7 +130,7 @@ def test_second_capture_of_unchanged_pages_adds_no_rows(tmp_path):
         ("2026-09-01T08:00:00",)
     ]
     assert _query(db, "select distinct run_id from raw_reviews") == [
-        ("app-store:2026-09-01T08-00-00",)
+        (f"{FEED.platform}/{FEED.name}/2026-09-01T08-00-00",)
     ]
 
 
@@ -167,6 +174,7 @@ def test_rebuild_from_captures_is_byte_stable_under_a_moving_clock(
     """Two fresh rebuilds from the same captures, with every clock the parser
     could reach poisoned, produce identical raw rows — provenance included."""
     import ingest.app_store as parser
+    import ingest.captures as captures
 
     class NoClock(parser.datetime):
         @classmethod
@@ -176,6 +184,7 @@ def test_rebuild_from_captures_is_byte_stable_under_a_moving_clock(
         utcnow = today = now
 
     monkeypatch.setattr(parser, "datetime", NoClock)
+    monkeypatch.setattr(captures, "datetime", NoClock)
     rows = []
     for name in ("a", "b"):
         db = tmp_path / f"{name}.duckdb"
@@ -210,10 +219,10 @@ def test_missing_or_malformed_meta_is_refused(tmp_path):
     d = _capture(cache, "2026-09-01T08-00-00", "2026-09-01T08:00:00")
     (d / "page-1.meta.json").write_text('{"source_url": "x"}')
     with pytest.raises(FeedShapeError, match="meta must have exactly"):
-        read_captures(cache)
+        read_captures(cache / FEED_DIR, FEED)
     (d / "page-1.meta.json").unlink()
     with pytest.raises(FeedShapeError, match="meta is missing"):
-        read_captures(cache)
+        read_captures(cache / FEED_DIR, FEED)
 
 
 @pytest.mark.parametrize(
@@ -249,7 +258,7 @@ def test_meta_value_outside_the_declared_shape_refuses_the_capture(
     meta[field] = value
     meta_path.write_text(json.dumps(meta))
     with pytest.raises(FeedShapeError, match=f"field '{field}'"):
-        read_captures(cache)
+        read_captures(cache / FEED_DIR, FEED)
     db = tmp_path / "w.duckdb"
     with pytest.raises(FeedShapeError):
         rebuild("duckdb", "captured", database=db, cache_dir=cache)
@@ -266,11 +275,34 @@ def test_meta_with_an_extra_key_is_refused(tmp_path):
     meta["extra"] = 1
     meta_path.write_text(json.dumps(meta))
     with pytest.raises(FeedShapeError, match="meta must have exactly"):
-        read_captures(cache)
+        read_captures(cache / FEED_DIR, FEED)
 
 
 def test_zero_captures_is_zero_rows_not_an_error(tmp_path):
     counts = rebuild(
         "duckdb", "captured", database=tmp_path / "w.duckdb", cache_dir=tmp_path / "no"
     )
-    assert counts == {"raw_reviews": 0, "stg_reviews": 0}
+    assert counts["raw_reviews"] == 0 and counts["stg_reviews"] == 0
+
+
+def test_meta_is_validated_against_the_sources_declared_host(tmp_path, monkeypatch):
+    """Phase 3a, invariant 3: the host check is the declaration's, not the
+    fetch-time allowlist. A meta on another allowed host refuses; shrinking the
+    allowlist to nothing does not unload the declared source's capture."""
+    import ingest.politeness as politeness
+
+    cache = tmp_path / "cache"
+    d = _capture(cache, "2026-09-01T08-00-00", "2026-09-01T08:00:00")
+    meta_path = d / "page-1.meta.json"
+    meta = json.loads(meta_path.read_text())
+    meta["source_url"] = (
+        "https://play.google.com/fr/rss/x/page=1/json"  # allowed, not ours
+    )
+    meta_path.write_text(json.dumps(meta))
+    with pytest.raises(FeedShapeError, match="field 'source_url'.*itunes.apple.com"):
+        read_captures(cache / FEED_DIR, FEED)
+    meta["source_url"] = FEED.page_url(1)
+    meta_path.write_text(json.dumps(meta))
+    monkeypatch.setattr(politeness, "ALLOWED_HOSTS", ())
+    ((_, parsed),) = read_captures(cache / FEED_DIR, FEED)
+    assert len(parsed.reviews) == sum(pins.APP_STORE_SAMPLE_ITEMS_ON_PAGES)

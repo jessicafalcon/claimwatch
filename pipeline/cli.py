@@ -15,17 +15,12 @@ from __future__ import annotations
 import argparse
 import sys
 
-from ingest.app_store import FeedShapeError, has_pages
-from ingest.politeness import ALLOWED_HOSTS, MAX_PAGES
+from ingest import sources
+from ingest.captures import has_pages, parser_module
+from ingest.parsed import PageShapeError
+from ingest.politeness import MAX_PAGES
 from ingest.sources import SOURCES, by_name, source_names
-from pipeline.build import (
-    DEFAULT_CACHE,
-    INPUTS,
-    capture_root,
-    idempotency_check,
-    rebuild,
-    reset,
-)
+from pipeline.build import INPUTS, captures_for, idempotency_check, rebuild, reset
 from pipeline.metrics import reviews_per_month
 from pipeline.warehouse import TARGETS, connect, database_for
 
@@ -63,9 +58,12 @@ def _prompt(question: str, refusal: str) -> bool:
 def _do_rebuild(args: argparse.Namespace) -> int:
     target = resolve_choice(args.target, TARGETS, "duckdb")
     rows = resolve_choice(args.rows, INPUTS, "captured")
-    root = capture_root(rows)
-    if rows == "captured" and not (root and has_pages(root)):
-        shown = DEFAULT_CACHE.relative_to(DEFAULT_CACHE.parents[2])
+    if rows == "captured" and not any(
+        has_pages(root, parser_module(src.parser).EXTENSION)
+        for src, root, _ in captures_for(rows)
+        if src.parser is not None
+    ):
+        shown = sources.CACHE_ROOT.relative_to(sources.CACHE_ROOT.parents[1])
         print(
             f"no captures under {shown} — nothing to load from the scraper; "
             "`make scrape CONFIRM=yes` fetches them (developer-run)"
@@ -100,8 +98,9 @@ def _do_scrape(args: argparse.Namespace) -> int:
         raise Refused("refusing: no source is declared in ingest/sources.py")
     if not confirmed(args.confirm, args.confirm_origin):
         listed = ", ".join(s.name for s in chosen)
+        hosts = ", ".join(sorted({s.host for s in chosen if s.fetchable})) or "no host"
         ok = _prompt(
-            f"Fetch robots.txt + up to {MAX_PAGES} feed pages from {ALLOWED_HOSTS[0]} "
+            f"Fetch robots.txt + up to {MAX_PAGES} pages per source from {hosts} "
             f"for {listed}, >= 2 s apart? [y/N] ",
             "scrape: refusing — pass CONFIRM=yes on the command line "
             "(an environment CONFIRM=yes does not count); nothing fetched",
@@ -116,7 +115,7 @@ def _do_scrape(args: argparse.Namespace) -> int:
     try:
         for source in chosen:  # one source's refusal is its own line; the run goes on
             try:
-                capture_dir, pages = scrape(source, DEFAULT_CACHE, client=polite)
+                capture_dir, pages = scrape(source, sources.CACHE_ROOT, client=polite)
             except FetchRefused as exc:
                 print(str(exc), file=sys.stderr)
                 refused += 1
@@ -189,7 +188,7 @@ def main(argv: list[str] | None = None) -> int:
     except Refused as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    except FeedShapeError as exc:
+    except PageShapeError as exc:
         # A stored capture that is not the declared shape (hand-edited, or a
         # parser tightened since it was written): one line, never a traceback.
         print(f"refusing: {exc}", file=sys.stderr)

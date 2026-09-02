@@ -1,9 +1,10 @@
 """Where things live (spec Phase 2, invariants 6 and 7, done-when 1 and 6):
 `httpx` is imported only by the fetcher, the politeness knobs are defined only
 in `ingest/politeness.py`, a rebuild never imports the fetcher, `ingest/` never
-reads `.env`, the only clock is the fetcher's stamp, and exactly one source is
-declared. Mechanical greps over every `*.py` in the repo outside `tests/` and
-dot-directories (tests build `httpx.MockTransport`s), so a module landing in
+reads `.env`, the only clock is the fetcher's stamp, and every source is a
+full declaration (Phase 3a). Mechanical greps over every `*.py` in the repo
+outside `tests/` and dot-directories (tests build `httpx.MockTransport`s), so
+a module landing in
 `classify/`, `models/`, `dags/`, `study/` or the root is covered the day it
 appears — invariant 6 says "all modules"."""
 
@@ -15,7 +16,16 @@ from pathlib import Path
 import pytest
 
 from ingest import politeness
-from ingest.sources import SOURCES, source_names
+from ingest.sources import (
+    CHANNELS,
+    PARSERS,
+    SEGMENTS,
+    SOURCES,
+    Source,
+    app_store_source,
+    by_name,
+    source_names,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 EXCLUDED_TOP = ("tests",)  # plus every dot-directory (.venv, .git, .claude)
@@ -72,11 +82,15 @@ def test_politeness_knobs_live_in_one_module():
     ua = _lines_matching(r'"User-Agent"')
     assert set(ua) == {"ingest/fetch.py"}, ua
     assert politeness.MIN_INTERVAL_S >= 2.0
-    assert politeness.MAX_PAGES == 10  # the feed's own cap: the request budget
+    assert politeness.MAX_PAGES == 60  # Phase 3a, D6: the per-source ceiling
     assert politeness.TIMEOUT_S == 20.0
     assert politeness.MAX_CRAWL_DELAY_S == 60.0
     assert "friction-ledger" in politeness.USER_AGENT
-    assert politeness.ALLOWED_HOSTS == ("itunes.apple.com",)
+    assert politeness.ALLOWED_HOSTS == (
+        "itunes.apple.com",
+        "play.google.com",
+        "www.opinion-assurances.fr",
+    )
 
 
 def test_the_stdlib_robots_parser_is_not_used():
@@ -116,32 +130,104 @@ def test_the_only_clock_is_the_fetch_stamp():
     assert set(hits) == {"ingest/fetch.py"}, hits
 
 
-def test_exactly_one_source_is_declared():
-    assert len(SOURCES) == 1
-    (src,) = SOURCES
-    assert source_names() == (src.name,)
+def test_the_phase_2_feed_source_is_declared_as_before():
+    src = by_name("fr-digital-first")
     assert re.fullmatch(r"[a-z0-9-]+", src.name)
-    assert src.host == "itunes.apple.com"
+    assert src.host == "itunes.apple.com" and src.parser == "app_store"
     assert src.page_url(2).startswith("https://itunes.apple.com/")
-    assert "page=2/json" in src.page_url(2)
+    assert "page=2/json" in src.page_url(2) and len(src.pages) == 10
     # A sourced data point: the listing the id was read from, by id only —
     # no app or company name in the address.
-    assert src.listing == f"https://apps.apple.com/{src.country}/app/id{src.app_id}"
+    assert src.listing.startswith("https://apps.apple.com/fr/app/id")
     # The recorded terms position is declared, with its reason (amendment A5).
     assert src.fetchable is False
     assert "robots.txt" in src.terms and "2026-09-02" in src.terms
 
 
-def test_every_non_fetchable_source_states_its_reason():
-    """The property over every declaration, not today's one: fetchable=False
-    implies a non-empty reason; the declaration itself refuses otherwise."""
-    for src in SOURCES:
-        assert src.fetchable or src.terms.strip(), src.name
-    from ingest.sources import AppStoreSource
+def test_every_source_declares_parser_cache_host_and_attribution():
+    """Phase 3a, invariant 3: every fact the fetcher and the loader need is in
+    the declaration — parser (a closed set), host, page addresses on that host,
+    a cache directory under the one root, profile, segment, channel."""
+    from urllib.parse import urlsplit
 
+    from ingest import sources
+
+    assert len(SOURCES) >= 3 and len(set(source_names())) == len(SOURCES)
+    for src in SOURCES:
+        assert src.parser is None or src.parser in PARSERS
+        assert src.segment in SEGMENTS and src.channel in CHANNELS
+        assert src.cache_dir == sources.CACHE_ROOT / src.platform / src.name
+        assert all(urlsplit(u).hostname == src.host for u in src.pages), src.name
+        assert all(u.startswith("https://") for u in src.pages)
+        assert src.declared_on == "2026-09-02"
+        if src.fetchable:
+            assert src.parser is not None and src.pages, src.name
+    assert {s.platform for s in SOURCES} == {"app-store", "google-play"}
+
+
+def test_every_fetchable_sources_host_is_allowed():
+    for src in SOURCES:
+        if src.fetchable:
+            assert src.host in politeness.ALLOWED_HOSTS, src.name
+
+
+def test_the_cache_root_is_bound_once():
+    """One binding (`ingest/sources.py::CACHE_ROOT`); no other module writes a
+    `data/cache` path."""
+    hits = _lines_matching(r'"cache"')
+    assert set(hits) == {"ingest/sources.py"}, hits
+
+
+def test_no_module_branches_on_a_platform_name():
+    """Nothing outside the declarations and a parser's own constants compares
+    against a platform or source name: the second platform is a declaration,
+    not a branch."""
+    rx = (
+        r'(==|!=|\bin\b)\s*\(?\s*"'
+        r'(app-store|google-play|opinion-assurances|fr-digital-first[a-z-]*)"'
+    )
+    hits = _lines_matching(rx)
+    assert hits == {}, hits
+
+
+def test_every_non_fetchable_source_states_its_reason():
+    """The property over every declaration, not today's: fetchable=False
+    implies a reason naming robots or a terms clause and a date; the
+    declaration itself refuses otherwise."""
+    for src in SOURCES:
+        if not src.fetchable:
+            assert re.search(r"robots\.txt|terms|conditions", src.terms), src.name
+            assert re.search(r"20[0-9]{2}-[0-9]{2}-[0-9]{2}", src.terms), src.name
     with pytest.raises(ValueError, match="needs terms"):
-        AppStoreSource(name="x", app_id=1, country="fr", listing="", fetchable=False)
+        app_store_source(name="x", app_id=1, country="fr", listing="", fetchable=False)
     with pytest.raises(ValueError, match="needs terms"):
-        AppStoreSource(
+        app_store_source(
             name="x", app_id=1, country="fr", listing="", fetchable=False, terms="  "
+        )
+    with pytest.raises(ValueError, match="needs a parser"):
+        Source(
+            name="x",
+            platform="p",
+            host="h",
+            parser=None,
+            pages=(),
+            profile="x",
+            segment="traditional",
+            channel="unsolicited",
+            listing="",
+            fetchable=True,
+        )
+    with pytest.raises(ValueError, match="segment"):
+        Source(
+            name="x",
+            platform="p",
+            host="h",
+            parser=None,
+            pages=(),
+            profile="x",
+            segment="invited",
+            channel="unsolicited",
+            listing="",
+            fetchable=False,
+            terms="t",
         )
