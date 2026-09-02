@@ -49,10 +49,14 @@ def section(text: str, heading: str) -> str:
 
 
 def run(cmd: list[str], cwd: Path) -> tuple[int, str]:
-    """Run `cmd`, capture stdout+stderr merged, never raise on non-zero."""
-    res = subprocess.run(
-        cmd, cwd=cwd, capture_output=True, text=True, stdin=subprocess.DEVNULL
-    )
+    """Run `cmd`, capture stdout+stderr merged, never raise: a non-zero exit is
+    returned, a missing executable is (127, one line) — never a traceback."""
+    try:
+        res = subprocess.run(
+            cmd, cwd=cwd, capture_output=True, text=True, stdin=subprocess.DEVNULL
+        )
+    except FileNotFoundError:
+        return 127, f"command not found: {cmd[0]}"
     return res.returncode, res.stdout + res.stderr
 
 

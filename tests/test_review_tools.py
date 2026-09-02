@@ -12,7 +12,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import review_gate  # noqa: E402
-from review_common import Refused, resolve_spec, section  # noqa: E402
+from review_common import Refused, resolve_spec, run, section  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -51,6 +51,11 @@ def test_base_is_validated():
     for bad in ("-x", "--output=x", "a b", "", "main;rm"):
         with pytest.raises(Refused):
             review_gate.resolve_base(bad)
+
+
+def test_run_reports_a_missing_command():
+    code, out = run(["definitely-not-a-command-xyz"], ROOT)
+    assert code == 127 and out == "command not found: definitely-not-a-command-xyz"
 
 
 def test_section_matches_heading_prefix():
