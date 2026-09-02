@@ -378,7 +378,8 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 ## Current status
 
 **Phase 0b — Contracts** (`phase-0b-contracts`, spec
-`specs/phase-0b-contracts.md`): built, PR pending. `SPEC.md` (the five parts
+`specs/phase-0b-contracts.md`): built; review round 1 dispositions landed; PR
+open. `SPEC.md` (the five parts
 and the exact chart list, each panel citing its BACKING row id and wearing its
 tag), the full `BACKING.md` table (19 rows, all Pending), the classification
 grain (one row per review × theme) stated in SPEC and the Classification
@@ -386,6 +387,6 @@ contract above, the ten-term glossary, and one new guard — the SPEC ↔ BACKIN
 citation check in `check_backing.py`. No pipeline code, no `sql/`, no fixtures.
 Phase 0a merged (PR #1). Next: Phase 1 — schema and the empty warehouse.
 
-Open BACKLOG rows: **5**.
+Open BACKLOG rows: **6**.
 
 (Update this section at the end of every working day.)

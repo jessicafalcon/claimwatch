@@ -1,11 +1,11 @@
-# Phase 0b — Contracts (PROPOSED)
+# Phase 0b — Contracts (APPROVED)
 
 Contract for the `phase-0b-contracts` branch. Source: PROJECT_BRIEF.md §9
 Phase 0 (the contracts half), split per `docs/PLAN.md` §5 (approved
 2026-09-01): 0a built the gate, 0b writes the contracts the gate then checks.
 Depends on `phase-0a-machinery` merged.
 
-**Status: APPROVED 2026-09-01 — in progress.** One dependency change: none
+**Status: APPROVED 2026-09-01 — DELIVERED 2026-09-01, PR open.** One dependency change: none
 (stdlib only). This phase adds one small guard to `scripts/check_backing.py` and
 its test; no runtime package. The allowlist is in CLAUDE.md → Conventions.
 
@@ -219,3 +219,24 @@ destructive/variable target is in the range.**
 - Mechanical tag-on-panel and tag-match checks — editorial now (study-editor,
   coherence-auditor); may become a guard when the export lands.
 - The `classified_reviews` grain test — Phase 5b (named in Evidence row 4).
+
+## Delivered (2026-09-01, PR open)
+
+As specified: `SPEC.md` (five parts, 19 panels each citing its `B<beat>.<n>` row
+and naming its tag), the full `BACKING.md` table (19 rows, all Pending), the
+classification grain (one row per review × theme) stated identically in SPEC.md
+and CLAUDE.md, the ten-term glossary, and one new guard — check 7 (SPEC ↔
+BACKING citation parity) in `check_backing.py`, pinned by
+`tests/test_check_backing.py::test_spec_citations`. `make review-gate
+SPEC=specs/phase-0b-contracts.md` prints `7/7`; 67 tests.
+
+Review round 1 (code-reviewer, functionality-tester, study-editor,
+coherence-auditor; security-reviewer not triggered — no sensitive surface)
+reported eight findings, no BLOCKER. Dispositions: five wording/record fixes in
+one batched commit (four SPEC.md voice rewrites — the Beat 5 plain opener, the
+B5.1 and B2.1 headings, "contacts" as a cost unit —, this spec's title to
+APPROVED, and the stale "nothing reads SPEC.md yet" BACKLOG parenthetical); one
+BACKLOG row accepted (the citation guard strips fenced blocks but not inline
+code spans — count 5 → 6); two spec-sanctioned deferrals accepted (the Phase 5b
+grain code test; the render-time no-number check). functionality-tester: works —
+all four citation-guard hand-mutations bite, determinism confirmed.

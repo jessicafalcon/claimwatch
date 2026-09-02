@@ -222,3 +222,13 @@ guard:
 - Tag-on-panel presence and tag-match stay editorial (study-editor,
   coherence-auditor); the render-time "a Pending panel shows no number" refusal
   is still a BACKLOG row for Phase 9.
+
+**Review round 1 (2026-09-01).** Four agents (code-reviewer,
+functionality-tester, study-editor, coherence-auditor; security-reviewer not
+triggered — no sensitive surface): eight findings, no BLOCKER. Five
+wording/record fixes batched in one commit (four SPEC.md voice rewrites, the
+spec title to APPROVED, the stale BACKLOG parenthetical); one BACKLOG row
+accepted (the citation guard strips fenced blocks but not inline code spans,
+count 5 → 6); two spec-sanctioned deferrals accepted (the Phase 5b grain code
+test; the render-time no-number check). The gate stayed 7/7 and the two-round
+cap did not apply (round 1).

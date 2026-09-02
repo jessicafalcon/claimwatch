@@ -67,7 +67,7 @@ reviews we labeled by hand before any chart uses it. The five themes are the
 document loop, silent rejections, second-payer failures, support without
 traction, and coverage-and-price frustration (PROJECT_BRIEF.md §5).
 
-- **B2.1 — The taxonomy.** The five themes, each with paraphrased examples from
+- **B2.1 — The five kinds of complaint.** The five themes, each with paraphrased examples from
   public reviews. Tag: *Documented* (Pending until the examples are curated with
   links).
 - **B2.2 — Theme share over time, by segment.** The share of negative reviews in
@@ -87,8 +87,9 @@ traction, and coverage-and-price frustration (PROJECT_BRIEF.md §5).
 
 ## Beat 3 — What a wrongly held claim costs
 
-A held claim that turns out to be legitimate is not free — it costs contacts,
-staff time, and lost customers. This part puts a number on that with plain
+A held claim that turns out to be legitimate is not free — it costs staff time
+answering calls and messages, and it costs lost customers. This part puts a
+number on that with plain
 arithmetic: every formula is printed above its chart, and every assumption is a
 slider that is either sourced or openly marked as a guess.
 
@@ -144,14 +145,14 @@ claims data is used; none is public.
 
 ## Beat 5 — How this was built, and where the rigor lives
 
-The study stands on a deterministic backbone with a language model only at the
-edges. This part states the checkable facts plainly and shows how anyone can
-reproduce every number.
+The study is built so the same data always produces the same numbers, and a
+language model is used in only one small step. This part states the checkable
+facts plainly and shows how anyone can reproduce every number.
 
 *Under the hood:* the pipeline is idempotent and reruns to the same numbers; the
 one place a model makes a decision is a single module, gated against hand labels.
 
-- **B5.1 — The determinism facts.** One place a model makes a decision, every
+- **B5.1 — The facts you can check.** One place a model makes a decision, every
   formula displayed next to its output, and no number anywhere without a source
   or a Modeled label. Tag: *Measured* (Pending until the pipeline is complete
   enough to count).
