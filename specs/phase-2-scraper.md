@@ -514,7 +514,7 @@ Freeze: fixtures/app-store/
 - [x] BACKING — none (no mart lands; every row stays Pending; 0 orphans)
 - [x] SPEC — none (no chart or beat changed)
 - [x] README — none (Phase 9; PROJECT_BRIEF.md is the front door until then)
-- [x] PROJECT_BRIEF — §9 Phase 2 reworded on the developer's call at the exit
+- [x] `PROJECT_BRIEF.md` — §9 Phase 2 reworded on the developer's call at the exit
       audit (2026-09-02), as for Phase 1: "one queryable metric", and a
       Done-when in the frozen-sample form with real rows moved to Phase 3
 - [x] `docs/PLAN.md` — §5 rows 1 and 2 corrected in place at the exit audit
@@ -616,3 +616,50 @@ coherence-auditor at exit.
   Beat 5 lands (BACKLOG row opened this phase).
 - `pyyaml` — Phase 5b (`rules.yaml`); nothing here needs it.
 - Classification, the cost model, the study — Phases 5–9.
+
+## Delivered (2026-09-02, pre-PR)
+
+As specified, under amendments A1–A7: one polite collector for an app store's
+public review feed, end to end, proven on a frozen sample. `ingest/` holds the
+fetcher (`fetch.py`, the only `httpx` import: robots.txt read first, every
+page checked against it by our own RFC 9309 matcher in `robots.py`, ≥ 2 s
+between requests and a Crawl-delay honoured up to a minute, one identifying
+User-Agent, no proxy, no retry, every page archived byte-exact under
+`data/cache/` with its address, time and the robots file beside it), the
+strict parser (`app_store.py`: a declared shape to Phase 1's eight raw
+columns, any deviation refuses the whole page, the author fields never read)
+and the one declared source (`sources.py`: id and listing address, a
+`fetchable` flag and its terms position). `make rebuild` reads captures by
+default through the unchanged `load_reviews` guard; `FIXTURE` is the closed set
+`{cache, empty, synthetic, app-store}`, each input in its own database file;
+reviews per month is a pinned query in `pipeline/metrics.py`, not a mart, until
+B5.2 lands. `fixtures/app-store/` is frozen (hand-written, fake, nameless) with
+its MANIFEST. `make scrape` is CONFIRM-gated and developer-run.
+
+**Not as first written: no real rows.** The first live run (2026-09-02) found
+the source's robots.txt disallows the feed path for every crawler and that the
+stdlib parser had missed the wildcard rule; the capture and its database were
+deleted, the matcher replaced (A1), the source recorded as not to fetch, and
+the DONE command, Done-when 3 and 4 (A7) and PROJECT_BRIEF.md §9 Phase 2 moved
+to the frozen-sample form. The first real rows land in Phase 3a with the first
+source whose robots file allows its feed; `make scrape` has no green path until
+then (BACKLOG). `make rebuild FIXTURE=app-store && make idempotency-check
+FIXTURE=app-store` prints raw 8 / staging 8, three months, every count
+unchanged on the second rebuild; Phase 1's line stays raw 40 / staging 39;
+`make review-gate SPEC=specs/phase-2-scraper.md` prints 7/7; 290 tests;
+check-backing 19 rows, 0 marts, 0 orphans; BACKLOG 14 open rows.
+
+Four review rounds and the exit audit (DECISIONS → Phase 2): rounds 1–3 each
+found the previous round's robots fix permissive at an edge, so the review cap
+applied at round 3 — the invariant was stated and the check rebuilt once (A6);
+round 4, the one scoped re-review, found four parser edges, each fixed with its
+pin and none changing the invariant. The coherence audit found no architecture
+erosion and no per-diff issue; its two BLOCKERs were record drift (the "real
+rows" wording surviving A1 in the spec and the brief) and were settled on the
+developer's call as above; its corrections landed in one code commit (build
+runs SQL through `warehouse.run_sql_file`, the seam four records named and
+nothing called) and one record commit. CLAUDE.md is 443 lines against the ~400
+cap (reported, as the cap asks). Forward to 3a, recorded: segment attribution
+joins `source_url` by exact value, never a pattern in SQL; the capture path is
+hardwired to one platform; the frozen `robots.txt` is read by nothing; three
+earlier BACKLOG rows trigger on 3a.
