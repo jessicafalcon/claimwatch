@@ -81,14 +81,17 @@ def _parse_groups(text: str) -> list[_Group]:
                 groups.append(current)
             current.agents.append(value.lower())
             naming = True
-        elif current is None:
+            continue
+        # Any other line ends a run of User-agent lines — a `Sitemap:` or an
+        # unknown key between two of them must not fuse two groups into one,
+        # or a foreign group's Allow would land in the catch-all verdict.
+        naming = False
+        if current is None:
             continue  # a rule before any group applies to no one
-        elif key in RULE_KEYS:
-            naming = False
+        if key in RULE_KEYS:
             if value:  # an empty `Disallow:` is "nothing disallowed": no rule
                 current.rules.append((key == "allow", value))
         elif key == "crawl-delay":
-            naming = False
             try:
                 delay = float(value)
             except ValueError:

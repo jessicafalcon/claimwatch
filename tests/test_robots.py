@@ -130,3 +130,17 @@ def test_the_query_string_is_part_of_the_matched_path():
     rules = Robots.parse("User-agent: *\nDisallow: /*?q=\n")
     assert rules.allows("https://h/p?q=1") is False
     assert rules.allows("https://h/p") is True
+
+
+def test_a_non_user_agent_line_ends_the_naming_run():
+    """A `Sitemap:` (or any unknown key) between `User-agent: *` and
+    `User-agent: googlebot` must not fuse the two into one group: googlebot's
+    long Allow would otherwise outrank the site's Disallow in the catch-all
+    verdict. Without the line, one group naming both is what the file says."""
+    star = "User-agent: *\nDisallow: /*/rss/*\n\n"
+    fused = "User-agent: *\nSitemap: https://h/s.xml\nUser-agent: googlebot\n"
+    fused += "Allow: /fr/rss/customerreviews\n"
+    assert Robots.parse(star + fused).allows(FEED) is False
+    honest = "User-agent: *\nUser-agent: googlebot\nAllow: /fr/rss/customerreviews\n"
+    assert Robots.parse(star + honest).allows(FEED) is True
+    assert Robots.parse(star + fused.replace("Sitemap", "Host")).allows(FEED) is False
