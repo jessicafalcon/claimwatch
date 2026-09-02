@@ -106,6 +106,21 @@ def test_gate_fails_on_a_missing_evidence_test_id():
     assert review_gate.check_evidence(spec, {"tests/test_a.py::test_x"}, {"nope"}) == []
 
 
+def test_invariant_and_threat_model_ids_are_checked():
+    """A test named only in Invariants or Threat model must exist too — an
+    invariant with a made-up pin was green before."""
+    spec = (
+        "## Evidence (REQUIRED)\n| 1 | `tests/test_a.py::test_x` |\n"
+        "## Invariants (REQUIRED)\n| inv | `tests/test_b.py::test_ghost` |\n"
+        "## Threat model\n| t | … | `tests/test_c.py::test_phantom` |\n"
+    )
+    errors = review_gate.check_evidence(spec, {"tests/test_a.py::test_x"}, set())
+    assert errors == [
+        "spec names a test that does not exist: tests/test_b.py::test_ghost",
+        "spec names a test that does not exist: tests/test_c.py::test_phantom",
+    ]
+
+
 def test_gate_fails_on_a_missing_or_empty_required_section():
     """A spec with no Evidence / Record updates section, or an Evidence section
     naming no test, must FAIL — never pass because nothing was found."""
@@ -203,4 +218,6 @@ def test_make_review_gate_refuses_end_to_end():
         assert res.returncode == 2, (var, res.stdout, res.stderr)
         refusals = [ln for ln in res.stderr.splitlines() if ln.startswith("refusing:")]
         assert len(refusals) == 1 and "Traceback" not in res.stderr, (var, res.stderr)
-        assert "pwned" not in res.stdout  # the echo never ran
+        # make echoes the recipe (the literal value inside quotes); had the shell
+        # run it, `pwned` would stand alone on a line.
+        assert "pwned" not in [ln.strip() for ln in res.stdout.splitlines()]

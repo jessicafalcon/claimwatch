@@ -13,9 +13,9 @@ FAIL, 2 on a refused SPEC/BASE, never a traceback. Run via
                  unless the spec has a `Freeze: fixtures/…` line; with no
                  --spec any fixture change is a FAIL (read-only after the phase
                  that froze them)
-  f. evidence  — (--spec) every `tests/….py::test_x` id and `make <target>` the
-                 spec's Evidence section names exists (pytest --collect-only;
-                 the Makefile's declared targets)
+  f. evidence  — (--spec) every `tests/….py::test_x` id the spec names — in
+                 Evidence, Invariants or Threat model — is collected, and every
+                 `make <target>` Evidence names is declared in the Makefile
   g. records   — (--spec) every backticked path on a `- [ ]`/`- [x]` line of
                  the spec's Record updates section is in the diff (FAIL);
                  every record file in the diff NOT on the list is a WARN
@@ -97,17 +97,33 @@ def evidence_ids(spec_text: str) -> tuple[list[str], list[str], list[str]]:
     return tests, sorted(set(_MAKE_TICK.findall(body))), errors
 
 
+NAMED_SECTIONS = ("Evidence", "Invariants", "Threat model")
+
+
+def named_test_ids(spec_text: str) -> tuple[list[str], list[str]]:
+    """(test ids, errors) across every section that names tests — Evidence,
+    Invariants ("Falsified by") and Threat model ("Pinned by")."""
+    tests: list[str] = []
+    errors: list[str] = []
+    for heading in NAMED_SECTIONS:
+        found, bad = parse_test_ids(section(spec_text, heading))
+        tests += found
+        errors += bad
+    return tests, errors
+
+
 def check_evidence(
     spec_text: str, collected: set[str], declared: set[str]
 ) -> list[str]:
     if not section(spec_text, "Evidence").strip():
         return ["spec has no Evidence section (REQUIRED)"]
-    tests, targets, errors = evidence_ids(spec_text)
-    if not tests and not errors:
+    ev_tests, targets, _ = evidence_ids(spec_text)
+    tests, errors = named_test_ids(spec_text)
+    if not ev_tests and not errors:
         return ["Evidence names no test id"]
     errors += [
-        f"Evidence names a test that does not exist: {t}"
-        for t in tests
+        f"spec names a test that does not exist: {t}"
+        for t in dict.fromkeys(tests)
         if t not in collected
     ]
     errors += [
