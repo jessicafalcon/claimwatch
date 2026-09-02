@@ -127,9 +127,15 @@ def test_cli_scrape_refuses_a_bad_source_with_exit_2(capsys):
     assert err.startswith("refusing:") and err.count("\n") <= 1
 
 
-def test_cli_scrape_refuses_an_unfilled_source_before_any_request(capsys):
-    """Confirmed on the command line but the declared source has no app id:
-    the fetcher refuses before a request (a socket would raise here)."""
+def test_cli_scrape_refuses_an_unfilled_source_before_any_request(capsys, monkeypatch):
+    """Confirmed on the command line but the source has no app id: the fetcher
+    refuses before a request (a socket would raise here). The unfilled source
+    is patched in, so the test holds whatever id the developer has declared."""
+    from ingest.sources import AppStoreSource
+    from pipeline import cli
+
+    blank = AppStoreSource(name="blank", app_id=0, country="fr")
+    monkeypatch.setattr(cli, "SOURCES", (blank,))
     code = main(["scrape", "--confirm=yes", "--confirm-origin=command line"])
     assert code == 2
     err = capsys.readouterr().err
