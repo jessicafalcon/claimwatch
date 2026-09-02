@@ -248,3 +248,35 @@ def test_cli_scrape_on_the_declared_source_refuses_before_the_network(capsys):
     err = capsys.readouterr().err
     assert err.startswith("refusing:") and "not fetchable" in err
     assert err.count("\n") == 1
+
+
+def test_cli_scrape_reports_each_refused_source_and_fetches_the_rest(
+    capsys, monkeypatch, isolated_paths
+):
+    """A declared not-fetchable source is one stderr line; the next source is
+    still fetched; the exit code says something was refused."""
+    import ingest.fetch as fetch
+    from ingest.sources import AppStoreSource
+    from pipeline import cli
+    from tests.test_app_store_fetch import Clock, Served, _polite
+
+    server, clock = Served(), Clock()
+    monkeypatch.setattr(fetch, "polite_client", lambda: _polite(server, clock))
+    two = (
+        AppStoreSource(
+            name="no",
+            app_id=1,
+            country="fr",
+            listing="",
+            fetchable=False,
+            terms="asked",
+        ),
+        AppStoreSource(name="yes", app_id=2, country="fr", listing="", fetchable=True),
+    )
+    monkeypatch.setattr(cli, "SOURCES", two)
+    code = main(["scrape", "--confirm=yes", "--confirm-origin=command line"])
+    out, err = capsys.readouterr()
+    assert code == 2
+    assert err.count("\n") == 1 and "'no' is declared not fetchable" in err
+    assert out.count("scrape: yes:") == 1
+    assert all("id=2/" in u for u in server.urls() if "rss" in u)

@@ -112,16 +112,19 @@ def _do_scrape(args: argparse.Namespace) -> int:
     from ingest.fetch import FetchRefused, polite_client, scrape
 
     polite = polite_client()  # one client, one per-host clock, for every source
+    refused = 0
     try:
-        for source in chosen:
+        for source in chosen:  # one source's refusal is its own line; the run goes on
             try:
                 capture_dir, pages = scrape(source, DEFAULT_CACHE, client=polite)
             except FetchRefused as exc:
-                raise Refused(str(exc)) from exc
+                print(str(exc), file=sys.stderr)
+                refused += 1
+                continue
             print(f"scrape: {source.name}: {pages} page(s) -> {capture_dir}")
     finally:
         polite.close()
-    return 0
+    return 2 if refused else 0
 
 
 def _do_idempotency(args: argparse.Namespace) -> int:
