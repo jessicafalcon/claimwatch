@@ -90,7 +90,16 @@ def test_measured_without_source_fails(tmp_path: Path):
         "| B3 c | m | `sql/marts/m.sql` | TBD | Measured |\n"
         "| B4 d | m | `sql/marts/m.sql` | ? | Documented |\n"
         "| B5 e | m | `sql/marts/m.sql` | see the brief | Measured |\n"
-        "| B6 f | m | `sql/marts/m.sql` | — | Modeled |\n",
+        "| B6 f | m | `sql/marts/m.sql` | — | Modeled |\n"
+        # closed at both ends: a placeholder in backticks, a link to a non-URL,
+        # a blank name, a valid part with trailing prose, an empty `;` part
+        "| B7 g | m | `sql/marts/m.sql` | `TBD` | Measured |\n"
+        "| B8 h | m | `sql/marts/m.sql` | [src](javascript:alert(1)) | Documented |\n"
+        "| B9 i | m | `sql/marts/m.sql` | [a](../../etc/passwd) | Measured |\n"
+        "| B10 j | m | `sql/marts/m.sql` | ` ` | Documented |\n"
+        "| B11 k | m | `sql/marts/m.sql` | https://a.example see notes | Measured |\n"
+        "| B12 l | m | `sql/marts/m.sql` | `ds-1` and prose | Documented |\n"
+        "| B13 m | m | `sql/marts/m.sql` | https://a.example; | Measured |\n",
         ("m.sql",),
     )
     msg = "row has no source of the declared shape (URL, markdown link, or `dataset`)"
@@ -100,6 +109,13 @@ def test_measured_without_source_fails(tmp_path: Path):
         f"line 9: Measured {msg}",
         f"line 10: Documented {msg}",
         f"line 11: Measured {msg}",
+        f"line 13: Measured {msg}",
+        f"line 14: Documented {msg}",
+        f"line 15: Measured {msg}",
+        f"line 16: Documented {msg}",
+        f"line 17: Measured {msg}",
+        f"line 18: Documented {msg}",
+        f"line 19: Measured {msg}",
     ]
 
 
@@ -111,7 +127,9 @@ def test_source_shapes_accepted(tmp_path: Path):
         "| Documented |\n"
         "| B3 c | m | `sql/marts/m.sql` | `open-damir-2026-01` | Measured |\n"
         "| B4 d | m | `sql/marts/m.sql` | https://a.example; https://b.example "
-        "| Measured |\n",
+        "| Measured |\n"
+        "| B5 e | m | `sql/marts/m.sql` | `fixtures/anchors/seed.csv` | Documented |\n"
+        "| B6 f | m | `sql/marts/m.sql` | https://x.example/a_(b) | Measured |\n",
         ("m.sql",),
     )
     assert check_backing.check_sources(_rows(root)) == []

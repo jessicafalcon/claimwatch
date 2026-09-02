@@ -10,12 +10,16 @@ Rules checked, one line per check:
   1. Header — the table's five columns start with exactly those five words.
   2. Tags — every row's Tag is one of Measured, Documented, Modeled, Pending.
   3. Sources — a Measured or Documented row names a source of the declared
-     shape: a URL, a markdown link, or a backticked dataset name; several
-     separated by `;`. `TBD`, `?`, `—` or prose is not a source.
+     shape, each `;`-separated part being exactly one of: a URL `https?://…`
+     (no whitespace); a markdown link whose destination is such a URL; a
+     backticked dataset name of two or more lowercase segments joined by
+     `-`, `_`, `.` or `/` (`open-damir-2026-01`). Nothing trails a part, so
+     `TBD`, `?`, `—`, `` `TBD` ``, a `javascript:` link or prose is not a source.
   4. SQL files — a non-Pending row's SQL file exists and lives under `sql/`.
-     A Pending row may point at a file not built yet (the tag says so: the
-     brief writes BACKING before code; a row flips Pending → Measured/Modeled
-     in the phase that lands its mart).
+     "No file yet" is written as a blank cell or `—` (nothing else). A Pending
+     row may point at a file not built yet (the tag says so: the brief writes
+     BACKING before code; a row flips Pending → Measured/Modeled in the phase
+     that lands its mart).
   5. Orphans — every `sql/marts/*.sql` is named by at least one row (work that
      maps to no claim is out of scope, §8).
 
@@ -35,10 +39,14 @@ from review_common import ROOT  # noqa: E402
 COLUMNS = ("Study claim", "Mart table", "SQL file", "Upstream source", "Tag")
 TAGS = frozenset({"Measured", "Documented", "Modeled", "Pending"})
 NEEDS_SOURCE = frozenset({"Measured", "Documented"})
-EMPTY = {"", "—", "-", "n/a"}
+NO_FILE = frozenset({"", "—"})  # the one declared spelling of "no SQL file yet"
 _SEP = re.compile(r":?-+:?")  # one separator cell: ---, :---, ---:, :---:
-# One source: a URL, a markdown link, or a backticked dataset name.
-_SOURCE_PART = re.compile(r"^(https?://\S+|\[[^\]]+\]\(\S+\)|`[^`]+`)$")
+# One source part, whole-cell anchored: a URL, a markdown link TO a URL, or a
+# backticked dataset name (two or more lowercase segments — `tbd` is not one).
+_URL = r"https?://\S+"
+_LINK_URL = r"https?://[^\s()<>]+"  # inside `[…](…)` the `)` closes the link
+_DATASET = r"[a-z0-9]+(?:[-._/][a-z0-9]+)+"
+_SOURCE_PART = re.compile(rf"^(?:{_URL}|\[[^\]]+\]\({_LINK_URL}\)|`{_DATASET}`)$")
 
 
 @dataclass(frozen=True)
@@ -116,7 +124,7 @@ def check_sql_files(rows: list[Row], root: Path) -> list[str]:
     errors: list[str] = []
     for r in rows:
         path = _bare(r.sql_file)
-        if path in EMPTY:
+        if path in NO_FILE:
             if r.tag != "Pending":
                 errors.append(f"line {r.line}: {r.tag} row names no SQL file")
             continue
