@@ -9,10 +9,14 @@ holds its query and its source. Nothing else is a chart in this study.
 
 **How to read a panel.** Every panel wears exactly one evidence tag — *Measured*
 (we captured it), *Documented* (a sourced public report), *Modeled* (arithmetic
-we show), or *Pending* (an honest placeholder that shows no number). Today every
-row is Pending: the contracts are written before the data, so each panel names
-the tag it will wear once its data lands and shows a gray "not yet" state until
-then. A panel never invents a number to fill itself.
+we show), or *Pending* (an honest placeholder that shows no number). Most rows
+are still Pending: the contracts were written before the data, so each panel
+names the tag it will wear once its data lands and shows a gray "not yet" state
+until then. The rating panels of Beat 1 and the peer context of Beat 2 show
+numbers today: the public figures the brief gathered at scoping, loaded as
+seeded anchors and tagged *Documented*; our own captures land beside them tagged
+*Measured*, and each point carries its own tag, so a chart can be read point by
+point until then. A panel never invents a number to fill itself.
 
 **The classification grain (settled here, before any theme chart is frozen).** A
 review can be about more than one thing, so the classifier writes **one row per
@@ -44,15 +48,18 @@ PROJECT_BRIEF.md §6 and marked as seeded.
   confirmed date (never a live counter, because we cannot verify it daily). Tag:
   *Documented* (Pending until the case is curated with its public link).
 - **B1.2 — The rating trend.** The studied segment's public rating over time,
-  as a monthly series. Tag: *Measured* (Pending until `platform_snapshots`
-  lands). *Sampling bias, stated beside the chart:* unsolicited review platforms
+  as a monthly series. Tag: *Documented* for the seeded points, *Measured* for
+  our own captures, each point marked; the row reads Measured once the
+  captures make the series (Phase 4). *Sampling bias, stated beside the chart:* unsolicited review platforms
   are negatively self-selected — a company that stops inviting reviews drifts
   down — so part of any decline is a sampling choice, not only a service change.
 - **B1.3 — The channel gap.** Ratings on channels a company controls or invites
-  versus unsolicited platforms, side by side. Tag: *Measured* (Pending).
+  versus unsolicited platforms, side by side. Tag: *Documented* for the seeded
+  points, *Measured* for our own captures, each point marked.
 - **B1.4 — The stat row.** One-star share on independent platforms, review
   counts, and the difference in how quickly companies answer reviews. Tag:
-  *Measured* (Pending).
+  *Documented* for the seeded points, *Measured* for our own captures, each
+  point marked.
 
 ## Beat 2 — The complaints have a shape
 
@@ -75,7 +82,8 @@ traction, and coverage-and-price frustration (PROJECT_BRIEF.md §5).
   theme rows under the grain above. Tag: *Measured* via the gated classifier
   (Pending until its mart lands — never faked).
 - **B2.3 — Peer context.** Public ratings across the market segment, so no one
-  insurer is read in isolation. Tag: *Measured* (Pending).
+  insurer is read in isolation. Tag: *Documented* for the seeded points,
+  *Measured* for our own captures, each point marked.
 - **B2.4 — Classifier quality.** How often each theme label is right and how many
   true cases it catches, measured against the hand labels and shown next to the
   charts it feeds. Tag: *Measured* (Pending until the eval gate writes its mart).

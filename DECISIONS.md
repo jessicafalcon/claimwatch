@@ -82,6 +82,39 @@ place and never deleted.
     3a's `platform_snapshots`), never a different User-Agent or a
     "syndication feeds don't count" reading.
     ([Phase 2](#phase-2))
+  - *Google Play listing (Phase 3a).* The app's store page, read for its
+    machine-readable rating block (schema.org JSON-LD `AggregateRating`) and
+    nothing else — one page, no reviews. **Position as of 2026-09-02:** the
+    host's `robots.txt` catch-all group disallows `/_`, `/store/getreviews`
+    and `/store/xhr` and does not disallow the details page; Google's terms
+    forbid automated access only where it breaches robots.txt. Fetchable. Its
+    reviews load through the disallowed `/_` call and are never fetched.
+    ([Phase 3a](#phase-3a))
+  - *App Store listing (Phase 3a).* Allowed by `robots.txt`, **forbidden by
+    Apple's website terms of use** ("Your Use of the Site": no robot, spider,
+    page-scrape or automated means to access or copy the site; no robots.txt
+    carve-out; read 2026-09-02). Declared not fetchable; its rating and count
+    are read by hand and entered in `data/snapshots/manual_snapshots.csv`,
+    tagged Measured. The by-id address also answers a redirect to a slug
+    address (Gotchas). ([Phase 3a](#phase-3a))
+  - *Opinion Assurances profile pages (Phase 3a).* `robots.txt` allows the
+    profile and its path-based pages (`…-page<n>.html`) and disallows every
+    address with a query string; the site's conditions générales (V.3) forbid
+    automated extraction **without prior written authorization**, and V.1
+    reproduction without written agreement. **Position as of 2026-09-02: the
+    developer holds the site's written authorization** (requested and granted
+    2026-09-02), recorded as the source's `terms`; the study publishes
+    aggregates and paraphrases only (brief §2.5). Fetchable: the studied
+    insurer's profile, up to its own page count, ≥ 2 s apart; the reviewer
+    pseudonym is never read. ([Phase 3a](#phase-3a))
+- **An address that spells the brand is a sourced data point and lives in
+  `ingest/sources.py` only (Phase 3a, decision D1).** A store package id or a
+  profile path names the insurer where a numeric store id does not. It may
+  appear in the source declaration — the `pages` and `listing` fields — and
+  nowhere else: no prose, comment, commit message, test name, fixture or
+  tracked data file repeats it (the hand-entry file names the source by its
+  declared name). The future hashed naming check excludes those two fields.
+  ([Phase 3a](#phase-3a))
 - **A scraped page is parsed strictly to a declared shape; the page is the
   unit of refusal.** A feed item missing or mis-typing a required field, a
   rating outside 1–5 or a non-ISO timestamp refuses the whole page, naming
@@ -165,6 +198,36 @@ Each entry: the surprise, the official-docs check, what we did.
   the real path; the disallowed capture and its database were deleted; the
   DONE command moved to the frozen-sample form; the terms position above
   records the disallow.
+
+- **Phase 3a — the candidate checks ran from the build session, not by hand
+  (2026-09-02).** The spec said the developer would check each candidate's
+  robots file, terms and page shape in a browser; the developer asked the
+  session to do it. Done with `curl` and the stdlib client, the project's
+  User-Agent, one request per page, ≥ 2 s per host, saved outside the repo.
+  Midway, the session's permission classifier blocked further downloads from
+  `apps.apple.com` and `opinion-assurances.fr` and every local script over the
+  saved profile page (it would print review text); two pages were read
+  through a text summary instead, and the profile page's structure was dumped
+  by the developer with a redacting script (`inspect_oa_structure.py`, text
+  nodes replaced by their lengths). Recorded because the spec's stack-risk
+  section assumed a hand check.
+- **Phase 3a — the App Store listing's by-id address redirects.**
+  `https://apps.apple.com/fr/app/id<n>` answers 301 to a slug address that
+  spells the app's name; the fetcher follows no redirect and refuses a non-200,
+  so even under permission the declared address would have to be the slug
+  (D1). Moot: Apple's terms forbid the fetch and the figures are hand-read.
+- **Phase 3a — Opinion Assurances carries no JSON-LD; it carries microdata.**
+  The listing parser's assumption (a `<script type="application/ld+json">`
+  block) does not hold there: the profile page marks its data inline with
+  schema.org `itemscope`/`itemprop` attributes — 40 `review` scopes a page,
+  each with a `reviewRating` (`ratingValue` as a `meta content`) and an
+  `author` scope (never read); one `AggregateRating` (`ratingValue`,
+  `ratingCount` as `meta content`); the star distribution and the response
+  figures are layout text (progress bars, labels), not data. Official-docs
+  check: schema.org documents both encodings; the WHATWG microdata spec
+  defines the attributes. What we did: a second parser walking microdata with
+  the stdlib HTML parser (`ingest/opinion_assurances.py`), the field
+  addresses declared in its header from the structure dump.
 
 ## Appendix — by phase
 
@@ -476,3 +539,91 @@ mart, no model.
   design; the bypass was the drift).
 
 **Gotchas:** the live feed is unverified at build — see Gotchas above.
+
+### Phase 3a
+
+Branch `phase-3a-snapshots`, spec `specs/phase-3a-snapshots.md` (approved
+2026-09-02 with amendment A1). Depends on Phase 2 (PR #4) merged. Built the
+platform-snapshot table and its four marts, turned every source into a
+declaration, added the listing parser and the Opinion Assurances parser,
+renamed the rebuild input, closed five BACKLOG rows.
+
+- **The candidate checks, and what they decided (2026-09-02).** Three sites
+  were checked before approval (Gotchas; positions under "Scrape politely").
+  No candidate allowed reviews on its own terms: Opinion Assurances forbids
+  automated extraction without written authorization, Apple forbids robots
+  on its listing, Google Play allows its listing and not its reviews. The
+  spec was re-scoped to snapshots (its own disposition), then amended at
+  approval when the developer obtained Opinion Assurances' written
+  authorization (A1): its profile pages are the phase's review source.
+  Rejected: fetching a page whose terms say no because its robots file says
+  yes (both bind us); Google Play reviews through the internal call (not a
+  public feed, and disallowed).
+- **`platform_snapshots`: anchors Documented, our captures Measured (D2,
+  D3).** `raw_platform_snapshots` keyed on `(source, profile, captured_at)` +
+  a hash of five measures (rating, count, one-star share, response rate,
+  response delay); `origin` ∈ {anchor, manual, fetch} decides the tag in
+  staging by an exact comparison. `fixtures/anchors/` was re-frozen
+  (`Freeze:` in the spec, MANIFEST regenerated): the Phase 1 file had no
+  profile (two peers collided on every key), carried a channel where a
+  segment belongs on the two app rows, and omitted the brief's Opinion
+  Assurances anchor (534 reviews, 23.1 % one-star, 82 % answered, 1.5 days,
+  no rating) — nine anchors now, not eight; PROJECT_BRIEF.md §6 says
+  Documented on the developer's call. Rejected: Measured for anchors (a
+  person's reading at scoping, without a capture time of ours); repairing
+  the seed's meaning in SQL; keeping the page's full-precision rating as text
+  (`decimal(4,3)`, rounded half-even, keeps every displayed value exactly).
+- **Four marts, four flips to Documented.** `rating_trend` (B1.2),
+  `channel_gap` (B1.3), `platform_stats` (B1.4), `peer_ratings` (B2.3) are
+  window selects over `stg_platform_snapshots`, each row carrying its point's
+  tag; BACKING flips the four rows Pending → Documented with the anchors file
+  and the platform roots as sources; the flip to Measured is Phase 4's, when
+  scheduled captures make the series ours. SPEC.md's header and four panels
+  say so. Rejected: one shared mart under four rows; flipping to Measured on
+  a few 2026-09-02 points; leaving B1.4 Pending (the Opinion Assurances page
+  and the anchors carry its numbers).
+- **A source is a declaration (pinned decision 3).** `ingest/sources.py::Source`
+  carries platform, host, parser (a closed set of module names), the page
+  addresses (the closed set of `source_url` values), profile, segment,
+  channel, the listing address, `fetchable` and `terms`, `declared_on`;
+  `CACHE_ROOT` is the one binding of the cache root; `ingest/captures.py`
+  reads any parser's captures back and checks the meta's host against the
+  declaring source's host, not the fetch-time allowlist; `pipeline/build.py`
+  iterates the declarations and dispatches to the declared parser; nothing
+  compares a platform name (a test greps for it). Reviews get their segment
+  from `raw_source_pages` — one row per declared page address, written in
+  Python at every rebuild — joined on exact `source_url`; `pipeline/sql_lint.py`
+  refuses `like` and `similar to` beside `regexp`. Rejected: a `segment`
+  column on `raw_reviews` (Phase 1's shape); a pattern over the address in
+  SQL; deriving the allowlist from the declarations (a circular import; the
+  allowlist is a fetch-time knob).
+- **The listing parser reads one machine-readable block and nothing else.**
+  `ingest/listing.py`: the page's `<script type="application/ld+json">`
+  objects, exactly one carrying `aggregateRating`, its `ratingValue` (0–5)
+  and `ratingCount` or `reviewCount` as digit strings or numbers; a second
+  block, none, or a value outside the shape refuses the page naming the
+  field; `name`, `author`, `url` and review items are never read.
+  `fixtures/listings/` is its hand-written, fake sample (`Freeze:` in the
+  spec).
+- **The hand-entry path is a tracked CSV, not a make target.**
+  `data/snapshots/manual_snapshots.csv`: eight columns (a declared source name
+  whose `fetchable` is False, a day, five numbers, the word `page`), parsed
+  strictly by `make rebuild`; platform, address and attribution come from the
+  declaration, so the file carries no address and no name. Rejected: a `make
+  snapshot` target with eight variables (eight threat-model rows for a CSV
+  edit); the address in the file (D1); a clock stamp for a manual row (the
+  reader states the day).
+- **`ROWS` names the rebuild input (D4); `samples` runs every frozen sample.**
+  `captured | none | synthetic | samples` replace `cache | empty | synthetic |
+  app-store` (Phase 2's `FIXTURE` decision is superseded by this one); a
+  sample is read under a declaration whose profile, segment and channel are
+  the literal `sample`. `fixtures/app-store/robots.txt` re-frozen to the real
+  rule and read by a test. Rejected: keeping `FIXTURE` (the name called the
+  corpus a fixture); one value per sample.
+- **The robots matcher matches directly.** `_matches` is a two-pointer glob
+  with one fallback to the last `*`; time is bounded by pattern × path
+  length; the matching table is unchanged. Rejected: a cap on `*` per pattern
+  (a denylist on the input); `fnmatch` (the same regex underneath).
+- **The Opinion Assurances parser reads schema.org microdata** —
+  *(filled in when the parser lands: the field addresses for the rating,
+  the date, the body and the review identifier, from the structure dump.)*
