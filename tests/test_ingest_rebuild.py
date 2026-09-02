@@ -214,6 +214,42 @@ def test_missing_or_malformed_meta_is_refused(tmp_path):
         read_captures(cache)
 
 
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("captured_at", ""),
+        ("captured_at", "yesterday"),
+        ("captured_at", "2026-09-01 08:00:00"),
+        ("captured_at", "2025-13-40T00:00:00"),
+        ("captured_at", 20260901),
+        ("source_url", ""),
+        ("source_url", "http://itunes.apple.com/fr/rss/x/page=1/json"),
+        ("source_url", "https://example.com/fr/rss/x/page=1/json"),
+        ("source_url", 5),
+        ("status", 500),
+        ("status", "200"),
+        ("status", True),
+    ],
+)
+def test_meta_value_outside_the_declared_shape_refuses_the_capture(
+    tmp_path, field, value
+):
+    """Fix amendment A4: the row's own provenance is parsed as strictly as the
+    review's date; nothing loads with an empty or nonsense `captured_at`."""
+    cache = tmp_path / "cache"
+    d = _capture(cache, "2026-09-01T08-00-00", "2026-09-01T08:00:00")
+    meta_path = d / "page-1.meta.json"
+    meta = json.loads(meta_path.read_text())
+    meta[field] = value
+    meta_path.write_text(json.dumps(meta))
+    with pytest.raises(FeedShapeError, match=f"field '{field}'"):
+        read_captures(cache)
+    db = tmp_path / "w.duckdb"
+    with pytest.raises(FeedShapeError):
+        rebuild("duckdb", "cache", database=db, cache_dir=cache)
+    assert _query(db, "select count(*) from raw_reviews") == [(0,)]
+
+
 def test_zero_captures_is_zero_rows_not_an_error(tmp_path):
     counts = rebuild(
         "duckdb", "cache", database=tmp_path / "w.duckdb", cache_dir=tmp_path / "no"

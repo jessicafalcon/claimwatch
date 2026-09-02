@@ -30,12 +30,16 @@ import json
 import re
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import urlsplit
+
+from ingest.politeness import ALLOWED_HOSTS
 
 SOURCE = "app-store"  # the platform slug, as in fixtures/anchors/
 RATING_MIN, RATING_MAX = 1, 5
 _DIGITS = re.compile(r"^[0-9]+$")
 _PAGE = re.compile(r"^page-([0-9]+)\.json$")
 META_FIELDS = ("source_url", "captured_at", "status")
+_STAMP = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$")
 
 
 class FeedShapeError(ValueError):
@@ -135,17 +139,35 @@ def parse_page(
 
 
 def read_meta(path: Path) -> dict[str, object]:
-    """`page-<n>.meta.json`, strictly: the three provenance fields, no more."""
+    """`page-<n>.meta.json`, strictly (fix amendment A4): exactly the three
+    provenance fields, each in the shape the fetcher writes — `captured_at` a
+    real `YYYY-MM-DDTHH:MM:SS` instant (it is staging's dedup sort key),
+    `source_url` an https address on an allowed host, `status` the integer 200.
+    Anything else refuses the capture with the file and field named."""
     try:
         meta = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         raise FeedShapeError(f"{path}: meta is missing or not JSON") from exc
     if not isinstance(meta, dict) or set(meta) != set(META_FIELDS):
         raise FeedShapeError(f"{path}: meta must have exactly {META_FIELDS}")
-    if not isinstance(meta["source_url"], str) or not isinstance(
-        meta["captured_at"], str
-    ):
-        raise FeedShapeError(f"{path}: source_url and captured_at must be strings")
+    stamp = meta["captured_at"]
+    if not isinstance(stamp, str) or not _STAMP.match(stamp):
+        raise FeedShapeError(f"{path}: field 'captured_at' is not YYYY-MM-DDTHH:MM:SS")
+    try:
+        datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%S")
+    except ValueError as exc:
+        raise FeedShapeError(
+            f"{path}: field 'captured_at' is not a real instant"
+        ) from exc
+    url = meta["source_url"]
+    parts = urlsplit(url) if isinstance(url, str) else None
+    if parts is None or parts.scheme != "https" or parts.hostname not in ALLOWED_HOSTS:
+        raise FeedShapeError(
+            f"{path}: field 'source_url' is not an https address on {ALLOWED_HOSTS}"
+        )
+    status = meta["status"]
+    if type(status) is not int or status != 200:
+        raise FeedShapeError(f"{path}: field 'status' is not 200")
     return meta
 
 
