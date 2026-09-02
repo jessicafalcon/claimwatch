@@ -327,6 +327,55 @@ def load_snapshots(conn, rows: list[dict[str, object]], run_id: str) -> None:
         )
 
 
+def source_pages(sources: tuple[Source, ...] = SOURCES) -> list[dict[str, str]]:
+    """One row per declared page address: the closed set of `source_url` values
+    a source's rows can carry, with the attribution they inherit."""
+    return [
+        {
+            "source": s.platform,
+            "source_url": url,
+            "profile": s.profile,
+            "segment": s.segment,
+            "channel": s.channel,
+            "captured_at": s.declared_on,
+        }
+        for s in sources
+        for url in s.pages
+    ]
+
+
+def write_source_pages(
+    conn, run_id: str, sources: tuple[Source, ...] = SOURCES
+) -> None:
+    """Append each declared page not already present under (source, source_url)
+    + the hash of its attribution — the same guard shape as the other loaders."""
+    for r in source_pages(sources):
+        h = hashlib.sha256(
+            _SEP.join((r["profile"], r["segment"], r["channel"])).encode("utf-8")
+        ).hexdigest()
+        conn.execute(
+            "insert into raw_source_pages "
+            "(source, source_url, profile, segment, channel, captured_at, run_id, "
+            " content_hash) "
+            "select ?, ?, ?, ?, ?, ?, ?, ? "
+            "where not exists (select 1 from raw_source_pages "
+            "where source = ? and source_url = ? and content_hash = ?)",
+            [
+                r["source"],
+                r["source_url"],
+                r["profile"],
+                r["segment"],
+                r["channel"],
+                r["captured_at"],
+                run_id,
+                h,
+                r["source"],
+                r["source_url"],
+                h,
+            ],
+        )
+
+
 def _sql_files(stage: str) -> list[Path]:
     """The sql/<stage>/*.sql files in name order (deterministic). A missing or
     empty stage directory yields no files (marts is empty in Phase 1)."""
@@ -443,6 +492,7 @@ def rebuild(
     try:
         create_raw(conn)
         if rows != "none":
+            write_source_pages(conn, run_id or "declared")
             load_snapshots(conn, read_anchors(), run_id or "anchors")
         if rows == "synthetic":
             load_reviews(conn, read_fixture("synthetic"), run_id or "synthetic")

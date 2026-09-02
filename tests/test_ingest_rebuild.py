@@ -14,7 +14,7 @@ import pytest
 
 from ingest.app_store import FeedShapeError
 from ingest.captures import capture_pages, read_captures
-from ingest.sources import by_name, sample_source
+from ingest.sources import SOURCES, by_name, sample_source
 from pipeline.build import idempotency_check, rebuild
 from pipeline.metrics import reviews_per_month
 from pipeline.warehouse import connect
@@ -300,3 +300,34 @@ def test_meta_is_validated_against_the_sources_declared_host(tmp_path, monkeypat
     monkeypatch.setattr(politeness, "ALLOWED_HOSTS", ())
     ((_, parsed),) = read_captures(cache / FEED_DIR, FEED)
     assert len(parsed.reviews) == sum(pins.APP_STORE_SAMPLE_ITEMS_ON_PAGES)
+
+
+def test_every_captured_review_joins_exactly_one_declared_page(tmp_path):
+    """Phase 3a, invariant 4: `raw_source_pages` holds every address a declared
+    source can produce, so each captured review joins exactly one row by exact
+    `source_url`; a review from an address outside the declaration is
+    unattributed, and this test would count it."""
+    cache = tmp_path / "cache"
+    d = _capture(cache, "2026-09-01T08-00-00", "2026-09-01T08:00:00")
+    for n in (1, 2, 3):  # the sample's addresses (id=0) -> the declared ones
+        meta_path = d / f"page-{n}.meta.json"
+        meta = json.loads(meta_path.read_text())
+        meta["source_url"] = FEED.page_url(n)
+        meta_path.write_text(json.dumps(meta))
+    db = tmp_path / "w.duckdb"
+    counts = rebuild("duckdb", "captured", database=db, cache_dir=cache)
+    assert counts["raw_reviews"] == pins.APP_STORE_SAMPLE_RAW_ROWS
+    assert counts["raw_source_pages"] == sum(len(s.pages) for s in SOURCES)
+    joined = _query(
+        db,
+        "select r.external_id, count(p.source_url), min(p.profile), min(p.segment) "
+        "from stg_reviews r left join raw_source_pages p "
+        "on r.source = p.source and r.source_url = p.source_url "
+        "group by r.external_id",
+    )
+    assert len(joined) == pins.APP_STORE_SAMPLE_STG_ROWS
+    assert all(n == 1 for _, n, _, _ in joined), joined
+    assert {(p, s) for _, _, p, s in joined} == {(FEED.profile, FEED.segment)}
+    # a second rebuild re-declares the same pages and adds nothing
+    again = rebuild("duckdb", "captured", database=db, cache_dir=cache, run_id="again")
+    assert again["raw_source_pages"] == counts["raw_source_pages"]

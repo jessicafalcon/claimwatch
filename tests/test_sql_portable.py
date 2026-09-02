@@ -42,3 +42,13 @@ def test_metric_query_is_portable_and_clock_free():
     assert find_nonportable(REVIEWS_PER_MONTH) == []
     assert find_clock(REVIEWS_PER_MONTH) == []
     assert "substr(review_date, 1, 7)" in REVIEWS_PER_MONTH
+
+
+def test_pattern_matching_is_refused_in_sql():
+    """Phase 3a, invariant 4: attribution joins on exact values; `like`,
+    `similar to` and any regex function are refused alike."""
+    assert find_nonportable("select 1 from t where source_url like '%id=1%'")
+    assert find_nonportable("select 1 from t where url similar to 'a.*'")
+    assert find_nonportable("select 1 from t where regexp_matches(url, 'x')")
+    assert find_nonportable("select 1 from t where source_url = 'https://x/'") == []
+    assert find_nonportable("-- never like this\nselect 1") == []

@@ -1,8 +1,9 @@
 """Portability + no-clock guard for `sql/` (docs/PLAN.md §4.10, CLAUDE.md ->
 Deterministic first). The same SQL must run on DuckDB and Snowflake, so a file
-may use only the shared subset: no engine-specific reader, no regex (regex lives
-in `rules.yaml`/Python — a file with no regex carries no dialect), and no clock
-(time is `captured_at` or the review's own date, never `now()`).
+may use only the shared subset: no engine-specific reader, no pattern matching
+(regex, `like`, `similar to` — patterns live in `rules.yaml`/Python; a file
+with no pattern carries no dialect and attribution joins on exact values), and
+no clock (time is `captured_at` or the review's own date, never `now()`).
 
 A denylist, not a parser: it strips `--` line comments (so a header sentence is
 never a false hit), lowercases, and looks for forbidden substrings. The set is
@@ -16,14 +17,19 @@ import re
 
 _COMMENT = re.compile(r"--[^\n]*")
 
-# DuckDB-only or otherwise non-ANSI-both forms. `regexp` catches every regex
-# function (banned in SQL); `read_csv/parquet/json` catch readers; the rest are
-# DuckDB select/aggregate sugar Snowflake does not share.
+# DuckDB-only or otherwise non-ANSI-both forms, and every form of pattern
+# matching: `regexp` catches every regex function, ` like ` and `similar to`
+# the ANSI patterns — attribution joins on exact values or on a column written
+# in Python, never a pattern (spec Phase 3a, invariant 4); `read_csv/parquet/
+# json` catch readers; the rest are DuckDB select/aggregate sugar Snowflake
+# does not share.
 NONPORTABLE = (
     "read_csv",
     "read_parquet",
     "read_json",
     "regexp",
+    " like ",
+    "similar to",
     "summarize",
     "unpivot",
     "list_value",
