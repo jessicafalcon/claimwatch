@@ -215,3 +215,19 @@ def test_a_malformed_stored_page_is_a_one_line_refusal_from_rebuild(
         err = capsys.readouterr().err
         assert err.startswith("refusing:") and err.count("\n") == 1
         assert "page=1/json" in err and "field" in err
+
+
+def test_a_capture_holding_only_refused_pages_still_gets_the_no_captures_hint(
+    capsys, isolated_paths
+):
+    """The hint and the reader share one rule for what a page is: a directory
+    with only page-1.refused.json (a run refused at page 1) loads nothing and
+    says so, rather than printing zero rows with no explanation."""
+    d = isolated_paths / "x" / "2026-09-01T08-00-00"
+    d.mkdir(parents=True)
+    (d / "page-1.refused.json").write_text("{}")
+    (d / "page-1.meta.json").write_text("{}")
+    assert main(["rebuild"]) == 0
+    out = capsys.readouterr().out
+    assert "no captures under" in out
+    assert _count(out, "raw_reviews") == 0

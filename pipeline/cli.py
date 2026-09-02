@@ -15,7 +15,7 @@ from __future__ import annotations
 import argparse
 import sys
 
-from ingest.app_store import FeedShapeError
+from ingest.app_store import FeedShapeError, has_pages
 from ingest.politeness import ALLOWED_HOSTS, MAX_PAGES
 from ingest.sources import SOURCES, by_name, source_names
 from pipeline.build import (
@@ -64,9 +64,7 @@ def _do_rebuild(args: argparse.Namespace) -> int:
     target = resolve_choice(args.target, TARGETS, "duckdb")
     fixture = resolve_choice(args.fixture, FIXTURES, "cache")
     root = capture_root(fixture)
-    if fixture == "cache" and not (
-        root and root.is_dir() and any(root.rglob("page-*.json"))
-    ):
+    if fixture == "cache" and not (root and has_pages(root)):
         shown = DEFAULT_CACHE.relative_to(DEFAULT_CACHE.parents[2])
         print(
             f"no captures under {shown} — nothing to load from the scraper; "

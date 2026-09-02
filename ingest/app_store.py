@@ -181,6 +181,13 @@ def capture_pages(capture_dir: Path) -> list[Path]:
     return [p for _, p in sorted(pages)]
 
 
+def has_pages(root: Path) -> bool:
+    """Whether anything under `root` is a page a rebuild would load — the same
+    rule `read_captures` applies, so a refused page (`page-<n>.refused.json`)
+    counts for neither."""
+    return root.is_dir() and any(_PAGE.match(p.name) for p in root.rglob("page-*.json"))
+
+
 def read_captures(root: Path) -> list[tuple[str, list[dict[str, object]]]]:
     """Every capture under `root` -> [(capture_id, rows)], captures in name
     order, pages in page order, items in feed order. A capture is any directory
