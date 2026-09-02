@@ -55,7 +55,14 @@ def test_httpx_is_imported_only_by_the_fetcher():
 def test_politeness_knobs_live_in_one_module():
     """The five knobs are assigned in politeness.py and nowhere else; the
     User-Agent header is set in the fetcher only, from that constant."""
-    knobs = ("MIN_INTERVAL_S", "USER_AGENT", "TIMEOUT_S", "MAX_PAGES", "ALLOWED_HOSTS")
+    knobs = (
+        "MIN_INTERVAL_S",
+        "USER_AGENT",
+        "TIMEOUT_S",
+        "MAX_PAGES",
+        "ALLOWED_HOSTS",
+        "MAX_CRAWL_DELAY_S",
+    )
     for name in knobs:
         assert hasattr(politeness, name), name
         hits = _lines_matching(rf"^{name}\s*=.*$")

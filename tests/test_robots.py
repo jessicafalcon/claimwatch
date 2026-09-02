@@ -61,6 +61,10 @@ def test_crawl_delay_is_read_from_our_group_only():
     assert Robots.parse("User-agent: *\nCrawl-delay: 5\n").crawl_delay == 5.0
     assert Robots.parse("User-agent: other\nCrawl-delay: 5\n").crawl_delay is None
     assert Robots.parse("User-agent: *\nCrawl-delay: soon\n").crawl_delay is None
+    for absurd in ("1e400", "nan", "-5"):  # not finite, or negative: none declared
+        assert (
+            Robots.parse(f"User-agent: *\nCrawl-delay: {absurd}\n").crawl_delay is None
+        )
     assert Robots.permissive().crawl_delay is None
 
 

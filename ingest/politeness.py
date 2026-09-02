@@ -25,6 +25,11 @@ TIMEOUT_S = 20.0
 # The App Store feed serves at most ten pages per app and country.
 MAX_PAGES = 10
 
+# A host may ask for a longer wait than ours (robots.txt Crawl-delay) and we
+# obey it up to this ceiling; a host asking for more than a minute between
+# requests is a one-line refusal, not a silent day-long sleep.
+MAX_CRAWL_DELAY_S = 60.0
+
 # The only hosts the fetcher will ever contact; a URL elsewhere is refused
 # before any request.
 ALLOWED_HOSTS = ("itunes.apple.com",)

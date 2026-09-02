@@ -30,6 +30,7 @@ import httpx
 from ingest.app_store import FeedShapeError, parse_page
 from ingest.politeness import (
     ALLOWED_HOSTS,
+    MAX_CRAWL_DELAY_S,
     MAX_PAGES,
     MIN_INTERVAL_S,
     TIMEOUT_S,
@@ -181,6 +182,11 @@ def scrape(
     else:
         raise FetchRefused(f"refusing: robots.txt returned {robots.status_code}")
     if rules.crawl_delay is not None:
+        if rules.crawl_delay > MAX_CRAWL_DELAY_S:
+            raise FetchRefused(
+                f"refusing: robots.txt asks for a Crawl-delay of {rules.crawl_delay} s,"
+                f" above our {MAX_CRAWL_DELAY_S} s ceiling"
+            )
         polite.raise_interval(source.host, rules.crawl_delay)
 
     written = 0

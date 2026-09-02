@@ -17,6 +17,7 @@ Nothing here fetches; the fetcher hands it the text it archived."""
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass, field
 from urllib.parse import urlsplit
@@ -58,9 +59,11 @@ def _parse_groups(text: str) -> list[_Group]:
         elif key == "crawl-delay":
             naming = False
             try:
-                current.crawl_delay = float(value)
+                delay = float(value)
             except ValueError:
-                pass  # not a number: no delay is declared
+                continue  # not a number: no delay is declared
+            if math.isfinite(delay) and delay >= 0:
+                current.crawl_delay = delay  # inf, nan or negative: none declared
     return groups
 
 

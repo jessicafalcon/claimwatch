@@ -114,6 +114,20 @@ def test_a_longer_crawl_delay_lengthens_the_wait_and_a_shorter_one_does_not(tmp_
     assert clock.sleeps == [2.0] * (len(server.requests) - 1)
 
 
+def test_a_crawl_delay_above_the_ceiling_is_a_one_line_refusal(tmp_path):
+    """A host asking for more than MAX_CRAWL_DELAY_S between requests is refused
+    after robots.txt, with no feed page asked for and no day-long sleep."""
+    server, clock = (
+        Served(robots="User-agent: *\nDisallow:\nCrawl-delay: 86400\n"),
+        Clock(),
+    )
+    with pytest.raises(FetchRefused, match="Crawl-delay of 86400.0 s") as exc:
+        scrape(SRC, tmp_path, client=_polite(server, clock), stamp=lambda: STAMP)
+    assert "\n" not in str(exc.value)
+    assert server.urls() == ["https://itunes.apple.com/robots.txt"]
+    assert clock.sleeps == []
+
+
 def test_robots_error_status_is_a_refusal_and_404_is_not(tmp_path):
     with pytest.raises(FetchRefused, match="robots.txt returned 503"):
         scrape(
