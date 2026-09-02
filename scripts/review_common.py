@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 # A target is DECLARED by a rule line `name:` at column 0 (not `.PHONY`).
-_TARGET_LINE = re.compile(r"^([a-z][a-z0-9-]*):", re.M)
+_TARGET_LINE = re.compile(r"^([a-z][a-z0-9-]*):(?!=)", re.M)  # `x := v` is not a target
 
 
 class Refused(Exception):

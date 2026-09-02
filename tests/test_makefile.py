@@ -7,9 +7,13 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+from review_common import make_targets  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRUB = ("SPEC", "BASE", "MAKEFLAGS", "MFLAGS")
@@ -79,12 +83,13 @@ def test_help_lists_every_declared_target():
     out = subprocess.run(
         ["make", "-s", "help"], cwd=ROOT, capture_output=True, text=True, check=True
     ).stdout
-    declared = [
-        line.split(":")[0]
-        for line in (ROOT / "Makefile").read_text().splitlines()
-        if line and line[0].islower() and ":" in line and not line.startswith(".")
-    ]
+    declared = make_targets(ROOT)  # the one parser (review_common)
     assert declared, "no targets parsed"
     names = {line.split()[0] for line in out.splitlines() if line.strip()}
     for target in declared:
         assert target in names, target
+
+
+def test_make_targets_ignores_variable_assignments(tmp_path: Path):
+    (tmp_path / "Makefile").write_text("foo := 1\nbar:\n\tx\n.PHONY: bar\n")
+    assert make_targets(tmp_path) == {"bar"}
