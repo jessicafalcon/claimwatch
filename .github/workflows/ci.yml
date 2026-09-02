@@ -33,4 +33,7 @@ jobs:
       - run: make check-docs
       - run: make check-backing
       - run: make test
-      # Phase 1 adds: make rebuild FIXTURE=synthetic (DuckDB, offline, no key).
+      # DuckDB, offline, no key: rebuilding the synthetic fixture is a free
+      # graceful-degradation proof on every run (no model is imported).
+      - run: make rebuild FIXTURE=synthetic
+      - run: make idempotency-check

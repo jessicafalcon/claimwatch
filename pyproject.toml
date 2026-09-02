@@ -3,7 +3,9 @@ name = "friction-ledger"
 version = "0.1.0"
 description = "A public-data study of why health-insurance refunds get stuck, where every chart shows its evidence"
 requires-python = ">=3.12,<3.13"
-dependencies = []
+dependencies = [
+    "duckdb>=1.5.5",
+]
 # Runtime packages land with their phase (CLAUDE.md → Conventions allowlist):
 # duckdb (Phase 1); pyyaml, httpx (Phase 2); anthropic (Phase 6);
 # snowflake-connector-python (Phase 10). Nothing before it is needed.

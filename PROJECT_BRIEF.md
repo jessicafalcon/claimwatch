@@ -265,8 +265,8 @@ Repo structure; write SPEC.md (freeze the 5 beats and exact chart list), BACKING
 Done when: all three files exist and agree with this brief.
 
 **Phase 1 — Schema and the empty warehouse.**
-All DDL (raw/staging/marts) with provenance columns; `make rebuild` scaffold runs against DuckDB with zero rows.
-Done when: empty pipeline runs end to end; schema matches BACKING.md.
+Raw and staging DDL with provenance columns in this phase; each mart lands with its upstream in a later phase (see BACKING.md), so Phase 1 has no mart. `make rebuild` scaffold runs against DuckDB with zero rows.
+Done when: empty pipeline runs end to end; the raw/staging schema and BACKING.md agree.
 
 **Phase 2 — One scraper, end to end.**
 Easiest source only (app-store API or Opinion Assurances — NOT Trustpilot). Fetch → raw → staging dedupe → one trivial mart (reviews per month).
