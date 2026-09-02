@@ -113,6 +113,8 @@ class _Walker(HTMLParser):
                 "ratingValue",
                 "ratingCount",
             ):
+                if itemprop in self.aggregates[-1]:
+                    self.aggregate_duplicates.append(itemprop)  # outside the shape
                 self.aggregates[-1][itemprop] = attrs.get("content")
             elif (
                 self.current is not None
@@ -120,6 +122,7 @@ class _Walker(HTMLParser):
                 and self.rating_depth is not None
                 and itemprop == "ratingValue"
             ):
+                self.current.ratings_seen += 1
                 self.current.rating = attrs.get("content")
         if tag in _VOID:
             return
@@ -302,6 +305,17 @@ def parse(body: bytes | str, page_url: str, captured_at: str, source: Source) ->
     if not w.aggregates:
         raise refuse(
             page_url, None, "aggregateRating", "is missing: not a profile page"
+        )
+    if w.aggregate_duplicates:
+        raise refuse(
+            page_url, None, w.aggregate_duplicates[0], "appears twice in the aggregate"
+        )
+    if w.nested_reviews:
+        raise refuse(
+            page_url,
+            None,
+            "review",
+            f"{w.nested_reviews} review scope(s) nested in a review",
         )
     if not w.reviews:
         return Parsed()  # the end of the list

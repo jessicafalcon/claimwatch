@@ -248,7 +248,8 @@ def test_two_rating_values_in_one_review_refuse_the_page():
         _page(1),
         lambda s: s.replace(
             '<meta itemprop="ratingValue" content="5">',
-            '<meta itemprop="ratingValue" content="5"><meta itemprop="ratingValue" content="1">',
+            '<meta itemprop="ratingValue" content="5">'
+            '<meta itemprop="ratingValue" content="1">',
             1,
         ),
     )
@@ -258,7 +259,8 @@ def test_two_rating_values_in_one_review_refuse_the_page():
         parse(html, PAGE_URL, CAPTURED, SRC)
     twice = _page(1).replace(
         '<meta itemprop="ratingCount" content="512">',
-        '<meta itemprop="ratingCount" content="512"><meta itemprop="ratingCount" content="9">',
+        '<meta itemprop="ratingCount" content="512">'
+        '<meta itemprop="ratingCount" content="9">',
     )
     with pytest.raises(PageShapeError, match="'ratingCount' appears twice"):
         parse(twice, PAGE_URL, CAPTURED, SRC)
@@ -272,7 +274,8 @@ def test_a_nested_review_scope_refuses_the_page():
         '<div itemscope itemtype="https://schema.org/review" itemprop="review">'
         '<div itemscope itemprop="reviewRating" itemtype="https://schema.org/Rating">'
         '<meta itemprop="ratingValue" content="4"></div>'
-        '<div class="oa_description">Avis publié le 01/08/2026 suite à une expérience le 01/07/2026'
+        '<div class="oa_description">Avis publié le 01/08/2026 '
+        "suite à une expérience le 01/07/2026"
         '<h4 class="oa_text">EXEMPLE FICTIF. Imbriqué.</h4></div></div>'
     )
     scopes[1] = scopes[1].replace(
