@@ -103,6 +103,18 @@ def test_rating_outside_1_to_5_is_refused(label):
         _parse(_mutated(set_rating))
 
 
+@pytest.mark.parametrize("label", ["abc", "12a", "", " 123", "\uff11\uff12\uff13"])
+def test_non_digit_item_id_is_refused(label):
+    """The declared shape says the item id is a digit string; anything else,
+    including a fullwidth digit, refuses the page naming 'id'."""
+
+    def set_id(item):
+        item["id"]["label"] = label
+
+    with pytest.raises(FeedShapeError, match="'id'"):
+        _parse(_mutated(set_id))
+
+
 @pytest.mark.parametrize(
     "label",
     [
