@@ -66,11 +66,12 @@ and Beat 2's peer context can then show numbers with the tag they deserve.
 Second, the generalisation Phase 2 deliberately skipped: a source declares its
 own parser and cache root, so the second platform costs a declaration, not a
 branch, and a source we may not fetch is declared as plainly as one we may.
-Third, five BACKLOG rows fall due here and each is closed or re-deferred. What
-the phase does not deliver, and says so: real review rows. Every review source
-we have checked refuses us in its robots file or its terms; Phase 3b checks
-Trustpilot; an authorization from Opinion Assurances, if it comes, reopens that
-source.
+Third, the first real review rows: the two app stores refuse us (one in its
+robots file, one in its terms), but Opinion Assurances has given the developer
+written authorization to read its pages (A1), so its profile pages become the
+first review source, through the unchanged Phase 1 guard. Fourth, five BACKLOG
+rows fall due here and each is closed or re-deferred. Phase 3b checks
+Trustpilot.
 
 **Teaching notes (become code comments / README lines at build — CLAUDE.md →
 Teaching rule).**
