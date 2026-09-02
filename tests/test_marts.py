@@ -31,7 +31,7 @@ def anchors_db(tmp_path_factory) -> Path:
     return db
 
 
-def test_four_marts_exist_and_every_row_carries_exactly_one_tag(anchors_db):
+def test_every_mart_row_carries_exactly_one_tag(anchors_db):
     names = {
         r[0]
         for r in _query(anchors_db, "select table_name from information_schema.tables")

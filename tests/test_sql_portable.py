@@ -11,7 +11,7 @@ from pipeline.sql_lint import find_clock, find_nonportable
 SQL_FILES = sorted((Path(__file__).resolve().parent.parent / "sql").rglob("*.sql"))
 
 
-def test_repo_sql_is_portable_and_clock_free():
+def test_every_sql_file_is_portable_and_clock_free():
     assert SQL_FILES, "no sql files found"
     for path in SQL_FILES:
         text = path.read_text(encoding="utf-8")
