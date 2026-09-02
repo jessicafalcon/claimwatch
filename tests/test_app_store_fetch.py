@@ -12,7 +12,7 @@ import httpx
 import pytest
 
 from ingest.fetch import FetchRefused, PoliteClient, make_client, scrape
-from ingest.politeness import MAX_PAGES, MIN_INTERVAL_S, USER_AGENT
+from ingest.politeness import MAX_PAGES, USER_AGENT
 from ingest.sources import AppStoreSource
 from tests import pins
 
@@ -107,17 +107,18 @@ def test_every_request_carries_the_identifying_user_agent(tmp_path):
 
 def test_consecutive_requests_are_spaced_two_seconds(tmp_path):
     """With a clock that does not advance on its own, every request after the
-    first waits the full interval; the first waits nothing."""
+    first waits the full two seconds; the first waits nothing. The literal is
+    deliberate: pinned to MIN_INTERVAL_S, a shorter constant would pass."""
     server, clock = Served(), Clock()
     scrape(SRC, tmp_path, client=_polite(server, clock), stamp=lambda: STAMP)
     n = len(server.requests)
     assert n == 1 + pins.APP_STORE_SAMPLE_PAGES  # robots + three pages
-    assert clock.sleeps == [MIN_INTERVAL_S] * (n - 1)
+    assert clock.sleeps == [2.0] * (n - 1)
 
 
 def test_a_slow_response_does_not_shorten_the_gap(tmp_path):
-    """The interval is measured from the END of the previous request: if the
-    server took 1.5 s, we still wait the remaining 0.5 s before the next one."""
+    """The interval is measured from the END of the previous request: a server
+    that took 1.5 s to answer still gets the full two seconds after it did."""
     clock = Clock()
 
     def slow(request: httpx.Request) -> httpx.Response:
@@ -129,7 +130,7 @@ def test_a_slow_response_does_not_shorten_the_gap(tmp_path):
     )
     polite.get("https://itunes.apple.com/robots.txt")
     polite.get("https://itunes.apple.com/robots.txt")
-    assert clock.sleeps == [pytest.approx(MIN_INTERVAL_S)]
+    assert clock.sleeps == [pytest.approx(2.0)]
 
 
 def test_pages_are_archived_byte_exact_with_meta(tmp_path):
