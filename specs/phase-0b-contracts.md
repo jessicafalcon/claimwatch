@@ -5,7 +5,7 @@ Phase 0 (the contracts half), split per `docs/PLAN.md` §5 (approved
 2026-09-01): 0a built the gate, 0b writes the contracts the gate then checks.
 Depends on `phase-0a-machinery` merged.
 
-**Status: PROPOSED — do not start until approved.** One dependency change: none
+**Status: APPROVED 2026-09-01 — in progress.** One dependency change: none
 (stdlib only). This phase adds one small guard to `scripts/check_backing.py` and
 its test; no runtime package. The allowlist is in CLAUDE.md → Conventions.
 
@@ -85,7 +85,7 @@ make review-gate SPEC=specs/phase-0b-contracts.md
 | 1 | `make check-docs` prints `check-docs OK` (make-targets check green over SPEC.md, pinned by `tests/test_check_docs.py::test_every_named_make_target_exists_today`); study-editor confirms every panel wears one tag and one `B<beat>.<n>` id and the rating-trend panel names its sampling bias |
 | 2 | `make check-backing` prints `check-backing OK: <N> rows, 0 marts` with every row Pending; the tag, source-shape and row-id checks are pinned by `tests/test_check_backing.py::test_tag_outside_the_four_fails`, `::test_measured_without_source_fails`, `::test_claim_without_row_id_fails`, `::test_pending_row_is_ok_without_source` |
 | 3 | `tests/test_check_backing.py::test_spec_citations` — a SPEC citation with no BACKING row fails, a BACKING row cited nowhere in SPEC fails, matched sets pass, an absent SPEC.md passes; `make check-backing` green on the delivered pair |
-| 4 | coherence-auditor confirms SPEC.md and CLAUDE.md state the same grain (one row per review × theme); the falsifying code test lands with `classified_reviews` in Phase 5b (`tests/test_classify_grain.py::test_k_themes_yield_k_rows`, deferred — documentary here) |
+| 4 | coherence-auditor confirms SPEC.md and CLAUDE.md state the same grain (one row per review × theme); the falsifying code test lands with `classified_reviews` in Phase 5b (a grain test, named when that mart exists — deferred; documentary here) |
 | 5 | `make check-docs` glossary check green (≤ 10 terms), pinned by `tests/test_check_docs.py::test_check_glossary_reports_an_eleventh_term`; study-editor confirms each term carries an everyday example |
 | 6 | `make check-docs` BACKLOG-count check green (5), pinned by `tests/test_check_docs.py::test_check_backlog_count_reports_a_mismatch`; coherence-auditor at exit reports no stale SPEC/BACKING/CLAUDE sentence |
 
@@ -97,7 +97,7 @@ make review-gate SPEC=specs/phase-0b-contracts.md
 | For all BACKING rows, the tag is one of exactly four, a Measured or Documented row names a source of the declared shape, the claim opens with `B<beat>.<n> `, and every SQL path resolves under `sql/` (a Pending row may name a file not built yet). | `tests/test_check_backing.py::test_tag_outside_the_four_fails`, `::test_measured_without_source_fails`, `::test_claim_without_row_id_fails`, `::test_pending_row_is_ok_without_source`, `::test_sql_path_traversal_is_refused` (0a invariant, now exercised on a full table) |
 | For all glossary sections in a LIVING doc, there are ≤ 10 `- **term**` bullets. | `tests/test_check_docs.py::test_check_glossary_reports_an_eleventh_term` |
 | For all `make` targets a LIVING doc names, the target exists as an exact token in the Makefile (SPEC.md is LIVING, so a chart may name a mart by its BACKING row id but never a `make` target that is not built). | `tests/test_check_docs.py::test_every_named_make_target_exists_today`, `::test_partial_rename_is_a_failure` |
-| For all classified reviews, a review carrying K themes yields exactly K theme rows and a review with none yields one `unclassified` (or `positive`) row — pinned now in SPEC.md and CLAUDE.md; the mechanism and its falsifying test land with `classified_reviews` in Phase 5b. In 0b the check is editorial: coherence-auditor confirms SPEC.md and CLAUDE.md agree. | Phase 5b `tests/test_classify_grain.py::test_k_themes_yield_k_rows` (deferred); 0b: coherence-auditor cross-reads SPEC.md ↔ CLAUDE.md |
+| For all classified reviews, a review carrying K themes yields exactly K theme rows and a review with none yields one `unclassified` (or `positive`) row — pinned now in SPEC.md and CLAUDE.md; the mechanism and its falsifying test land with `classified_reviews` in Phase 5b. In 0b the check is editorial: coherence-auditor confirms SPEC.md and CLAUDE.md agree. | A Phase 5b grain test on `classified_reviews` (deferred, named when that mart exists); in 0b, coherence-auditor cross-reads SPEC.md ↔ CLAUDE.md |
 
 ## Pinned decisions (do not re-litigate)
 
