@@ -289,3 +289,17 @@ scraper, no model.
 
 **Gotchas:** none — DuckDB's `create or replace`, `insert … where not exists`
 and `information_schema.tables` behaved as the official docs describe.
+
+**Review round 1 (2026-09-02).** Five agents (code-reviewer,
+functionality-tester, security-reviewer, study-editor, coherence-auditor) on
+`main...HEAD`: 11 findings, no BLOCKER. functionality-tester: works — DONE green,
+all five hand-mutations caught. security-reviewer and study-editor: pass (two
+optional voice suggestions declined — no regression). Dispositions: two
+correctness fixes, one per commit — the staging `content_hash` tiebreak now
+pinned by a both-insertion-orders test (invariant 3), and `reset` refuses a
+non-duckdb TARGET with the CLI's one-line refusal instead of an uncaught
+ValueError; one coverage-tests commit (the `RATING_RANGE` span, `reset()`
+deletion scope, and `main()`-level exit-2 on a refused value); one record/wording
+commit (the zero-row phrasing clarified — `make rebuild` is 0/0 on a fresh
+warehouse, raw being append-only; the stale `ci.yml` repo-map one-liner; the spec
+title to APPROVED). The two-round cap did not apply (round 1).

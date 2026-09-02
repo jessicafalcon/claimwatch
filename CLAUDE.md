@@ -65,8 +65,9 @@ in the middle, and come out on the right as the numbers the study shows.
   holds every pinned number.
 - `.claude/` — agents (report-only), commands, the run-tests hook. Settings
   are local-only and gitignored.
-- `.github/workflows/ci.yml` — lint, check-docs, check-backing, test.
-  `weekly.yml` *(Phase 4)* — the scheduled scrape + snapshot commit.
+- `.github/workflows/ci.yml` — lint, check-docs, check-backing, test, rebuild
+  (synthetic) + idempotency-check. `weekly.yml` *(Phase 4)* — the scheduled
+  scrape + snapshot commit.
   `.github/pull_request_template.md` — the PR body.
 - `pyproject.toml`, `uv.lock`, `.python-version`, `.pre-commit-config.yaml` —
   the toolchain (uv, ruff, pytest, pre-commit), versions pinned in lockstep.
@@ -393,7 +394,8 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 ## Current status
 
 **Phase 1 — Schema and the empty warehouse** (`phase-1-schema`, spec
-`specs/phase-1-schema.md`): built; pre-review. Raw + staging DDL for reviews
+`specs/phase-1-schema.md`): built; review round 1 dispositions landed; pre-PR.
+Raw + staging DDL for reviews
 with the four provenance columns (`sql/raw/raw_reviews.sql`,
 `sql/staging/stg_reviews.sql`); the DuckDB/Snowflake seam (`pipeline/`); the two
 frozen fixture sets with MANIFESTs; `tests/pins.py`; the portability/clock and

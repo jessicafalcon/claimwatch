@@ -1,4 +1,4 @@
-# Phase 1 — Schema and the empty warehouse (PROPOSED)
+# Phase 1 — Schema and the empty warehouse (APPROVED)
 
 Contract for the `phase-1-schema` branch. Source: PROJECT_BRIEF.md §9 Phase 1
 (schema and the empty warehouse), scoped by `docs/PLAN.md` §5 row 1 and the
@@ -58,9 +58,11 @@ make rebuild FIXTURE=synthetic && make idempotency-check
   `tests/pins.py` stage counts. Offline, DuckDB, no key.
 - `make idempotency-check` — rebuilds twice and diffs per-table row counts; a
   non-zero diff exits 1. This is the run-twice property as a command.
-- Also green: `make rebuild` (no FIXTURE → the empty, zero-row run, end to end);
-  `make test` (offline, no services, no network); `make check-backing` (still
-  19 rows, 0 marts, 0 orphans — Phase 1 lands no mart).
+- Also green: `make rebuild` (no FIXTURE → the zero-row run, end to end — 0/0 on
+  a fresh warehouse; raw is append-only, so `make reset` first for a clean 0/0
+  after a synthetic build); `make test` (offline, no services, no network);
+  `make check-backing` (still 19 rows, 0 marts, 0 orphans — Phase 1 lands no
+  mart).
 
 ## Done-when
 
