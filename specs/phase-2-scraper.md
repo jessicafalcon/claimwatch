@@ -219,6 +219,41 @@ the integer 200 — any other value refuses the capture with the file and field
 named. `status` thereby becomes a guard rather than a decoration (code-reviewer
 #11). Pinned by: one parametrized test over each bad value.
 
+### Fix amendments — review round 2 (2026-09-02)
+
+**A5 — a robots verdict is authoritative only from a recognised robots body;
+a source can be declared not-fetchable; our group is matched by substring**
+(security-reviewer #1 #2 #3, code-reviewer #1). Restores invariant 5 ("the
+host's `robots.txt` was read first and allowed the path") against the round 1
+failure class — a rule we cannot see becoming permission — and makes the
+recorded terms position durable in code rather than a live-fetch outcome.
+Three kind changes, one paragraph because they gate the same request:
+(a) *What counts as a robots file.* Today a 200 whose body is not a robots
+file (an HTML catch-all page) parses to zero groups and is read as "nothing
+disallowed". New kind: a 200 is a robots file only if its `Content-Type` is
+`text/plain` or its body carries at least one recognised directive line
+(`user-agent:`, `allow:`, `disallow:`, `crawl-delay:`, `sitemap:`); anything
+else is a one-line refusal like the 503 branch, never `permissive()`. Only a
+404 is permissive. Pinned by: an HTML 200 body refuses before any feed
+request; a `text/plain` body with an empty `Disallow:` allows.
+(b) *A declared position, not an inferred one.* `AppStoreSource` gains
+`fetchable: bool` and `terms: str` (the recorded position, a reason — never a
+name); `scrape` refuses a non-fetchable source before any request, the way it
+refuses `app_id == 0`, so a robots hiccup, a rewrite or a mis-parse cannot
+silently re-enable a fetch the terms position records as disallowed. The
+robots check stays as the second, independent gate. The declared source
+becomes `fetchable=False, terms="robots.txt disallows /*/rss/* for every
+crawler (2026-09-02)"`. Pinned by: the declared source is refused with no
+request; a `fetchable=True` test source proceeds; the layout test pins that a
+non-fetchable source states its terms.
+(c) *Which group is ours.* Today group selection is exact token equality, so
+`User-agent: friction-ledger/0.1` or `friction` falls through to `*`, and the
+failure direction is permissive; A1 itself said substring. New kind: a group
+applies to us when its non-empty User-agent value, lowercased, is a substring
+of our full `USER_AGENT` lowercased; `*` stays the fallback. Pinned by:
+`friction-ledger/0.1`, `friction` and `FRICTION-LEDGER` select the group,
+`other-bot` does not, and the empty value selects nothing.
+
 *Not amended, disposed as fixes or accepted:* page order past page-9, the
 literal 2 s pin, the whole-repo layout grep, no directory before robots
 answers, one client per run (five fix commits, one finding each); `sleep`
