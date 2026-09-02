@@ -70,6 +70,9 @@ def test_politeness_knobs_live_in_one_module():
     ua = _lines_matching(r'"User-Agent"')
     assert set(ua) == {"ingest/fetch.py"}, ua
     assert politeness.MIN_INTERVAL_S >= 2.0
+    assert politeness.MAX_PAGES == 10  # the feed's own cap: the request budget
+    assert politeness.TIMEOUT_S == 20.0
+    assert politeness.MAX_CRAWL_DELAY_S == 60.0
     assert "friction-ledger" in politeness.USER_AGENT
     assert politeness.ALLOWED_HOSTS == ("itunes.apple.com",)
 
