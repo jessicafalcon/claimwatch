@@ -65,18 +65,29 @@ def resolve_base(arg: str) -> str:
     return arg
 
 
-def evidence_ids(spec_text: str) -> tuple[list[str], list[str]]:
-    """(test ids, make targets) the Evidence section names. A bare `::test_x`
-    continues the previous file."""
-    body = section(spec_text, "Evidence")
+def parse_test_ids(body: str) -> tuple[list[str], list[str]]:
+    """(test ids, errors) in a section body. A bare `::test_x` continues the
+    previous file ON THE SAME LINE; with no file before it on its line it is an
+    error, never silently dropped or attached to another row's file."""
     tests: list[str] = []
-    current = ""
-    for m in _TEST_ID.finditer(body):
-        if m.group(1):
-            current = m.group(1)
-        if current:
+    errors: list[str] = []
+    for line in body.splitlines():
+        current = ""
+        for m in _TEST_ID.finditer(line):
+            if m.group(1):
+                current = m.group(1)
+            if not current:
+                errors.append(f"test id without a file: {m.group(2)}")
+                continue
             tests.append(current + m.group(2))
-    return tests, sorted(set(_MAKE_TICK.findall(body)))
+    return tests, errors
+
+
+def evidence_ids(spec_text: str) -> tuple[list[str], list[str], list[str]]:
+    """(test ids, make targets, errors) the Evidence section names."""
+    body = section(spec_text, "Evidence")
+    tests, errors = parse_test_ids(body)
+    return tests, sorted(set(_MAKE_TICK.findall(body))), errors
 
 
 def check_evidence(
@@ -84,10 +95,10 @@ def check_evidence(
 ) -> list[str]:
     if not section(spec_text, "Evidence").strip():
         return ["spec has no Evidence section (REQUIRED)"]
-    tests, targets = evidence_ids(spec_text)
-    if not tests:
+    tests, targets, errors = evidence_ids(spec_text)
+    if not tests and not errors:
         return ["Evidence names no test id"]
-    errors = [
+    errors += [
         f"Evidence names a test that does not exist: {t}"
         for t in tests
         if t not in collected

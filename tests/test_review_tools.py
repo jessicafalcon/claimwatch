@@ -64,13 +64,30 @@ def test_evidence_ids_continue_the_previous_file():
         "## Evidence (REQUIRED)\n| 1 | `tests/test_a.py::test_x`, `::test_y`; "
         "`make check-docs` prints ok |\n| 2 | `tests/test_b.py::test_z` |\n## Next\n"
     )
-    tests, targets = review_gate.evidence_ids(spec)
+    tests, targets, errors = review_gate.evidence_ids(spec)
+    assert errors == []
     assert tests == [
         "tests/test_a.py::test_x",
         "tests/test_a.py::test_y",
         "tests/test_b.py::test_z",
     ]
     assert targets == ["check-docs"]
+
+
+def test_bare_test_id_without_a_file_is_an_error():
+    """`::test_y` with no file on its own line is an error; the file context of
+    the previous ROW never carries over (a same-named test elsewhere must not
+    make it pass)."""
+    spec = (
+        "## Evidence (REQUIRED)\n| 1 | `tests/test_a.py::test_x` |\n"
+        "| 2 | `::test_y` |\n## Next\n"
+    )
+    tests, _, errors = review_gate.evidence_ids(spec)
+    assert tests == ["tests/test_a.py::test_x"]
+    assert errors == ["test id without a file: ::test_y"]
+    assert review_gate.check_evidence(spec, {"tests/test_a.py::test_x"}, set()) == [
+        "test id without a file: ::test_y"
+    ]
 
 
 def test_gate_fails_on_a_missing_evidence_test_id():
