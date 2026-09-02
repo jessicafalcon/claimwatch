@@ -174,3 +174,27 @@ def test_the_catch_all_is_never_our_group():
     ours = "User-agent: friction-ledger\nDisallow: /fr/\n\n"
     text = ours + "User-agent: *\nAllow: /fr/rss/\n"
     assert Robots.parse(text).allows(FEED) is False
+
+
+@pytest.mark.parametrize(
+    ("robots", "allowed"),
+    [
+        ("User-agent: *\nDisallow:\n", True),  # empty Disallow: nothing disallowed
+        ("User-agent: *\nDisallow: /fr/rss/\n", False),  # plain prefix
+        ("User-agent: *\nDisallow: /fr/rss/$\n", True),  # anchored: exact path only
+        ("User-agent: *\nDisallow: /*/customerreviews/\n", False),  # inner wildcard
+        ("User-agent: *\nDisallow: /*json$\n", False),  # wildcard then anchor
+        ("User-agent: *\nDisallow: /\nAllow: /fr/rss/\n", True),  # longer Allow wins
+        (
+            "User-agent: *\nAllow: /\nDisallow: /fr/rss/\n",
+            False,
+        ),  # longer Disallow wins
+        ("User-agent: *\nAllow: /fr/rss/\nDisallow: /fr/rss/\n", True),  # tie: Allow
+        ("User-agent: *\nDisallow: /fr/rss/customerreviews/id=1/*\n", False),
+        ("User-agent: *\nDisallow: /fr/rss/customerreviews/id=2/*\n", True),
+    ],
+)
+def test_pattern_matching_and_precedence(robots: str, allowed: bool):
+    """The rules of the game, pinned on their own: `*`, the `$` anchor,
+    longest match wins, Allow wins a tie."""
+    assert Robots.parse(robots).allows(FEED) is allowed
