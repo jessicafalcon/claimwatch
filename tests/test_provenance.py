@@ -26,3 +26,31 @@ def test_raw_reviews_has_four_provenance_columns(synthetic_conn):
         "select count(*) from raw_reviews where run_id = ''"
     ).fetchone()[0]
     assert blank_run == 0
+
+
+def test_every_raw_table_has_four_provenance_columns(synthetic_conn):
+    """Phase 3a, invariant 1: every `raw_*` table, not only reviews, carries the
+    four provenance columns and no row leaves one empty."""
+    tables = [
+        row[0]
+        for row in synthetic_conn.execute(
+            "select table_name from information_schema.tables "
+            "where table_schema = 'main' and table_name like 'raw_%' "
+            "order by table_name"
+        ).fetchall()
+    ]
+    assert "raw_reviews" in tables and "raw_platform_snapshots" in tables
+    for table in tables:
+        columns = {
+            row[0]
+            for row in synthetic_conn.execute(
+                "select column_name from information_schema.columns "
+                f"where table_name = '{table}'"
+            ).fetchall()
+        }
+        assert set(PROVENANCE) <= columns, table
+        predicate = " or ".join(f"{c} is null or {c} = ''" for c in PROVENANCE)
+        bad = synthetic_conn.execute(
+            f"select count(*) from {table} where {predicate}"
+        ).fetchone()[0]
+        assert bad == 0, table

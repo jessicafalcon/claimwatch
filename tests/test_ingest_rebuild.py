@@ -53,10 +53,8 @@ def _query(db: Path, sql: str):
 
 def test_rebuild_from_sample_matches_pins(tmp_path):
     counts = rebuild("duckdb", "samples", database=tmp_path / "w.duckdb")
-    assert counts == {
-        "raw_reviews": pins.APP_STORE_SAMPLE_RAW_ROWS,
-        "stg_reviews": pins.APP_STORE_SAMPLE_STG_ROWS,
-    }
+    assert counts["raw_reviews"] == pins.APP_STORE_SAMPLE_RAW_ROWS
+    assert counts["stg_reviews"] == pins.APP_STORE_SAMPLE_STG_ROWS
     rows = _query(
         tmp_path / "w.duckdb",
         "select distinct source, run_id, captured_at from raw_reviews",
@@ -122,10 +120,8 @@ def test_second_capture_of_unchanged_pages_adds_no_rows(tmp_path):
     _capture(cache, "2026-09-08T08-00-00", "2026-09-08T08:00:00")
     db = tmp_path / "w.duckdb"
     counts = rebuild("duckdb", "captured", database=db, cache_dir=cache)
-    assert counts == {
-        "raw_reviews": pins.APP_STORE_SAMPLE_RAW_ROWS,
-        "stg_reviews": pins.APP_STORE_SAMPLE_STG_ROWS,
-    }
+    assert counts["raw_reviews"] == pins.APP_STORE_SAMPLE_RAW_ROWS
+    assert counts["stg_reviews"] == pins.APP_STORE_SAMPLE_STG_ROWS
     assert _query(db, "select distinct captured_at from raw_reviews") == [
         ("2026-09-01T08:00:00",)
     ]
@@ -144,10 +140,8 @@ def test_edited_review_in_a_later_capture_appends_one_row(tmp_path):
     _capture(cache, "2026-09-08T08-00-00", "2026-09-08T08:00:00", edit=edit)
     db = tmp_path / "w.duckdb"
     counts = rebuild("duckdb", "captured", database=db, cache_dir=cache)
-    assert counts == {
-        "raw_reviews": pins.APP_STORE_SAMPLE_RAW_ROWS + 1,
-        "stg_reviews": pins.APP_STORE_SAMPLE_STG_ROWS,
-    }
+    assert counts["raw_reviews"] == pins.APP_STORE_SAMPLE_RAW_ROWS + 1
+    assert counts["stg_reviews"] == pins.APP_STORE_SAMPLE_STG_ROWS
     ext = pins.APP_STORE_SAMPLE_FIRST_ROW["external_id"]
     assert _query(
         db, f"select rating, captured_at from stg_reviews where external_id = '{ext}'"

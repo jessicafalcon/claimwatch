@@ -65,3 +65,28 @@ LISTING_SAMPLE_ROW = {
     "?id=example.fictional.app&hl=fr&gl=FR",
     "captured_at": LISTING_SAMPLE_CAPTURED_AT,
 }
+
+# fixtures/anchors/platform_snapshots_seed.csv (re-frozen in Phase 3a, D2): the
+# brief's §6 public figures — nine rows, every one Documented. Six are the
+# studied insurer's (three Trustpilot points, one Opinion Assurances point with
+# the stat-row figures and no rating, the two app-store ratings) and three are
+# anonymous peers. Loaded in every rebuild input but `none`.
+ANCHOR_ROWS = 9
+ANCHOR_PROFILES = {
+    "fr-digital-first": 6,
+    "peer-traditional-1": 1,
+    "peer-traditional-2": 1,
+    "peer-digital-challenger-1": 1,
+}
+# The marts on the anchors alone (`ROWS=synthetic` or `none`+anchors):
+RATING_TREND_ANCHOR_ROWS = 8  # every anchor with a rating, one per month
+CHANNEL_GAP_ANCHOR_ROWS = 6  # latest rating per segment × channel × platform × profile
+PLATFORM_STATS_ANCHOR_ROWS = 2  # the two anchors carrying a stat-row figure
+PEER_RATINGS_ANCHOR_ROWS = 4  # unsolicited: the studied insurer + three peers
+# The studied insurer's latest unsolicited point and its invited ones.
+CHANNEL_GAP_DIGITAL_FIRST = {
+    ("unsolicited", "trustpilot"): ("3.900", 975, "2026-06-15"),
+    ("invited", "app-store"): ("4.900", 5000, "2024-09-15"),
+    ("invited", "google-play"): ("4.500", 765, "2024-09-15"),
+}
+PLATFORM_STATS_OPINION_ASSURANCES = ("0.231", "0.820", "1.5", 534)

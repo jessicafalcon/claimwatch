@@ -7,6 +7,10 @@ docs/PLAN.md §4 decision 2). The stages:
                   pandas) or from the scraper's captures, each declared
                   source's through its declared parser (Phase 3a) — the SAME
                   guard for all
+  load_snapshots-> insert each platform snapshot only if (source, profile,
+                  captured_at, content_hash) is unseen; the rows come from the
+                  anchors fixture (Documented), the hand-entry file under
+                  data/snapshots/ or a capture (Measured) — Phase 3a
   build_derived-> run sql/staging/*.sql then sql/marts/*.sql (`create or replace`)
 
 Idempotency: raw is append-only keyed on the natural key + a content fingerprint,
@@ -23,11 +27,23 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import re
 import tempfile
+from datetime import date
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from ingest.captures import parser_module, read_captures
-from ingest.sources import PARSERS, SOURCES, Source, sample_source
+from ingest.parsed import PageShapeError
+from ingest.sources import (
+    CHANNELS,
+    PARSERS,
+    SEGMENTS,
+    SOURCES,
+    Source,
+    by_name,
+    sample_source,
+)
 from pipeline import warehouse
 from pipeline.warehouse import ROOT, connect
 
@@ -40,6 +56,45 @@ _SEP = "\x1f"  # unit separator — cannot appear in the CSV content fields
 # The content fields whose hash is the fingerprint (provenance is excluded, so a
 # re-capture of the same review at a new time is NOT a new row).
 _CONTENT = ("rating", "review_date", "title", "body")
+# A snapshot's fingerprint: its five measures (spec Phase 3a, pinned decision 1).
+_MEASURES = (
+    "rating",
+    "review_count",
+    "one_star_share",
+    "response_rate",
+    "response_delay_days",
+)
+ANCHORS = ROOT / "fixtures" / "anchors" / "platform_snapshots_seed.csv"
+ANCHOR_COLUMNS = (
+    "platform",
+    "profile",
+    "segment",
+    "channel",
+    "rating",
+    "review_count",
+    "one_star_share",
+    "response_rate",
+    "response_delay_days",
+    "captured_at",
+    "source_url",
+    "seeded_from",
+)
+# Figures a person read off a page whose terms forbid a robot (spec Phase 3a,
+# pinned decision 4): a tracked file under the one tracked subtree of data/,
+# hand-edited, eight columns, no address and no name.
+MANUAL_SNAPSHOTS = ROOT / "data" / "snapshots" / "manual_snapshots.csv"
+MANUAL_COLUMNS = (
+    "source",
+    "captured_at",
+    "rating",
+    "review_count",
+    "one_star_share",
+    "response_rate",
+    "response_delay_days",
+    "read_from",
+)
+_SLUG = re.compile(r"^[a-z0-9-]+$")
+_DAY = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
 
 
 def content_hash(row: dict[str, str]) -> str:
@@ -47,6 +102,229 @@ def content_hash(row: dict[str, str]) -> str:
     and machines."""
     payload = _SEP.join(str(row[c]) for c in _CONTENT)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def snapshot_hash(row: dict[str, object]) -> str:
+    """sha256 of the five measures, in a fixed order; an absent measure is the
+    empty string, so a row is its numbers and nothing else."""
+    payload = _SEP.join("" if row[c] is None else str(row[c]) for c in _MEASURES)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _refuse_row(where: str, line: int, field: str, why: str) -> PageShapeError:
+    return PageShapeError(f"{where}: line {line}: field {field!r} {why}")
+
+
+def _decimal(
+    value: str, *, where: str, line: int, field: str, lo: Decimal, hi: Decimal | None
+) -> Decimal | None:
+    """An optional decimal inside [lo, hi] (hi None = unbounded); empty -> None."""
+    if value == "":
+        return None
+    try:
+        number = Decimal(value)
+    except InvalidOperation as exc:
+        raise _refuse_row(where, line, field, f"is not a number: {value!r}") from exc
+    if not number.is_finite() or number < lo or (hi is not None and number > hi):
+        raise _refuse_row(where, line, field, f"is outside the range: {value!r}")
+    return number
+
+
+def _count(value: str, *, where: str, line: int, field: str) -> int:
+    if not re.fullmatch(r"[0-9]+", value):
+        raise _refuse_row(
+            where, line, field, f"is not a non-negative integer: {value!r}"
+        )
+    return int(value)
+
+
+def _day(value: str, *, where: str, line: int, field: str) -> str:
+    if not _DAY.match(value):
+        raise _refuse_row(where, line, field, f"is not YYYY-MM-DD: {value!r}")
+    try:
+        date.fromisoformat(value)
+    except ValueError as exc:
+        raise _refuse_row(where, line, field, f"is not a real day: {value!r}") from exc
+    return value
+
+
+def _measures(row: dict[str, str], *, where: str, line: int) -> dict[str, object]:
+    one = Decimal(1)
+    return {
+        "rating": _decimal(
+            row["rating"],
+            where=where,
+            line=line,
+            field="rating",
+            lo=Decimal(0),
+            hi=Decimal(5),
+        ),
+        "review_count": _count(
+            row["review_count"], where=where, line=line, field="review_count"
+        ),
+        "one_star_share": _decimal(
+            row["one_star_share"],
+            where=where,
+            line=line,
+            field="one_star_share",
+            lo=Decimal(0),
+            hi=one,
+        ),
+        "response_rate": _decimal(
+            row["response_rate"],
+            where=where,
+            line=line,
+            field="response_rate",
+            lo=Decimal(0),
+            hi=one,
+        ),
+        "response_delay_days": _decimal(
+            row["response_delay_days"],
+            where=where,
+            line=line,
+            field="response_delay_days",
+            lo=Decimal(0),
+            hi=None,
+        ),
+    }
+
+
+def _read_csv(path: Path, columns: tuple[str, ...]) -> list[dict[str, str]]:
+    where = str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path)
+    with path.open(encoding="utf-8", newline="") as fh:
+        reader = csv.DictReader(fh)
+        if tuple(reader.fieldnames or ()) != columns:
+            raise PageShapeError(f"{where}: columns must be exactly {columns}")
+        rows = list(reader)
+    for i, row in enumerate(rows, 2):
+        if None in row or None in row.values():
+            raise PageShapeError(f"{where}: line {i}: wrong number of cells")
+    return rows
+
+
+def read_anchors(path: Path = ANCHORS) -> list[dict[str, object]]:
+    """The brief's §6 public figures, parsed strictly to snapshot rows with
+    `origin = anchor` (Documented downstream). A row outside the declared shape
+    refuses the seed, naming line and field."""
+    where = str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path)
+    out: list[dict[str, object]] = []
+    for i, row in enumerate(_read_csv(path, ANCHOR_COLUMNS), 2):
+        for field in ("platform", "profile"):
+            if not _SLUG.match(row[field]):
+                raise _refuse_row(where, i, field, f"is not a slug: {row[field]!r}")
+        if row["segment"] not in SEGMENTS:
+            raise _refuse_row(
+                where, i, "segment", f"not in {SEGMENTS}: {row['segment']!r}"
+            )
+        if row["channel"] not in CHANNELS:
+            raise _refuse_row(
+                where, i, "channel", f"not in {CHANNELS}: {row['channel']!r}"
+            )
+        if not row["source_url"].startswith("https://"):
+            raise _refuse_row(where, i, "source_url", "is not an https address")
+        if not row["seeded_from"].strip():
+            raise _refuse_row(where, i, "seeded_from", "is empty")
+        out.append(
+            {
+                "source": row["platform"],
+                "profile": row["profile"],
+                "segment": row["segment"],
+                "channel": row["channel"],
+                "origin": "anchor",
+                **_measures(row, where=where, line=i),
+                "source_url": row["source_url"],
+                "captured_at": _day(
+                    row["captured_at"], where=where, line=i, field="captured_at"
+                ),
+                "seeded_from": row["seeded_from"],
+            }
+        )
+    return out
+
+
+def read_manual_snapshots(path: Path = MANUAL_SNAPSHOTS) -> list[dict[str, object]]:
+    """Hand-read figures -> snapshot rows with `origin = manual` (Measured
+    downstream). The row names a declared source that is NOT fetchable —
+    platform, address, profile, segment and channel come from the declaration,
+    so the file carries no address and no name; a fetched source's figures
+    come from its capture, never from a hand entry. A missing file is zero
+    rows (a clone before any reading)."""
+    if not path.is_file():
+        return []
+    where = str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path)
+    out: list[dict[str, object]] = []
+    for i, row in enumerate(_read_csv(path, MANUAL_COLUMNS), 2):
+        try:
+            source = by_name(row["source"])
+        except KeyError as exc:
+            raise _refuse_row(
+                where, i, "source", f"is not a declared source: {row['source']!r}"
+            ) from exc
+        if source.fetchable:
+            raise _refuse_row(
+                where,
+                i,
+                "source",
+                f"{row['source']!r} is fetchable: its figures come from its capture",
+            )
+        if row["read_from"] != "page":
+            raise _refuse_row(
+                where, i, "read_from", f"must be the word 'page': {row['read_from']!r}"
+            )
+        out.append(
+            {
+                "source": source.platform,
+                "profile": source.profile,
+                "segment": source.segment,
+                "channel": source.channel,
+                "origin": "manual",
+                **_measures(row, where=where, line=i),
+                "source_url": source.listing,
+                "captured_at": _day(
+                    row["captured_at"], where=where, line=i, field="captured_at"
+                ),
+                "seeded_from": "",
+            }
+        )
+    return out
+
+
+def load_snapshots(conn, rows: list[dict[str, object]], run_id: str) -> None:
+    """Append each snapshot not already present under its natural key + hash —
+    the same guard shape as `load_reviews`."""
+    for r in rows:
+        h = snapshot_hash(r)
+        conn.execute(
+            "insert into raw_platform_snapshots "
+            "(source, profile, segment, channel, origin, rating, review_count, "
+            " one_star_share, response_rate, response_delay_days, source_url, "
+            " captured_at, run_id, seeded_from, content_hash) "
+            "select ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? "
+            "where not exists (select 1 from raw_platform_snapshots "
+            "where source = ? and profile = ? and captured_at = ? "
+            "and content_hash = ?)",
+            [
+                r["source"],
+                r["profile"],
+                r["segment"],
+                r["channel"],
+                r["origin"],
+                r["rating"],
+                r["review_count"],
+                r["one_star_share"],
+                r["response_rate"],
+                r["response_delay_days"],
+                r["source_url"],
+                r["captured_at"],
+                run_id,
+                r.get("seeded_from", ""),
+                h,
+                r["source"],
+                r["profile"],
+                r["captured_at"],
+                h,
+            ],
+        )
 
 
 def _sql_files(stage: str) -> list[Path]:
@@ -150,25 +428,32 @@ def rebuild(
     database: str | Path | None = None,
     run_id: str | None = None,
     cache_dir: str | Path | None = None,
+    manual_file: str | Path | None = None,
 ) -> dict[str, int]:
     """Build the warehouse from raw and return the per-table row counts.
-    `captured` loads every capture under data/cache (zero captures -> zero
-    rows); `none` runs the pipeline end to end with zero rows; `synthetic`
-    loads the fixture; `samples` loads the frozen samples through the real
-    parsers. Capture-fed rows go through the same `load_reviews` guard as the
-    fixture. With no `database`, each input builds its own file
-    (`warehouse.database_for`)."""
+    `captured` loads the anchors, the hand-entry file and every capture under
+    data/cache (zero captures -> the anchors and the file); `none` runs the
+    pipeline end to end with zero rows; `synthetic` loads the review fixture
+    and the anchors; `samples` loads the anchors and the frozen samples
+    through the real parsers. Every input goes through the same guards. With
+    no `database`, each input builds its own file (`warehouse.database_for`)."""
     if database is None:
         database = warehouse.database_for(rows)
     conn = connect(target, database=database)
     try:
         create_raw(conn)
+        if rows != "none":
+            load_snapshots(conn, read_anchors(), run_id or "anchors")
         if rows == "synthetic":
             load_reviews(conn, read_fixture("synthetic"), run_id or "synthetic")
+        if rows == "captured":
+            path = Path(manual_file) if manual_file is not None else MANUAL_SNAPSHOTS
+            load_snapshots(conn, read_manual_snapshots(path), run_id or "manual")
         for source, root, prefix in captures_for(rows, cache_dir):
             for capture_id, parsed in read_captures(root, source):
                 stamp = prefix if rows == "samples" else f"{prefix}/{capture_id}"
                 load_reviews(conn, parsed.reviews, run_id or stamp)
+                load_snapshots(conn, parsed.snapshots, run_id or stamp)
         build_derived(conn)
         return table_counts(conn)
     finally:
@@ -180,14 +465,29 @@ def idempotency_check(
     rows: str = "synthetic",
     *,
     cache_dir: str | Path | None = None,
+    manual_file: str | Path | None = None,
 ) -> tuple[bool, dict[str, int], dict[str, int]]:
     """Rebuild twice into one fresh database (different `run_id` each time, to
     prove `run_id` is not in the natural key) and compare per-table counts. Uses a
     throwaway file so it depends on no prior state and touches no working db."""
     with tempfile.TemporaryDirectory() as tmp:
         db = Path(tmp) / "idempotency.duckdb"
-        first = rebuild(target, rows, database=db, run_id="run-1", cache_dir=cache_dir)
-        second = rebuild(target, rows, database=db, run_id="run-2", cache_dir=cache_dir)
+        first = rebuild(
+            target,
+            rows,
+            database=db,
+            run_id="run-1",
+            cache_dir=cache_dir,
+            manual_file=manual_file,
+        )
+        second = rebuild(
+            target,
+            rows,
+            database=db,
+            run_id="run-2",
+            cache_dir=cache_dir,
+            manual_file=manual_file,
+        )
     return first == second, first, second
 
 

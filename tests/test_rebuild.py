@@ -20,8 +20,11 @@ _INSERT_RAW = (
 
 
 def test_zero_row_rebuild(tmp_path):
-    counts = rebuild("duckdb", "empty", database=tmp_path / "empty.duckdb")
-    assert counts == {"raw_reviews": 0, "stg_reviews": 0}
+    """`none`: every table exists and every count is zero — the anchors seed
+    every other input, not this one."""
+    counts = rebuild("duckdb", "none", database=tmp_path / "none.duckdb")
+    assert set(counts) >= {"raw_reviews", "stg_reviews", "raw_platform_snapshots"}
+    assert all(n == 0 for n in counts.values()), counts
 
 
 def test_synthetic_stage_counts_match_pins(tmp_path):
