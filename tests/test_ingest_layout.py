@@ -2,8 +2,10 @@
 `httpx` is imported only by the fetcher, the politeness knobs are defined only
 in `ingest/politeness.py`, a rebuild never imports the fetcher, `ingest/` never
 reads `.env`, the only clock is the fetcher's stamp, and exactly one source is
-declared. Mechanical greps over the tracked modules (tests excluded — they build
-`httpx.MockTransport`s)."""
+declared. Mechanical greps over every `*.py` in the repo outside `tests/` and
+dot-directories (tests build `httpx.MockTransport`s), so a module landing in
+`classify/`, `models/`, `dags/`, `study/` or the root is covered the day it
+appears — invariant 6 says "all modules"."""
 
 from __future__ import annotations
 
@@ -14,11 +16,25 @@ from ingest import politeness
 from ingest.sources import SOURCES, source_names
 
 ROOT = Path(__file__).resolve().parent.parent
-MODULE_DIRS = ("ingest", "pipeline", "scripts")
+EXCLUDED_TOP = ("tests",)  # plus every dot-directory (.venv, .git, .claude)
 
 
 def _modules() -> list[Path]:
-    return sorted(p for d in MODULE_DIRS for p in (ROOT / d).rglob("*.py"))
+    out = []
+    for p in ROOT.rglob("*.py"):
+        parts = p.relative_to(ROOT).parts
+        if parts[0] in EXCLUDED_TOP or any(part.startswith(".") for part in parts):
+            continue
+        out.append(p)
+    return sorted(out)
+
+
+def test_the_module_walk_is_the_repo_not_a_list():
+    """The walk covers the three Phase 2 directories and would cover a new one
+    without editing this file; tests and dot-directories are the only exclusions."""
+    seen = {p.relative_to(ROOT).parts[0] for p in _modules()}
+    assert {"ingest", "pipeline", "scripts"} <= seen
+    assert "tests" not in seen and not any(s.startswith(".") for s in seen)
 
 
 def _lines_matching(pattern: str) -> dict[str, list[str]]:
