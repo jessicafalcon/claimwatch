@@ -18,8 +18,9 @@ page and the README.
 Read in this order: `PROJECT_BRIEF.md` (what we build and why — the master
 document), `SPEC.md` (the study's structure: the five parts and every chart,
 settled in Phase 0b), `BACKING.md` (the evidence contract: claim → table → SQL
-→ source → tag), this file (how we work), then the active spec in `specs/`. `docs/PLAN.md` is how this workflow
-was designed; `DECISIONS.md` is the why-not-X log.
+→ source → tag), this file (how we work), then the active spec in `specs/`.
+`docs/PLAN.md` is how this workflow was designed; `DECISIONS.md` is the
+why-not-X log.
 
 ## Architecture
 
@@ -65,9 +66,10 @@ in the middle, and come out on the right as the numbers the study shows.
   holds every pinned number.
 - `.claude/` — agents (report-only), commands, the run-tests hook. Settings
   are local-only and gitignored.
-- `.github/workflows/ci.yml` — lint, check-docs, check-backing, test, rebuild
-  (synthetic) + idempotency-check. `weekly.yml` *(Phase 4)* — the scheduled
-  scrape + snapshot commit.
+- `.github/workflows/ci.yml` — lint, check-docs, check-backing, test, then
+  rebuild + idempotency-check twice: once on the synthetic fixture, once on the
+  frozen App Store sample. `weekly.yml` *(Phase 4)* — the scheduled scrape +
+  snapshot commit.
   `.github/pull_request_template.md` — the PR body.
 - `pyproject.toml`, `uv.lock`, `.python-version`, `.pre-commit-config.yaml` —
   the toolchain (uv, ruff, pytest, pre-commit), versions pinned in lockstep.
@@ -75,17 +77,31 @@ in the middle, and come out on the right as the numbers the study shows.
   (`sql/marts/` empty until a mart lands in its phase); `pipeline/` —
   `warehouse.py` (the one place that knows DuckDB from Snowflake), `build.py`
   (raw→staging→marts), `cli.py`/`__main__.py` (the validating `make` entry),
-  `sql_lint.py` (the portability/clock denylist the tests use).
+  `sql_lint.py` (the portability/clock denylist the tests use),
+  `metrics.py` (reviews per month — a pinned query, not a mart; folds into
+  B5.2 in Beat 5).
   `fixtures/synthetic/` — hand-written fake reviews, read-only after Phase 1;
   `fixtures/anchors/` — the brief's §6 public figures with source URLs
-  (frozen in Phase 1; first read by `platform_snapshots` in Phase 3). Both
-  carry a `MANIFEST.sha256`.
-- *(Phase 2+)* `ingest/` — scrapers and snapshot capture. *(Phase 5+)*
+  (frozen in Phase 1; first read by `platform_snapshots` in Phase 3);
+  `fixtures/app-store/` — a hand-written capture of the App Store feed in its
+  exact shape: three pages, their meta files and the robots file (frozen in
+  Phase 2; what CI parses). All three carry a `MANIFEST.sha256`.
+- `ingest/` — the scrapers. A *capture* is one run's saved copy of the pages
+  exactly as they arrived, with each page's address and time beside it and the
+  robots file they were checked against. `politeness.py` (the good manners of
+  a fetch in one place: read robots.txt first, say who we are, wait between
+  requests), `robots.py` (the robots.txt matcher, RFC 9309: `*`, `$`, longest
+  match wins, Crawl-delay), `sources.py` (the declared sources, a closed set;
+  each a sourced data point — id and listing address, never a name),
+  `app_store.py` (the strict parser to the raw shape; reads captures back),
+  `fetch.py` (the
+  only `httpx` import; writes captures under `data/cache/`). *(Phase 3)*
+  snapshot capture and the other sources. *(Phase 5+)*
   `classify/` — `rules.yaml`, `rules.py`, `llm.py` (the ONE model call site),
   `eval/` (the only reader of `labels.csv`). *(Phase 8)* `models/` —
   `cost_model.py` (`FORMULAS`), `guardrail_sim.py`. *(Phase 9)* `study/` —
   Metabase setup + the HTML export. *(Phase 10)* `dags/friction_ledger.py`.
-- `data/` — gitignored working output (corpus, cached pages, `*.duckdb`);
+- `data/` — gitignored working output (corpus, captured pages, `*.duckdb`);
   `data/snapshots/` *(Phase 4)* is the one tracked subtree.
 
 ## Commands (macOS, uv)
@@ -103,14 +119,30 @@ in the middle, and come out on the right as the numbers the study shows.
   + check-docs + check-backing + fixtures; with SPEC, Evidence ids and
   Record-updates files. One line per check, exit 1 on FAIL, 2 on a refused
   SPEC/BASE. `/review-round N` runs it first.
-- `make rebuild [TARGET=duckdb] [FIXTURE=empty|synthetic]` — build the
-  warehouse from raw (DuckDB; Snowflake defers to Phase 10). `empty` runs it
-  end to end with zero rows; `synthetic` loads the fixture.
+- `make rebuild [TARGET=duckdb] [FIXTURE=cache|empty|synthetic|app-store]` —
+  build the warehouse from raw (DuckDB; Snowflake defers to Phase 10) and print
+  reviews per month. Each input builds its own database file, so a fixture
+  never lands in the corpus. The default, `cache`, loads every capture under
+  `data/cache/app-store/` (with no capture it loads nothing and says so);
+  `empty` runs it end to end with zero rows; `synthetic` loads the fixture;
+  `app-store` runs the frozen sample through the real parser (CI does; the
+  Phase 2 DONE command).
 - `make idempotency-check [TARGET=] [FIXTURE=synthetic]` — rebuild twice, diff
-  per-table row counts (the run-twice property as a command).
-- `make reset [TARGET=duckdb]` — DESTRUCTIVE: drop the DuckDB file; needs
-  `CONFIRM=yes` on the command line (`$(origin CONFIRM)`; an environment
-  `CONFIRM=yes` does not count).
+  per-table row counts (the run-twice property as a command); same `FIXTURE`
+  values as `rebuild`, but this one defaults to `synthetic`; pass
+  `FIXTURE=cache` to prove it on real rows.
+- `make scrape [SOURCE=<declared name>]` — NETWORK, developer-run, never by an
+  agent: fetch the declared source's public review feed into a new capture
+  under `data/cache/`, robots.txt first and every page checked against it,
+  ≥ 2 s apart (more if the site asks), identifying User-Agent, no proxy, no
+  retry. Needs `CONFIRM=yes` on the command line (`$(origin CONFIRM)`, as
+  `reset`); refuses a source we have recorded as one not to fetch (the site
+  asked us not to; the reason sits beside the source in code and in
+  DECISIONS), one whose app id is not filled in, and one whose feed path
+  robots.txt disallows.
+- `make reset [TARGET=duckdb]` — DESTRUCTIVE: drop every DuckDB file this repo
+  built, the corpus and one per fixture; needs `CONFIRM=yes` on the command
+  line (`$(origin CONFIRM)`; an environment `CONFIRM=yes` does not count).
 
 ## Deterministic first (the number one rule — brief §2.1)
 
@@ -324,9 +356,9 @@ one, and write one sentence in the README about why.
 - PR via `gh pr create` when Done-when passes AND verdicts are approved. Body:
   the PR template. Title `Phase N — <name>`.
 - CI runs `make lint`, `make check-docs`, `make check-backing`, `make test`,
-  `make rebuild FIXTURE=synthetic` and `make idempotency-check` (offline,
-  DuckDB, no key). Mergeable only when CI is green and the surface's agents
-  have run.
+  `make rebuild FIXTURE=synthetic`, `make idempotency-check` and the same two
+  with `FIXTURE=app-store` (offline, DuckDB, no key, no fetch). Mergeable only
+  when CI is green and the surface's agents have run.
 - The developer merges (squash), never Claude. After merge: `git checkout
   main && git pull`.
 - Hotfixes on `fix/<slug>` from main, same rules. Never mix two phases in a
@@ -393,20 +425,19 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 ## Current status
 
-**Phase 1 — Schema and the empty warehouse** (`phase-1-schema`, spec
-`specs/phase-1-schema.md`): built; review round 1 dispositions landed; pre-PR.
-Raw + staging DDL for reviews
-with the four provenance columns (`sql/raw/raw_reviews.sql`,
-`sql/staging/stg_reviews.sql`); the DuckDB/Snowflake seam (`pipeline/`); the two
-frozen fixture sets with MANIFESTs; `tests/pins.py`; the portability/clock and
-idempotency guards; `make rebuild`, `idempotency-check`, `reset`. `make rebuild
-FIXTURE=synthetic && make idempotency-check` is green (raw 40, staging 39).
-**All 13 marts (and `platform_snapshots`) are deferred to the phases that land
-their upstreams — Phase 1 lands no mart, so every BACKING row stays Pending
-(check-backing: 19 rows, 0 marts). This narrowed the brief's "All DDL
-(raw/staging/marts)"; PROJECT_BRIEF.md §9 reworded to match (developer's call).** Phase
-0b merged (PR #2). Next: Phase 2 — one scraper, end to end.
+**Phase 2 — One scraper, end to end** (`phase-2-scraper`, spec
+`specs/phase-2-scraper.md`): built; review rounds 1 to 4 and the exit audit
+done, their fixes and amendments A1–A7 in (DECISIONS → Phase 2). We can now
+collect published reviews from an app store politely and count how many
+arrive each month, but the one source we tried asks crawlers not to read its
+review feed, so the counts so far come from a hand-written sample and the
+first real rows wait for a source that allows us (Phase 3a). The DONE
+command is `make rebuild FIXTURE=app-store && make idempotency-check
+FIXTURE=app-store` (raw 8 / staging 8); Phase 1's line stays green (raw 40 /
+staging 39). Phase 1 merged (PR #3). Next: the Phase 2 PR; then Phase 3a —
+snapshots and the remaining polite sources, starting with one whose robots
+file lets us read its reviews.
 
-Open BACKLOG rows: **6**.
+Open BACKLOG rows: **14**.
 
 (Update this section at the end of every working day.)

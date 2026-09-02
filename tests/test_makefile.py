@@ -20,7 +20,16 @@ from pipeline.cli import Refused, confirmed, resolve_choice  # noqa: E402
 from pipeline.warehouse import TARGETS  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
-SCRUB = ("SPEC", "BASE", "TARGET", "FIXTURE", "CONFIRM", "MAKEFLAGS", "MFLAGS")
+SCRUB = (
+    "SPEC",
+    "BASE",
+    "TARGET",
+    "FIXTURE",
+    "CONFIRM",
+    "SOURCE",
+    "MAKEFLAGS",
+    "MFLAGS",
+)
 
 BAD_VALUES = ("../x", '"; echo pwned; "', "$(shell echo x)", "sqlite", "SYNTHETIC")
 
@@ -113,8 +122,13 @@ def test_rebuild_variables_are_a_closed_set():
     `../x` or a metacharacter is just a name not in the set."""
     assert resolve_choice("", TARGETS, "duckdb") == "duckdb"  # empty -> default
     assert resolve_choice("duckdb", TARGETS, "duckdb") == "duckdb"
-    assert resolve_choice("", FIXTURES, "empty") == "empty"
-    assert resolve_choice("synthetic", FIXTURES, "empty") == "synthetic"
+    # Phase 2: the closed set of rebuild inputs; `make rebuild` defaults to the
+    # scraper's captures (`cache`), the offline proof is `app-store`.
+    assert FIXTURES == ("cache", "empty", "synthetic", "app-store")
+    assert resolve_choice("", FIXTURES, "cache") == "cache"
+    assert resolve_choice("synthetic", FIXTURES, "cache") == "synthetic"
+    assert resolve_choice("app-store", FIXTURES, "cache") == "app-store"
+    assert resolve_choice("empty", FIXTURES, "cache") == "empty"
     for bad in BAD_VALUES:
         with pytest.raises(Refused):
             resolve_choice(bad, TARGETS, "duckdb")
@@ -129,7 +143,7 @@ def test_idempotency_check_variables_are_a_closed_set():
 
 
 def test_fixture_outside_the_set_is_refused():
-    for bad in ("../x", "prod", '"; rm -rf', "SYNTHETIC"):
+    for bad in ("../x", "prod", '"; rm -rf', "SYNTHETIC", "fixtures/app-store"):
         with pytest.raises(Refused):
             resolve_choice(bad, FIXTURES, "empty")
 
@@ -166,3 +180,48 @@ def test_reset_requires_command_line_confirm():
     assert "--confirm-origin='command line'" in from_cmdline
     from_env = _make_n("reset", {}, {"CONFIRM": "yes"})
     assert "--confirm-origin='environment'" in from_env
+
+
+# --- Phase 2: the network target (scrape) ---
+
+
+def test_scrape_source_is_a_closed_set():
+    """SOURCE validates against the declared names; a value is never a path."""
+    from ingest.sources import source_names
+
+    names = source_names()
+    assert resolve_choice("", names, names[0]) == names[0]
+    for bad in BAD_VALUES + ("fixtures/app-store", "app-store"):
+        with pytest.raises(Refused):
+            resolve_choice(bad, names, names[0])
+
+
+def test_scrape_requires_command_line_confirm():
+    """The recipe passes SOURCE unexpanded and the true `$(origin CONFIRM)`; an
+    environment CONFIRM=yes reaches Python as origin `environment`, which
+    `confirmed()` rejects — so an agent's or a CI's non-interactive call never
+    fetches."""
+    from_cmdline = _make_n("scrape", {"CONFIRM": "yes", "SOURCE": "x"}, {})
+    assert "--source='x'" in from_cmdline
+    assert "--confirm='yes'" in from_cmdline
+    assert "--confirm-origin='command line'" in from_cmdline
+    from_env = _make_n("scrape", {}, {"CONFIRM": "yes", "SOURCE": "x"})
+    assert "--source='x'" in from_env
+    assert "--confirm-origin='environment'" in from_env
+    assert confirmed("yes", "environment") is False
+
+
+@pytest.mark.parametrize(
+    "var, flag", [("SOURCE", "--source"), ("CONFIRM", "--confirm")]
+)
+def test_scrape_variables_reach_python_as_one_literal(var, flag):
+    value = "$(shell echo pwned)"
+    quoted = "'" + value.replace("'", "'\\''") + "'"
+    for origin in ("cmdline", "env"):
+        out = _make_n(
+            "scrape",
+            {var: value} if origin == "cmdline" else {},
+            {var: value} if origin == "env" else {},
+        )
+        assert f"{flag}={quoted}" in out, (var, origin, out)
+        assert "pwned" not in out.replace(value, "")

@@ -269,8 +269,8 @@ Raw and staging DDL with provenance columns in this phase; each mart lands with 
 Done when: empty pipeline runs end to end; the raw/staging schema and BACKING.md agree.
 
 **Phase 2 — One scraper, end to end.**
-Easiest source only (app-store API or Opinion Assurances — NOT Trustpilot). Fetch → raw → staging dedupe → one trivial mart (reviews per month).
-Done when: `make rebuild` produces real rows and one queryable metric. Do not start a second source.
+Easiest source only (app-store API or Opinion Assurances — NOT Trustpilot). Fetch → raw → staging dedupe → one queryable metric (reviews per month; no study claim needs it as a mart, so it is a pinned query until Beat 5's row-count mart lands).
+Done when: `make rebuild` runs the real parser over a frozen sample of the feed and prints the metric, and running twice changes no row count. The first real rows land in Phase 3 with the first source whose robots file allows its feed (the Phase 2 source disallows it). Do not start a second source.
 
 **Phase 3 — Scraper fleet + snapshots.**
 Remaining sources (Trustpilot and its bot handling is its own session). Add `platform_snapshots` (rating, review count, timestamp, source URL per platform per run). Seed with §6 historical anchors, marked as such.

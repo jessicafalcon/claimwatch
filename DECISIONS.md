@@ -64,6 +64,30 @@ place and never deleted.
   manually captured snapshot tagged Measured — not circumvention. Each
   source's terms position is recorded here when its scraper lands.
   ([Phase 0a](#phase-0a), PLAN §6.2)
+  - *App Store customer-reviews feed (Phase 2).* A public, keyless JSON feed
+    Apple publishes per app and storefront for syndication — no login, no
+    API key, no page scraping. Read at the feed's own cap (ten pages), with
+    the manners above and `robots.txt` read first; a disallow, a block or a
+    non-200 stops the run with one line and no retry. The pages are archived
+    under gitignored `data/` and never published; the reviewer's name is never
+    read into the warehouse. **Position as of 2026-09-02: the host's
+    `robots.txt` disallows the feed path for every crawler (`User-agent: *`,
+    `Disallow: /*/rss/*`).** The first live run fetched one capture before
+    the matcher was corrected (see Gotchas); that capture and its database
+    were deleted the same day. The source stays declared as a data point (id
+    and listing address) but marked not to fetch — `fetchable=False`, with
+    this reason recorded as its `terms` — so the fetcher refuses it before
+    any request, even if the host's file reads differently on a later day
+    (amendment A5); the fallback is the manual snapshot path above (Phase
+    3a's `platform_snapshots`), never a different User-Agent or a
+    "syndication feeds don't count" reading.
+    ([Phase 2](#phase-2))
+- **A scraped page is parsed strictly to a declared shape; the page is the
+  unit of refusal.** A feed item missing or mis-typing a required field, a
+  rating outside 1–5 or a non-ISO timestamp refuses the whole page, naming
+  page, item and field; nothing partial is loaded and nothing is defaulted.
+  Widening the shape is a tested change in `ingest/app_store.py`, never a
+  `.get(…, default)`. ([PLAN §2](docs/PLAN.md) Boundary row; [Phase 2](#phase-2))
 
 **Process**
 
@@ -121,7 +145,26 @@ place and never deleted.
 
 ## Gotchas (stack surprises found live)
 
-None yet. Each entry: the surprise, the official-docs check, what we did.
+Each entry: the surprise, the official-docs check, what we did.
+
+- **Phase 2 — the live feed, checked by the first run (2026-09-02).** An agent
+  runs no fetch, so the build session could not check the feed; the developer's
+  first `make scrape CONFIRM=yes` was the check. Result: the field names match
+  the declared shape (8 pages, 316 items, every page parsed, no widening
+  needed); the feed ended at page 8 with an empty page, which the fetcher
+  treats as the end.
+- **Phase 2 — Python 3.12's `urllib.robotparser` matches prefixes only.** The
+  same run read the host's `robots.txt`, which carries `Disallow: /*/rss/*`
+  under `User-agent: *`, and passed it: the stdlib parser on the pinned
+  interpreter ignores `*` and `$` (RFC 9309 wildcard support arrived in
+  3.14), so a rule written with a wildcard is invisible to it, and the spec's
+  own disallow test used a plain prefix, so the suite could not catch it.
+  Official-docs check: the 3.12 `urllib.robotparser` page describes no
+  pattern syntax. What we did: fix amendment A1 — our own matcher in
+  `ingest/robots.py`, checked for every page, pinned by the real rule against
+  the real path; the disallowed capture and its database were deleted; the
+  DONE command moved to the frozen-sample form; the terms position above
+  records the disallow.
 
 ## Appendix — by phase
 
@@ -304,3 +347,132 @@ deletion scope, and `main()`-level exit-2 on a refused value); one record/wordin
 commit (the zero-row phrasing clarified — `make rebuild` is 0/0 on a fresh
 warehouse, raw being append-only; the stale `ci.yml` repo-map one-liner; the spec
 title to APPROVED). The two-round cap did not apply (round 1).
+
+### Phase 2
+
+Branch `phase-2-scraper`, spec `specs/phase-2-scraper.md`. Depends on Phase 1
+(PR #3) merged. Built the first scraper end to end on the frozen sample: the
+App Store customer-reviews feed → byte-exact captures → the strict parser →
+Phase 1's raw shape and guard → staging → reviews per month. One source, no
+mart, no model.
+
+- **The one source is the App Store feed, declared in `ingest/sources.py`**
+  (name, app id, country — a data point, never a name in prose; the developer
+  fills the app id). `source` = `app-store`, `external_id` = the item's id,
+  `source_url` = the feed page URL, `captured_at` stamped once per run at
+  fetch (UTC, the synthetic fixture's format), `review_date` = the date part
+  of the item's own timestamp, no timezone arithmetic. Rejected: Opinion
+  Assurances (HTML, stricter terms — Phase 3a); Trustpilot (3b); a per-app
+  column in raw (the shape is Phase 1's; the app is recoverable from
+  `source_url`; segment attribution is Phase 3a's table).
+- **The strict parser and the scrape manners** — promoted to "Decisions still
+  in force" above (Data).
+- **Captures are archived per run, never overwritten:**
+  `data/cache/app-store/<source>/<captured_at>/page-<n>.json` beside
+  `page-<n>.meta.json` (`source_url`, `captured_at`, `status`) and the
+  `robots.txt` obeyed. A second capture of unchanged pages adds no raw row
+  (the content hash), which is what proves "re-scrape → nothing new" on real
+  rows. Rejected: one overwritten cache per source (loses the history the
+  proof needs).
+- **`rebuild` reads captures by default; `FIXTURE` names the rebuild input:
+  `{cache, empty, synthetic, app-store}`.** `cache` is the real run (a clone
+  runs `make rebuild` and gets data once it has scraped), `app-store` runs the
+  frozen sample through the real parser (CI does, offline). `run_id` is the
+  capture id in cache mode, the fixture name otherwise — no clock. Rejected: a
+  second variable; keeping `empty` as the default.
+- **Reviews per month is a query, not a mart** (`pipeline/metrics.py`, printed
+  by `rebuild`, pinned by a test). No SPEC.md panel shows it, so a
+  `sql/marts/` file would be an orphan under BACKING.md's rule; it surfaces in
+  Beat 5 through B5.2 `pipeline_row_counts` (BACKLOG row). **This narrows the
+  brief's Phase 2 "one trivial mart (reviews per month)" to the brief's own
+  Done-when wording, "one queryable metric".** On the developer's call at the
+  exit audit (2026-09-02) PROJECT_BRIEF.md §9 Phase 2 was reworded to match,
+  as Phase 1's was, together with its Done-when (the exit-audit entry
+  below). Rejected: a new BACKING
+  row (a new study claim needs a SPEC.md panel); flipping B5.2 early with a
+  partial mart.
+- **Review round 1 (2026-09-02) — four fix amendments, approved and built:**
+  A1 robots matched by `ingest/robots.py` (RFC 9309) for every page, with
+  Crawl-delay raising the per-host wait — the stdlib parser is gone; A2 one
+  database file per rebuild input (`warehouse.database_for`), so a fixture
+  never lands in the corpus and `reset` drops the closed set; A3 a page the
+  strict parser refuses is archived as `page-<n>.refused.json` (kept, never
+  loaded) and a malformed stored page is a one-line refusal from `rebuild`;
+  A4 capture meta parsed strictly (`captured_at` a real instant, `source_url`
+  https on an allowed host, `status` 200). Rejected: patching the stdlib
+  parser's output (a denylist of paths — the kind change is the fix);
+  truncating raw on rebuild (raw is append-only; separate files keep both
+  properties); dropping refused pages (the evidence is the point).
+- **Review round 2 (2026-09-02) — amendment A5, approved and built:** we
+  treat a reply as the site's rules file only when it looks like one — plain
+  text, or carrying a rule line; a decorated error page that answers "OK" is
+  a refusal, never permission (superseded in part by A6 below);
+  `AppStoreSource` carries `fetchable` and `terms`, so a recorded terms
+  position is declared in code and refused before any request rather than
+  inferred from a live fetch; we pick the block of rules written for our
+  crawler by looking for its name inside the whole User-Agent line, so a
+  version suffix no longer drops us into the catch-all block (superseded by
+  A6 below). Rejected: trusting any 200 (the round 1 failure class again);
+  keeping the position only in this file (a robots hiccup would silently
+  re-enable the fetch); exact token equality (a group written for us with a
+  version suffix fell through to `*`, permissively).
+- **Review round 3 (2026-09-02) — amendment A6, approved and built; the
+  review cap.** Rounds 2 and 3 had each found the previous round's robots
+  fix permissive at an edge, so the cap applied: stop patching, state the
+  invariant, rebuild the check once. The invariant: a feed page is asked for
+  only if the reply reads as the site's rules file on its own terms and the
+  path is allowed by both the rules written for us and the rules written for
+  everyone. In practice: the body alone decides whether there is a file to
+  obey (every line rule-shaped, a `User-agent:` line unless the file is only
+  sitemaps, no rule before the first group; the content-type is archived
+  beside it, never trusted); our block is the one naming our product token,
+  never the rest of the User-Agent line, and the everyone block always
+  applies beside it, so a wide match can only tighten; the longer of the two
+  waits wins; which rules bind us is never a caller's value. Round 4, the
+  one scoped re-review the cap allows, found four parser edges (a `Sitemap:`
+  between two `User-agent:` lines fusing groups, a colon-bearing error body
+  read as rules-free, a leading byte-order mark, a second wait in one
+  group); each landed as one fix with its pin and none changed the
+  invariant. Rejected: a third patch to the matcher (the cap); trusting the
+  content-type (the round 3 hole); requiring a closed set of directive keys
+  (`Host:` and `Clean-param:` are real and harmless; the shape is the
+  guard, the `User-agent:` requirement the authority).
+- **The sample is a new frozen fixture, `fixtures/app-store/`,** hand-written
+  in the feed's exact shape (placeholder author labels, bodies marked
+  fictional, app id 0): a real captured page would publish raw corpus and
+  reviewer names. Malformed variants are built in tests by mutation, never
+  committed. `Freeze: fixtures/app-store/` in the spec; MANIFEST in the diff.
+  Rejected: a sample under `ingest/` or `tests/` (outside the MANIFEST
+  discipline); a scrubbed real page.
+- **`make scrape` is CONFIRM-gated like `reset` and developer-run.** Prompt on
+  a tty, otherwise `CONFIRM=yes` from the command line only; SOURCE is a closed
+  set of declared names; the fetcher is imported only inside the command, so a
+  rebuild never loads `httpx`; the test suite blocks every socket (conftest).
+- **`httpx` added (pre-approved); `pyyaml` deferred** to `rules.yaml` (5b) —
+  nothing in Phase 2 needs YAML.
+- **Exit audit (2026-09-02) — amendment A7 and three record corrections,
+  approved and built.** A7: Done-when items 3 and 4 still said "real rows"
+  after A1 moved the DONE command to the frozen sample; they now say what the
+  phase proves (rows from a capture, the sample being one) and the real-rows
+  proof moves to Phase 3a. **This narrows the brief's Phase 2 Done-when,
+  "`make rebuild` produces real rows"; on the developer's call PROJECT_BRIEF.md
+  §9 Phase 2 was reworded to match** — the frozen-sample form, with real rows
+  landing in Phase 3 from the first source whose robots file allows its feed —
+  so Phase 3's "all sources land with provenance" no longer assumes Phase 2
+  landed one. The corrections: `pipeline/build.py` now runs every SQL file
+  through `warehouse.run_sql_file`, the seam this file, PLAN §4.1 and Phase
+  1's Delivered name (it had no caller since Phase 1); `MAX_CRAWL_DELAY_S =
+  60.0` (a host asking for a longer wait is a one-line refusal, not a day-long
+  sleep) is written into the spec's politeness decision — it had a pin and no
+  record; `docs/PLAN.md` §5 rows 1 and 2 are corrected in place (raw and
+  staging DDL only; the feed's host disallows the path, the metric is a query,
+  the DONE command is the sample form). Two BACKLOG rows opened for Phase 3a:
+  the capture path is hardwired to one platform, and the frozen `robots.txt`
+  is permissive and read by nothing. CLAUDE.md stands at 443 lines
+  against the ~400 cap after the status paragraph was cut back to the plain
+  layer — reported, as the cap asks. Rejected: leaving the brief and the phase
+  disagreeing (the Phase 1 precedent went the other way); dropping
+  `run_sql_file` from the four records instead of calling it (the seam is the
+  design; the bypass was the drift).
+
+**Gotchas:** the live feed is unverified at build — see Gotchas above.

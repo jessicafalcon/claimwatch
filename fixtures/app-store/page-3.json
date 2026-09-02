@@ -1,0 +1,24 @@
+{
+ "feed": {
+  "author": {
+   "name": {
+    "label": "iTunes Store"
+   },
+   "uri": {
+    "label": "http://www.apple.com/itunes/"
+   }
+  },
+  "updated": {
+   "label": "2026-09-01T01:00:00-07:00"
+  },
+  "rights": {
+   "label": "SAMPLE — hand-written fixture, not a captured page"
+  },
+  "title": {
+   "label": "iTunes Store: Customer Reviews"
+  },
+  "id": {
+   "label": "https://itunes.apple.com/fr/rss/customerreviews/id=0/sortBy=mostRecent/page=3/json"
+  }
+ }
+}

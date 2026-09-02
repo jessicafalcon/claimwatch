@@ -1,0 +1,176 @@
+{
+ "feed": {
+  "author": {
+   "name": {
+    "label": "iTunes Store"
+   },
+   "uri": {
+    "label": "http://www.apple.com/itunes/"
+   }
+  },
+  "updated": {
+   "label": "2026-09-01T01:00:00-07:00"
+  },
+  "rights": {
+   "label": "SAMPLE — hand-written fixture, not a captured page"
+  },
+  "title": {
+   "label": "iTunes Store: Customer Reviews"
+  },
+  "id": {
+   "label": "https://itunes.apple.com/fr/rss/customerreviews/id=0/sortBy=mostRecent/page=2/json"
+  },
+  "entry": [
+   {
+    "author": {
+     "uri": {
+      "label": "https://itunes.apple.com/fr/reviews/id0"
+     },
+     "name": {
+      "label": "reviewer-placeholder"
+     },
+     "label": ""
+    },
+    "updated": {
+     "label": "2026-01-28T22:10:00-07:00"
+    },
+    "im:rating": {
+     "label": "4"
+    },
+    "im:version": {
+     "label": "9.9.9"
+    },
+    "id": {
+     "label": "900000006"
+    },
+    "title": {
+     "label": "Exemple: correct"
+    },
+    "content": {
+     "label": "EXEMPLE FICTIF. Application claire, un remboursement en attente mais regle depuis.",
+     "attributes": {
+      "type": "text"
+     }
+    },
+    "link": {
+     "attributes": {
+      "rel": "related",
+      "href": "https://itunes.apple.com/fr/review?id=0&type=Purchase"
+     }
+    },
+    "im:voteSum": {
+     "label": "0"
+    },
+    "im:contentType": {
+     "attributes": {
+      "term": "Application",
+      "label": "Application"
+     }
+    },
+    "im:voteCount": {
+     "label": "0"
+    }
+   },
+   {
+    "author": {
+     "uri": {
+      "label": "https://itunes.apple.com/fr/reviews/id0"
+     },
+     "name": {
+      "label": "reviewer-placeholder"
+     },
+     "label": ""
+    },
+    "updated": {
+     "label": "2026-01-16T09:00:00-07:00"
+    },
+    "im:rating": {
+     "label": "2"
+    },
+    "im:version": {
+     "label": "9.9.9"
+    },
+    "id": {
+     "label": "900000007"
+    },
+    "title": {
+     "label": "Exemple: hausse de prix"
+    },
+    "content": {
+     "label": "EXEMPLE FICTIF. Cotisation en hausse et garanties en baisse, sans explication.",
+     "attributes": {
+      "type": "text"
+     }
+    },
+    "link": {
+     "attributes": {
+      "rel": "related",
+      "href": "https://itunes.apple.com/fr/review?id=0&type=Purchase"
+     }
+    },
+    "im:voteSum": {
+     "label": "0"
+    },
+    "im:contentType": {
+     "attributes": {
+      "term": "Application",
+      "label": "Application"
+     }
+    },
+    "im:voteCount": {
+     "label": "0"
+    }
+   },
+   {
+    "author": {
+     "uri": {
+      "label": "https://itunes.apple.com/fr/reviews/id0"
+     },
+     "name": {
+      "label": "reviewer-placeholder"
+     },
+     "label": ""
+    },
+    "updated": {
+     "label": "2026-01-05T14:20:00-07:00"
+    },
+    "im:rating": {
+     "label": "1"
+    },
+    "im:version": {
+     "label": "9.9.9"
+    },
+    "id": {
+     "label": "900000008"
+    },
+    "title": {
+     "label": "Exemple: dossier bloque"
+    },
+    "content": {
+     "label": "EXEMPLE FICTIF. Une facture d'urgences de 340 euros en attente depuis des mois.",
+     "attributes": {
+      "type": "text"
+     }
+    },
+    "link": {
+     "attributes": {
+      "rel": "related",
+      "href": "https://itunes.apple.com/fr/review?id=0&type=Purchase"
+     }
+    },
+    "im:voteSum": {
+     "label": "0"
+    },
+    "im:contentType": {
+     "attributes": {
+      "term": "Application",
+      "label": "Application"
+     }
+    },
+    "im:voteCount": {
+     "label": "0"
+    }
+   }
+  ]
+ }
+}
