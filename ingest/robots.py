@@ -76,8 +76,8 @@ def _select(groups: list[_Group], token: str) -> _Group | None:
             merged = _Group()
             for g in chosen:
                 merged.rules.extend(g.rules)
-                if g.crawl_delay is not None:
-                    merged.crawl_delay = g.crawl_delay
+                if g.crawl_delay is not None:  # several declared: the longest wait
+                    merged.crawl_delay = max(merged.crawl_delay or 0.0, g.crawl_delay)
             return merged
     return None
 

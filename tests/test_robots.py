@@ -68,6 +68,13 @@ def test_crawl_delay_is_read_from_our_group_only():
     assert Robots.permissive().crawl_delay is None
 
 
+def test_two_groups_naming_us_keep_the_longest_crawl_delay():
+    longest_first = "User-agent: *\nCrawl-delay: 30\n\nUser-agent: *\nCrawl-delay: 1\n"
+    longest_last = "User-agent: *\nCrawl-delay: 1\n\nUser-agent: *\nCrawl-delay: 30\n"
+    assert Robots.parse(longest_first).crawl_delay == 30.0
+    assert Robots.parse(longest_last).crawl_delay == 30.0
+
+
 def test_the_query_string_is_part_of_the_matched_path():
     rules = Robots.parse("User-agent: *\nDisallow: /*?q=\n")
     assert rules.allows("https://h/p?q=1") is False
