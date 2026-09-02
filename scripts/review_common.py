@@ -12,7 +12,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 # A target is DECLARED by a rule line `name:` at column 0 (not `.PHONY`).
-_TARGET_LINE = re.compile(r"^([a-z][a-z0-9-]*):(?!=)", re.M)  # `x := v` is not a target
+# `x:= v` and `x::= v` are assignments, not targets; `x::` (a double-colon rule) is one.
+_TARGET_LINE = re.compile(r"^([a-z][a-z0-9-]*):(?!:?=)", re.M)
 # A `make` target NAMED in backticks — the one regex check_docs and the gate share.
 MAKE_TICK = re.compile(r"`make ([a-z][a-z0-9-]*)[^`]*`")
 # Document classes (check_docs.py explains them); the gate's record files build on them.

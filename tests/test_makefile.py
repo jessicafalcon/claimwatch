@@ -91,5 +91,9 @@ def test_help_lists_every_declared_target():
 
 
 def test_make_targets_ignores_variable_assignments(tmp_path: Path):
-    (tmp_path / "Makefile").write_text("foo := 1\nbar:\n\tx\n.PHONY: bar\n")
-    assert make_targets(tmp_path) == {"bar"}
+    """Spaced and unspaced assignments (`foo := 1`, `foo:= 1`, `baz:=3`,
+    `qux::= 4`) are variables; only a rule line declares a target."""
+    (tmp_path / "Makefile").write_text(
+        "foo := 1\nfoo2:= 1\nbaz:=3\nqux::= 4\nbar:\n\tx\ndc::\n\ty\n.PHONY: bar\n"
+    )
+    assert make_targets(tmp_path) == {"bar", "dc"}
