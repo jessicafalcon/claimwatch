@@ -51,7 +51,7 @@ def test_missing_separator_is_a_header_error(tmp_path: Path):
     not a silently swallowed first row."""
     (tmp_path / "BACKING.md").write_text(
         HEADER.replace("|---|---|---|---|---|\n", "")
-        + "| B1 a | m | `sql/marts/m.sql` | https://x | Measured |\n"
+        + "| B1.1 a | m | `sql/marts/m.sql` | https://x | Measured |\n"
     )
     rows, errors = check_backing.parse_table((tmp_path / "BACKING.md").read_text())
     assert rows == [] and errors == [
@@ -61,7 +61,7 @@ def test_missing_separator_is_a_header_error(tmp_path: Path):
 
 def test_missized_row_is_a_header_error(tmp_path: Path, capsys):
     root = _root(
-        tmp_path, "| B1 a | m | `sql/marts/m.sql` | https://x | Measured | extra |\n"
+        tmp_path, "| B1.1 a | m | `sql/marts/m.sql` | https://x | Measured | extra |\n"
     )
     rows, errors = check_backing.parse_table((root / "BACKING.md").read_text())
     assert rows == [] and errors == ["line 7: row has 6 cells, want 5"]
@@ -72,7 +72,7 @@ def test_missized_row_is_a_header_error(tmp_path: Path, capsys):
 def test_tag_outside_the_four_fails(tmp_path: Path):
     root = _root(
         tmp_path,
-        "| B1 rating trend | m | `sql/marts/m.sql` | https://x | Verified |\n",
+        "| B1.1 rating trend | m | `sql/marts/m.sql` | https://x | Verified |\n",
         ("m.sql",),
     )
     assert check_backing.check_tags(_rows(root)) == [
@@ -85,21 +85,21 @@ def test_measured_without_source_fails(tmp_path: Path):
     `TBD` and `?` fail exactly like `—` and empty; Modeled needs none."""
     root = _root(
         tmp_path,
-        "| B1 a | m | `sql/marts/m.sql` | — | Measured |\n"
-        "| B2 b | m | `sql/marts/m.sql` |  | Documented |\n"
-        "| B3 c | m | `sql/marts/m.sql` | TBD | Measured |\n"
-        "| B4 d | m | `sql/marts/m.sql` | ? | Documented |\n"
-        "| B5 e | m | `sql/marts/m.sql` | see the brief | Measured |\n"
-        "| B6 f | m | `sql/marts/m.sql` | — | Modeled |\n"
+        "| B1.1 a | m | `sql/marts/m.sql` | — | Measured |\n"
+        "| B2.1 b | m | `sql/marts/m.sql` |  | Documented |\n"
+        "| B3.1 c | m | `sql/marts/m.sql` | TBD | Measured |\n"
+        "| B4.1 d | m | `sql/marts/m.sql` | ? | Documented |\n"
+        "| B5.1 e | m | `sql/marts/m.sql` | see the brief | Measured |\n"
+        "| B6.1 f | m | `sql/marts/m.sql` | — | Modeled |\n"
         # closed at both ends: a placeholder in backticks, a link to a non-URL,
         # a blank name, a valid part with trailing prose, an empty `;` part
-        "| B7 g | m | `sql/marts/m.sql` | `TBD` | Measured |\n"
-        "| B8 h | m | `sql/marts/m.sql` | [src](javascript:alert(1)) | Documented |\n"
-        "| B9 i | m | `sql/marts/m.sql` | [a](../../etc/passwd) | Measured |\n"
-        "| B10 j | m | `sql/marts/m.sql` | ` ` | Documented |\n"
-        "| B11 k | m | `sql/marts/m.sql` | https://a.example see notes | Measured |\n"
-        "| B12 l | m | `sql/marts/m.sql` | `ds-1` and prose | Documented |\n"
-        "| B13 m | m | `sql/marts/m.sql` | https://a.example; | Measured |\n",
+        "| B7.1 g | m | `sql/marts/m.sql` | `TBD` | Measured |\n"
+        "| B8.1 h | m | `sql/marts/m.sql` | [src](javascript:alert(1)) | Documented |\n"
+        "| B9.1 i | m | `sql/marts/m.sql` | [a](../../etc/passwd) | Measured |\n"
+        "| B10.1 j | m | `sql/marts/m.sql` | ` ` | Documented |\n"
+        "| B11.1 k | m | `sql/marts/m.sql` | https://a.example see notes | Measured |\n"
+        "| B12.1 l | m | `sql/marts/m.sql` | `ds-1` and prose | Documented |\n"
+        "| B13.1 m | m | `sql/marts/m.sql` | https://a.example; | Measured |\n",
         ("m.sql",),
     )
     msg = "row has no source of the declared shape (URL, markdown link, or `dataset`)"
@@ -122,14 +122,14 @@ def test_measured_without_source_fails(tmp_path: Path):
 def test_source_shapes_accepted(tmp_path: Path):
     root = _root(
         tmp_path,
-        "| B1 a | m | `sql/marts/m.sql` | https://example.org/p?x=1 | Measured |\n"
-        "| B2 b | m | `sql/marts/m.sql` | [profile](https://example.org/p) "
+        "| B1.1 a | m | `sql/marts/m.sql` | https://example.org/p?x=1 | Measured |\n"
+        "| B2.1 b | m | `sql/marts/m.sql` | [profile](https://example.org/p) "
         "| Documented |\n"
-        "| B3 c | m | `sql/marts/m.sql` | `open-damir-2026-01` | Measured |\n"
-        "| B4 d | m | `sql/marts/m.sql` | https://a.example; https://b.example "
+        "| B3.1 c | m | `sql/marts/m.sql` | `open-damir-2026-01` | Measured |\n"
+        "| B4.1 d | m | `sql/marts/m.sql` | https://a.example; https://b.example "
         "| Measured |\n"
-        "| B5 e | m | `sql/marts/m.sql` | `fixtures/anchors/seed.csv` | Documented |\n"
-        "| B6 f | m | `sql/marts/m.sql` | https://x.example/a_(b) | Measured |\n",
+        "| B5.1 e | m | `sql/marts/m.sql` | `fixtures/anchors/x.csv` | Documented |\n"
+        "| B6.1 f | m | `sql/marts/m.sql` | https://x.example/a_(b) | Measured |\n",
         ("m.sql",),
     )
     assert check_backing.check_sources(_rows(root)) == []
@@ -138,9 +138,9 @@ def test_source_shapes_accepted(tmp_path: Path):
 def test_missing_sql_file_fails(tmp_path: Path):
     root = _root(
         tmp_path,
-        "| B1 a | m | `sql/marts/missing.sql` | https://x | Measured |\n"
-        "| B2 b | m | `scripts/x.sql` | https://x | Measured |\n"
-        "| B3 c | m | — | https://x | Modeled |\n",
+        "| B1.1 a | m | `sql/marts/missing.sql` | https://x | Measured |\n"
+        "| B2.1 b | m | `scripts/x.sql` | https://x | Measured |\n"
+        "| B3.1 c | m | — | https://x | Modeled |\n",
     )
     (root / "scripts").mkdir()
     (root / "scripts" / "x.sql").write_text("select 1\n")
@@ -156,8 +156,8 @@ def test_sql_path_traversal_is_refused(tmp_path: Path):
     refused for every tag, Pending included (the path is checked, not the file)."""
     root = _root(
         tmp_path,
-        "| B1 a | m | `sql/../pyproject.toml` | https://x | Measured |\n"
-        "| B2 b | m | `sql/../later.sql` | — | Pending |\n",
+        "| B1.1 a | m | `sql/../pyproject.toml` | https://x | Measured |\n"
+        "| B2.1 b | m | `sql/../later.sql` | — | Pending |\n",
     )
     (root / "pyproject.toml").write_text("[project]\n")
     assert check_backing.check_sql_files(_rows(root), root) == [
@@ -169,7 +169,7 @@ def test_sql_path_traversal_is_refused(tmp_path: Path):
 def test_pending_row_is_ok_without_source(tmp_path: Path):
     root = _root(
         tmp_path,
-        "| B2 theme share | theme_share | `sql/marts/theme_share.sql` "
+        "| B2.1 theme share | theme_share | `sql/marts/theme_share.sql` "
         "| — | Pending |\n",
     )
     rows = _rows(root)
@@ -184,11 +184,29 @@ def test_pending_row_is_ok_without_source(tmp_path: Path):
 def test_orphan_mart_sql_fails(tmp_path: Path):
     root = _root(
         tmp_path,
-        "| B1 a | m | `sql/marts/m.sql` | https://x | Measured |\n",
+        "| B1.1 a | m | `sql/marts/m.sql` | https://x | Measured |\n",
         ("m.sql", "orphan.sql"),
     )
     assert check_backing.check_orphans(_rows(root), root) == [
         "sql/marts/orphan.sql: no BACKING row names it"
+    ]
+    assert check_backing.main(root) == 1
+
+
+def test_claim_without_row_id_fails(tmp_path: Path):
+    """The id SPEC.md cites is checked, not assumed: `B2.3 ` opens the cell."""
+    root = _root(
+        tmp_path,
+        "| B2.3 theme share | m | `sql/marts/m.sql` | https://x | Measured |\n"
+        "| theme share | m | `sql/marts/m.sql` | https://x | Measured |\n"
+        "| B2 theme share | m | `sql/marts/m.sql` | https://x | Measured |\n"
+        "| B2.3theme | m | `sql/marts/m.sql` | https://x | Measured |\n",
+        ("m.sql",),
+    )
+    assert check_backing.check_row_ids(_rows(root)) == [
+        "line 8: claim does not start with a row id `B<beat>.<n> `: 'theme share'",
+        "line 9: claim does not start with a row id `B<beat>.<n> `: 'B2 theme share'",
+        "line 10: claim does not start with a row id `B<beat>.<n> `: 'B2.3theme'",
     ]
     assert check_backing.main(root) == 1
 

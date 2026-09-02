@@ -22,6 +22,8 @@ Rules checked, one line per check:
      that lands its mart).
   5. Orphans — every `sql/marts/*.sql` is named by at least one row (work that
      maps to no claim is out of scope, §8).
+  6. Row ids — every claim cell starts with `B<beat>.<n> ` (`B2.3 …`), the id
+     SPEC.md panels cite.
 
 An empty table with no marts is OK — Phase 0a. Exit 1 on any FAIL.
 """
@@ -41,6 +43,7 @@ TAGS = frozenset({"Measured", "Documented", "Modeled", "Pending"})
 NEEDS_SOURCE = frozenset({"Measured", "Documented"})
 NO_FILE = frozenset({"", "—"})  # the one declared spelling of "no SQL file yet"
 _SEP = re.compile(r":?-+:?")  # one separator cell: ---, :---, ---:, :---:
+_ROW_ID = re.compile(r"^B\d+\.\d+ ")  # `B<beat>.<n> ` opens every claim cell
 # One source part, whole-cell anchored: a URL, a markdown link TO a URL, or a
 # backticked dataset name (two or more lowercase segments — `tbd` is not one).
 _URL = r"https?://\S+"
@@ -98,6 +101,15 @@ def check_tags(rows: list[Row]) -> list[str]:
         f"line {r.line}: tag {r.tag!r} not in {sorted(TAGS)}"
         for r in rows
         if r.tag not in TAGS
+    ]
+
+
+def check_row_ids(rows: list[Row]) -> list[str]:
+    return [
+        f"line {r.line}: claim does not start with a row id `B<beat>.<n> `: "
+        f"{r.claim[:30]!r}"
+        for r in rows
+        if not _ROW_ID.match(r.claim)
     ]
 
 
@@ -160,6 +172,7 @@ def main(root: Path = ROOT) -> int:
         ("sources", check_sources(rows)),
         ("SQL files", check_sql_files(rows, root)),
         ("orphans", check_orphans(rows, root)),
+        ("row ids", check_row_ids(rows)),
     ]
     failed = 0
     for name, errors in checks:
