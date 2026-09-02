@@ -46,6 +46,19 @@ def test_missing_header_fails(tmp_path: Path):
     assert check_backing.main(tmp_path) == 1
 
 
+def test_missing_separator_is_a_header_error(tmp_path: Path):
+    """A header followed directly by a data row (no `|---|` line) is an error,
+    not a silently swallowed first row."""
+    (tmp_path / "BACKING.md").write_text(
+        HEADER.replace("|---|---|---|---|---|\n", "")
+        + "| B1 a | m | `sql/marts/m.sql` | https://x | Measured |\n"
+    )
+    rows, errors = check_backing.parse_table((tmp_path / "BACKING.md").read_text())
+    assert rows == [] and errors == [
+        "line 6: header is not followed by a separator row"
+    ]
+
+
 def test_missized_row_is_a_header_error(tmp_path: Path, capsys):
     root = _root(
         tmp_path, "| B1 a | m | `sql/marts/m.sql` | https://x | Measured | extra |\n"

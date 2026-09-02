@@ -22,6 +22,7 @@ An empty table with no marts is OK — Phase 0a. Exit 1 on any FAIL.
 
 from __future__ import annotations
 
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -33,6 +34,7 @@ COLUMNS = ("Study claim", "Mart table", "SQL file", "Upstream source", "Tag")
 TAGS = frozenset({"Measured", "Documented", "Modeled", "Pending"})
 NEEDS_SOURCE = frozenset({"Measured", "Documented"})
 EMPTY = {"", "—", "-", "n/a"}
+_SEP = re.compile(r":?-+:?")  # one separator cell: ---, :---, ---:, :---:
 
 
 @dataclass(frozen=True)
@@ -56,8 +58,14 @@ def parse_table(text: str) -> tuple[list[Row], list[str]]:
         if len(cells) == len(COLUMNS) and all(
             c.startswith(col) for c, col in zip(cells, COLUMNS, strict=True)
         ):
+            sep = lines[i + 1] if i + 1 < len(lines) else ""
+            sep_cells = [c.strip() for c in sep.strip().strip("|").split("|")]
+            if len(sep_cells) != len(COLUMNS) or not all(
+                _SEP.fullmatch(c) for c in sep_cells
+            ):
+                return [], [f"line {i + 2}: header is not followed by a separator row"]
             rows: list[Row] = []
-            for j in range(i + 2, len(lines)):  # skip the separator row
+            for j in range(i + 2, len(lines)):
                 raw = lines[j]
                 if not raw.startswith("|"):
                     break
