@@ -253,8 +253,9 @@ Rules:
 
 ## 9. Build phases (one phase = one Claude Code session = one reviewable diff)
 
-*Build note (2026-09-01): Phases 0 and 5 are each split in two — 0a machinery /
-0b contracts, 5a label sample / 5b rules — see `docs/PLAN.md` §5. Each phase's
+*Build note (2026-09-01): Phases 0, 3 and 5 are each split in two — 0a
+machinery / 0b contracts, 3a snapshots and polite sources / 3b Trustpilot, 5a
+label sample / 5b rules — see `docs/PLAN.md` §5. Each phase's
 contract is its spec in `specs/`; the numbering below is otherwise unchanged.*
 
 Feed each session: this file + SPEC.md + BACKING.md + CLAUDE.md + the current phase goal. Not the whole history. End every phase by writing its "done when" as an actual test or make target.

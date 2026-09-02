@@ -28,10 +28,16 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from review_common import ROOT, make_targets  # noqa: E402
+from review_common import (  # noqa: E402
+    LIVING_DOCS,
+    MAKE_TICK,
+    RECORD_DOCS,
+    ROOT,
+    make_targets,
+)
 
-LIVING = ("CLAUDE.md", "README.md", "SPEC.md", "BACKING.md")
-RECORDS = ("DECISIONS.md", "BACKLOG.md")
+LIVING = LIVING_DOCS
+RECORDS = RECORD_DOCS
 PLAN_GLOBS = ("PROJECT_BRIEF.md", "docs/*.md", "specs/*.md")
 STUDY_GLOB = "study/**/*.md"
 
@@ -51,7 +57,7 @@ BANNED = (
 GLOSSARY_MAX = 10
 
 _LINK = re.compile(r"\[[^\]]*\]\((?!https?://)(?!mailto:)([^)\s]+)\)")
-_MAKE_TICK = re.compile(r"`make ([a-z][a-z0-9-]*)[^`]*`")
+_MAKE_TICK = MAKE_TICK
 _MAKE_FENCE_LINE = re.compile(r"^\s*make ([a-z][a-z0-9-]*)", re.M)
 _FENCE = re.compile(r"```.*?```", re.S)
 _HEADING = re.compile(r"^#{1,6}\s+(.*?)\s*$", re.M)

@@ -4,6 +4,7 @@ is green today. Offline, no services."""
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -123,3 +124,12 @@ def test_backlog_count_matches_today():
 def test_check_docs_is_green_today(capsys):
     assert check_docs.main(ROOT) == 0
     assert capsys.readouterr().out.rstrip().endswith("check-docs OK")
+
+
+def test_banned_list_matches_the_claude_md_fence():
+    """CLAUDE.md states the list inside a fence; the code's tuple must be the
+    same set, or the two drift apart silently."""
+    text = (ROOT / "CLAUDE.md").read_text()
+    fence = re.search(r"```\n(.*?)```", text[text.index("Banned words") :], re.S)
+    assert fence is not None
+    assert set(fence.group(1).split()) == set(check_docs.BANNED)

@@ -5,11 +5,15 @@
 A public-data study of why health-insurance refunds get stuck, where every
 chart drills down to its raw evidence, every formula is printed next to its
 output, and every assumption is either sourced or clearly labeled as a guess.
-Public reviews of French digital-first health insurers are scraped, cleaned,
-and tagged by theme (rules first, a language model only for what rules could
-not decide, gated by hand labels); a deterministic cost model and a guardrail
-simulator turn the counts into euros; a study (Metabase + a static HTML export
-+ the README) tells it in five beats.
+We read what customers of French digital-first health insurers say in public
+reviews, count what they complain about, and work out what a wrongly blocked
+refund costs. The study tells it in five parts.
+
+How this is built: reviews are scraped, cleaned and tagged by theme (rules
+first; a language model only for what rules could not decide, checked against
+hand labels); a cost model and a guardrail simulator, both plain arithmetic,
+turn the counts into euros; the study is a Metabase dashboard, a static HTML
+page and the README.
 
 Read in this order: `PROJECT_BRIEF.md` (what we build and why — the master
 document), `SPEC.md` (the frozen study structure — Phase 0b), `BACKING.md`
@@ -59,6 +63,9 @@ was designed; `DECISIONS.md` is the why-not-X log.
   are local-only and gitignored.
 - `.github/workflows/ci.yml` — lint, check-docs, check-backing, test.
   `weekly.yml` *(Phase 4)* — the scheduled scrape + snapshot commit.
+  `.github/pull_request_template.md` — the PR body.
+- `pyproject.toml`, `uv.lock`, `.python-version`, `.pre-commit-config.yaml` —
+  the toolchain (uv, ruff, pytest, pre-commit), versions pinned in lockstep.
 - *(Phase 1)* `sql/staging/`, `sql/marts/` — plain SQL, one file per table;
   `pipeline/warehouse.py` — the one place that knows DuckDB from Snowflake;
   `fixtures/synthetic/` — hand-written fake reviews, read-only after Phase 1;
@@ -88,44 +95,60 @@ was designed; `DECISIONS.md` is the why-not-X log.
 
 ## Deterministic first (the number one rule — brief §2.1)
 
+Run the pipeline twice on the same data and every number comes out the same,
+and a person can redo the arithmetic by hand. A language model is used in one
+narrow place and never trusted on its own. The rules:
+
 - Rules, SQL and arithmetic decide everything that can be decided that way.
 - A language model is called from exactly one module: `classify/llm.py`. It
   sees only what `rules.yaml` could not decide. Nowhere else, for nothing else.
 - The model's output is never trusted by default: it passes the eval gate
-  (per-theme precision/recall on held-out hand labels, written to the
-  `classifier_quality` mart and displayed in the study) before any chart uses
-  it.
+  (scored on the eval set — reviews labeled by hand and kept aside — for how
+  often each theme label is right and how many true cases it catches; the
+  scores land in the `classifier_quality` mart and are displayed in the study)
+  before any chart uses it.
 - **The no-key run is green.** Delete the API key: the pipeline still runs
-  end to end, ambiguous reviews are `unclassified`, the study shows a gray
-  band. A test proves it every phase from 6 on.
+  end to end, ambiguous reviews are `unclassified`, and the study shows them
+  as a gray "not yet classified" band rather than hiding them. A test proves
+  it every phase from 6 on.
 - No clock on the data path: `now()` / `current_date` in `sql/` is a bug; time
   is `captured_at` or the review's own date.
 - Idempotent everywhere: raw is append-only keyed on natural key + content
   hash; staging dedupes; run twice, row counts unchanged.
 - Formulas are data: `models/cost_model.py::FORMULAS` is the only place a
   formula is written; the study renders from it; a test pins the outputs.
-- No fitted models, no black boxes. The cost model and the simulator are pure
-  arithmetic with every parameter on a slider.
+- No fitted predictive models, no black boxes. The cost model and the
+  simulator are pure arithmetic with every parameter on a slider; the
+  simulator's claim-cost distributions are fitted to public reimbursement data
+  with the fit displayed (brief §7), which anyone can redo.
 
 ## The five contracts
+
+Five promises the code keeps, each checked by a test or a guard: every number
+says where it came from; every claim has an evidence row; the classifier can
+only answer from a fixed list; the same SQL runs on both databases; no insurer
+is the target.
 
 - **Provenance.** Every raw row carries `source`, `source_url`, `captured_at`,
   `run_id`. Every displayed number carries exactly one tag: Measured,
   Documented, Modeled, Pending. A Pending panel shows no number — never fake
   one.
 - **Evidence.** `BACKING.md` is the scope. Work that maps to no row is out of
-  scope; a claim that cannot be backed is rewritten or tagged Pending.
+  scope; a claim that cannot be backed is rewritten or tagged Pending. Each
+  row has an id (`B<beat>.<n>`) that `SPEC.md` panels cite.
 - **Classification.** Exactly seven labels: the five themes of brief §5,
   `positive`, `unclassified`. A model reply outside the set becomes
   `unclassified`, never an eighth label. Decisions are cached by
   `(review_id, prompt_version, model)`; a re-run calls the model only for
   uncached rows. `classify/eval/labels.csv` is read only by `classify/eval/`;
   the held-out split is `sha256(review_id) % 5`, never random.
-- **Portability.** ANSI SQL both engines run; `pipeline/warehouse.py` is the
-  one seam; regex lives in `rules.yaml` and Python, never in SQL.
-- **Neutrality.** A sector phenomenon, never an exposé. The studied company is
-  never named as the target in prose, code, comments or commits — insurers
-  appear as sourced data points. Paraphrase, link, no personal data.
+- **Portability.** The same SQL runs on the laptop database (DuckDB) and the
+  cloud one (Snowflake); exactly one file knows which is which
+  (`pipeline/warehouse.py`); pattern-matching lives in `rules.yaml` and
+  Python, never in SQL, which is what keeps the SQL portable.
+- **Neutrality.** A sector phenomenon, never an exposé. No insurer is named as
+  the target of the study, in prose, code, comments or commits — insurers
+  appear only as sourced data points. Paraphrase, link, no personal data.
 
 ## Writing rules (brief §2.3)
 
@@ -134,7 +157,11 @@ was designed; `DECISIONS.md` is the why-not-X log.
   Rigor is never removed to simplify — it moves one layer down.
 - Name things by what they mean, not what they are.
 - One glossary, ten terms max, one sentence each with an everyday example.
-- Every number in prose wears its tag. No live counters.
+- Every number in prose wears its tag. No live counters: a "Day N since…"
+  figure is frozen at the last publicly confirmed date and says so.
+- `SPEC.md` is a living document: it names BACKING rows (`B<beat>.<n>`), never
+  a `make` target that does not exist yet; the not-yet-built paths live in
+  BACKING's Pending rows.
 - Banned words, checked by `make check-docs` over CLAUDE.md, README, SPEC,
   BACKING and `study/` (this fenced block is the one place they may appear):
 
@@ -301,9 +328,14 @@ checkout under `mktemp -d`, hand-mutate THERE, and remove it). Findings are
 fixed in the main session or explicitly accepted — never auto-fixed.
 
 - `run-tests` hook — `.claude/hooks/run-tests.py` (tracked); after any `.py`,
-  `.sql` or `.yaml` edit in this repo, runs pytest and blocks on red; "no tests
-  collected" is a skip. Wiring is local-only by design: copy into the
-  gitignored `.claude/settings.local.json`:
+  `.sql`, `.yaml` or `.yml` edit in this repo, runs pytest and blocks on red;
+  "no tests collected" is a skip. It runs the checked-out branch's tests on
+  your machine with your HOME; the reduced environment keeps environment
+  credentials out of the suite and nothing else. Before letting Claude edit on
+  an inbound branch, read its diff of `.claude/hooks/`, `tests/conftest.py`,
+  `pyproject.toml` and `Makefile` — the hook fires before any review round.
+  Wiring is local-only by design: copy into the gitignored
+  `.claude/settings.local.json`:
   `{"hooks": {"PostToolUse": [{"matcher": "Write|Edit|MultiEdit|NotebookEdit",
   "hooks": [{"type": "command", "command": "python3
   \"$CLAUDE_PROJECT_DIR/.claude/hooks/run-tests.py\""}]}]}}`.
@@ -312,7 +344,8 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 - `code-reviewer` — diff review against this file (deterministic first,
   provenance, tags, formulas, portability, allowlist, scope).
 - `security-reviewer` — mandatory when CI, `.env`, a scraper, the model call,
-  Snowflake, the weekly commit, or a destructive target is touched.
+  Snowflake, the weekly commit, `.claude/hooks/`, `.claude/settings*.json`, or
+  a destructive target is touched.
 - `functionality-tester` — the suite, the spec's DONE command, Evidence rows,
   idempotency, the no-key run, hand-mutation. After code-reviewer.
 - `coherence-auditor` — whole-repo drift audit (SPEC ↔ BACKING ↔ marts ↔
@@ -330,11 +363,12 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 ## Current status
 
 **Phase 0a — Workflow machinery** (`phase-0a-machinery`, spec
-`specs/phase-0a-machinery.md`): in progress. The gate, the three guards, five
-agents, three commands, the hook, CI, the spec template and the four record
-files. No pipeline code, no data, no study text. Next: Phase 0b — `SPEC.md`
-(five beats, exact chart list), the full `BACKING.md` table, the glossary.
+`specs/phase-0a-machinery.md`): built; review round 1 dispositions landed;
+PR pending. The gate, the three guards, five agents, three commands, the hook,
+CI, the spec template and the four record files. No pipeline code, no data, no
+study text. Next: Phase 0b — `SPEC.md` (five beats, exact chart list, each
+panel citing its BACKING row id), the full `BACKING.md` table, the glossary.
 
-Open BACKLOG rows: **3**.
+Open BACKLOG rows: **7**.
 
 (Update this section at the end of every working day.)

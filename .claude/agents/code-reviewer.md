@@ -58,7 +58,7 @@ When invoked:
 - **Scope guard.** Anything that feeds no BACKING row; a second model call;
   embeddings or a vector store; a proxy or evasion library; a live counter;
   pandas on a pipeline path.
-- **Neutrality in code.** The studied company named as the target in a
+- **Neutrality in code.** An insurer named as the target of the study in a
   comment, identifier, docstring or commit message (data rows and source URLs
   are data — fine). Hand prose to `study-editor`.
 - **Dependency allowlist** (CLAUDE.md → Conventions): `duckdb`, `pyyaml`,

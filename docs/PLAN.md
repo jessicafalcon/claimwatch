@@ -1,12 +1,12 @@
 # The Friction Ledger — design and plan (Phase 0 proposal)
 
-**Status: PROPOSED — nothing here is built.** Written 2026-09-01 after reading
+**Status: APPROVED 2026-09-01; Phase 0a was built on it** (`specs/phase-0a-machinery.md`; the round-1 corrections below are marked). Written 2026-09-01 after reading
 `PROJECT_BRIEF.md` and the reference repo `ontime-rate-recovery-pipeline`
 (read-only, used as the workflow exemplar). Approve, amend or strike sections;
 Phase 0 starts from the approved version. This document is the plan for how we
 build; `PROJECT_BRIEF.md` stays the plan for what we build.
 
-Plain layer: the reference project proved a way of working where every phase is
+The reference project proved a way of working where every phase is
 one branch, judged by a command rather than by opinion, with a small set of
 review agents that only report. We keep that skeleton, cut everything that
 existed for a cloud stack we do not have, and add three guards this project
@@ -36,14 +36,14 @@ maintenance cost") is the filter below.
 
 | Reference piece | Verdict | For this project | Lands in |
 |---|---|---|---|
-| `CLAUDE.md` skeleton (What / Architecture / Repo map / Commands / Determinism / Contracts / Style / Workflow / Before DONE / Git / Which agents run / Tooling / Status) | **Adapt** | Keep the headings, cap at ~250 lines. Rule: `CLAUDE.md` holds rules and an index; command semantics live in `make help` and the README. Brief §2 supplies the content (Deterministic first, Plain English, Provenance, Neutrality). | Phase 0a |
+| `CLAUDE.md` skeleton (What / Architecture / Repo map / Commands / Determinism / Contracts / Style / Workflow / Before DONE / Git / Which agents run / Tooling / Status) | **Adapt** | Keep the headings, cap at ~350 lines (0a landed at ~340; the coherence audit reports growth). Rule: `CLAUDE.md` holds rules and an index; command semantics live in `make help` and the README. Brief §2 supplies the content (Deterministic first, Plain English, Provenance, Neutrality). | Phase 0a |
 | `specs/TEMPLATE.md` — Invariants, Evidence, Record updates, Threat model; ONE DONE command; ≤6 done-when items | **Adapt** | Keep all four sections. Threat model narrowed to targets that take a variable, delete, call a paid API, or touch the network (scrapers, LLM, Snowflake). | Phase 0a |
 | `docs/PHASES.md` (separate live plan) | **Drop as a file** | Brief §9 is the phase list; each phase gets a spec in `specs/`; the "Delivered" paragraph is appended to the spec, never to the brief. One numbering, one place. | — |
 | `docs/ARCHITECTURE.md` | **Drop** | Brief §4 + `SPEC.md` + `BACKING.md` are the architecture. A fourth document breaks §2.2. Stack surprises go to a `## Gotchas` section in `DECISIONS.md`. | — |
 | `DECISIONS.md` — why-not-X log, "still in force" set, superseded-in-place | **Adopt** | The brief's "say in the README why not dbt" is literally this file. README links entries. Cap "still in force" at 15. | Phase 0a |
 | `BACKLOG.md` — deferred findings with a revisit trigger, reviewed at phase exit | **Adopt** | Verbatim shape. | Phase 0a |
 | `scripts/check_docs.py` — links, named make targets, symbol traces, BACKLOG count | **Adapt** | Add two checks from brief §2.3: **banned words** over README / SPEC / study text / CLAUDE (union of the brief's list and the reference's), and **glossary ≤ 10 terms**. | Phase 0a |
-| *(none)* | **New: `scripts/check_backing.py`** | The scoping guard brief §8 asks for: every `sql/marts/*.sql` maps to ≥1 BACKING row; every row's SQL file exists; every row's tag ∈ {Measured, Documented, Modeled, Pending}; every Measured/Documented row names a source URL; a Pending row has no number in SPEC. `make check-backing`. | Phase 0a |
+| *(none)* | **New: `scripts/check_backing.py`** | The scoping guard brief §8 asks for: every `sql/marts/*.sql` maps to ≥1 BACKING row; every row's SQL file exists; every row's tag ∈ {Measured, Documented, Modeled, Pending}; every Measured/Documented row names a source of a declared shape; a Pending row has no number in SPEC (enforced at render time, Phase 9 — BACKLOG). `make check-backing`. | Phase 0a |
 | `scripts/review_gate.py` — test + ruff + check-docs + Evidence ids + Record-updates diff + deleted symbols + fixture freeze | **Adapt, lighter** | test + ruff + check-docs + check-backing + Evidence ids + Record-updates. Keep the 20-line fixture check (`fixtures/` changes need a `Freeze:` line in the spec). Drop `DELETED`. | Phase 0a |
 | `scripts/mutate.py` — mutation sweep, 4 Python + 2 SQL operators | **Defer (BACKLOG)** | 20 KB whose value showed at the reference's multi-branch SQL and write-back. Our load-bearing logic (rules classifier, cost formulas) is pinned by goldens plus the Phase 8 "code formulas equal displayed numbers" test. Trigger: a bug in `classify/` or `models/` that a green suite missed. | BACKLOG row |
 | `scripts/round_tag.py` + `/review-round N` with local tags | **Adapt, no tags** | `/review-round N`: gate → agents by diff surface → one consolidated table → STOP. Range is always `main...HEAD`; N is a label; "missed in round N−1" labelling works by pasting the previous table into the agent prompt. Solo repo, PR-sized ranges: the tag machinery buys nothing. | Phase 0a |
@@ -93,7 +93,7 @@ maintenance cost") is the filter below.
     └── run-tests.py             adopted — matcher widened to .py|.sql|.yaml
 
 scripts/
-├── check_docs.py       links, make targets, traces, BACKLOG count, banned words, glossary size
+├── check_docs.py       links, make targets, BACKLOG count, banned words, glossary size (no symbol traces — DECISIONS)
 ├── check_backing.py    NEW — the evidence contract (BACKING.md ↔ sql/marts ↔ tags ↔ sources)
 ├── review_gate.py      lighter: test, ruff, check-docs, check-backing, Evidence ids, Record updates, fixture freeze
 └── review_common.py    spec-path validator, section parser, subprocess runner (stdlib only)
@@ -127,11 +127,11 @@ Wiring for the hook (local only, `.claude/settings.local.json`, gitignored):
   connection module; regex in SQL.
 - **Scope guard.** Anything that does not feed a BACKING row; a second model
   call; embeddings; a proxy library; a live counter.
-- **Neutrality in code.** The studied company named as the target in a
+- **Neutrality in code.** An insurer named as the target of the study in a
   comment, identifier, commit message or docstring (data rows and source URLs
   are fine). Hand this to `study-editor` for prose.
-- **Dependency allowlist** (proposed, ask before any other): `duckdb`,
-  `pyyaml`, `httpx` (Phase 2); `anthropic` (Phase 6); `snowflake-connector-
+- **Dependency allowlist** (proposed, ask before any other): `duckdb`
+  (Phase 1); `pyyaml`, `httpx` (Phase 2); `anthropic` (Phase 6); `snowflake-connector-
   python` (Phase 10); dev: `pytest`, `ruff`, `pre-commit`. Airflow and Metabase
   via Docker only. No pandas on a pipeline path.
 
@@ -227,7 +227,7 @@ the gate, 0b writes the contracts the gate then verifies.
 
 | Phase | Goal | DONE command (proposed) | Agents by surface |
 |---|---|---|---|
-| **0a — Machinery** | uv + Python 3.12, ruff, pytest, `Makefile` (`setup test lint check-docs check-backing review-gate help`), `scripts/`, CI, hook, the five agents, three commands, `specs/TEMPLATE.md`, `DECISIONS.md` + `BACKLOG.md` opened, `CLAUDE.md` v0 (§2 distilled), `BACKING.md` header + empty table, `.gitignore` merged. Tests pin the guards on throwaway trees. | `make review-gate SPEC=specs/phase-0a-machinery.md` | code-reviewer, functionality-tester, security-reviewer (CI touched) |
+| **0a — Machinery** | uv + Python 3.12, ruff, pytest, `Makefile` (`setup test lint check-docs check-backing review-gate help`), `scripts/`, CI, hook, the five agents, three commands, `specs/TEMPLATE.md`, `DECISIONS.md` + `BACKLOG.md` opened, `CLAUDE.md` v0 (§2 distilled), `BACKING.md` header + empty table, `.gitignore` merged. Tests pin the guards on throwaway trees. | `make review-gate SPEC=specs/phase-0a-machinery.md` | code-reviewer, functionality-tester, security-reviewer (CI, hook), study-editor (CLAUDE.md prose), coherence-auditor (phase exit) |
 | **0b — Contracts** | `SPEC.md` (five beats, exact chart list, each with tag + BACKING row id), `BACKING.md` full table, `CLAUDE.md` final, glossary (≤ 10). | `make check-docs && make check-backing` green; coherence-auditor pass | coherence-auditor, study-editor |
 | **1 — Schema and empty warehouse** | DDL raw/staging/marts with provenance columns; `pipeline/warehouse.py`; `make rebuild TARGET=duckdb` runs with zero rows AND with `FIXTURE=synthetic`; `fixtures/` frozen with MANIFEST; `tests/pins.py`; SQL portability test. | `make rebuild FIXTURE=synthetic && make idempotency-check` | code-reviewer, functionality-tester |
 | **2 — One scraper end to end** | App Store review feed (public JSON, ToS-friendly — recommended over Opinion Assurances) → raw → staging → `reviews_per_month` mart. Strict parse of the feed shape. Politeness settings in one place. | `make rebuild` on real rows; `make idempotency-check` | + security-reviewer (network) |
@@ -295,7 +295,7 @@ model).
 
 ---
 
-## 7. Proposed `CLAUDE.md` outline (~250 lines, written in 0a, final in 0b)
+## 7. Proposed `CLAUDE.md` outline (~350 lines, written in 0a, final in 0b)
 
 1. **What this is** — the one-sentence description (dinner-table version) and
    the pointer: brief = what, `SPEC.md` = study structure, `BACKING.md` =

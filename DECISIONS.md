@@ -52,12 +52,26 @@ place and never deleted.
   `check_backing.py`, `review_common.py`) carry their hardening from day one
   (spec-path validation, unexpanded `$(value)` + `_Q` quoting, one-line
   refusals) rather than earning it incident by incident.
-- **Phase 0 split into 0a (machinery) and 0b (contracts); Phase 5 into 5a
-  (label sample + wall) and 5b (rules).** The brief's rule "done-when is a
-  test or make target" needs the gate to exist before the contracts it checks;
-  hand-labeling is human hours, not a session. Numbering otherwise follows
-  PROJECT_BRIEF.md §9; each phase's contract is its spec in `specs/`, and the
-  "Delivered" paragraph is appended to the spec, never to the brief.
+- **Phase 0 split into 0a (machinery) and 0b (contracts); Phase 3 into 3a
+  (snapshots + polite sources) and 3b (Trustpilot, its own session per the
+  brief); Phase 5 into 5a (label sample + wall) and 5b (rules).** The brief's
+  rule "done-when is a test or make target" needs the gate to exist before the
+  contracts it checks; hand-labeling is human hours, not a session. Numbering
+  otherwise follows PROJECT_BRIEF.md §9; each phase's contract is its spec in
+  `specs/`, and the "Delivered" paragraph is appended to the spec, never to the
+  brief.
+- **`SPEC.md` names BACKING rows, never unbuilt `make` targets (round 1,
+  2026-09-01).** `check_docs.py` treats SPEC.md as a LIVING doc (every `make`
+  mention must exist), while BACKING.md's Pending rows may name paths not
+  built yet. Rather than a class change in the guard, the rule is editorial:
+  a SPEC.md panel cites its BACKING row id (`B<beat>.<n>`); BACKING carries
+  the future paths. Rejected: exempting SPEC.md's `make` mentions (a living
+  doc that names commands that do not exist is exactly what the check is for).
+- **No symbol-trace check.** The reference's `TRACES` table (doc → exact
+  source token) is not adopted: no doc cites a symbol by identity yet, deleted
+  symbols are grepped under "Before reporting DONE" item 1, and the coherence
+  audit reads the records against the code. Revisit when a doc names a guard
+  or function by identity.
 - **No mutation sweep, no round tags.** The reference's `mutate.py` and
   `round_tag.py` (~26 KB plus tests) earned their keep on multi-branch SQL and
   a write-back contract; nothing here has that shape yet. BACKLOG row with a
@@ -108,9 +122,30 @@ defaults from `docs/PLAN.md` §6, approved 2026-09-01:
 10. **Naming-the-target check** — agent-only for now (BACKLOG row).
 
 Also decided in this phase: Python 3.12 via `uv`, dev dependencies only
-(`pytest`, `ruff`, `pre-commit`); `duckdb` lands in Phase 1. `check_backing.py`
+(`pytest`, `ruff`, `pre-commit`); `duckdb` lands in Phase 1. The distribution
+name in `pyproject.toml` is `friction-ledger` (what PEP 503 normalizes to); the
+importable package, when one exists, is `friction_ledger`. CLAUDE.md landed at
+~340 lines against PLAN's ~250: the five contracts, the agents table and the
+tooling index each earn their lines, so the cap is restated as ~350 and the
+coherence audit reports growth. `check_backing.py`
 lets a **Pending** row name a SQL file not built yet — the brief writes BACKING
 before code, so every row starts Pending and flips when its mart lands;
 requiring the file for Pending rows would make Phase 0b un-passable. The
-hook's matcher is widened to `.sql` and `.yaml`: SQL files and `rules.yaml`
-are code in this repo.
+hook's matcher is widened to `.sql`, `.yaml` and `.yml`: SQL files, `rules.yaml`
+and the workflow files are code in this repo.
+
+**Review round 1 (2026-09-01).** Five agents (code-reviewer,
+functionality-tester, security-reviewer, study-editor, coherence-auditor) on
+`main...HEAD`: 44 findings, no BLOCKER. Dispositions: 16 correctness fixes,
+one per commit (two survived hand-mutations pinned, `sql/../x` traversal
+refused, vacuous passes on missing spec sections and same-page anchors closed,
+the hook parsed strictly and tested, BASE covered by the both-origins test, one
+Makefile-target parser); four fix amendments recorded in the spec's Invariants
+(source shape as a closed parse, every named test id checked across Evidence /
+Invariants / Threat model, the Pending exemption in invariant 3, "SPEC.md names
+BACKING rows"); one records-and-voice commit (this entry, CLAUDE.md's plain
+openers and neutral phrasing, BACKING.md's header, the hook's trust boundary
+stated, `# v4.4.0`); four BACKLOG rows (link-check edge cases, a second
+BACKING table, the render-time Pending check, label arity). One process
+lesson: a test helper that piped pytest through `tail` hid a red suite for two
+commits; commits are gated on pytest's own exit code since.

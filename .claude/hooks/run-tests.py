@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # .claude/hooks/run-tests.py
 # PostToolUse hook (matcher: Write|Edit|MultiEdit|NotebookEdit) — runs pytest
-# after a .py, .sql or .yaml file in this project changes. SQL files and
-# rules.yaml are code here. Makes a broken test VISIBLE the instant it breaks.
+# after a .py, .sql, .yaml or .yml file in this project changes. SQL files
+# and rules.yaml are code here. Makes a broken test VISIBLE the instant it breaks.
 #
 # This gate deliberately fails OPEN (missing pytest, malformed event → allow):
 # it is a visibility aid, not a security control. A hung suite (timeout) DOES
@@ -64,8 +64,9 @@ def main() -> None:
             )
             sys.exit(0)
 
-    # Reduced environment: PATH and HOME only — never the shell's credentials
-    # (an .env-loaded API key must not reach a suite an inbound branch wrote).
+    # Reduced environment: PATH and HOME only. This keeps ENVIRONMENT credentials
+    # (an .env-loaded API key) out of the suite and nothing else — the tests still
+    # run as you, with your HOME (CLAUDE.md → Project tooling states the risk).
     env = {k: os.environ[k] for k in ("PATH", "HOME") if k in os.environ}
     try:
         res = subprocess.run(

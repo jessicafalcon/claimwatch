@@ -1,6 +1,6 @@
 ---
 name: security-reviewer
-description: Read-only security review for The Friction Ledger. MANDATORY before committing changes that touch CI workflows, .env or credential handling, a scraper or any network call, the model API call, Snowflake access, the weekly Actions commit, or any destructive make target. Checks scrape conduct (rate limits, robots.txt, no evasion), personal data in tracked files, committed or echoed secrets, the Actions write token, and unguarded destructive targets. Reports; never edits.
+description: Read-only security review for The Friction Ledger. MANDATORY before committing changes that touch CI workflows, .env or credential handling, a scraper or any network call, the model API call, Snowflake access, the weekly Actions commit, `.claude/hooks/` or Claude Code settings, or any destructive make target. Checks scrape conduct (rate limits, robots.txt, no evasion), personal data in tracked files, committed or echoed secrets, the Actions write token, and unguarded destructive targets. Reports; never edits.
 tools: Read, Grep, Glob, Bash
 model: opus
 ---

@@ -31,6 +31,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from review_common import (  # noqa: E402
+    LIVING_DOCS,
+    MAKE_TICK,
+    RECORD_DOCS,
     ROOT,
     Refused,
     die,
@@ -43,19 +46,11 @@ from review_common import (  # noqa: E402
 
 _BASE = re.compile(r"^[\w./-]+$")
 _TEST_ID = re.compile(r"`(tests/[\w/]+\.py)?(::test_\w+)`")
-_MAKE_TICK = re.compile(r"`make ([a-z][a-z0-9-]*)[^`]*`")
+_MAKE_TICK = MAKE_TICK
 _RECORD_LINE = re.compile(r"^- \[[ x]\] (.*)$", re.M)
 _TICKED = re.compile(r"`([^`\s]+)`")
 _FREEZE = re.compile(r"^Freeze: (fixtures/\S+)", re.M)
-RECORD_FILES = (
-    "DECISIONS.md",
-    "BACKLOG.md",
-    "CLAUDE.md",
-    "BACKING.md",
-    "SPEC.md",
-    "README.md",
-    "PROJECT_BRIEF.md",
-)
+RECORD_FILES = LIVING_DOCS + RECORD_DOCS + ("PROJECT_BRIEF.md",)
 
 
 def is_record_path(token: str) -> bool:

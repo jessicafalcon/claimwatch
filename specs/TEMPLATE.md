@@ -69,6 +69,12 @@ invariant it satisfies.
 
 - <Every file the phase touches, code and record alike.>
 
+Freeze: none
+
+(If the phase changes `fixtures/`, replace that line with exactly
+`Freeze: fixtures/<name>/MANIFEST.sha256` at column 0 — `make review-gate`
+reads it; without it any fixture change is a FAIL.)
+
 ## Record updates (REQUIRED)
 
 `make review-gate SPEC=…` diffs this list against `git diff main...HEAD`: a

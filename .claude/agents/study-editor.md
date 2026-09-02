@@ -51,7 +51,7 @@ When invoked:
   ("traps its customers", "refuses to pay") is a BLOCKER; the factual,
   comparative form is the rewrite ("held-claim complaints appear at
   digital-first insurers at N× the rate of traditional mutuelles").
-- **The studied company is never named as the target** in prose, headings,
+- **No insurer is named as the target of the study** in prose, headings,
   commit messages or the repo description. Insurers appear as sourced data
   points only. Flag the sentence; the data row is fine.
 - **Paraphrase, don't quote.** Review excerpts are paraphrased or quoted

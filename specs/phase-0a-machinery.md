@@ -35,8 +35,9 @@ make review-gate SPEC=specs/phase-0a-machinery.md
   `tests/test_check_docs.py`, `tests/test_check_backing.py`,
   `tests/test_makefile.py`, `tests/test_claude_config.py`) green, offline.
 - `ruff check` + `ruff format --check` — read-only lint green.
-- `make check-docs` — links, named targets, banned words, glossary size,
-  BACKLOG count green over CLAUDE.md, README, docs/, DECISIONS, BACKLOG.
+- `make check-docs` — links green over every doc; named targets, banned words
+  and glossary size green over the living docs (CLAUDE.md, README, SPEC,
+  BACKING) plus `study/`; BACKLOG count green.
 - `make check-backing` — the empty table passes (no rows, no `sql/marts/`).
 - Evidence rows — every test id and target below exists; Record updates —
   every listed file is in `git diff main...HEAD`.
@@ -50,8 +51,8 @@ make review-gate SPEC=specs/phase-0a-machinery.md
    absent from the diff, a `fixtures/` change with no `Freeze:` line in the
    spec. *Evidence: row 2.*
 3. **The docs are load-bearing:** every relative link and anchor resolves;
-   every `make` target the docs name exists; no banned word in CLAUDE.md,
-   README or `docs/`; the glossary (when it exists) has ≤ 10 terms; the
+   every `make` target a living doc names exists; no banned word in a living
+   doc (CLAUDE.md, README, SPEC, BACKING) or under `study/`; the glossary (when it exists) has ≤ 10 terms; the
    "Open BACKLOG rows: **N**" count matches. Each check reports an error on a
    planted violation. *Evidence: row 3.*
 4. **The evidence contract is checked mechanically:** a non-Pending BACKING
@@ -71,7 +72,7 @@ make review-gate SPEC=specs/phase-0a-machinery.md
 | Done-when | Proof |
 |---|---|
 | 1 | `make review-gate` prints `review-gate OK: 5/5 checks` (no SPEC: test, lint, docs, backing, fixtures) / `review-gate OK: 7/7 checks` with SPEC (+ evidence, records) |
-| 2 | `tests/test_review_tools.py::test_spec_outside_specs_is_refused`, `::test_gate_fails_on_a_missing_evidence_test_id`, `::test_gate_fails_on_a_record_file_absent_from_the_diff`, `::test_fixture_change_without_freeze_line_fails`, `::test_cli_refusals_are_one_line_exit_2`, `::test_collected_tests_finds_the_suite` |
+| 2 | `tests/test_review_tools.py::test_spec_outside_specs_is_refused`, `::test_gate_fails_on_a_missing_evidence_test_id`, `::test_gate_fails_on_a_record_file_absent_from_the_diff`, `::test_fixture_change_without_freeze_line_fails`, `::test_cli_refusals_are_one_line_exit_2`, `::test_collected_tests_finds_the_suite`, `::test_make_review_gate_refuses_end_to_end` |
 | 3 | `tests/test_check_docs.py::test_check_links_reports_a_broken_link_and_anchor`, `::test_check_make_targets_reports_an_unknown_target`, `::test_check_banned_words_reports_each_hit`, `::test_check_glossary_reports_an_eleventh_term`, `::test_check_backlog_count_reports_a_mismatch`, `::test_every_named_make_target_exists_today`; `make check-docs` prints `check-docs OK` |
 | 4 | `tests/test_check_backing.py::test_empty_table_is_ok`, `::test_missing_sql_file_fails`, `::test_tag_outside_the_four_fails`, `::test_measured_without_source_fails`, `::test_orphan_mart_sql_fails`, `::test_pending_row_is_ok_without_source`; `make check-backing` prints `check-backing OK: 0 rows, 0 marts` |
 | 5 | `tests/test_claude_config.py::test_tracked_claude_config_is_prose_and_hook_scripts_only`, `::test_settings_and_mcp_are_gitignored` |
@@ -142,17 +143,18 @@ mechanism's kind or the contract, written before any fix was implemented:
 
 ## Record updates (REQUIRED)
 
-- [ ] `DECISIONS.md` — new file: "Decisions still in force", "Process", Phase
+- [x] `DECISIONS.md` — new file: "Decisions still in force", "Process", Phase
       0a entry (the ten PLAN §6 defaults, each one line)
-- [ ] `BACKLOG.md` — new file: mutation sweep deferred; CI green unverified
+- [x] `BACKLOG.md` — new file: mutation sweep deferred; CI green unverified
       until first push; naming-the-target check is agent-only
-- [ ] `CLAUDE.md` — new file (v0); Current status; Commands; BACKLOG count
-- [ ] `BACKING.md` — new file: header, §8 rules, empty table
-- [ ] SPEC.md — none (Phase 0b)
-- [ ] README.md — none (Phase 9; PROJECT_BRIEF.md is the front door until then)
-- [ ] `PROJECT_BRIEF.md` — the one-sentence split pointer in §9
-- [ ] `specs/TEMPLATE.md` — new file
-- [ ] `specs/phase-0a-machinery.md` — this spec; the "Delivered" paragraph
+- [x] `CLAUDE.md` — new file (v0); Current status; Commands; BACKLOG count
+- [x] `BACKING.md` — new file: header, §8 rules, empty table
+- [x] SPEC.md — none (Phase 0b)
+- [x] README.md — none (Phase 9; PROJECT_BRIEF.md is the front door until then)
+- [x] `PROJECT_BRIEF.md` — the one-sentence split pointer in §9
+- [x] `docs/PLAN.md` — status line; the round-1 corrections
+- [x] `specs/TEMPLATE.md` — new file
+- [x] `specs/phase-0a-machinery.md` — this spec; the "Delivered" paragraph
       appended at exit
 
 ## Threat model (REQUIRED when the phase adds a `make` target that takes a variable, deletes anything, calls a paid API, or touches the network)
@@ -164,7 +166,7 @@ a setup step outside the gate).
 | Target | empty | `../x` | `"; ` | env-exported | `$(origin)` | Pinned by |
 |---|---|---|---|---|---|---|
 | `make review-gate SPEC=` | no SPEC → checks a–d only, prints `SKIP evidence, records` | refused, exit 2, one line | one literal argv token; refused as not-a-file; nothing runs | reaches the recipe as one literal, validated in Python like a command-line value | n/a (no CONFIRM in 0a) | `tests/test_makefile.py::test_user_variable_reaches_python_as_one_literal_from_both_origins`, `tests/test_review_tools.py::test_spec_outside_specs_is_refused` |
-| `BASE=` | defaults to `main` | validated `[\w./-]+`, no leading `-`; else refused | one literal; refused | same | n/a | `tests/test_review_tools.py::test_base_is_validated` |
+| `BASE=` | defaults to `main` | validated `[\w./-]+`, no leading `-`, else refused; a well-formed but unknown or `..`-shaped rev is not refused by Python — git rejects it and the gate prints one FAIL line | one literal; refused | same | n/a | `tests/test_review_tools.py::test_base_is_validated` |
 
 Stated residual: `MAKEFLAGS='SPEC=…'` is a make-level override; the threat
 model is "mistakes, not a user who controls the environment".
@@ -195,3 +197,14 @@ model is "mistakes, not a user who controls the environment".
 - Mutation sweep — BACKLOG row.
 - `weekly.yml` — Phase 4.
 - Any `sql/`, `fixtures/`, `pipeline/` file — Phase 1.
+
+## Delivered (2026-09-01, PR pending)
+
+As planned, plus: a self-check found and fixed one gate bug live (`pytest
+--collect-only` under a doubled `-q` printed no node ids). Review round 1
+(five agents) reported 44 findings, no BLOCKER: 16 correctness fixes landed
+one per commit, four fix amendments (source shape as a closed parse, every
+named test id checked, the Pending exemption in invariant 3, "SPEC.md names
+BACKING rows"), one records-and-voice commit, four BACKLOG rows. 59 tests;
+`make review-gate SPEC=specs/phase-0a-machinery.md` prints `7/7`. CI green is
+verified on first push (BACKLOG row).
