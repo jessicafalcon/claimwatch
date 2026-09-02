@@ -79,6 +79,11 @@ class _Walker(HTMLParser):
     def __init__(self) -> None:
         super().__init__()
         self.stack: list[tuple[str, dict[str, str | None]]] = []
+        # For each tag, the stack positions of its open elements, innermost
+        # last: closing an element is a pop, never a rescan of the stack, so a
+        # page with thousands of unclosed elements and stray closers costs
+        # time linear in its size (round 1, security-reviewer #1).
+        self.open: dict[str, list[int]] = {}
         self.reviews: list[_Review] = []
         self.review_depth: int | None = None
         self.rating_depth: int | None = None
@@ -114,6 +119,7 @@ class _Walker(HTMLParser):
                 self.current.rating = attrs.get("content")
         if tag in _VOID:
             return
+        self.open.setdefault(tag, []).append(len(self.stack))
         self.stack.append((tag, attrs))
         if scope and _REVIEW_TYPE.match(itemtype) and self.review_depth is None:
             self.review_depth = depth
@@ -141,11 +147,13 @@ class _Walker(HTMLParser):
     def handle_endtag(self, tag: str) -> None:
         if tag in _VOID:
             return
-        # pop to the nearest open element of this tag (lenient on stray closers)
-        for i in range(len(self.stack) - 1, -1, -1):
-            if self.stack[i][0] == tag:
-                del self.stack[i:]
-                break
+        positions = self.open.get(tag)
+        if not positions:
+            return  # a stray closer with nothing open: ignored
+        idx = positions.pop()
+        for inner, _ in self.stack[idx + 1 :]:  # closed implicitly with their parent
+            self.open[inner].pop()
+        del self.stack[idx:]
         depth = len(self.stack)
         review = self.current
         if (

@@ -224,3 +224,18 @@ def test_sample_is_obviously_fake_and_nameless():
     assert re.findall(r'itemprop="name">([^<]+)<', _page(1)) == [
         f"reviewer-placeholder-{k}" for k in (1, 2, 3)
     ]
+
+
+def test_a_pathological_page_parses_in_linear_time():
+    """Round 1, security-reviewer #1: thousands of unclosed elements followed by
+    thousands of stray closers must not make the walker rescan its stack —
+    the parse stays well under a second and the sample's rows come out
+    unchanged."""
+    import time
+
+    junk = "<div>" * 20000 + "</span>" * 20000
+    html = _page(1).replace("<body>", "<body>" + junk)
+    t0 = time.perf_counter()
+    parsed = parse(html, PAGE_URL, CAPTURED, SRC)
+    assert time.perf_counter() - t0 < 1.0
+    assert len(parsed.reviews) == pins.OA_SAMPLE_REVIEWS_ON_PAGES[0]
