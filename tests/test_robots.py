@@ -162,3 +162,15 @@ def test_two_crawl_delays_in_one_group_keep_the_longer():
         Robots.parse("User-agent: *\nCrawl-delay: 1\nCrawl-delay: 30\n").crawl_delay
         == 30.0
     )
+
+
+def test_the_catch_all_is_never_our_group():
+    """If `*` were merged into ours, the catch-all's longer Allow could
+    outrank our own group's Disallow under longest-match; kept apart and
+    conjoined, our Disallow stands. Pins the surviving round 4 mutant."""
+    from ingest.robots import _names_us
+
+    assert _names_us("*") is False
+    ours = "User-agent: friction-ledger\nDisallow: /fr/\n\n"
+    text = ours + "User-agent: *\nAllow: /fr/rss/\n"
+    assert Robots.parse(text).allows(FEED) is False
