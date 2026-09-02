@@ -458,12 +458,13 @@ declaration that says which parser reads it, where its pages are and whether
 its site lets us fetch it; `ROWS` names what a rebuild loads. Of the three
 sites checked, Google Play's listing may be fetched, Apple's listing may not
 (its terms), and Opinion Assurances gave written authorization for its review
-pages — the first real review rows come from there. Remaining: the Opinion
-Assurances parser, the review rounds, the exit audit. The DONE command is
+pages — the first real review rows come from there, read from the page's
+machine-readable marks with the reviewer's name never read. Remaining: the
+first live run, the review rounds, the exit audit. The DONE command is
 `make rebuild && make idempotency-check ROWS=captured`; Phase 1's line stays
 green (raw 40 / staging 39); CI runs `ROWS=synthetic` and `ROWS=samples`.
 Phase 2 merged (PR #4). Next: the Phase 3a PR; then Phase 3b — Trustpilot.
 
-Open BACKLOG rows: **11**.
+Open BACKLOG rows: **13**.
 
 (Update this section at the end of every working day.)

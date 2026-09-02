@@ -624,6 +624,26 @@ renamed the rebuild input, closed five BACKLOG rows.
   with one fallback to the last `*`; time is bounded by pattern × path
   length; the matching table is unchanged. Rejected: a cap on `*` per pattern
   (a denylist on the input); `fnmatch` (the same regex underneath).
-- **The Opinion Assurances parser reads schema.org microdata** —
-  *(filled in when the parser lands: the field addresses for the rating,
-  the date, the body and the review identifier, from the structure dump.)*
+- **The Opinion Assurances parser reads schema.org microdata, and its review
+  id is a content hash (A1).** `ingest/opinion_assurances.py` walks the page
+  once with the stdlib HTML parser: each `itemscope` of type `review` yields
+  one row — `rating` from the `reviewRating` scope's `<meta itemprop=
+  "ratingValue" content>` (a digit 1–5), `review_date` from the description's
+  own sentence "Avis publié le dd/mm/yyyy suite à une expérience le
+  dd/mm/yyyy" (the first date; the second is the experience date), `body`
+  from `h4.oa_text`, `title` empty (the page has none); the `author` scope
+  (a pseudonym and a member link) is skipped in full; the page's one
+  `AggregateRating` (`ratingValue`, `ratingCount` as `meta content`) yields
+  the snapshot row; a page with the aggregate and no review is the end of the
+  list; a page with neither is refused. **The page marks no stable review
+  identifier** (the only per-review link is the reviewer's member page — an
+  author field), so `external_id` is sha256 over the publication date, the
+  experience date, the rating and the body: deterministic and author-free,
+  taken on the build session's recommendation at the STOP-and-decide the
+  spec named (2026-09-02). Cost, in BACKLOG: an edited review is a new
+  review, not a new version of one. The one-star share, response rate and
+  response delay the page shows are layout text (progress bars, labels), not
+  data, and are not read — those figures stay Documented from the anchor
+  (BACKLOG). Rejected: the member id as the key (reads the author and
+  identifies the reviewer); the position on the page (unstable); parsing the
+  layout percentages (presentation, not a declared shape).
