@@ -169,7 +169,7 @@ friction-ledger/
 
 ### 4.3 Cross-cutting trust layer (properties, not a box)
 
-- **Idempotency:** every task re-runs without duplicating. Raw is append-only with provenance columns (source, url, captured_at). Staging dedupes on natural keys. Verify by running twice and diffing row counts.
+- **Idempotency:** every task re-runs without duplicating. Raw is append-only with provenance columns (source, source_url, captured_at, run_id). Staging dedupes on natural keys. Verify by running twice and diffing row counts.
 - **Contracts:** lightweight checks between layers — row counts reconcile, ratings within 1–5, no future dates — failing loudly in the DAG, never silently in a chart.
 - **Lineage:** BACKING.md maps every study claim to its SQL file and source; Metabase drill-throughs make the map clickable.
 
@@ -252,6 +252,11 @@ Rules:
 ---
 
 ## 9. Build phases (one phase = one Claude Code session = one reviewable diff)
+
+*Build note (2026-09-01): Phases 0, 3 and 5 are each split in two — 0a
+machinery / 0b contracts, 3a snapshots and polite sources / 3b Trustpilot, 5a
+label sample / 5b rules — see `docs/PLAN.md` §5. Each phase's
+contract is its spec in `specs/`; the numbering below is otherwise unchanged.*
 
 Feed each session: this file + SPEC.md + BACKING.md + CLAUDE.md + the current phase goal. Not the whole history. End every phase by writing its "done when" as an actual test or make target.
 
