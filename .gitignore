@@ -1,6 +1,7 @@
 # Secrets — never commit. The API key and warehouse credentials live in .env only.
-.env
-.env.*
+# `.env*` also catches .envrc (direnv) and .env-prod; a template would be `.env.example`
+# and needs a `!` line here first.
+.env*
 *.pem
 credentials*
 

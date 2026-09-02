@@ -46,6 +46,9 @@ def test_settings_and_mcp_are_gitignored():
         ".claude/settings.local.json",
         ".mcp.json",
         ".env",
+        ".env.local",
+        ".envrc",
+        ".env-prod",
         "data/x.duckdb",
         "data/corpus/a.json",
     ):
@@ -66,3 +69,4 @@ def test_every_agent_is_report_only():
         assert not {"Write", "Edit", "MultiEdit", "NotebookEdit"} & {
             t.strip() for t in tools.group(1).split(",")
         }, name
+
