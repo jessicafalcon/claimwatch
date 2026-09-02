@@ -283,3 +283,30 @@ def test_a_nested_review_scope_refuses_the_page():
         PageShapeError, match="field 'review' 1 review scope\(s\) nested"
     ):
         parse(html, PAGE_URL, CAPTURED, SRC)
+
+
+@pytest.mark.parametrize(
+    "markup",
+    [
+        '<span itemprop="author">reviewer-placeholder-9</span>',
+        '<div itemscope itemtype="http://schema.org/Person"><span>reviewer-placeholder-9</span></div>',
+        '<b itemprop="author"><i>reviewer-placeholder-9</i></b>',
+    ],
+)
+def test_author_markup_without_itemscope_is_still_never_read(markup):
+    """Round 1, functionality-tester F3: author markup inside the body element,
+    with no itemscope, must not land in `body`; the guard is about persons, not
+    about one scope."""
+    html = _second_review(
+        _page(1),
+        lambda s: s.replace(
+            '<h4 class="oa_text my-xl-4 my-3">',
+            '<h4 class="oa_text my-xl-4 my-3">' + markup,
+            1,
+        ),
+    )
+    rows = parse(html, PAGE_URL, CAPTURED, SRC).reviews
+    assert (
+        rows[1]["body"] == parse(_page(1), PAGE_URL, CAPTURED, SRC).reviews[1]["body"]
+    )
+    assert "reviewer-placeholder-9" not in rows[1]["body"]

@@ -55,6 +55,7 @@ _SENTENCE = re.compile(
 )
 _REVIEW_TYPE = re.compile(r"^https?://schema\.org/review$", re.I)
 _AGGREGATE_TYPE = re.compile(r"^https?://schema\.org/aggregaterating$", re.I)
+_PERSON_TYPE = re.compile(r"^https?://schema\.org/person$", re.I)
 _VOID = frozenset({"meta", "br", "img", "input", "hr", "link", "source", "wbr"})
 _SEP = "\x1f"
 _PLACES = Decimal("0.001")
@@ -138,7 +139,13 @@ class _Walker(HTMLParser):
         review = self.current
         if review is None:
             return
-        if scope and itemprop == "author" and review.author_depth is None:
+        # Author markup is skipped wherever it sits and however it is marked:
+        # an `author` property with or without a scope, or any `Person` — the
+        # kind of the guard is "this element is about a person", not "this
+        # element is the author scope" (round 1, functionality-tester F3).
+        if review.author_depth is None and (
+            itemprop == "author" or _PERSON_TYPE.match(itemtype)
+        ):
             review.author_depth = depth
         elif scope and itemprop == "reviewRating" and self.rating_depth is None:
             self.rating_depth = depth
