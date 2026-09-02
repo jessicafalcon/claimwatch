@@ -4,6 +4,7 @@ CLI refusals by spawning the script. Offline, no services."""
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -181,3 +182,25 @@ def test_collected_tests_finds_the_suite():
     assert code == 0
     assert "tests/test_review_tools.py::test_collected_tests_finds_the_suite" in ids
     assert "tests/test_review_tools.py::test_cli_refusals_are_one_line_exit_2" in ids
+
+
+def test_make_review_gate_refuses_end_to_end():
+    """Through make, not the script: the value crosses the Makefile quoting and
+    Python refuses in one line, exit 2, nothing runs, nothing is expanded."""
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k not in ("SPEC", "BASE", "MAKEFLAGS", "MFLAGS")
+    }
+    for var in ("SPEC=../x", 'SPEC="; echo pwned; "', "SPEC=specs", "BASE=-x"):
+        res = subprocess.run(
+            ["make", "review-gate", var],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        assert res.returncode == 2, (var, res.stdout, res.stderr)
+        refusals = [ln for ln in res.stderr.splitlines() if ln.startswith("refusing:")]
+        assert len(refusals) == 1 and "Traceback" not in res.stderr, (var, res.stderr)
+        assert "pwned" not in res.stdout  # the echo never ran
