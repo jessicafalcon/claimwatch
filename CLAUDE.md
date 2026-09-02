@@ -75,12 +75,20 @@ in the middle, and come out on the right as the numbers the study shows.
   (`sql/marts/` empty until a mart lands in its phase); `pipeline/` —
   `warehouse.py` (the one place that knows DuckDB from Snowflake), `build.py`
   (raw→staging→marts), `cli.py`/`__main__.py` (the validating `make` entry),
-  `sql_lint.py` (the portability/clock denylist the tests use).
+  `sql_lint.py` (the portability/clock denylist the tests use),
+  `metrics.py` (reviews per month — a pinned query, not a mart; folds into
+  B5.2 in Beat 5).
   `fixtures/synthetic/` — hand-written fake reviews, read-only after Phase 1;
   `fixtures/anchors/` — the brief's §6 public figures with source URLs
-  (frozen in Phase 1; first read by `platform_snapshots` in Phase 3). Both
-  carry a `MANIFEST.sha256`.
-- *(Phase 2+)* `ingest/` — scrapers and snapshot capture. *(Phase 5+)*
+  (frozen in Phase 1; first read by `platform_snapshots` in Phase 3);
+  `fixtures/app-store/` — a hand-written sample of the App Store feed in its
+  exact shape (frozen in Phase 2; what CI parses). All three carry a
+  `MANIFEST.sha256`.
+- `ingest/` — the scrapers: `politeness.py` (every manner of a fetch, in one
+  place), `sources.py` (the declared sources, a closed set), `app_store.py`
+  (the strict parser to the raw shape; reads captures back), `fetch.py` (the
+  only `httpx` import; writes captures under `data/cache/`). *(Phase 3)*
+  snapshot capture and the other sources. *(Phase 5+)*
   `classify/` — `rules.yaml`, `rules.py`, `llm.py` (the ONE model call site),
   `eval/` (the only reader of `labels.csv`). *(Phase 8)* `models/` —
   `cost_model.py` (`FORMULAS`), `guardrail_sim.py`. *(Phase 9)* `study/` —
@@ -103,11 +111,20 @@ in the middle, and come out on the right as the numbers the study shows.
   + check-docs + check-backing + fixtures; with SPEC, Evidence ids and
   Record-updates files. One line per check, exit 1 on FAIL, 2 on a refused
   SPEC/BASE. `/review-round N` runs it first.
-- `make rebuild [TARGET=duckdb] [FIXTURE=empty|synthetic]` — build the
-  warehouse from raw (DuckDB; Snowflake defers to Phase 10). `empty` runs it
-  end to end with zero rows; `synthetic` loads the fixture.
+- `make rebuild [TARGET=duckdb] [FIXTURE=cache|empty|synthetic|app-store]` —
+  build the warehouse from raw (DuckDB; Snowflake defers to Phase 10) and print
+  reviews per month. The default, `cache`, loads every capture under
+  `data/cache/app-store/` (none yet → nothing loaded, with a hint); `empty`
+  runs it end to end with zero rows; `synthetic` loads the fixture;
+  `app-store` runs the frozen sample through the real parser (CI does).
 - `make idempotency-check [TARGET=] [FIXTURE=synthetic]` — rebuild twice, diff
-  per-table row counts (the run-twice property as a command).
+  per-table row counts (the run-twice property as a command); same `FIXTURE`
+  set as `rebuild`, so `FIXTURE=cache` proves it on real rows.
+- `make scrape [SOURCE=<declared name>]` — NETWORK, developer-run, never by an
+  agent: fetch the declared source's public review feed into a new capture
+  under `data/cache/`, robots.txt first, ≥ 2 s apart, identifying User-Agent,
+  no proxy, no retry. Needs `CONFIRM=yes` on the command line (`$(origin
+  CONFIRM)`, as `reset`); refuses a source whose app id is not filled in.
 - `make reset [TARGET=duckdb]` — DESTRUCTIVE: drop the DuckDB file; needs
   `CONFIRM=yes` on the command line (`$(origin CONFIRM)`; an environment
   `CONFIRM=yes` does not count).
@@ -324,8 +341,8 @@ one, and write one sentence in the README about why.
 - PR via `gh pr create` when Done-when passes AND verdicts are approved. Body:
   the PR template. Title `Phase N — <name>`.
 - CI runs `make lint`, `make check-docs`, `make check-backing`, `make test`,
-  `make rebuild FIXTURE=synthetic` and `make idempotency-check` (offline,
-  DuckDB, no key). Mergeable only when CI is green and the surface's agents
+  `make rebuild FIXTURE=synthetic`, `make idempotency-check` and the same two
+  with `FIXTURE=app-store` (offline, DuckDB, no key, no fetch). Mergeable only when CI is green and the surface's agents
   have run.
 - The developer merges (squash), never Claude. After merge: `git checkout
   main && git pull`.
@@ -393,20 +410,23 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 ## Current status
 
-**Phase 1 — Schema and the empty warehouse** (`phase-1-schema`, spec
-`specs/phase-1-schema.md`): built; review round 1 dispositions landed; pre-PR.
-Raw + staging DDL for reviews
-with the four provenance columns (`sql/raw/raw_reviews.sql`,
-`sql/staging/stg_reviews.sql`); the DuckDB/Snowflake seam (`pipeline/`); the two
-frozen fixture sets with MANIFESTs; `tests/pins.py`; the portability/clock and
-idempotency guards; `make rebuild`, `idempotency-check`, `reset`. `make rebuild
-FIXTURE=synthetic && make idempotency-check` is green (raw 40, staging 39).
-**All 13 marts (and `platform_snapshots`) are deferred to the phases that land
-their upstreams — Phase 1 lands no mart, so every BACKING row stays Pending
-(check-backing: 19 rows, 0 marts). This narrowed the brief's "All DDL
-(raw/staging/marts)"; PROJECT_BRIEF.md §9 reworded to match (developer's call).** Phase
-0b merged (PR #2). Next: Phase 2 — one scraper, end to end.
+**Phase 2 — One scraper, end to end** (`phase-2-scraper`, spec
+`specs/phase-2-scraper.md`): built on the frozen sample; pre-review. `ingest/`
+fetches the App Store customer-reviews feed politely (robots.txt first, ≥ 2 s,
+identifying User-Agent, allowlisted host, no proxy, no retry) into byte-exact
+captures under `data/cache/`, and parses the declared shape strictly into
+Phase 1's eight raw columns through the unchanged `load_reviews` guard; the
+page is the unit of refusal and the reviewer's name is never read. `make
+rebuild` now defaults to the captures and prints reviews per month (a pinned
+query in `pipeline/metrics.py`, not a mart — check-backing stays 19 rows, 0
+marts). `make rebuild FIXTURE=app-store && make idempotency-check
+FIXTURE=app-store` is green (raw 8 / staging 8, three months); the synthetic
+line stays green (raw 40 / staging 39). **The live feed has not been fetched
+yet: the developer fills the app id in `ingest/sources.py`, runs `make scrape
+CONFIRM=yes`, then the DONE command; the feed's real shape is confirmed by that
+first run (DECISIONS → Gotchas).** Phase 1 merged (PR #3). Next: review round
+1, then Phase 3a — snapshots and the remaining polite sources.
 
-Open BACKLOG rows: **6**.
+Open BACKLOG rows: **7**.
 
 (Update this section at the end of every working day.)

@@ -64,6 +64,19 @@ place and never deleted.
   manually captured snapshot tagged Measured — not circumvention. Each
   source's terms position is recorded here when its scraper lands.
   ([Phase 0a](#phase-0a), PLAN §6.2)
+  - *App Store customer-reviews feed (Phase 2).* A public, keyless JSON feed
+    Apple publishes per app and storefront for syndication — no login, no
+    API key, no page scraping. Read at the feed's own cap (ten pages), with
+    the manners above and `robots.txt` read first; a disallow, a block or a
+    non-200 stops the run with one line and no retry. The pages are archived
+    under gitignored `data/` and never published; the reviewer's name is never
+    read into the warehouse. ([Phase 2](#phase-2))
+- **A scraped page is parsed strictly to a declared shape; the page is the
+  unit of refusal.** A feed item missing or mis-typing a required field, a
+  rating outside 1–5 or a non-ISO timestamp refuses the whole page, naming
+  page, item and field; nothing partial is loaded and nothing is defaulted.
+  Widening the shape is a tested change in `ingest/app_store.py`, never a
+  `.get(…, default)`. ([PLAN §2](docs/PLAN.md) Boundary row; [Phase 2](#phase-2))
 
 **Process**
 
@@ -121,7 +134,16 @@ place and never deleted.
 
 ## Gotchas (stack surprises found live)
 
-None yet. Each entry: the surprise, the official-docs check, what we did.
+Each entry: the surprise, the official-docs check, what we did.
+
+- **Phase 2 — the live feed is unverified at build.** An agent runs no fetch,
+  so the build session could not check `itunes.apple.com/robots.txt`, the
+  feed's field names, whether a one-review page returns `entry` as an object
+  rather than a list, or what a page past the last returns. The parser
+  implements the shape the spec declares; the developer's first `make scrape
+  CONFIRM=yes` is the check. A mismatch is a one-line `FeedShapeError` naming
+  the field, and the fix is a declared, tested widening — recorded here when
+  it happens.
 
 ## Appendix — by phase
 
@@ -304,3 +326,60 @@ deletion scope, and `main()`-level exit-2 on a refused value); one record/wordin
 commit (the zero-row phrasing clarified — `make rebuild` is 0/0 on a fresh
 warehouse, raw being append-only; the stale `ci.yml` repo-map one-liner; the spec
 title to APPROVED). The two-round cap did not apply (round 1).
+
+### Phase 2
+
+Branch `phase-2-scraper`, spec `specs/phase-2-scraper.md`. Depends on Phase 1
+(PR #3) merged. Built the first scraper end to end on the frozen sample: the
+App Store customer-reviews feed → byte-exact captures → the strict parser →
+Phase 1's raw shape and guard → staging → reviews per month. One source, no
+mart, no model.
+
+- **The one source is the App Store feed, declared in `ingest/sources.py`**
+  (name, app id, country — a data point, never a name in prose; the developer
+  fills the app id). `source` = `app-store`, `external_id` = the item's id,
+  `source_url` = the feed page URL, `captured_at` stamped once per run at
+  fetch (UTC, the synthetic fixture's format), `review_date` = the date part
+  of the item's own timestamp, no timezone arithmetic. Rejected: Opinion
+  Assurances (HTML, stricter terms — Phase 3a); Trustpilot (3b); a per-app
+  column in raw (the shape is Phase 1's; the app is recoverable from
+  `source_url`; segment attribution is Phase 3a's table).
+- **The strict parser and the scrape manners** — promoted to "Decisions still
+  in force" above (Data).
+- **Captures are archived per run, never overwritten:**
+  `data/cache/app-store/<source>/<captured_at>/page-<n>.json` beside
+  `page-<n>.meta.json` (`source_url`, `captured_at`, `status`) and the
+  `robots.txt` obeyed. A second capture of unchanged pages adds no raw row
+  (the content hash), which is what proves "re-scrape → nothing new" on real
+  rows. Rejected: one overwritten cache per source (loses the history the
+  proof needs).
+- **`rebuild` reads captures by default; `FIXTURE` names the rebuild input:
+  `{cache, empty, synthetic, app-store}`.** `cache` is the real run (a clone
+  runs `make rebuild` and gets data once it has scraped), `app-store` runs the
+  frozen sample through the real parser (CI does, offline). `run_id` is the
+  capture id in cache mode, the fixture name otherwise — no clock. Rejected: a
+  second variable; keeping `empty` as the default.
+- **Reviews per month is a query, not a mart** (`pipeline/metrics.py`, printed
+  by `rebuild`, pinned by a test). No SPEC.md panel shows it, so a
+  `sql/marts/` file would be an orphan under BACKING.md's rule; it surfaces in
+  Beat 5 through B5.2 `pipeline_row_counts` (BACKLOG row). **This narrows the
+  brief's Phase 2 "one trivial mart (reviews per month)" to the brief's own
+  Done-when wording, "one queryable metric"; whether PROJECT_BRIEF.md §9 is
+  reworded is the developer's call, as in Phase 1.** Rejected: a new BACKING
+  row (a new study claim needs a SPEC.md panel); flipping B5.2 early with a
+  partial mart.
+- **The sample is a new frozen fixture, `fixtures/app-store/`,** hand-written
+  in the feed's exact shape (placeholder author labels, bodies marked
+  fictional, app id 0): a real captured page would publish raw corpus and
+  reviewer names. Malformed variants are built in tests by mutation, never
+  committed. `Freeze: fixtures/app-store/` in the spec; MANIFEST in the diff.
+  Rejected: a sample under `ingest/` or `tests/` (outside the MANIFEST
+  discipline); a scrubbed real page.
+- **`make scrape` is CONFIRM-gated like `reset` and developer-run.** Prompt on
+  a tty, otherwise `CONFIRM=yes` from the command line only; SOURCE is a closed
+  set of declared names; the fetcher is imported only inside the command, so a
+  rebuild never loads `httpx`; the test suite blocks every socket (conftest).
+- **`httpx` added (pre-approved); `pyyaml` deferred** to `rules.yaml` (5b) —
+  nothing in Phase 2 needs YAML.
+
+**Gotchas:** the live feed is unverified at build — see Gotchas above.
