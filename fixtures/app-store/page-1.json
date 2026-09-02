@@ -1,0 +1,326 @@
+{
+ "feed": {
+  "author": {
+   "name": {
+    "label": "iTunes Store"
+   },
+   "uri": {
+    "label": "http://www.apple.com/itunes/"
+   }
+  },
+  "updated": {
+   "label": "2026-09-01T01:00:00-07:00"
+  },
+  "rights": {
+   "label": "SAMPLE — hand-written fixture, not a captured page"
+  },
+  "title": {
+   "label": "iTunes Store: Customer Reviews"
+  },
+  "id": {
+   "label": "https://itunes.apple.com/fr/rss/customerreviews/id=0/sortBy=mostRecent/page=1/json"
+  },
+  "entry": [
+   {
+    "author": {
+     "uri": {
+      "label": "https://itunes.apple.com/fr/reviews/id0"
+     },
+     "name": {
+      "label": "reviewer-placeholder"
+     },
+     "label": ""
+    },
+    "updated": {
+     "label": "2026-03-20T10:15:00-07:00"
+    },
+    "im:rating": {
+     "label": "1"
+    },
+    "im:version": {
+     "label": "9.9.9"
+    },
+    "id": {
+     "label": "900000001"
+    },
+    "title": {
+     "label": "Exemple: encore un document"
+    },
+    "content": {
+     "label": "EXEMPLE FICTIF. On me redemande un justificatif a chaque envoi, sans fin.",
+     "attributes": {
+      "type": "text"
+     }
+    },
+    "link": {
+     "attributes": {
+      "rel": "related",
+      "href": "https://itunes.apple.com/fr/review?id=0&type=Purchase"
+     }
+    },
+    "im:voteSum": {
+     "label": "0"
+    },
+    "im:contentType": {
+     "attributes": {
+      "term": "Application",
+      "label": "Application"
+     }
+    },
+    "im:voteCount": {
+     "label": "0"
+    }
+   },
+   {
+    "author": {
+     "uri": {
+      "label": "https://itunes.apple.com/fr/reviews/id0"
+     },
+     "name": {
+      "label": "reviewer-placeholder"
+     },
+     "label": ""
+    },
+    "updated": {
+     "label": "2026-03-11T08:00:00-07:00"
+    },
+    "im:rating": {
+     "label": "2"
+    },
+    "im:version": {
+     "label": "9.9.9"
+    },
+    "id": {
+     "label": "900000002"
+    },
+    "title": {
+     "label": "Exemple: refus silencieux"
+    },
+    "content": {
+     "label": "EXEMPLE FICTIF. Remboursement refuse sans notification, vu par hasard dans l'appli.",
+     "attributes": {
+      "type": "text"
+     }
+    },
+    "link": {
+     "attributes": {
+      "rel": "related",
+      "href": "https://itunes.apple.com/fr/review?id=0&type=Purchase"
+     }
+    },
+    "im:voteSum": {
+     "label": "0"
+    },
+    "im:contentType": {
+     "attributes": {
+      "term": "Application",
+      "label": "Application"
+     }
+    },
+    "im:voteCount": {
+     "label": "0"
+    }
+   },
+   {
+    "author": {
+     "uri": {
+      "label": "https://itunes.apple.com/fr/reviews/id0"
+     },
+     "name": {
+      "label": "reviewer-placeholder"
+     },
+     "label": ""
+    },
+    "updated": {
+     "label": "2026-02-27T19:30:00-07:00"
+    },
+    "im:rating": {
+     "label": "5"
+    },
+    "im:version": {
+     "label": "9.9.9"
+    },
+    "id": {
+     "label": "900000003"
+    },
+    "title": {
+     "label": "Exemple: rapide"
+    },
+    "content": {
+     "label": "EXEMPLE FICTIF. Rembourse en deux jours, rien a redire.",
+     "attributes": {
+      "type": "text"
+     }
+    },
+    "link": {
+     "attributes": {
+      "rel": "related",
+      "href": "https://itunes.apple.com/fr/review?id=0&type=Purchase"
+     }
+    },
+    "im:voteSum": {
+     "label": "0"
+    },
+    "im:contentType": {
+     "attributes": {
+      "term": "Application",
+      "label": "Application"
+     }
+    },
+    "im:voteCount": {
+     "label": "0"
+    }
+   },
+   {
+    "author": {
+     "uri": {
+      "label": "https://itunes.apple.com/fr/reviews/id0"
+     },
+     "name": {
+      "label": "reviewer-placeholder"
+     },
+     "label": ""
+    },
+    "updated": {
+     "label": "2026-02-14T12:00:00-07:00"
+    },
+    "im:rating": {
+     "label": "1"
+    },
+    "im:version": {
+     "label": "9.9.9"
+    },
+    "id": {
+     "label": "900000004"
+    },
+    "title": {
+     "label": "Exemple: second payeur"
+    },
+    "content": {
+     "label": "EXEMPLE FICTIF. Le releve de ma mutuelle principale est rejete automatiquement a chaque fois.",
+     "attributes": {
+      "type": "text"
+     }
+    },
+    "link": {
+     "attributes": {
+      "rel": "related",
+      "href": "https://itunes.apple.com/fr/review?id=0&type=Purchase"
+     }
+    },
+    "im:voteSum": {
+     "label": "0"
+    },
+    "im:contentType": {
+     "attributes": {
+      "term": "Application",
+      "label": "Application"
+     }
+    },
+    "im:voteCount": {
+     "label": "0"
+    }
+   },
+   {
+    "author": {
+     "uri": {
+      "label": "https://itunes.apple.com/fr/reviews/id0"
+     },
+     "name": {
+      "label": "reviewer-placeholder"
+     },
+     "label": ""
+    },
+    "updated": {
+     "label": "2026-02-03T07:45:00-07:00"
+    },
+    "im:rating": {
+     "label": "3"
+    },
+    "im:version": {
+     "label": "9.9.9"
+    },
+    "id": {
+     "label": "900000005"
+    },
+    "title": {
+     "label": "Exemple: support sans effet"
+    },
+    "content": {
+     "label": "EXEMPLE FICTIF. Le chat repond a cote et personne ne peut debloquer le dossier.",
+     "attributes": {
+      "type": "text"
+     }
+    },
+    "link": {
+     "attributes": {
+      "rel": "related",
+      "href": "https://itunes.apple.com/fr/review?id=0&type=Purchase"
+     }
+    },
+    "im:voteSum": {
+     "label": "0"
+    },
+    "im:contentType": {
+     "attributes": {
+      "term": "Application",
+      "label": "Application"
+     }
+    },
+    "im:voteCount": {
+     "label": "0"
+    }
+   },
+   {
+    "author": {
+     "uri": {
+      "label": "https://itunes.apple.com/fr/reviews/id0"
+     },
+     "name": {
+      "label": "reviewer-placeholder"
+     },
+     "label": ""
+    },
+    "updated": {
+     "label": "2026-01-28T22:10:00-07:00"
+    },
+    "im:rating": {
+     "label": "4"
+    },
+    "im:version": {
+     "label": "9.9.9"
+    },
+    "id": {
+     "label": "900000006"
+    },
+    "title": {
+     "label": "Exemple: correct"
+    },
+    "content": {
+     "label": "EXEMPLE FICTIF. Application claire, un remboursement en attente mais regle depuis.",
+     "attributes": {
+      "type": "text"
+     }
+    },
+    "link": {
+     "attributes": {
+      "rel": "related",
+      "href": "https://itunes.apple.com/fr/review?id=0&type=Purchase"
+     }
+    },
+    "im:voteSum": {
+     "label": "0"
+    },
+    "im:contentType": {
+     "attributes": {
+      "term": "Application",
+      "label": "Application"
+     }
+    },
+    "im:voteCount": {
+     "label": "0"
+    }
+   }
+  ]
+ }
+}

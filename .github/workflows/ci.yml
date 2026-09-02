@@ -37,3 +37,8 @@ jobs:
       # graceful-degradation proof on every run (no model is imported).
       - run: make rebuild FIXTURE=synthetic
       - run: make idempotency-check
+      # The frozen App Store sample through the real parser and the same load
+      # guard: the scraper path, proven offline (no fetch — `make scrape` is
+      # developer-run and never appears here).
+      - run: make rebuild FIXTURE=app-store
+      - run: make idempotency-check FIXTURE=app-store

@@ -2,8 +2,10 @@
 docs/PLAN.md §4 decision 2). The stages:
 
   create_raw   -> run every sql/raw/*.sql (`create table if not exists`)
-  load_reviews -> read the fixture in Python (stdlib csv, no pandas), insert each
-                  row only if (source, external_id, content_hash) is unseen
+  load_reviews -> insert each row only if (source, external_id, content_hash)
+                  is unseen; the rows come from the fixture (stdlib csv, no
+                  pandas) or from the scraper's captures (ingest.app_store's
+                  strict parser) — the SAME guard for both (Phase 2)
   build_derived-> run sql/staging/*.sql then sql/marts/*.sql (`create or replace`)
 
 Idempotency: raw is append-only keyed on the natural key + a content fingerprint,
@@ -11,8 +13,10 @@ so a re-run of an unchanged review inserts nothing and an edited review (new
 fingerprint) appends a new row; staging keeps the latest capture. `run_id` is
 stamped here in Python (never in SQL — no clock on the data path) and is in no
 natural key and no mart, so a changing `run_id` never duplicates a row or moves a
-number; in FIXTURE mode it is the fixture name, making the synthetic run
-byte-stable, not merely count-stable."""
+number; in FIXTURE mode it is the fixture name and in cache mode the capture
+id, making every rebuild from the same input byte-stable, not merely
+count-stable. A rebuild reads captures from disk and never imports the fetcher:
+no network on the data path."""
 
 from __future__ import annotations
 
@@ -21,9 +25,15 @@ import hashlib
 import tempfile
 from pathlib import Path
 
+from ingest.app_store import read_captures
 from pipeline.warehouse import ROOT, connect
 
-FIXTURES = ("empty", "synthetic")  # the closed set of rebuild inputs
+# The closed set of rebuild inputs: the scraper's captures under data/ (the
+# real run, the default), nothing, the synthetic fixture, or the frozen
+# App Store sample read as a capture (the offline proof of the parser path).
+FIXTURES = ("cache", "empty", "synthetic", "app-store")
+DEFAULT_CACHE = ROOT / "data" / "cache" / "app-store"  # gitignored (data/*)
+SAMPLE_CAPTURE = ROOT / "fixtures" / "app-store"
 _SEP = "\x1f"  # unit separator — cannot appear in the CSV content fields
 # The content fields whose hash is the fingerprint (provenance is excluded, so a
 # re-capture of the same review at a new time is NOT a new row).
@@ -103,20 +113,42 @@ def table_counts(conn) -> dict[str, int]:
     return {n: conn.execute(f"select count(*) from {n}").fetchone()[0] for n in names}
 
 
+def capture_root(fixture: str, cache_dir: str | Path | None = None) -> Path | None:
+    """Where a capture-fed rebuild reads from: `cache` -> data/cache/app-store
+    (or `cache_dir`), `app-store` -> the frozen sample (or `cache_dir`); the
+    other inputs read no capture."""
+    if fixture == "cache":
+        return Path(cache_dir) if cache_dir is not None else DEFAULT_CACHE
+    if fixture == "app-store":
+        return Path(cache_dir) if cache_dir is not None else SAMPLE_CAPTURE
+    return None
+
+
 def rebuild(
     target: str = "duckdb",
     fixture: str = "empty",
     *,
     database: str | Path | None = None,
     run_id: str | None = None,
+    cache_dir: str | Path | None = None,
 ) -> dict[str, int]:
-    """Build the warehouse from raw and return the per-table row counts. `empty`
-    runs the pipeline end to end with zero rows; `synthetic` loads the fixture."""
+    """Build the warehouse from raw and return the per-table row counts. `cache`
+    loads every capture under data/cache (zero captures -> zero rows); `empty`
+    runs the pipeline end to end with zero rows; `synthetic` loads the fixture;
+    `app-store` loads the frozen sample through the real parser. Capture-fed
+    rows go through the same `load_reviews` guard as the fixture."""
     conn = connect(target, database=database)
     try:
         create_raw(conn)
         if fixture == "synthetic":
             load_reviews(conn, read_fixture("synthetic"), run_id or "synthetic")
+        root = capture_root(fixture, cache_dir)
+        if root is not None:
+            for capture_id, rows in read_captures(root):
+                stamp = run_id or (
+                    "app-store" if fixture == "app-store" else capture_id
+                )
+                load_reviews(conn, rows, f"app-store:{stamp}")
         build_derived(conn)
         return table_counts(conn)
     finally:
@@ -124,15 +156,22 @@ def rebuild(
 
 
 def idempotency_check(
-    target: str = "duckdb", fixture: str = "synthetic"
+    target: str = "duckdb",
+    fixture: str = "synthetic",
+    *,
+    cache_dir: str | Path | None = None,
 ) -> tuple[bool, dict[str, int], dict[str, int]]:
     """Rebuild twice into one fresh database (different `run_id` each time, to
     prove `run_id` is not in the natural key) and compare per-table counts. Uses a
     throwaway file so it depends on no prior state and touches no working db."""
     with tempfile.TemporaryDirectory() as tmp:
         db = Path(tmp) / "idempotency.duckdb"
-        first = rebuild(target, fixture, database=db, run_id="run-1")
-        second = rebuild(target, fixture, database=db, run_id="run-2")
+        first = rebuild(
+            target, fixture, database=db, run_id="run-1", cache_dir=cache_dir
+        )
+        second = rebuild(
+            target, fixture, database=db, run_id="run-2", cache_dir=cache_dir
+        )
     return first == second, first, second
 
 

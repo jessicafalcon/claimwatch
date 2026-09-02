@@ -1,5 +1,6 @@
-"""fixtures/synthetic/ and fixtures/anchors/ match their MANIFEST.sha256 (spec
-Phase 1, done-when 5). A byte flip, a missing file or an extra file fails."""
+"""fixtures/synthetic/ and fixtures/anchors/ (Phase 1, done-when 5) and
+fixtures/app-store/ (Phase 2, done-when 6) match their MANIFEST.sha256. A byte
+flip, a missing file or an extra file fails."""
 
 from __future__ import annotations
 
@@ -27,3 +28,4 @@ def _check(name: str) -> None:
 def test_manifests_match():
     _check("synthetic")
     _check("anchors")
+    _check("app-store")
