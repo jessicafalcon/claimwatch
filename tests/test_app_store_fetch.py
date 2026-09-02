@@ -218,3 +218,13 @@ def test_a_malformed_page_is_kept_but_the_run_is_refused(tmp_path):
         scrape(SRC, tmp_path, client=polite, stamp=lambda: STAMP)
     capture = tmp_path / SRC.name / STAMP.replace(":", "-")
     assert (capture / "page-1.json").exists()  # evidence of what was served
+
+
+def test_an_existing_capture_directory_is_a_refusal_not_a_traceback(tmp_path):
+    """Two runs stamped in the same second would share a directory; the second
+    refuses with one line and asks nothing of the site."""
+    server = Served()
+    (tmp_path / SRC.name / STAMP.replace(":", "-")).mkdir(parents=True)
+    with pytest.raises(FetchRefused, match="already exists"):
+        scrape(SRC, tmp_path, client=_polite(server, Clock()), stamp=lambda: STAMP)
+    assert server.requests == []
