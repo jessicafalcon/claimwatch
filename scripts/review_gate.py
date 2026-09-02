@@ -10,9 +10,11 @@ FAIL, 2 on a refused SPEC/BASE, never a traceback. Run via
   c. docs      — `make check-docs`
   d. backing   — `make check-backing`
   e. fixtures  — `fixtures/**` in `git diff --name-only <base>...HEAD` is a FAIL
-                 unless the spec has a `Freeze: fixtures/…` line; with no
-                 --spec any fixture change is a FAIL (read-only after the phase
-                 that froze them)
+                 unless a `Freeze:` line in the spec covers it exactly:
+                 `Freeze: fixtures/<name>/` covers that directory and requires
+                 its MANIFEST.sha256 in the diff; `Freeze: fixtures/<path>`
+                 covers that one file. With no --spec any fixture change is a
+                 FAIL (read-only after the phase that froze them)
   f. evidence  — (--spec) the four REQUIRED sections exist; every
                  `tests/….py::test_x` id the spec names — in Evidence,
                  Invariants or Threat model — is collected, and every
@@ -50,7 +52,9 @@ _TEST_ID = re.compile(r"`(tests/[\w/]+\.py)?(::test_\w+)`")
 _MAKE_TICK = MAKE_TICK
 _RECORD_LINE = re.compile(r"^- \[[ x]\] (.*)$", re.M)
 _TICKED = re.compile(r"`([^`\s]+)`")
-_FREEZE = re.compile(r"^Freeze: (fixtures/\S+)", re.M)
+# `Freeze: fixtures/<name>/` (a directory) or `Freeze: fixtures/<path>` (one file)
+_FREEZE = re.compile(r"^Freeze: (fixtures/[\w.-]+(?:/[\w.-]+)*/?)\s*$", re.M)
+MANIFEST = "MANIFEST.sha256"
 RECORD_FILES = LIVING_DOCS + RECORD_DOCS + ("PROJECT_BRIEF.md",)
 
 
@@ -170,13 +174,21 @@ def check_records(spec_text: str, diff: set[str]) -> tuple[list[str], list[str]]
 
 
 def check_fixtures(spec_text: str | None, diff: set[str]) -> list[str]:
+    """A `Freeze:` grant covers exactly what it names: a directory (trailing
+    `/`, whose MANIFEST must be in the diff) or one file — never its parent."""
     changed = sorted(p for p in diff if p.startswith("fixtures/"))
     if not changed:
         return []
-    frozen = set(_FREEZE.findall(spec_text or ""))
+    grants = set(_FREEZE.findall(spec_text or ""))
     errors: list[str] = []
+    for g in sorted(grants):
+        if g.endswith("/") and g + MANIFEST not in diff:
+            errors.append(
+                f"`Freeze: {g}` grants a directory but {g}{MANIFEST} is not in the diff"
+            )
     for p in changed:
-        if not any(p.startswith(f.rsplit("/", 1)[0] + "/") for f in frozen):
+        covered = any(p == g or (g.endswith("/") and p.startswith(g)) for g in grants)
+        if not covered:
             errors.append(f"fixture changed with no `Freeze:` line covering it: {p}")
     return errors
 

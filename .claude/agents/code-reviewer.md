@@ -66,7 +66,8 @@ When invoked:
   `pre-commit`, stdlib. Anything else is a finding: new packages need
   explicit approval.
 - **Fixtures are read-only.** After Phase 1, any diff touching `fixtures/`
-  is a BLOCKER unless the spec pins a `Freeze:` line with a new MANIFEST.
+  is a BLOCKER unless the spec pins a `Freeze: fixtures/<name>/` line and the
+  diff carries that directory's new MANIFEST.
 - **Guards over foreign input** (scraped pages, a model's reply, a CLI's
   output) parse strictly to a declared shape or check against a closed set; a
   `.get(…, default)` on foreign JSON or a regex of bad cases is a finding —

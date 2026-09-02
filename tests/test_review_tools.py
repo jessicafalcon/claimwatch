@@ -191,16 +191,40 @@ def test_gate_fails_on_a_record_file_absent_from_the_diff():
 
 
 def test_fixture_change_without_freeze_line_fails():
+    """A grant covers exactly what it names: a directory needs its MANIFEST in
+    the diff; a file grant covers that file only; nothing widens to a parent."""
     diff = {"fixtures/synthetic/reviews.csv", "scripts/x.py"}
     assert review_gate.check_fixtures(None, diff)  # no spec → any fixture change fails
     assert review_gate.check_fixtures("no freeze here", diff)
+    assert review_gate.check_fixtures("Freeze: fixtures/anchors/\n", diff)  # other dir
+    # a file grant covers that one file, not its directory
     assert review_gate.check_fixtures(
-        "Freeze: fixtures/anchors/MANIFEST.sha256\n", diff
-    )  # other dir
+        "Freeze: fixtures/synthetic/MANIFEST.sha256\n", diff
+    ) == [
+        "fixture changed with no `Freeze:` line covering it: "
+        "fixtures/synthetic/reviews.csv"
+    ]
     assert (
-        review_gate.check_fixtures("Freeze: fixtures/synthetic/MANIFEST.sha256\n", diff)
+        review_gate.check_fixtures(
+            "Freeze: fixtures/synthetic/reviews.csv\n",
+            {"fixtures/synthetic/reviews.csv"},
+        )
         == []
     )
+    # a directory grant needs its MANIFEST in the diff …
+    assert review_gate.check_fixtures("Freeze: fixtures/synthetic/\n", diff) == [
+        "`Freeze: fixtures/synthetic/` grants a directory but "
+        "fixtures/synthetic/MANIFEST.sha256 is not in the diff"
+    ]
+    # … and then covers every file under it
+    with_manifest = diff | {"fixtures/synthetic/MANIFEST.sha256"}
+    assert (
+        review_gate.check_fixtures("Freeze: fixtures/synthetic/\n", with_manifest) == []
+    )
+    # `fixtures/` alone or `fixtures/MANIFEST.sha256` never unlocks the tree
+    for wide in ("Freeze: fixtures/\n", "Freeze: fixtures/MANIFEST.sha256\n"):
+        assert review_gate.check_fixtures(wide, with_manifest), wide
+    assert review_gate.check_fixtures("Freeze: none\n", {"scripts/x.py"}) == []
     assert review_gate.check_fixtures(None, {"scripts/x.py"}) == []
 
 

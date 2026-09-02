@@ -71,9 +71,11 @@ invariant it satisfies.
 
 Freeze: none
 
-(If the phase changes `fixtures/`, replace that line with exactly
-`Freeze: fixtures/<name>/MANIFEST.sha256` at column 0 — `make review-gate`
-reads it; without it any fixture change is a FAIL.)
+(If the phase re-freezes a fixture set, replace that line with exactly
+`Freeze: fixtures/<name>/` at column 0 — `make review-gate` reads it: the
+grant covers that directory and requires `fixtures/<name>/MANIFEST.sha256` in
+the diff. `Freeze: fixtures/<path>` covers one file. Without a covering line
+any fixture change is a FAIL; a grant never widens to its parent.)
 
 ## Record updates (REQUIRED)
 
