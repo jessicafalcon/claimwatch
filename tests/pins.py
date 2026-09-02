@@ -90,3 +90,32 @@ CHANNEL_GAP_DIGITAL_FIRST = {
     ("invited", "google-play"): ("4.500", 765, "2024-09-15"),
 }
 PLATFORM_STATS_OPINION_ASSURANCES = ("0.231", "0.820", "1.5", 534)
+
+# fixtures/opinion-assurances/: a hand-written profile in the page's microdata
+# shape — three reviews on page 1, two on page 2 of which one repeats page 1's
+# third (paging overlap: same content, same hash, so the guard skips it), and
+# page 3 with the aggregate and no review (the end of the list). Four distinct
+# reviews; one snapshot (the aggregate repeats on pages 1 and 2, same key and
+# hash). external_id is a content hash, so it is pinned by shape, not value.
+OA_SAMPLE_PAGES = 3
+OA_SAMPLE_REVIEWS_ON_PAGES = (3, 2, 0)
+OA_SAMPLE_RAW_ROWS = 4
+OA_SAMPLE_STG_ROWS = 4
+OA_SAMPLE_CAPTURED_AT = "2026-09-01T10:00:00"
+OA_SAMPLE_FIRST_ROW = {
+    "source": "opinion-assurances",
+    "source_url": "https://www.opinion-assurances.fr/assureur-exemple-fictif.html",
+    "captured_at": OA_SAMPLE_CAPTURED_AT,
+    "review_date": "2026-08-20",  # "publié le 20/08/2026": the first date
+    "rating": 1,
+    "title": "",
+}
+OA_SAMPLE_REVIEWS_PER_MONTH = (
+    ("opinion-assurances", "2026-06", 1),
+    ("opinion-assurances", "2026-07", 1),
+    ("opinion-assurances", "2026-08", 2),
+)
+OA_SAMPLE_SNAPSHOT = ("3.600", 512)
+# `ROWS=samples`: every frozen sample through its parser, plus the anchors.
+SAMPLES_RAW_REVIEWS = APP_STORE_SAMPLE_RAW_ROWS + OA_SAMPLE_RAW_ROWS
+SAMPLES_RAW_SNAPSHOTS = ANCHOR_ROWS + 1 + 1  # the listing's row and the profile's

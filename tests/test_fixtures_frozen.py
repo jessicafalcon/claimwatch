@@ -31,3 +31,4 @@ def test_manifests_match():
     _check("anchors")
     _check("app-store")
     _check("listings")
+    _check("opinion-assurances")

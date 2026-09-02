@@ -84,9 +84,11 @@ def test_rebuild_from_the_sample_prints_the_metric(isolated_paths, capsys):
 
     assert main(["rebuild", "--rows=samples"]) == 0
     out = capsys.readouterr().out
-    assert f"{'raw_reviews':24} {pins.APP_STORE_SAMPLE_RAW_ROWS}" in out
+    assert f"{'raw_reviews':24} {pins.SAMPLES_RAW_REVIEWS}" in out
     assert "reviews per month" in out
-    for source, month, n in pins.APP_STORE_SAMPLE_REVIEWS_PER_MONTH:
+    for source, month, n in (
+        pins.APP_STORE_SAMPLE_REVIEWS_PER_MONTH + pins.OA_SAMPLE_REVIEWS_PER_MONTH
+    ):
         assert f"{source:14} {month}  {n}" in out
 
 
@@ -184,19 +186,20 @@ def test_each_input_builds_its_own_database(capsys, isolated_paths):
     sample builds beside the corpus, never into it; `synthetic` leaves the
     corpus file absent; `reset` names every file it removed."""
     import pipeline.warehouse as warehouse
+    from tests import pins
 
     corpus = warehouse.DEFAULT_DB
     assert main(["rebuild", "--rows=synthetic"]) == 0
     assert _count(capsys.readouterr().out, "raw_reviews") == 40
     assert not corpus.exists()
     assert main(["rebuild", "--rows=samples"]) == 0
-    assert _count(capsys.readouterr().out, "raw_reviews") == 8
+    assert _count(capsys.readouterr().out, "raw_reviews") == pins.SAMPLES_RAW_REVIEWS
     assert main(["rebuild"]) == 0  # the cache, empty here
     assert _count(capsys.readouterr().out, "raw_reviews") == 0
     files = {corpus.with_name(f"w.{f}.duckdb") for f in ("synthetic", "samples")}
     assert corpus.exists() and all(f.exists() for f in files)
-    assert main(["rebuild", "--rows=samples"]) == 0  # again: still 8, not 16
-    assert _count(capsys.readouterr().out, "raw_reviews") == 8
+    assert main(["rebuild", "--rows=samples"]) == 0  # again: the same, not double
+    assert _count(capsys.readouterr().out, "raw_reviews") == pins.SAMPLES_RAW_REVIEWS
     assert main(["reset", "--confirm=yes", "--confirm-origin=command line"]) == 0
     out = capsys.readouterr().out
     assert not corpus.exists() and not any(f.exists() for f in files)

@@ -32,7 +32,7 @@ CHANNELS = ("invited", "unsolicited")
 ORIGINS = ("anchor", "manual", "fetch")  # how a snapshot row came to be
 # The parsers, by module name under `ingest/` — a closed set; each module
 # exposes parse(), EXTENSION, SAMPLE_PLATFORM, SAMPLE_HOST, SAMPLE_DIR.
-PARSERS = ("app_store", "listing")
+PARSERS = ("app_store", "listing", "opinion_assurances")
 SAMPLE = "sample"  # the name and attribution of a frozen sample's declaration
 
 _SLUG = re.compile(r"^[a-z0-9-]+$")
@@ -131,6 +131,15 @@ def app_store_source(
     )
 
 
+def profile_pages(profile_url: str, pages: int) -> tuple[str, ...]:
+    """An Opinion Assurances profile's pages: the profile itself, then
+    `<profile>-page<n>.html` — the path form its robots file allows (every
+    query-string address is disallowed there)."""
+    assert profile_url.endswith(".html")
+    stem = profile_url[: -len(".html")]
+    return (profile_url,) + tuple(f"{stem}-page{n}.html" for n in range(2, pages + 1))
+
+
 def sample_source(parser: str) -> Source:
     """The declaration a frozen sample is read under (`ROWS=samples`): its
     profile, segment and channel are the literal `sample` — labels that exist
@@ -189,6 +198,29 @@ SOURCES: tuple[Source, ...] = (
         channel="invited",
         listing="https://play.google.com/store/apps/details?id=com.alanmobile&hl=fr",
         fetchable=True,
+        declared_on="2026-09-02",
+    ),
+    # The Opinion Assurances profile (A1): its robots.txt allows the profile
+    # and its path-based pages; its conditions générales (V.3) forbid automated
+    # extraction without prior written authorization — which the developer
+    # holds (granted 2026-09-02), so the source is fetchable. Fourteen pages of
+    # about forty reviews on 2026-09-02; the fetcher stops at the first page
+    # with no review. The profile path spells the brand: D1, here only.
+    Source(
+        name="fr-digital-first-opinion-assurances",
+        platform="opinion-assurances",
+        host="www.opinion-assurances.fr",
+        parser="opinion_assurances",
+        pages=profile_pages("https://www.opinion-assurances.fr/assureur-alan.html", 14),
+        profile="fr-digital-first",
+        segment="digital-first",
+        channel="unsolicited",
+        listing="https://www.opinion-assurances.fr/assureur-alan.html",
+        fetchable=True,
+        terms=(
+            "written authorization from the site, granted 2026-09-02 (its conditions"
+            " générales V.3 forbid automated extraction without it)"
+        ),
         declared_on="2026-09-02",
     ),
     # The App Store listing: allowed by robots.txt, forbidden by Apple's

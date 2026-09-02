@@ -133,6 +133,56 @@ def test_a_disallow_on_one_host_stops_that_source_only(tmp_path):
     assert LISTING.page_url(1) not in sites.urls()
 
 
+def test_a_review_page_source_stops_at_the_first_page_with_no_review(tmp_path):
+    """The profile has three declared pages in the sample's shape and a fourth
+    declared but never asked for: page 3 holds the aggregate and no review, so
+    the fetcher stops there (Phase 3a, pinned decision 4)."""
+    from ingest.opinion_assurances import SAMPLE_DIR as OA
+    from ingest.sources import profile_pages
+
+    base = "https://www.opinion-assurances.fr/assureur-exemple-fictif.html"
+    profile = Source(
+        name="test-profile",
+        platform="opinion-assurances",
+        host="www.opinion-assurances.fr",
+        parser="opinion_assurances",
+        pages=profile_pages(base, 6),
+        profile="fr-digital-first",
+        segment="digital-first",
+        channel="unsolicited",
+        listing=base,
+        fetchable=True,
+    )
+
+    def site(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/robots.txt":
+            return httpx.Response(200, text="User-agent: *\nDisallow: /*?*\n")
+        n = 1 if request.url.path.endswith("fictif.html") else int(request.url.path[-6])
+        n = min(n, pins.OA_SAMPLE_PAGES)
+        return httpx.Response(200, content=(OA / f"page-{n}.html").read_bytes())
+
+    urls: list[str] = []
+
+    def logged(request: httpx.Request) -> httpx.Response:
+        urls.append(str(request.url))
+        return site(request)
+
+    polite = PoliteClient(
+        make_client(httpx.MockTransport(logged)), sleep=lambda s: None
+    )
+    capture, pages = scrape(profile, tmp_path, client=polite, stamp=lambda: STAMP)
+    assert pages == pins.OA_SAMPLE_PAGES  # 1, 2 and the empty 3; never 4
+    assert urls == [profile.robots_url] + list(profile.pages[:3])
+    ((_, parsed),) = read_captures(tmp_path / profile.platform / profile.name, profile)
+    assert len(parsed.reviews) == sum(
+        pins.OA_SAMPLE_REVIEWS_ON_PAGES
+    )  # before the guard
+    assert (
+        len(parsed.snapshots) == 2
+    )  # pages 1 and 2 carry the aggregate; the guard dedups
+    assert all(r["title"] == "" for r in parsed.reviews)
+
+
 def test_a_non_fetchable_source_is_refused_before_any_request_whatever_robots_says(
     tmp_path,
 ):

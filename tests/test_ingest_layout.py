@@ -162,7 +162,11 @@ def test_every_source_declares_parser_cache_host_and_attribution():
         assert src.declared_on == "2026-09-02"
         if src.fetchable:
             assert src.parser is not None and src.pages, src.name
-    assert {s.platform for s in SOURCES} == {"app-store", "google-play"}
+    assert {s.platform for s in SOURCES} == {
+        "app-store",
+        "google-play",
+        "opinion-assurances",
+    }
 
 
 def test_every_fetchable_sources_host_is_allowed():

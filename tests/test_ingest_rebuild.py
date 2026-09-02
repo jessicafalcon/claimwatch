@@ -53,15 +53,45 @@ def _query(db: Path, sql: str):
 
 def test_rebuild_from_sample_matches_pins(tmp_path):
     counts = rebuild("duckdb", "samples", database=tmp_path / "w.duckdb")
-    assert counts["raw_reviews"] == pins.APP_STORE_SAMPLE_RAW_ROWS
-    assert counts["stg_reviews"] == pins.APP_STORE_SAMPLE_STG_ROWS
+    assert counts["raw_reviews"] == pins.SAMPLES_RAW_REVIEWS
+    assert (
+        counts["stg_reviews"]
+        == pins.APP_STORE_SAMPLE_STG_ROWS + pins.OA_SAMPLE_STG_ROWS
+    )
     rows = _query(
         tmp_path / "w.duckdb",
-        "select distinct source, run_id, captured_at from raw_reviews",
+        "select distinct source, run_id, captured_at from raw_reviews order by source",
     )
     assert rows == [
-        ("app-store", "sample:app-store", pins.APP_STORE_SAMPLE_CAPTURED_AT)
+        ("app-store", "sample:app-store", pins.APP_STORE_SAMPLE_CAPTURED_AT),
+        ("opinion-assurances", "sample:opinion-assurances", pins.OA_SAMPLE_CAPTURED_AT),
     ]
+
+
+def test_samples_load_every_frozen_sample_through_its_parser(tmp_path):
+    """Phase 3a, invariant 7: every declared parser has a frozen sample and it
+    loads under the sample declaration — a parser with no sample is a failure,
+    not a skip; the counts are pinned."""
+    from ingest.captures import parser_module
+    from ingest.sources import PARSERS
+
+    for parser in PARSERS:
+        mod = parser_module(parser)
+        assert mod.SAMPLE_DIR.is_dir(), parser
+        ((capture_id, parsed),) = read_captures(mod.SAMPLE_DIR, sample_source(parser))
+        assert capture_id == mod.SAMPLE_DIR.name
+        assert parsed.reviews or parsed.snapshots, parser
+    counts = rebuild("duckdb", "samples", database=tmp_path / "w.duckdb")
+    assert counts["raw_reviews"] == pins.SAMPLES_RAW_REVIEWS
+    assert counts["raw_platform_snapshots"] == pins.SAMPLES_RAW_SNAPSHOTS
+    months = _query(
+        tmp_path / "w.duckdb",
+        "select source, substr(review_date, 1, 7), count(*) from stg_reviews "
+        "group by 1, 2 order by 1, 2",
+    )
+    assert tuple(months) == (
+        pins.APP_STORE_SAMPLE_REVIEWS_PER_MONTH + pins.OA_SAMPLE_REVIEWS_PER_MONTH
+    )
 
 
 def test_reviews_per_month_matches_pins(tmp_path):
@@ -69,7 +99,9 @@ def test_reviews_per_month_matches_pins(tmp_path):
     rebuild("duckdb", "samples", database=db)
     conn = connect("duckdb", database=db)
     try:
-        assert tuple(reviews_per_month(conn)) == pins.APP_STORE_SAMPLE_REVIEWS_PER_MONTH
+        assert tuple(reviews_per_month(conn)) == (
+            pins.APP_STORE_SAMPLE_REVIEWS_PER_MONTH + pins.OA_SAMPLE_REVIEWS_PER_MONTH
+        )
     finally:
         conn.close()
 
@@ -109,7 +141,7 @@ def test_read_captures_orders_captures_then_pages_then_items():
 def test_second_rebuild_from_captures_adds_no_rows():
     ok, first, second = idempotency_check("duckdb", "samples")
     assert ok and first == second
-    assert first["raw_reviews"] == pins.APP_STORE_SAMPLE_RAW_ROWS
+    assert first["raw_reviews"] == pins.SAMPLES_RAW_REVIEWS
 
 
 def test_second_capture_of_unchanged_pages_adds_no_rows(tmp_path):
@@ -159,7 +191,9 @@ def test_reviews_per_month_is_stable_across_rebuilds(tmp_path):
         finally:
             conn.close()
     assert seen[0] == seen[1] == seen[2]
-    assert tuple(seen[0]) == pins.APP_STORE_SAMPLE_REVIEWS_PER_MONTH
+    assert tuple(seen[0]) == (
+        pins.APP_STORE_SAMPLE_REVIEWS_PER_MONTH + pins.OA_SAMPLE_REVIEWS_PER_MONTH
+    )
 
 
 def test_rebuild_from_captures_is_byte_stable_under_a_moving_clock(
@@ -187,7 +221,7 @@ def test_rebuild_from_captures_is_byte_stable_under_a_moving_clock(
             _query(db, "select * from raw_reviews order by external_id, content_hash")
         )
     assert rows[0] == rows[1]
-    assert len(rows[0]) == pins.APP_STORE_SAMPLE_RAW_ROWS
+    assert len(rows[0]) == pins.SAMPLES_RAW_REVIEWS
 
 
 def test_refused_page_loads_nothing_from_the_capture(tmp_path):
