@@ -92,6 +92,15 @@ def test_crawl_delay_is_the_longer_of_ours_and_the_catch_alls():
             "User-agent: *\nDisallow: /\n<script>x</script>\n",
             False,
         ),  # one bad line spoils it
+        # a non-empty body with no rules must still carry a User-agent line,
+        # unless it is nothing but Sitemap lines (round 4)
+        ("Error: 503 backend unavailable", False),
+        ("Forbidden: access denied by policy\nstatus: 404\n", False),
+        ("Host: example.org\n", False),
+        ("Sitemap: https://h/a.xml\nSitemap: https://h/b.xml\n", True),
+        # a rule before the first group refuses even when a group follows
+        ("Disallow: /*/rss/*\nUser-agent: *\nDisallow:\n", False),
+        ("Allow: /\n\nUser-agent: *\nDisallow: /\n", False),
     ],
 )
 def test_reads_as_robots_is_decided_by_the_body_alone(body, is_robots):
