@@ -262,18 +262,21 @@ stop patching, state the invariant, re-implement once, one scoped re-review.
 
 **A6 — the robots gate, re-implemented against its invariant** (round 3:
 code-reviewer #1 #3 #4 #5 #6 #8, security-reviewer #1 #2, functionality-tester
-F1–F5). Invariant 5, restated for the gate: *for every robots response, a feed
-request is made only if the body reads as a robots file on its own terms and
-the path is allowed by both the groups written for us and the `*` group.*
+F1–F5). Invariant 5, restated for the gate: *for every robots response with
+status 200, a feed request is made only if the body reads as a robots file on
+its own terms and the path is allowed by both the groups written for us and
+the `*` group* (a 404 is a file with no rules; any other status refuses).
 Three consequences, one mechanism:
 (a) *What counts as a robots file is decided by the body alone.* The
 content-type is recorded, never trusted: a 200 body is a robots file when
 every non-blank, non-comment line is directive-shaped (`<key>: <value>` with a
-letter-or-hyphen key) and, if it carries any `Allow`/`Disallow`, it also
-carries a `User-agent:` group for them to belong to. An empty body is a robots
-file with no rules. Anything else — an HTML or JSON page under any
-content-type, a plain-text error, a rule line before any group — is a one-line
-refusal like the 503 branch. The status and content-type are archived as
+letter-or-hyphen key; a leading byte-order mark is skipped), a non-empty body
+carries a `User-agent:` line unless every line is a `Sitemap:`, and no
+`Allow`/`Disallow` comes before the first `User-agent:`. An empty body and a
+sitemap-only body are robots files with no rules. Anything else — an HTML or
+JSON page under any content-type, a plain-text error even with colons in it
+(`Error: 503`), a rule line before the first group — is a one-line refusal
+like the 503 branch. The status and content-type are archived as
 `robots.meta.json` beside `robots.txt`, so a capture shows why its run
 proceeded.
 (b) *Our group never displaces the catch-all group.* The groups written for us
@@ -281,9 +284,12 @@ are those whose non-empty User-agent value is a case-insensitive substring of
 our product token (`friction-ledger`) at least three characters long, or has
 the token as a substring (so `friction-ledger`, `friction-ledger/0.1`,
 `FRICTION-LEDGER`, `friction` all select; `study`, `github`, `ai`, `f` and
-`0.1` do not — a one- or two-letter value is noise, not a name); `*` applies as well,
-always. A path is allowed only if both verdicts allow it; the Crawl-delay is
-the longer of the two. An over-broad selector can therefore only tighten.
+`0.1` do not — a one- or two-letter value is noise, not a name); `*` applies
+as well, always, and is never ours. A run of `User-agent:` lines ends at any
+other line, so a `Sitemap:` between two of them cannot fuse two groups. A
+path is allowed only if both verdicts allow it; the Crawl-delay is the longer
+declared anywhere for either, within a group or across groups. An over-broad
+selector can therefore only tighten.
 (c) *No caller decides which rules bind us.* `Robots.parse(text)` reads the
 product token from `politeness.USER_AGENT`; the parameter goes.
 Pinned by: an HTML page with colons in it, a JSON error, a plain-text error
@@ -295,8 +301,15 @@ body allows; a `Sitemap:`-only body allows; `*` Disallow-all beside an empty
 Crawl-delay 10 beside our group's 2 yields 10; each of the four required
 forms of our token selects our group; the refusal tests assert that only
 `/robots.txt` was requested; `robots.meta.json` carries status and
-content-type; `urllib.robotparser` stays absent; the `DIRECTIVES` closed set
-is pinned by a colon-bearing negative.
+content-type; `urllib.robotparser` stays absent; the directive shape and the
+`User-agent:` requirement are pinned by colon-bearing negatives (an HTML page
+with attributes, `Error: 503`); a `Sitemap:` between two `User-agent:` lines
+does not fuse their groups; `*` merged into ours would loosen our own
+Disallow and is pinned absent; a BOM-led file is obeyed; the matching table
+(`$`, inner `*`, longest match, Allow on a tie) stands on its own.
+*Round 4 (2026-09-02), the one scoped re-review the cap prescribes, found
+the parser edges above; each landed as a single fix with its pin, none
+changed the invariant.*
 
 *Not amended, disposed as fixes or accepted:* page order past page-9, the
 literal 2 s pin, the whole-repo layout grep, no directory before robots
@@ -357,7 +370,9 @@ snapshot commit.
   varies the User-Agent. Each run writes one capture:
   `data/cache/app-store/<source-name>/<capture-id>/page-<n>.json` (the body,
   byte-exact) beside `page-<n>.meta.json` (`source_url`, `captured_at`,
-  `status`) and the `robots.txt` it obeyed; `<capture-id>` is the run's
+  `status`), the `robots.txt` it obeyed and, since A6, `robots.meta.json`
+  (the status and content-type that answer came with; the frozen sample
+  predates it and nothing reads it at rebuild, so no re-freeze); `<capture-id>` is the run's
   `captured_at`. `data/cache/` is under the gitignored `data/*` — the corpus is
   never tracked (brief §2.5, §10). Satisfies invariants 5 and 6. Rejected:
   overwriting one cache per source (loses capture history, which is what

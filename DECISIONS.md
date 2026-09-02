@@ -404,17 +404,37 @@ mart, no model.
 - **Review round 2 (2026-09-02) — amendment A5, approved and built:** we
   treat a reply as the site's rules file only when it looks like one — plain
   text, or carrying a rule line; a decorated error page that answers "OK" is
-  a refusal, never permission (round 3 tightened this further: A6);
+  a refusal, never permission (superseded in part by A6 below);
   `AppStoreSource` carries `fetchable` and `terms`, so a recorded terms
   position is declared in code and refused before any request rather than
   inferred from a live fetch; we pick the block of rules written for our
   crawler by looking for its name inside the whole User-Agent line, so a
-  version suffix no longer drops us into the catch-all block (A6 narrows
-  the match and keeps the catch-all block in force beside ours). Rejected:
-  trusting any 200 (the round 1 failure class
-  again); keeping the position only in this file (a robots hiccup would
-  silently re-enable the fetch); exact token equality (a group written for us
-  with a version suffix fell through to `*`, permissively).
+  version suffix no longer drops us into the catch-all block (superseded by
+  A6 below). Rejected: trusting any 200 (the round 1 failure class again);
+  keeping the position only in this file (a robots hiccup would silently
+  re-enable the fetch); exact token equality (a group written for us with a
+  version suffix fell through to `*`, permissively).
+- **Review round 3 (2026-09-02) — amendment A6, approved and built; the
+  review cap.** Rounds 2 and 3 had each found the previous round's robots
+  fix permissive at an edge, so the cap applied: stop patching, state the
+  invariant, rebuild the check once. The invariant: a feed page is asked for
+  only if the reply reads as the site's rules file on its own terms and the
+  path is allowed by both the rules written for us and the rules written for
+  everyone. In practice: the body alone decides whether there is a file to
+  obey (every line rule-shaped, a `User-agent:` line unless the file is only
+  sitemaps, no rule before the first group; the content-type is archived
+  beside it, never trusted); our block is the one naming our product token,
+  never the rest of the User-Agent line, and the everyone block always
+  applies beside it, so a wide match can only tighten; the longer of the two
+  waits wins; which rules bind us is never a caller's value. Round 4, the
+  one scoped re-review the cap allows, found four parser edges (a `Sitemap:`
+  between two `User-agent:` lines fusing groups, a colon-bearing error body
+  read as rules-free, a leading byte-order mark, a second wait in one
+  group); each landed as one fix with its pin and none changed the
+  invariant. Rejected: a third patch to the matcher (the cap); trusting the
+  content-type (the round 3 hole); requiring a closed set of directive keys
+  (`Host:` and `Clean-param:` are real and harmless; the shape is the
+  guard, the `User-agent:` requirement the authority).
 - **The sample is a new frozen fixture, `fixtures/app-store/`,** hand-written
   in the feed's exact shape (placeholder author labels, bodies marked
   fictional, app id 0): a real captured page would publish raw corpus and

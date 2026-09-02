@@ -426,12 +426,10 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 ## Current status
 
 **Phase 2 — One scraper, end to end** (`phase-2-scraper`, spec
-`specs/phase-2-scraper.md`): built; review rounds 1 to 3 done, their fixes
-and the five amendments they produced (A1–A5, DECISIONS → Phase 2) in; one
-more (A6, the robots gate re-implemented against its invariant) awaits
-approval. We can now collect published reviews from an app store politely and
-count how many arrive each month, but the one source we tried asks crawlers
-not to read its
+`specs/phase-2-scraper.md`): built; review rounds 1 to 4 done, their fixes
+and the six amendments they produced (A1–A6, DECISIONS → Phase 2) in. We can
+now collect published reviews from an app store politely and count how many
+arrive each month, but the one source we tried asks crawlers not to read its
 review feed, so the counts so far come from a hand-written sample and the
 first real rows wait for a source that allows us. The collector reads the
 site's robots file first and checks every page against it, waits at least two
@@ -449,9 +447,9 @@ rule; the capture was deleted and the matcher replaced (DECISIONS → Gotchas
 and the terms position). The DONE command is the frozen-sample form, `make
 rebuild FIXTURE=app-store && make idempotency-check FIXTURE=app-store` (raw 8 /
 staging 8); the synthetic line stays green (raw 40 / staging 39).** Phase 1
-merged (PR #3). Next: A6, a scoped round 4, coherence audit, Delivered
-paragraph, PR; then Phase 3a — snapshots and the remaining polite sources,
-starting with one whose robots file lets us read its reviews.
+merged (PR #3). Next: the coherence audit, the Delivered paragraph, the PR;
+then Phase 3a — snapshots and the remaining polite sources, starting with one
+whose robots file lets us read its reviews.
 
 Open BACKLOG rows: **12**.
 
