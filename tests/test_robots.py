@@ -232,3 +232,22 @@ def test_a_pathological_pattern_matches_in_linear_time():
     assert _matches("/*json$", "/fr/rss/page=1/json") is True
     assert _matches("/*json$", "/fr/rss/page=1/json?x") is False
     assert _matches("", "/anything") is True  # an empty pattern is a prefix of all
+
+
+def test_the_frozen_app_store_robots_file_disallows_the_sample_feed():
+    """Phase 3a (BACKLOG row "permissive frozen robots.txt"): the frozen file is
+    the real rule, read through the matcher, and it refuses the sample's own
+    page address — the frozen capture documents why its source is not fetched."""
+    from pathlib import Path
+
+    from ingest.sources import by_name
+    from tests import pins
+
+    text = (
+        Path(__file__).resolve().parent.parent / "fixtures" / "app-store" / "robots.txt"
+    ).read_text()
+    rules = Robots.parse(text)
+    assert reads_as_robots(text)
+    assert rules.allows(pins.APP_STORE_SAMPLE_FIRST_ROW["source_url"]) is False
+    assert rules.allows(by_name("fr-digital-first").page_url(1)) is False
+    assert rules.allows("https://itunes.apple.com/fr/app/id1") is True
