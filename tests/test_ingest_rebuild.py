@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from ingest.app_store import FeedShapeError, read_captures
+from ingest.app_store import FeedShapeError, capture_pages, read_captures
 from pipeline.build import idempotency_check, rebuild
 from pipeline.metrics import reviews_per_month
 from pipeline.warehouse import connect
@@ -69,6 +69,27 @@ def test_reviews_per_month_matches_pins(tmp_path):
         assert tuple(reviews_per_month(conn)) == pins.APP_STORE_SAMPLE_REVIEWS_PER_MONTH
     finally:
         conn.close()
+
+
+def test_pages_beyond_nine_are_read_in_numeric_order(tmp_path):
+    """A ten-page capture is read page-1 .. page-10, not page-1, page-10,
+    page-2 (string order); the row's `source_url` follows the same order."""
+    d = tmp_path / "ten"
+    d.mkdir()
+    page = (SAMPLE / "page-2.json").read_bytes()  # three well-formed items
+    for n in range(1, 11):
+        (d / f"page-{n}.json").write_bytes(page)
+        meta = {
+            "source_url": f"https://itunes.apple.com/fr/rss/x/page={n}/json",
+            "captured_at": pins.APP_STORE_SAMPLE_CAPTURED_AT,
+            "status": 200,
+        }
+        (d / f"page-{n}.meta.json").write_text(json.dumps(meta))
+    expected = [f"page-{n}.json" for n in range(1, 11)]
+    assert [p.name for p in capture_pages(d)] == expected
+    ((_, rows),) = read_captures(d)
+    seen = [int(r["source_url"].rsplit("page=", 1)[1].split("/")[0]) for r in rows]
+    assert seen == sorted(seen) and seen[-1] == 10
 
 
 def test_read_captures_orders_captures_then_pages_then_items():
