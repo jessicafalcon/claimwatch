@@ -4,10 +4,13 @@
 # after a .py, .sql, .yaml or .yml file in this project changes. SQL files
 # and rules.yaml are code here. Makes a broken test VISIBLE the instant it breaks.
 #
-# This gate deliberately fails OPEN (missing pytest, malformed event → allow):
-# it is a visibility aid, not a security control. A hung suite (timeout) DOES
-# block — silence there would hide a real problem. Don't "fix" the open cases
-# into fail-closed — that would block all edits on a broken venv.
+# This gate deliberately fails OPEN — exit 0, no run — in exactly four cases:
+# a malformed event, no CLAUDE_PROJECT_DIR in the environment, a project dir
+# it cannot chdir into, and no pytest on the venv or PATH. It is a visibility
+# aid, not a security control. A red suite blocks (exit 2) and so does a hung
+# one: the timeout is RUN_TESTS_TIMEOUT seconds (digits only, default 120) —
+# silence there would hide a real problem. Don't "fix" the open cases into
+# fail-closed — that would block all edits on a broken venv.
 #
 # Wiring is LOCAL-ONLY, in the gitignored .claude/settings.local.json (see
 # CLAUDE.md → Project tooling). A tracked settings.json would auto-execute an
@@ -18,6 +21,13 @@ import subprocess
 import sys
 
 CODE_SUFFIXES = (".py", ".sql", ".yaml", ".yml")
+DEFAULT_TIMEOUT = 120
+
+
+def timeout_seconds() -> int:
+    """RUN_TESTS_TIMEOUT is foreign input: digits only, else the default."""
+    raw = os.environ.get("RUN_TESTS_TIMEOUT", "")
+    return int(raw) if raw.isdigit() and int(raw) > 0 else DEFAULT_TIMEOUT
 
 
 def main() -> None:
@@ -68,13 +78,15 @@ def main() -> None:
     # (an .env-loaded API key) out of the suite and nothing else — the tests still
     # run as you, with your HOME (CLAUDE.md → Project tooling states the risk).
     env = {k: os.environ[k] for k in ("PATH", "HOME") if k in os.environ}
+    limit = timeout_seconds()
     try:
         res = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=120, check=False, env=env
+            cmd, capture_output=True, text=True, timeout=limit, check=False, env=env
         )
     except subprocess.TimeoutExpired:
         print(
-            f"[run-tests] suite timed out (120s) after editing {fp}.", file=sys.stderr
+            f"[run-tests] suite timed out ({limit}s) after editing {fp}.",
+            file=sys.stderr,
         )
         sys.exit(2)
     # pytest exit code 5 = "no tests collected" — an early repo, not a failure.

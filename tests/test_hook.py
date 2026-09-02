@@ -18,10 +18,13 @@ RED = "def test_bad():\n    assert False\n"
 GREEN = "def test_ok():\n    assert True\n"
 
 
-def _hook(stdin: str, project: Path | None) -> subprocess.CompletedProcess[str]:
+def _hook(
+    stdin: str, project: Path | None, **extra: str
+) -> subprocess.CompletedProcess[str]:
     env = {
         "PATH": VENV_BIN + os.pathsep + os.environ.get("PATH", ""),
         "HOME": os.environ.get("HOME", ""),
+        **extra,
     }
     if project is not None:
         env["CLAUDE_PROJECT_DIR"] = str(project)
@@ -69,6 +72,28 @@ def test_non_code_and_outside_files_are_skipped(tmp_path: Path):
     assert res.returncode == 0 and res.stderr == ""
     outside = json.dumps({"tool_input": {"file_path": "/elsewhere/repo/x.py"}})
     assert _hook(outside, p).returncode == 0
+
+
+def test_hung_suite_blocks_with_exit_2(tmp_path: Path):
+    """The one deliberately blocking open case: a suite that never finishes.
+    RUN_TESTS_TIMEOUT shortens the wait; a non-digit value means the default."""
+    p = _project(tmp_path, "import time\n\n\ndef test_slow():\n    time.sleep(30)\n")
+    res = _hook(_event(p), p, RUN_TESTS_TIMEOUT="1")
+    assert res.returncode == 2 and "timed out (1s)" in res.stderr
+    assert "Traceback" not in res.stderr
+    (tmp_path / "g").mkdir()
+    green = _project(tmp_path / "g", GREEN)
+    assert _hook(_event(green), green, RUN_TESTS_TIMEOUT="x").returncode == 0
+
+
+def test_unreachable_project_dir_fails_open(tmp_path: Path):
+    """The documented open exits: no CLAUDE_PROJECT_DIR, a dir it cannot enter."""
+    p = _project(tmp_path, RED)
+    assert _hook(_event(p), None).returncode == 0
+    gone = tmp_path / "gone"
+    event = json.dumps({"tool_input": {"file_path": str(gone / "x.py")}})
+    res = _hook(event, gone)
+    assert res.returncode == 0 and "Traceback" not in res.stderr
 
 
 def test_malformed_input_fails_open(tmp_path: Path):
