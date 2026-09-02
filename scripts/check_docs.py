@@ -50,7 +50,7 @@ BANNED = (
 )
 GLOSSARY_MAX = 10
 
-_LINK = re.compile(r"\[[^\]]*\]\((?!https?://)(?!mailto:)(?!#)([^)\s]+)\)")
+_LINK = re.compile(r"\[[^\]]*\]\((?!https?://)(?!mailto:)([^)\s]+)\)")
 _MAKE_TICK = re.compile(r"`make ([a-z][a-z0-9-]*)[^`]*`")
 _MAKE_FENCE_LINE = re.compile(r"^\s*make ([a-z][a-z0-9-]*)", re.M)
 _FENCE = re.compile(r"```.*?```", re.S)
@@ -95,7 +95,9 @@ def check_links(files: list[Path], root: Path) -> list[str]:
         text = f.read_text(encoding="utf-8")
         for m in _LINK.finditer(text):
             target, _, anchor = m.group(1).partition("#")
-            dest = (f.parent / target).resolve()
+            # `#local` (no file part) is an anchor in THIS file.
+            dest = f.resolve() if not target else (f.parent / target).resolve()
+            shown = target or f.name
             if root.resolve() not in dest.parents and dest != root.resolve():
                 errors.append(f"{f.relative_to(root)}: link escapes the repo: {target}")
                 continue
@@ -105,7 +107,7 @@ def check_links(files: list[Path], root: Path) -> list[str]:
             if anchor and dest.is_file():
                 if anchor not in anchors(dest.read_text(encoding="utf-8")):
                     errors.append(
-                        f"{f.relative_to(root)}: missing anchor #{anchor} in {target}"
+                        f"{f.relative_to(root)}: missing anchor #{anchor} in {shown}"
                     )
     return errors
 
