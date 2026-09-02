@@ -45,6 +45,15 @@ def test_staging_keeps_latest_capture(synthetic_conn):
     assert rating == pins.EDITED_REVIEW_LATEST_RATING
 
 
+def test_fixture_spans_the_rating_range(synthetic_conn):
+    """The synthetic bodies cover every outcome from one-star to five-star; the
+    ratings span the whole pinned scale (uses tests/pins.py::RATING_RANGE)."""
+    lo, hi = synthetic_conn.execute(
+        "select min(rating), max(rating) from raw_reviews"
+    ).fetchone()
+    assert (lo, hi) == pins.RATING_RANGE
+
+
 def test_staging_tiebreak_is_deterministic_on_equal_captured_at():
     """Invariant 3's tiebreak: two captures of one key sharing a captured_at
     deduplicate to the higher content_hash, whatever the insertion order — so
