@@ -67,6 +67,7 @@ def _classes(attrs: dict[str, str | None]) -> set[str]:
 class _Review:
     def __init__(self) -> None:
         self.rating: str | None = None
+        self.ratings_seen = 0  # more than one ratingValue is outside the shape
         self.sentence: list[str] = []
         self.body: list[str] = []
         self.author_depth: int | None = None  # skipped while set
@@ -91,6 +92,8 @@ class _Walker(HTMLParser):
         self.body_depth: int | None = None
         self.aggregate_depth: int | None = None
         self.aggregates: list[dict[str, str | None]] = []
+        self.aggregate_duplicates: list[str] = []
+        self.nested_reviews = 0  # a review scope inside a review scope
 
     @property
     def current(self) -> _Review | None:
@@ -121,7 +124,10 @@ class _Walker(HTMLParser):
             return
         self.open.setdefault(tag, []).append(len(self.stack))
         self.stack.append((tag, attrs))
-        if scope and _REVIEW_TYPE.match(itemtype) and self.review_depth is None:
+        if scope and _REVIEW_TYPE.match(itemtype):
+            if self.review_depth is not None:
+                self.nested_reviews += 1  # outside the shape: refused, never dropped
+                return
             self.review_depth = depth
             self.reviews.append(_Review())
             return
@@ -197,6 +203,13 @@ def _review_row(
     item = f"review {k}"
     if review.rating is None:
         raise refuse(page_url, item, "ratingValue", "is missing")
+    if review.ratings_seen > 1:
+        raise refuse(
+            page_url,
+            item,
+            "ratingValue",
+            f"appears {review.ratings_seen} times, not once",
+        )
     if not re.fullmatch(r"[1-5]", review.rating):
         raise refuse(
             page_url, item, "ratingValue", f"is not a digit 1..5: {review.rating!r}"

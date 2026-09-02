@@ -239,3 +239,47 @@ def test_a_pathological_page_parses_in_linear_time():
     parsed = parse(html, PAGE_URL, CAPTURED, SRC)
     assert time.perf_counter() - t0 < 1.0
     assert len(parsed.reviews) == pins.OA_SAMPLE_REVIEWS_ON_PAGES[0]
+
+
+def test_two_rating_values_in_one_review_refuse_the_page():
+    """Round 1, functionality-tester F2: a second ratingValue used to win
+    silently; the shape declares one, so two refuse the page."""
+    html = _second_review(
+        _page(1),
+        lambda s: s.replace(
+            '<meta itemprop="ratingValue" content="5">',
+            '<meta itemprop="ratingValue" content="5"><meta itemprop="ratingValue" content="1">',
+            1,
+        ),
+    )
+    with pytest.raises(
+        PageShapeError, match="review 2': field 'ratingValue' appears 2 times"
+    ):
+        parse(html, PAGE_URL, CAPTURED, SRC)
+    twice = _page(1).replace(
+        '<meta itemprop="ratingCount" content="512">',
+        '<meta itemprop="ratingCount" content="512"><meta itemprop="ratingCount" content="9">',
+    )
+    with pytest.raises(PageShapeError, match="'ratingCount' appears twice"):
+        parse(twice, PAGE_URL, CAPTURED, SRC)
+
+
+def test_a_nested_review_scope_refuses_the_page():
+    """A review scope inside another used to be dropped without a word; it is
+    outside the declared shape and refuses the page."""
+    scopes = _page(1).split('itemtype="https://schema.org/review"')
+    inner = (
+        '<div itemscope itemtype="https://schema.org/review" itemprop="review">'
+        '<div itemscope itemprop="reviewRating" itemtype="https://schema.org/Rating">'
+        '<meta itemprop="ratingValue" content="4"></div>'
+        '<div class="oa_description">Avis publié le 01/08/2026 suite à une expérience le 01/07/2026'
+        '<h4 class="oa_text">EXEMPLE FICTIF. Imbriqué.</h4></div></div>'
+    )
+    scopes[1] = scopes[1].replace(
+        '<div class="oa_description">', inner + '<div class="oa_description">', 1
+    )
+    html = 'itemtype="https://schema.org/review"'.join(scopes)
+    with pytest.raises(
+        PageShapeError, match="field 'review' 1 review scope\(s\) nested"
+    ):
+        parse(html, PAGE_URL, CAPTURED, SRC)
