@@ -65,9 +65,10 @@ in the middle, and come out on the right as the numbers the study shows.
   holds every pinned number.
 - `.claude/` — agents (report-only), commands, the run-tests hook. Settings
   are local-only and gitignored.
-- `.github/workflows/ci.yml` — lint, check-docs, check-backing, test, rebuild
-  (synthetic) + idempotency-check. `weekly.yml` *(Phase 4)* — the scheduled
-  scrape + snapshot commit.
+- `.github/workflows/ci.yml` — lint, check-docs, check-backing, test, then
+  rebuild + idempotency-check twice: once on the synthetic fixture, once on the
+  frozen App Store sample. `weekly.yml` *(Phase 4)* — the scheduled scrape +
+  snapshot commit.
   `.github/pull_request_template.md` — the PR body.
 - `pyproject.toml`, `uv.lock`, `.python-version`, `.pre-commit-config.yaml` —
   the toolchain (uv, ruff, pytest, pre-commit), versions pinned in lockstep.
@@ -81,11 +82,14 @@ in the middle, and come out on the right as the numbers the study shows.
   `fixtures/synthetic/` — hand-written fake reviews, read-only after Phase 1;
   `fixtures/anchors/` — the brief's §6 public figures with source URLs
   (frozen in Phase 1; first read by `platform_snapshots` in Phase 3);
-  `fixtures/app-store/` — a hand-written sample of the App Store feed in its
-  exact shape (frozen in Phase 2; what CI parses). All three carry a
-  `MANIFEST.sha256`.
-- `ingest/` — the scrapers: `politeness.py` (every manner of a fetch, in one
-  place), `sources.py` (the declared sources, a closed set), `app_store.py`
+  `fixtures/app-store/` — a hand-written capture of the App Store feed in its
+  exact shape: three pages, their meta files and the robots file (frozen in
+  Phase 2; what CI parses). All three carry a `MANIFEST.sha256`.
+- `ingest/` — the scrapers. A *capture* is one run's saved copy of the pages
+  exactly as they arrived, with each page's address and time beside it and the
+  robots file they were checked against. `politeness.py` (the good manners of
+  a fetch in one place: read robots.txt first, say who we are, wait between
+  requests), `sources.py` (the declared sources, a closed set), `app_store.py`
   (the strict parser to the raw shape; reads captures back), `fetch.py` (the
   only `httpx` import; writes captures under `data/cache/`). *(Phase 3)*
   snapshot capture and the other sources. *(Phase 5+)*
@@ -93,7 +97,7 @@ in the middle, and come out on the right as the numbers the study shows.
   `eval/` (the only reader of `labels.csv`). *(Phase 8)* `models/` —
   `cost_model.py` (`FORMULAS`), `guardrail_sim.py`. *(Phase 9)* `study/` —
   Metabase setup + the HTML export. *(Phase 10)* `dags/friction_ledger.py`.
-- `data/` — gitignored working output (corpus, cached pages, `*.duckdb`);
+- `data/` — gitignored working output (corpus, captured pages, `*.duckdb`);
   `data/snapshots/` *(Phase 4)* is the one tracked subtree.
 
 ## Commands (macOS, uv)
@@ -114,12 +118,13 @@ in the middle, and come out on the right as the numbers the study shows.
 - `make rebuild [TARGET=duckdb] [FIXTURE=cache|empty|synthetic|app-store]` —
   build the warehouse from raw (DuckDB; Snowflake defers to Phase 10) and print
   reviews per month. The default, `cache`, loads every capture under
-  `data/cache/app-store/` (none yet → nothing loaded, with a hint); `empty`
+  `data/cache/app-store/` (with no capture it loads nothing and says so); `empty`
   runs it end to end with zero rows; `synthetic` loads the fixture;
   `app-store` runs the frozen sample through the real parser (CI does).
 - `make idempotency-check [TARGET=] [FIXTURE=synthetic]` — rebuild twice, diff
   per-table row counts (the run-twice property as a command); same `FIXTURE`
-  set as `rebuild`, so `FIXTURE=cache` proves it on real rows.
+  values as `rebuild`, but this one defaults to `synthetic`; pass
+  `FIXTURE=cache` to prove it on real rows.
 - `make scrape [SOURCE=<declared name>]` — NETWORK, developer-run, never by an
   agent: fetch the declared source's public review feed into a new capture
   under `data/cache/`, robots.txt first, ≥ 2 s apart, identifying User-Agent,
@@ -342,8 +347,8 @@ one, and write one sentence in the README about why.
   the PR template. Title `Phase N — <name>`.
 - CI runs `make lint`, `make check-docs`, `make check-backing`, `make test`,
   `make rebuild FIXTURE=synthetic`, `make idempotency-check` and the same two
-  with `FIXTURE=app-store` (offline, DuckDB, no key, no fetch). Mergeable only when CI is green and the surface's agents
-  have run.
+  with `FIXTURE=app-store` (offline, DuckDB, no key, no fetch). Mergeable only
+  when CI is green and the surface's agents have run.
 - The developer merges (squash), never Claude. After merge: `git checkout
   main && git pull`.
 - Hotfixes on `fix/<slug>` from main, same rules. Never mix two phases in a
