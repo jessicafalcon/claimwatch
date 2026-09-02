@@ -15,8 +15,14 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from review_common import make_targets  # noqa: E402
 
+from pipeline.build import FIXTURES  # noqa: E402
+from pipeline.cli import Refused, confirmed, resolve_choice  # noqa: E402
+from pipeline.warehouse import TARGETS  # noqa: E402
+
 ROOT = Path(__file__).resolve().parent.parent
-SCRUB = ("SPEC", "BASE", "MAKEFLAGS", "MFLAGS")
+SCRUB = ("SPEC", "BASE", "TARGET", "FIXTURE", "CONFIRM", "MAKEFLAGS", "MFLAGS")
+
+BAD_VALUES = ("../x", '"; echo pwned; "', "$(shell echo x)", "sqlite", "SYNTHETIC")
 
 
 def _env(extra: dict[str, str]) -> dict[str, str]:
@@ -97,3 +103,66 @@ def test_make_targets_ignores_variable_assignments(tmp_path: Path):
         "foo := 1\nfoo2:= 1\nbaz:=3\nqux::= 4\nbar:\n\tx\ndc::\n\ty\n.PHONY: bar\n"
     )
     assert make_targets(tmp_path) == {"bar", "dc"}
+
+
+# --- Phase 1: the pipeline targets (rebuild, idempotency-check, reset) ---
+
+
+def test_rebuild_variables_are_a_closed_set():
+    """TARGET/FIXTURE validate against a closed set; a value is never a path, so
+    `../x` or a metacharacter is just a name not in the set."""
+    assert resolve_choice("", TARGETS, "duckdb") == "duckdb"  # empty -> default
+    assert resolve_choice("duckdb", TARGETS, "duckdb") == "duckdb"
+    assert resolve_choice("", FIXTURES, "empty") == "empty"
+    assert resolve_choice("synthetic", FIXTURES, "empty") == "synthetic"
+    for bad in BAD_VALUES:
+        with pytest.raises(Refused):
+            resolve_choice(bad, TARGETS, "duckdb")
+
+
+def test_idempotency_check_variables_are_a_closed_set():
+    assert resolve_choice("", FIXTURES, "synthetic") == "synthetic"  # its default
+    assert resolve_choice("empty", FIXTURES, "synthetic") == "empty"
+    for bad in BAD_VALUES:
+        with pytest.raises(Refused):
+            resolve_choice(bad, FIXTURES, "synthetic")
+
+
+def test_fixture_outside_the_set_is_refused():
+    for bad in ("../x", "prod", '"; rm -rf', "SYNTHETIC"):
+        with pytest.raises(Refused):
+            resolve_choice(bad, FIXTURES, "empty")
+
+
+@pytest.mark.parametrize("target", ["rebuild", "idempotency-check"])
+@pytest.mark.parametrize(
+    "var, flag", [("TARGET", "--target"), ("FIXTURE", "--fixture")]
+)
+def test_pipeline_variables_reach_python_as_one_literal(target, var, flag):
+    """Whatever the origin, the recipe carries the UNEXPANDED value as one
+    single-quoted token — no shell, no make function runs."""
+    value = "$(shell echo pwned)"
+    quoted = "'" + value.replace("'", "'\\''") + "'"
+    for origin in ("cmdline", "env"):
+        out = _make_n(
+            target,
+            {var: value} if origin == "cmdline" else {},
+            {var: value} if origin == "env" else {},
+        )
+        assert f"{flag}={quoted}" in out, (var, origin, out)
+        assert "pwned" not in out.replace(value, "")
+
+
+def test_reset_requires_command_line_confirm():
+    """`confirmed` gates on the value AND its origin; the recipe passes the true
+    `$(origin CONFIRM)`, so an environment CONFIRM=yes cannot pose as one from
+    the command line."""
+    assert confirmed("yes", "command line") is True
+    assert confirmed("yes", "environment") is False
+    assert confirmed("", "command line") is False
+    assert confirmed("no", "command line") is False
+    from_cmdline = _make_n("reset", {"CONFIRM": "yes"}, {})
+    assert "--confirm='yes'" in from_cmdline
+    assert "--confirm-origin='command line'" in from_cmdline
+    from_env = _make_n("reset", {}, {"CONFIRM": "yes"})
+    assert "--confirm-origin='environment'" in from_env

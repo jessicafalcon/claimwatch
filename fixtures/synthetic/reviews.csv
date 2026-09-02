@@ -1,0 +1,41 @@
+source,external_id,source_url,captured_at,review_date,rating,title,body
+opinion-assurances,OA-101,https://www.opinion-assurances.fr/,2026-01-20T09:00:00,2026-01-18,1,Toujours un document de plus,"J'envoie une facture, on me reclame un RIB, puis une ordonnance, puis encore autre chose. Sans fin."
+opinion-assurances,OA-102,https://www.opinion-assurances.fr/,2026-01-20T09:00:00,2026-01-15,2,Refus jamais notifie,"Remboursement refuse sans aucune notification, decouvert dans l'appli par hasard."
+opinion-assurances,OA-103,https://www.opinion-assurances.fr/,2026-01-20T09:00:00,2026-01-10,1,Complementaire ingerable,"En complementaire ils n'arrivent jamais a lire le decompte de la Secu, rejet automatique."
+opinion-assurances,OA-104,https://www.opinion-assurances.fr/,2026-01-20T09:00:00,2026-01-12,2,Aucun interlocuteur,"Le chat repond a cote, pas de telephone, seulement un rappel qui n'arrive jamais."
+opinion-assurances,OA-105,https://www.opinion-assurances.fr/,2026-01-20T09:00:00,2026-01-09,2,"Plus cher, moins couvert","Cotisation en hausse et garanties en baisse, on nous pousse vers leur boutique."
+opinion-assurances,OA-106,https://www.opinion-assurances.fr/,2026-01-20T09:00:00,2026-01-08,5,Rapide et simple,"Dossier rembourse en deux jours, rien a redire."
+opinion-assurances,OA-107,https://www.opinion-assurances.fr/,2026-01-20T09:00:00,2026-01-05,3,Correct sans plus,"Application correcte, quelques bugs au login."
+opinion-assurances,OA-201,https://www.opinion-assurances.fr/,2026-02-10T09:00:00,2026-02-08,2,Dossier bloque,"Ma demande est en attente depuis des semaines, aucune avancee."
+opinion-assurances,OA-201,https://www.opinion-assurances.fr/,2026-03-15T09:00:00,2026-03-14,1,"Toujours bloque, edite","Mise a jour: toujours rien apres un mois, on redemande les memes papiers."
+opinion-assurances,OA-108,https://www.opinion-assurances.fr/,2026-02-11T09:00:00,2026-02-09,1,Trois pieces pour 40 euros,Troisieme piece demandee pour un remboursement de quarante euros.
+opinion-assurances,OA-109,https://www.opinion-assurances.fr/,2026-02-11T09:00:00,2026-02-07,4,Un peu lent,"Correct, un peu lent mais regle au final."
+app-store,AS-301,https://apps.apple.com/,2026-01-22T09:00:00,2026-01-20,5,Super appli,"Super appli, remboursements rapides."
+app-store,AS-302,https://apps.apple.com/,2026-01-22T09:00:00,2026-01-19,1,Refus muet,"Refus sans notification, aucune explication."
+app-store,AS-303,https://apps.apple.com/,2026-01-22T09:00:00,2026-01-18,2,Justificatifs sans fin,On me redemande sans cesse des justificatifs.
+app-store,AS-304,https://apps.apple.com/,2026-01-22T09:00:00,2026-01-16,3,Jolie interface,"Interface jolie, sans plus."
+app-store,AS-305,https://apps.apple.com/,2026-01-22T09:00:00,2026-01-14,1,Bot qui tourne en rond,"Impossible de joindre quelqu'un, le bot tourne en rond."
+app-store,AS-306,https://apps.apple.com/,2026-01-22T09:00:00,2026-01-13,2,Part deja payee ignoree,Ils ne comprennent pas la part deja payee par un autre assureur.
+app-store,AS-307,https://apps.apple.com/,2026-01-22T09:00:00,2026-01-11,5,Tout marche,"Rien a dire, tout marche."
+app-store,AS-308,https://apps.apple.com/,2026-01-22T09:00:00,2026-01-10,4,Bonne experience,Bonne experience globale.
+app-store,AS-309,https://apps.apple.com/,2026-01-22T09:00:00,2026-01-08,1,Prix en hausse,Prix qui grimpe chaque annee.
+app-store,AS-310,https://apps.apple.com/,2026-01-22T09:00:00,2026-01-06,2,La boucle des documents,"La boucle des documents, un classique ici."
+google-play,GP-401,https://play.google.com/,2026-01-25T09:00:00,2026-01-23,1,Encore un document,"Encore un document, encore un delai."
+google-play,GP-402,https://play.google.com/,2026-01-25T09:00:00,2026-01-22,2,Rejet en silence,"Demande rejetee en silence, decouvert tout seul."
+google-play,GP-403,https://play.google.com/,2026-01-25T09:00:00,2026-01-21,1,Deuxieme payeur rejete,Deuxieme payeur: rejet systematique au premier passage.
+google-play,GP-404,https://play.google.com/,2026-01-25T09:00:00,2026-01-19,3,Ca va,"Ca va, sans plus."
+google-play,GP-405,https://play.google.com/,2026-01-25T09:00:00,2026-01-17,5,Nickel,Remboursement nickel.
+google-play,GP-406,https://play.google.com/,2026-01-25T09:00:00,2026-01-15,2,Support inutile,Support qui ne debloque rien.
+google-play,GP-407,https://play.google.com/,2026-01-25T09:00:00,2026-01-13,1,Garanties rabotees,Garanties rabotees d'annee en annee.
+google-play,GP-408,https://play.google.com/,2026-01-25T09:00:00,2026-01-11,4,Plutot satisfait,Plutot satisfait de l'ensemble.
+google-play,GP-409,https://play.google.com/,2026-01-25T09:00:00,2026-01-09,2,Piece manquante,Toujours une piece manquante selon eux.
+google-play,GP-410,https://play.google.com/,2026-01-25T09:00:00,2026-01-07,3,Neutre,Sans opinion tranchee.
+trustpilot,TP-501,https://www.trustpilot.com/,2026-02-01T09:00:00,2026-01-28,1,Urgences en attente,"Facture urgences d'environ 340 euros en attente depuis des mois, on reclame des papiers en boucle."
+trustpilot,TP-502,https://www.trustpilot.com/,2026-02-01T09:00:00,2026-01-27,2,Refus sans alerte,"Aucune alerte lors d'un refus, il faut aller verifier."
+trustpilot,TP-503,https://www.trustpilot.com/,2026-02-01T09:00:00,2026-01-26,1,Decompte illisible,Decompte d'un autre assureur illisible pour leur systeme.
+trustpilot,TP-504,https://www.trustpilot.com/,2026-02-01T09:00:00,2026-01-24,5,Impeccable,"Service impeccable, remboursement rapide."
+trustpilot,TP-505,https://www.trustpilot.com/,2026-02-01T09:00:00,2026-01-22,2,Rappel jamais recu,"Pas de ligne telephonique, le rappel n'arrive jamais."
+trustpilot,TP-506,https://www.trustpilot.com/,2026-02-01T09:00:00,2026-01-20,1,Prime en hausse,Hausse de prime injustifiee cette annee.
+trustpilot,TP-507,https://www.trustpilot.com/,2026-02-01T09:00:00,2026-01-18,3,Moyen,Experience moyenne.
+trustpilot,TP-508,https://www.trustpilot.com/,2026-02-01T09:00:00,2026-01-16,4,Correct,Correct dans l'ensemble.
+trustpilot,TP-509,https://www.trustpilot.com/,2026-02-01T09:00:00,2026-01-14,2,Documents un par un,Encore des documents demandes un par un.

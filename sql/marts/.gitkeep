@@ -1,0 +1,3 @@
+# The mart layer is empty in Phase 1: every mart is deferred to the phase that
+# lands its upstream (spec Phase 1, first pinned decision). Marts arrive as
+# sql/marts/<name>.sql, each named by a BACKING row; check-backing enforces it.

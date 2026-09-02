@@ -1,9 +1,10 @@
 # The Friction Ledger — one command per stage. `make help` lists them.
 # Pipeline targets land with their phases (CLAUDE.md → Commands):
-# rebuild, idempotency-check (Phase 1); scrape (2); label-sample, classify-eval
-# (5); model (8); study (9).
+# rebuild, idempotency-check, reset (Phase 1); scrape (2); label-sample,
+# classify-eval (5); model (8); study (9).
 
-.PHONY: help setup test lint check-docs check-backing review-gate
+.PHONY: help setup test lint check-docs check-backing review-gate \
+        rebuild idempotency-check reset
 
 # User variables reach recipes ONLY as make values via `$(call _Q,$(value VAR))`
 # — UNEXPANDED and single-quoted — so a value like `SPEC='$(shell …)'` or
@@ -11,10 +12,10 @@
 # shell or make function runs on it; Python validates. `unexport` is hygiene
 # only (keeps the value out of the child's environment) — an environment-set
 # variable still reaches the recipe. The only way to tell command line from
-# environment is `$(origin VAR)`; every future CONFIRM knob tests
-# `$(origin CONFIRM)` = `command line` inside its recipe (specs/TEMPLATE.md →
-# Threat model; pinned by tests/test_makefile.py).
-unexport SPEC BASE
+# environment is `$(origin VAR)`; the destructive `reset` passes
+# `$(origin CONFIRM)` to Python, which confirms only on `command line`
+# (specs/TEMPLATE.md → Threat model; pinned by tests/test_makefile.py).
+unexport SPEC BASE TARGET FIXTURE CONFIRM
 _Q = '$(subst ','\'',$(1))'
 
 help: ## list the targets
@@ -38,3 +39,12 @@ check-backing: ## BACKING rows ↔ sql/marts files ↔ tags ↔ sources ↔ SPEC
 
 review-gate: ## offline gate [SPEC=specs/<f>.md] [BASE=main]; /review-round runs it first
 	uv run python scripts/review_gate.py $(if $(value SPEC),--spec=$(call _Q,$(value SPEC)),) --base=$(call _Q,$(if $(value BASE),$(value BASE),main))
+
+rebuild: ## build the warehouse from raw [TARGET=duckdb] [FIXTURE=empty|synthetic]
+	uv run python -m pipeline rebuild --target=$(call _Q,$(value TARGET)) --fixture=$(call _Q,$(value FIXTURE))
+
+idempotency-check: ## rebuild twice, diff per-table row counts (run-twice property)
+	uv run python -m pipeline idempotency-check --target=$(call _Q,$(value TARGET)) --fixture=$(call _Q,$(value FIXTURE))
+
+reset: ## DESTRUCTIVE drop the DuckDB file — needs CONFIRM=yes on the command line
+	uv run python -m pipeline reset --target=$(call _Q,$(value TARGET)) --confirm=$(call _Q,$(value CONFIRM)) --confirm-origin=$(call _Q,$(origin CONFIRM))

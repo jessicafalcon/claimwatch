@@ -1,0 +1,9 @@
+platform,segment,rating,review_count,captured_at,source_url,seeded_from
+trustpilot,digital-first,4.2,524,2025-01-15,https://www.trustpilot.com/,PROJECT_BRIEF §6
+trustpilot,digital-first,3.8,840,2025-09-15,https://www.trustpilot.com/,PROJECT_BRIEF §6
+trustpilot,digital-first,3.9,975,2026-06-15,https://www.trustpilot.com/,PROJECT_BRIEF §6
+app-store,invited,4.9,5000,2024-09-15,https://apps.apple.com/,PROJECT_BRIEF §6
+google-play,invited,4.5,765,2024-09-15,https://play.google.com/,PROJECT_BRIEF §6
+trustpilot,traditional,4.5,3000,2025-06-15,https://www.trustpilot.com/,PROJECT_BRIEF §6
+trustpilot,traditional,2.7,1200,2025-06-15,https://www.trustpilot.com/,PROJECT_BRIEF §6
+trustpilot,digital-challenger,3.1,600,2025-06-15,https://www.trustpilot.com/,PROJECT_BRIEF §6
