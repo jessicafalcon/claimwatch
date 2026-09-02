@@ -20,6 +20,7 @@ class AppStoreSource:
     name: str  # the SOURCE value and the capture directory; letters, digits, '-'
     app_id: int  # 0 = not filled in yet; the fetcher refuses it
     country: str  # two-letter storefront code
+    listing: str = ""  # where the id came from: the store listing, by id only
 
     @property
     def host(self) -> str:
@@ -37,10 +38,17 @@ class AppStoreSource:
         return f"https://{FEED_HOST}/robots.txt"
 
 
-# The studied segment's first app. `app_id` is filled by the developer at build
-# (it is a number in a data declaration, not a name — CLAUDE.md -> Neutrality).
+# The studied segment's first app: a sourced data point (the id and the listing
+# it was read from, by id only — a number and an address, never a name;
+# CLAUDE.md -> Neutrality). Filled 2026-09-02. Its feed path is disallowed by
+# the host's robots.txt, so the fetcher refuses it (DECISIONS -> terms position).
 SOURCES: tuple[AppStoreSource, ...] = (
-    AppStoreSource(name="fr-digital-first", app_id=1277025964, country="fr"),
+    AppStoreSource(
+        name="fr-digital-first",
+        app_id=1277025964,
+        country="fr",
+        listing="https://apps.apple.com/fr/app/id1277025964",
+    ),
 )
 
 

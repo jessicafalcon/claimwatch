@@ -106,3 +106,6 @@ def test_exactly_one_source_is_declared():
     assert src.host == "itunes.apple.com"
     assert src.page_url(2).startswith("https://itunes.apple.com/")
     assert "page=2/json" in src.page_url(2)
+    # A sourced data point: the listing the id was read from, by id only —
+    # no app or company name in the address.
+    assert src.listing == f"https://apps.apple.com/{src.country}/app/id{src.app_id}"
