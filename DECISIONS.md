@@ -75,7 +75,9 @@ place and never deleted.
     `Disallow: /*/rss/*`).** The first live run fetched one capture before
     the matcher was corrected (see Gotchas); that capture and its database
     were deleted the same day. The source stays declared as a data point (id
-    and listing address) and the fetcher refuses it; the fallback is the
+    and listing address) with `fetchable=False` and this reason as its
+    `terms`, so the fetcher refuses it before any request whatever the host's
+    file says on a later day (amendment A5); the fallback is the
     manual snapshot path above (Phase 3a's `platform_snapshots`), never a
     different User-Agent or a "syndication feeds don't count" reading.
     ([Phase 2](#phase-2))
@@ -398,6 +400,16 @@ mart, no model.
   parser's output (a denylist of paths — the kind change is the fix);
   truncating raw on rebuild (raw is append-only; separate files keep both
   properties); dropping refused pages (the evidence is the point).
+- **Review round 2 (2026-09-02) — amendment A5, approved and built:** a 200
+  for `robots.txt` is a robots file only if `text/plain` or carrying a
+  directive line (an HTML catch-all page is a refusal, never permission);
+  `AppStoreSource` carries `fetchable` and `terms`, so a recorded terms
+  position is declared in code and refused before any request rather than
+  inferred from a live fetch; our robots group is selected by substring of
+  the full User-Agent. Rejected: trusting any 200 (the round 1 failure class
+  again); keeping the position only in this file (a robots hiccup would
+  silently re-enable the fetch); exact token equality (a group written for us
+  with a version suffix fell through to `*`, permissively).
 - **The sample is a new frozen fixture, `fixtures/app-store/`,** hand-written
   in the feed's exact shape (placeholder author labels, bodies marked
   fictional, app id 0): a real captured page would publish raw corpus and

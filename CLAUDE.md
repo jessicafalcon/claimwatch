@@ -136,8 +136,9 @@ in the middle, and come out on the right as the numbers the study shows.
   under `data/cache/`, robots.txt first and every page checked against it,
   ≥ 2 s apart (more if the site asks), identifying User-Agent, no proxy, no
   retry. Needs `CONFIRM=yes` on the command line (`$(origin CONFIRM)`, as
-  `reset`); refuses a source whose app id is not filled in, and one whose feed
-  path robots.txt disallows.
+  `reset`); refuses a source declared not fetchable (its recorded terms
+  position), one whose app id is not filled in, and one whose feed path
+  robots.txt disallows.
 - `make reset [TARGET=duckdb]` — DESTRUCTIVE: drop every DuckDB file this repo
   built, the corpus and one per fixture; needs `CONFIRM=yes` on the command
   line (`$(origin CONFIRM)`; an environment `CONFIRM=yes` does not count).
@@ -424,8 +425,8 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 ## Current status
 
 **Phase 2 — One scraper, end to end** (`phase-2-scraper`, spec
-`specs/phase-2-scraper.md`): built; review rounds 1 and 2 done and their fixes
-in; one amendment (A5, the robots verdict's authority) awaits approval. We can
+`specs/phase-2-scraper.md`): built; review rounds 1 and 2 done, their fixes
+and amendments A1–A5 in; round 3, scoped to A5, next. We can
 now collect published reviews from an app store politely and count how many
 arrive each month, but the one source we tried asks crawlers not to read its
 review feed, so the counts so far come from a hand-written sample and the
@@ -445,7 +446,7 @@ rule; the capture was deleted and the matcher replaced (DECISIONS → Gotchas
 and the terms position). The DONE command is the frozen-sample form, `make
 rebuild FIXTURE=app-store && make idempotency-check FIXTURE=app-store` (raw 8 /
 staging 8); the synthetic line stays green (raw 40 / staging 39).** Phase 1
-merged (PR #3). Next: A5, coherence audit, Delivered paragraph, PR; then Phase
+merged (PR #3). Next: round 3, coherence audit, Delivered paragraph, PR; then Phase
 3a — snapshots and the remaining polite sources, starting with one whose
 robots file lets us read its reviews.
 
