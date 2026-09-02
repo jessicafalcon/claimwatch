@@ -33,7 +33,7 @@ lint: ## ruff via pre-commit (REWRITES files — never run inside a gate)
 check-docs: ## links, named make targets, banned words, glossary size, BACKLOG count
 	uv run python scripts/check_docs.py
 
-check-backing: ## BACKING.md rows ↔ sql/marts files ↔ tags ↔ sources
+check-backing: ## BACKING rows ↔ sql/marts files ↔ tags ↔ sources ↔ SPEC citations
 	uv run python scripts/check_backing.py
 
 review-gate: ## offline gate [SPEC=specs/<f>.md] [BASE=main]; /review-round runs it first

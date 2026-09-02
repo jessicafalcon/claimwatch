@@ -24,6 +24,10 @@ Rules checked, one line per check:
      maps to no claim is out of scope, §8).
   6. Row ids — every claim cell starts with `B<beat>.<n> ` (`B2.3 …`), the id
      SPEC.md panels cite.
+  7. Citations — SPEC.md and BACKING.md reconcile both ways: every `B<beat>.<n>`
+     token in SPEC.md (outside code fences) is a BACKING row, and every BACKING
+     row is cited by at least one SPEC.md panel or prose sentence. An absent
+     SPEC.md (Phase 0a, before the study structure is written) is OK.
 
 An empty table with no marts is OK — Phase 0a. Exit 1 on any FAIL.
 """
@@ -43,7 +47,11 @@ TAGS = frozenset({"Measured", "Documented", "Modeled", "Pending"})
 NEEDS_SOURCE = frozenset({"Measured", "Documented"})
 NO_FILE = frozenset({"", "—"})  # the one declared spelling of "no SQL file yet"
 _SEP = re.compile(r":?-+:?")  # one separator cell: ---, :---, ---:, :---:
-_ROW_ID = re.compile(r"^B\d+\.\d+ ")  # `B<beat>.<n> ` opens every claim cell
+_ROW_ID = re.compile(r"^(B\d+\.\d+) ")  # `B<beat>.<n> ` opens every claim cell
+_CITE = re.compile(r"\bB\d+\.\d+\b")  # a `B<beat>.<n>` token SPEC.md cites
+_FENCE = re.compile(
+    r"```.*?```", re.S
+)  # a fenced block: an example B-id is not a citation
 # One source part, whole-cell anchored: a URL, a markdown link TO a URL, or a
 # backticked dataset name (two or more lowercase segments — `tbd` is not one).
 _URL = r"https?://\S+"
@@ -150,6 +158,28 @@ def check_sql_files(rows: list[Row], root: Path) -> list[str]:
     return errors
 
 
+def row_id(claim: str) -> str | None:
+    m = _ROW_ID.match(claim)
+    return m.group(1) if m else None
+
+
+def check_citations(rows: list[Row], root: Path) -> list[str]:
+    """SPEC.md ↔ BACKING.md, both ways. An absent SPEC.md (Phase 0a) is OK; a
+    B-id inside a code fence is an example, not a citation."""
+    spec = root / "SPEC.md"
+    if not spec.is_file():
+        return []
+    cited = set(_CITE.findall(_FENCE.sub("", spec.read_text(encoding="utf-8"))))
+    defined = {rid for r in rows if (rid := row_id(r.claim))}
+    return [
+        f"SPEC.md cites {b}, which is not a BACKING row"
+        for b in sorted(cited - defined)
+    ] + [
+        f"BACKING row {b} is cited by no SPEC.md panel or sentence"
+        for b in sorted(defined - cited)
+    ]
+
+
 def check_orphans(rows: list[Row], root: Path) -> list[str]:
     named = {_bare(r.sql_file) for r in rows}
     marts = sorted(p for p in root.glob("sql/marts/*.sql") if p.is_file())
@@ -173,6 +203,7 @@ def main(root: Path = ROOT) -> int:
         ("SQL files", check_sql_files(rows, root)),
         ("orphans", check_orphans(rows, root)),
         ("row ids", check_row_ids(rows)),
+        ("citations", check_citations(rows, root)),
     ]
     failed = 0
     for name, errors in checks:

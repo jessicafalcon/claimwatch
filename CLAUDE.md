@@ -50,7 +50,7 @@ in the middle, and come out on the right as the numbers the study shows.
 
 ## Repo map
 
-- `PROJECT_BRIEF.md` — the master document. `SPEC.md` *(Phase 0b)* — the five
+- `PROJECT_BRIEF.md` — the master document. `SPEC.md` — the five
   parts of the study (called *beats* in the row ids `B<beat>.<n>`) and the
   exact chart list, each with its tag and BACKING row.
   `BACKING.md` — the evidence contract (§8 of the brief); `make check-backing`
@@ -91,7 +91,8 @@ in the middle, and come out on the right as the numbers the study shows.
 - `make lint` — ruff via pre-commit (rewrites files; never inside a gate)
 - `make check-docs` — links/anchors, named make targets, banned words,
   glossary size, BACKLOG count (`scripts/check_docs.py`)
-- `make check-backing` — BACKING rows ↔ `sql/marts` files ↔ tags ↔ sources
+- `make check-backing` — BACKING rows ↔ `sql/marts` files ↔ tags ↔ sources ↔
+  `SPEC.md` citations (`B<beat>.<n>` both ways)
 - `make review-gate [SPEC=specs/<f>.md] [BASE=main]` — test + ruff (read-only)
   + check-docs + check-backing + fixtures; with SPEC, Evidence ids and
   Record-updates files. One line per check, exit 1 on FAIL, 2 on a refused
@@ -142,7 +143,10 @@ study names no insurer as its subject.
   row has an id (`B<beat>.<n>`) that `SPEC.md` panels cite.
 - **Classification.** Exactly seven labels: the five themes of brief §5,
   `positive`, `unclassified`. A model reply outside the set becomes
-  `unclassified`, never an eighth label. Decisions are cached by
+  `unclassified`, never an eighth label. The grain is one row per review ×
+  theme: a review carrying K themes writes K theme rows, a review with none
+  writes one `positive` or `unclassified` row, so a "theme share" counts theme
+  rows and a review may appear in two theme bars. Decisions are cached by
   `(review_id, prompt_version, model)`; a re-run calls the model only for
   uncached rows. `classify/eval/labels.csv` is read only by `classify/eval/`;
   the held-out split is `sha256(review_id) % 5`, never random.
@@ -373,12 +377,15 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 ## Current status
 
-**Phase 0a — Workflow machinery** (`phase-0a-machinery`, spec
-`specs/phase-0a-machinery.md`): built; review rounds 1 and 2 dispositions
-landed; PR open. The gate, the three guards, five agents, three commands, the hook,
-CI, the spec template and the four record files. No pipeline code, no data, no
-study text. Next: Phase 0b — `SPEC.md` (five parts, exact chart list, each
-panel citing its BACKING row id), the full `BACKING.md` table, the glossary.
+**Phase 0b — Contracts** (`phase-0b-contracts`, spec
+`specs/phase-0b-contracts.md`): built; review round 1 dispositions landed; PR
+open. `SPEC.md` (the five parts
+and the exact chart list, each panel citing its BACKING row id and wearing its
+tag), the full `BACKING.md` table (19 rows, all Pending), the classification
+grain (one row per review × theme) stated in SPEC and the Classification
+contract above, the ten-term glossary, and one new guard — the SPEC ↔ BACKING
+citation check in `check_backing.py`. No pipeline code, no `sql/`, no fixtures.
+Phase 0a merged (PR #1). Next: Phase 1 — schema and the empty warehouse.
 
 Open BACKLOG rows: **6**.
 

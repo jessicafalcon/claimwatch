@@ -211,6 +211,36 @@ def test_claim_without_row_id_fails(tmp_path: Path):
     assert check_backing.main(root) == 1
 
 
+def test_spec_citations(tmp_path: Path):
+    """SPEC.md ↔ BACKING.md reconcile both ways; an absent SPEC.md is OK; a B-id
+    inside a code fence is an example, not a citation."""
+    rows_text = (
+        "| B1.1 rating trend | m | `sql/marts/m.sql` | — | Pending |\n"
+        "| B2.2 theme share | m | `sql/marts/m.sql` | — | Pending |\n"
+    )
+    root = _root(tmp_path, rows_text, ("m.sql",))
+    rows = _rows(root)
+
+    # no SPEC.md yet (Phase 0a): the check is vacuously OK
+    assert check_backing.check_citations(rows, root) == []
+
+    # a dangling citation and an uncited row, each reported once
+    (root / "SPEC.md").write_text(
+        "# SPEC\n\nBeat 1 cites B1.1 here.\n\nBeat 2 cites B9.9 (no such row).\n"
+        "\n```\nan example B7.7 inside a fence is not a citation\n```\n"
+    )
+    assert check_backing.check_citations(rows, root) == [
+        "SPEC.md cites B9.9, which is not a BACKING row",
+        "BACKING row B2.2 is cited by no SPEC.md panel or sentence",
+    ]
+    assert check_backing.main(root) == 1
+
+    # matched sets in both directions pass
+    (root / "SPEC.md").write_text("# SPEC\n\nB1.1 and B2.2 are both cited.\n")
+    assert check_backing.check_citations(rows, root) == []
+    assert check_backing.main(root) == 0
+
+
 def test_check_backing_is_green_today(capsys):
     assert check_backing.main(ROOT) == 0
     assert "check-backing OK" in capsys.readouterr().out

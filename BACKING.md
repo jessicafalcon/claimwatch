@@ -34,3 +34,22 @@ every rule below except the last sentence, which is editorial (PROJECT_BRIEF.md
 
 | Study claim (beat, chart/sentence) | Mart table (where the number lives) | SQL file (the query that builds it) | Upstream source (where the data came from) | Tag (what kind of evidence) |
 |---|---|---|---|---|
+| B1.1 Hero case: a roughly €340 ER refund on hold for months; "Day N" frozen at the last confirmed date (eventual Documented) | — (documented case) | — | — | Pending |
+| B1.2 The studied segment's public rating over time, monthly (eventual Measured) | rating_trend | `sql/marts/rating_trend.sql` | — | Pending |
+| B1.3 Channel gap: ratings on invited channels vs unsolicited platforms (eventual Measured) | channel_gap | `sql/marts/channel_gap.sql` | — | Pending |
+| B1.4 Stat row: one-star share, review counts, response-lag differences (eventual Measured) | platform_stats | `sql/marts/platform_stats.sql` | — | Pending |
+| B2.1 The five-theme taxonomy with paraphrased public examples (eventual Documented) | — (documented examples) | — | — | Pending |
+| B2.2 Theme share of negative reviews over time, by segment, via the gated classifier (eventual Measured) | theme_share_by_month | `sql/marts/theme_share_by_month.sql` | — | Pending |
+| B2.3 Peer context: public ratings across the market segment (eventual Measured) | peer_ratings | `sql/marts/peer_ratings.sql` | — | Pending |
+| B2.4 Classifier quality: per-theme precision and recall vs hand labels (eventual Measured) | classifier_quality | `sql/marts/classifier_quality.sql` | — | Pending |
+| B2.5 Held-claim complaint share, digital-first vs traditional mutuelles (eventual Measured) | theme_share_by_segment | `sql/marts/theme_share_by_segment.sql` | — | Pending |
+| B3.1 Cost-model formulas printed next to their output (eventual Modeled) | cost_model_outputs | `sql/marts/cost_model_outputs.sql` | — | Pending |
+| B3.2 Fraud saved vs friction cost curves over the flag rate, with the crossover (eventual Modeled) | cost_curves | `sql/marts/cost_curves.sql` | — | Pending |
+| B3.3 Sourced defaults: revenue per member, fraud pool, claim volume (eventual Modeled) | cost_model_params | `sql/marts/cost_model_params.sql` | `open-damir` | Pending |
+| B3.4 Declared-unsourced parameters as explore-the-range sliders (eventual Modeled) | cost_model_params | `sql/marts/cost_model_params.sql` | — | Pending |
+| B4.1 Fix 1 ask once: contacts per stuck claim drop to one, the curves move (eventual Modeled) | guardrail_sim | `sql/marts/guardrail_sim.sql` | — | Pending |
+| B4.2 Fix 2 a clock on every hold: the computed SLA threshold (eventual Modeled) | sla_threshold | `sql/marts/sla_threshold.sql` | — | Pending |
+| B4.3 Before and after hold durations from the simulator on calibrated synthetic claims (eventual Modeled) | guardrail_sim | `sql/marts/guardrail_sim.sql` | `open-damir` | Pending |
+| B4.4 Fix 3 count the mistakes: a false-positive rate per flag rule (eventual Modeled) | — (outcome log) | — | — | Pending |
+| B5.1 Determinism facts: one model decision, formulas shown, no untagged number (eventual Measured) | — (repo facts) | — | — | Pending |
+| B5.2 Reproducibility: row counts per stage, eval scores, the one rebuild command (eventual Measured) | pipeline_row_counts | `sql/marts/pipeline_row_counts.sql` | — | Pending |

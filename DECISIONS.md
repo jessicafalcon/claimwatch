@@ -34,6 +34,10 @@ place and never deleted.
 - **Formulas are data.** `models/cost_model.py::FORMULAS` is the only place a
   formula is written; the study renders from it and a test pins the outputs.
   ([PLAN §4](docs/PLAN.md); [Phase 0a](#phase-0a))
+- **Classification grain: one row per review × theme.** A review carrying K
+  themes writes K rows, a review with none writes one `positive`/`unclassified`
+  row; a "theme share" counts theme rows. This is what a theme chart means.
+  ([Brief §5](PROJECT_BRIEF.md); [Phase 0b](#phase-0b))
 
 **Data**
 
@@ -186,3 +190,45 @@ suffixes, `/review-round` gains the phase-exit branch, the repo description
 passes the dinner-table test). One process lesson, repeated: a commit helper
 that piped pytest through `tail` hid a red suite for two commits; both were
 folded before push and the helper checks pytest's exit code directly.
+
+### Phase 0b
+
+Branch `phase-0b-contracts`, spec `specs/phase-0b-contracts.md`. Depends on
+Phase 0a (PR #1) merged. Wrote the two contract files the gate checks, plus one
+guard:
+
+- **`SPEC.md`** — the five parts (beats) and the exact chart list: 19 panels
+  across Beats 1–5, each citing its `B<beat>.<n>` BACKING row and naming the tag
+  it will wear. Every panel is Pending today (no number before its data lands).
+  The rating-trend panel (B1.2) names the negative self-selection of unsolicited
+  platforms; B2.5 is framed as the hypothesis, not the verdict. Ten-term
+  glossary, an everyday example each.
+- **`BACKING.md`** — the full 19-row table, every row Pending; a Pending row may
+  name a `sql/marts/` file not built yet (the tag says so). Sources are `—`
+  where the number is measured or documented in a later phase; `open-damir` on
+  the two open-data rows.
+- **Classification grain — one row per review × theme** (closes the label-arity
+  BACKLOG row): stated in SPEC.md's Beat 2 and CLAUDE.md's Classification
+  contract before any chart is frozen; the code invariant (`classified_reviews`
+  grain) lands in Phase 5b. Rejected: one `theme` column per review — a
+  multi-theme review could not then be counted per theme.
+- **Citation guard** — one addition to `check_backing.py` (check 7): SPEC.md
+  `B<beat>.<n>` tokens (outside code fences) and BACKING row ids reconcile both
+  ways; an absent SPEC.md is OK. No new `make` target — it runs inside `make
+  check-backing`. Pinned by `tests/test_check_backing.py::test_spec_citations`.
+  Rejected: a separate `check-spec` target and a check in `check_docs` (which
+  does not parse the BACKING table); a "prose-only" marker column (the id in
+  SPEC.md is the single source of "cited").
+- Tag-on-panel presence and tag-match stay editorial (study-editor,
+  coherence-auditor); the render-time "a Pending panel shows no number" refusal
+  is still a BACKLOG row for Phase 9.
+
+**Review round 1 (2026-09-01).** Four agents (code-reviewer,
+functionality-tester, study-editor, coherence-auditor; security-reviewer not
+triggered — no sensitive surface): eight findings, no BLOCKER. Five
+wording/record fixes batched in one commit (four SPEC.md voice rewrites, the
+spec title to APPROVED, the stale BACKLOG parenthetical); one BACKLOG row
+accepted (the citation guard strips fenced blocks but not inline code spans,
+count 5 → 6); two spec-sanctioned deferrals accepted (the Phase 5b grain code
+test; the render-time no-number check). The gate stayed 7/7 and the two-round
+cap did not apply (round 1).
