@@ -36,7 +36,7 @@ from ingest.politeness import (
     TIMEOUT_S,
     USER_AGENT,
 )
-from ingest.robots import Robots
+from ingest.robots import Robots, looks_like_robots
 from ingest.sources import AppStoreSource
 
 
@@ -146,6 +146,11 @@ def scrape(
     declared shape; pages already written stay — each is a complete, honest
     capture of what the site served — and a refused page is kept under a name
     a rebuild never loads."""
+    if not source.fetchable:  # the recorded terms position, declared in code
+        raise FetchRefused(
+            f"refusing: source {source.name!r} is declared not fetchable — "
+            f"{source.terms}"
+        )
     if source.app_id == 0:
         raise FetchRefused(
             f"refusing: source {source.name!r} has no app_id — "
@@ -176,6 +181,14 @@ def scrape(
         ) from exc
     (capture_dir / "robots.txt").write_bytes(robots.content)
     if robots.status_code == 200:
+        # A 200 is a robots file only if it says so (text/plain) or reads as one;
+        # a catch-all page served with a 200 is a refusal, never permission.
+        ctype = robots.headers.get("content-type", "").split(";")[0].strip().lower()
+        if ctype != "text/plain" and not looks_like_robots(robots.text):
+            raise FetchRefused(
+                f"refusing: robots.txt returned 200 but is not a robots file "
+                f"(content-type {ctype or 'none'!r})"
+            )
         rules = Robots.parse(robots.text)
     elif robots.status_code == 404:
         rules = Robots.permissive()  # no robots file: nothing is disallowed

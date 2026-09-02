@@ -9,8 +9,9 @@ may use `*` for "anything" and a trailing `$` for "ends here", and when two
 rules match the same path the longer one wins. A rule like `Disallow: /*/rss/*`
 therefore covers `/fr/rss/…`, which a prefix-only matcher does not see.
 
-This module parses the file into groups, picks the group for our product token
-(else the `*` group; no group means nothing is disallowed), matches patterns
+This module parses the file into groups, picks the groups written for us — any
+whose User-agent value is a substring of our full User-Agent (else the `*`
+group; no group means nothing is disallowed) — matches patterns
 with `*` and `$`, lets the longest match win and `Allow` win a tie, and reports
 the group's `Crawl-delay` so the fetcher can wait longer than its own minimum.
 Nothing here fetches; the fetcher hands it the text it archived."""
@@ -24,7 +25,7 @@ from urllib.parse import urlsplit
 
 from ingest.politeness import USER_AGENT
 
-PRODUCT_TOKEN = USER_AGENT.split("/", 1)[0]  # the part before the version
+DIRECTIVES = ("user-agent", "allow", "disallow", "crawl-delay", "sitemap")
 
 
 @dataclass
@@ -67,10 +68,26 @@ def _parse_groups(text: str) -> list[_Group]:
     return groups
 
 
-def _select(groups: list[_Group], token: str) -> _Group | None:
-    """The groups naming our token, merged; else the `*` groups; else none."""
-    wanted = token.lower()
-    for match in (lambda g: wanted in g.agents, lambda g: "*" in g.agents):
+def looks_like_robots(text: str) -> bool:
+    """At least one recognised directive line: what makes a 200 body a robots
+    file rather than a catch-all page served with a 200 (amendment A5)."""
+    for raw in text.splitlines():
+        line = raw.split("#", 1)[0].strip()
+        key, sep, _ = line.partition(":")
+        if sep and key.strip().lower() in DIRECTIVES:
+            return True
+    return False
+
+
+def _select(groups: list[_Group], user_agent: str) -> _Group | None:
+    """The groups written for us — a non-empty User-agent value that is a
+    substring of our full User-Agent, case-insensitively — merged; else the
+    `*` groups; else none. Erring inclusive errs restrictive."""
+    ours = user_agent.lower()
+    for match in (
+        lambda g: any(a and a in ours for a in g.agents),
+        lambda g: "*" in g.agents,
+    ):
         chosen = [g for g in groups if match(g)]
         if chosen:
             merged = _Group()
@@ -100,8 +117,8 @@ class Robots:
     crawl_delay: float | None
 
     @classmethod
-    def parse(cls, text: str, token: str = PRODUCT_TOKEN) -> Robots:
-        group = _select(_parse_groups(text), token)
+    def parse(cls, text: str, user_agent: str = USER_AGENT) -> Robots:
+        group = _select(_parse_groups(text), user_agent)
         if group is None:
             return cls((), None)
         return cls(tuple(group.rules), group.crawl_delay)

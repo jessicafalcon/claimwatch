@@ -23,6 +23,7 @@ SRC = AppStoreSource(
     app_id=1,
     country="fr",
     listing="https://apps.apple.com/fr/app/id1",
+    fetchable=True,
 )
 STAMP = "2026-09-02T10:00:00"
 
@@ -131,6 +132,54 @@ def test_a_crawl_delay_above_the_ceiling_is_a_one_line_refusal(tmp_path):
     assert "\n" not in str(exc.value)
     assert server.urls() == ["https://itunes.apple.com/robots.txt"]
     assert clock.sleeps == []
+
+
+def test_a_200_that_is_not_a_robots_file_is_a_refusal_not_permission(tmp_path):
+    """Amendment A5(a): an HTML catch-all page served with a 200 for robots.txt
+    is refused before any feed request — a rule we cannot see is never
+    permission. A body that reads as a robots file is accepted whatever its
+    content-type; an empty text/plain body is a robots file with no rules."""
+
+    def html(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, html="<!doctype html><html><body>?</body></html>")
+
+    polite = PoliteClient(make_client(httpx.MockTransport(html)), sleep=lambda s: None)
+    with pytest.raises(FetchRefused, match="not a robots file") as exc:
+        scrape(SRC, tmp_path / "a", client=polite, stamp=lambda: STAMP)
+    assert "text/html" in str(exc.value) and "\n" not in str(exc.value)
+
+    def octet(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/robots.txt":
+            return httpx.Response(
+                200,
+                content=b"User-agent: *\nDisallow:\n",
+                headers={"content-type": "application/octet-stream"},
+            )
+        return httpx.Response(200, content=(SAMPLE / "page-3.json").read_bytes())
+
+    polite = PoliteClient(make_client(httpx.MockTransport(octet)), sleep=lambda s: None)
+    _, pages = scrape(SRC, tmp_path / "b", client=polite, stamp=lambda: STAMP)
+    assert pages == 1
+
+    server = Served(robots="")  # text/plain, empty: nothing disallowed
+    _, pages = scrape(
+        SRC, tmp_path / "c", client=_polite(server, Clock()), stamp=lambda: STAMP
+    )
+    assert pages == pins.APP_STORE_SAMPLE_PAGES
+
+
+def test_a_source_declared_not_fetchable_is_refused_before_any_request(tmp_path):
+    """Amendment A5(b): the recorded terms position lives in the declaration;
+    the declared source refuses with its reason, whatever robots.txt would say
+    today, and nothing is asked of the site."""
+    from ingest.sources import SOURCES
+
+    (declared,) = SOURCES
+    server = Served()
+    with pytest.raises(FetchRefused, match="not fetchable — robots.txt disallows"):
+        scrape(declared, tmp_path, client=_polite(server, Clock()), stamp=lambda: STAMP)
+    assert server.requests == []
+    assert not (tmp_path / declared.name).exists()
 
 
 def test_robots_error_status_is_a_refusal_and_404_is_not(tmp_path):
@@ -264,7 +313,9 @@ def test_host_outside_the_allowlist_is_refused_before_any_request():
 
 def test_unfilled_source_is_refused_before_any_request(tmp_path):
     server = Served()
-    unfilled = AppStoreSource(name="blank", app_id=0, country="fr", listing="")
+    unfilled = AppStoreSource(
+        name="blank", app_id=0, country="fr", listing="", fetchable=True
+    )
     with pytest.raises(FetchRefused, match="has no app_id"):
         scrape(unfilled, tmp_path, client=_polite(server, Clock()), stamp=lambda: STAMP)
     assert server.requests == []

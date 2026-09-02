@@ -6,10 +6,12 @@ from __future__ import annotations
 
 import pytest
 
-from ingest.robots import PRODUCT_TOKEN, Robots
+from ingest.robots import Robots, looks_like_robots
 from ingest.sources import AppStoreSource
 
-FEED = AppStoreSource(name="t", app_id=1, country="fr", listing="").page_url(1)
+FEED = AppStoreSource(
+    name="t", app_id=1, country="fr", listing="", fetchable=True
+).page_url(1)
 LIVE_FILE = "User-agent: *\nDisallow: /*/rss/*\n\nUser-agent: Googlebot\nDisallow:\n"
 
 
@@ -20,8 +22,36 @@ def test_the_live_hosts_wildcard_rule_disallows_the_feed_path():
     assert Robots.parse(LIVE_FILE).allows("https://itunes.apple.com/fr/app/x") is True
 
 
-def test_product_token_is_the_part_of_the_user_agent_before_the_version():
-    assert PRODUCT_TOKEN == "friction-ledger"
+@pytest.mark.parametrize(
+    ("agent", "selected"),
+    [
+        ("friction-ledger", True),
+        ("Friction-Ledger", True),
+        ("FRICTION-LEDGER", True),
+        ("friction-ledger/0.1", True),  # our full product token with version
+        ("friction", True),  # a shorter substring: erring inclusive errs restrictive
+        ("other-bot", False),
+        ("", False),  # an empty value selects nothing
+    ],
+)
+def test_our_group_is_any_whose_value_is_a_substring_of_our_user_agent(agent, selected):
+    text = f"User-agent: {agent}\nDisallow: /\n\nUser-agent: *\nDisallow:\n"
+    assert Robots.parse(text).allows(FEED) is (not selected)
+
+
+@pytest.mark.parametrize(
+    ("body", "is_robots"),
+    [
+        ("User-agent: *\nDisallow:\n", True),
+        ("# only a comment\nSitemap: https://h/s.xml\n", True),
+        ("crawl-delay: 5", True),
+        ("<!doctype html><html><body>Not found</body></html>", False),
+        ("", False),
+        ("User-agent *\n", False),  # no colon: not a directive line
+    ],
+)
+def test_looks_like_robots_wants_at_least_one_directive_line(body, is_robots):
+    assert looks_like_robots(body) is is_robots
 
 
 @pytest.mark.parametrize(

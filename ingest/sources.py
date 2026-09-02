@@ -21,6 +21,8 @@ class AppStoreSource:
     app_id: int  # 0 = not filled in yet; the fetcher refuses it
     country: str  # two-letter storefront code
     listing: str  # where the id came from: the store listing, by id only
+    fetchable: bool  # the recorded terms position; False is refused before any request
+    terms: str = ""  # why, when not fetchable — a reason, never a name
 
     @property
     def host(self) -> str:
@@ -40,14 +42,17 @@ class AppStoreSource:
 
 # The studied segment's first app: a sourced data point (the id and the listing
 # it was read from, by id only — a number and an address, never a name;
-# CLAUDE.md -> Neutrality). Filled 2026-09-02. Its feed path is disallowed by
-# the host's robots.txt, so the fetcher refuses it (DECISIONS -> terms position).
+# CLAUDE.md -> Neutrality). Filled 2026-09-02. Its terms position is declared
+# here (DECISIONS -> terms position): the host's robots.txt disallows the feed
+# path, so `fetchable=False` and the fetcher refuses it before any request.
 SOURCES: tuple[AppStoreSource, ...] = (
     AppStoreSource(
         name="fr-digital-first",
         app_id=1277025964,
         country="fr",
         listing="https://apps.apple.com/fr/app/id1277025964",
+        fetchable=False,
+        terms="robots.txt disallows /*/rss/* for every crawler (2026-09-02)",
     ),
 )
 

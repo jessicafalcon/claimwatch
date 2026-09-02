@@ -119,3 +119,6 @@ def test_exactly_one_source_is_declared():
     # A sourced data point: the listing the id was read from, by id only —
     # no app or company name in the address.
     assert src.listing == f"https://apps.apple.com/{src.country}/app/id{src.app_id}"
+    # The recorded terms position is declared, with its reason (amendment A5).
+    assert src.fetchable is False
+    assert "robots.txt" in src.terms and "2026-09-02" in src.terms

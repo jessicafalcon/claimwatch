@@ -134,7 +134,9 @@ def test_cli_scrape_refuses_an_unfilled_source_before_any_request(capsys, monkey
     from ingest.sources import AppStoreSource
     from pipeline import cli
 
-    blank = AppStoreSource(name="blank", app_id=0, country="fr", listing="")
+    blank = AppStoreSource(
+        name="blank", app_id=0, country="fr", listing="", fetchable=True
+    )
     monkeypatch.setattr(cli, "SOURCES", (blank,))
     code = main(["scrape", "--confirm=yes", "--confirm-origin=command line"])
     assert code == 2
@@ -156,8 +158,12 @@ def test_cli_scrape_keeps_the_host_interval_across_sources(
     server, clock = Served(), Clock()
     monkeypatch.setattr(fetch, "polite_client", lambda: _polite(server, clock))
     two = (
-        AppStoreSource(name="one", app_id=1, country="fr", listing="https://a/id1"),
-        AppStoreSource(name="two", app_id=2, country="fr", listing="https://a/id2"),
+        AppStoreSource(
+            name="one", app_id=1, country="fr", listing="https://a/id1", fetchable=True
+        ),
+        AppStoreSource(
+            name="two", app_id=2, country="fr", listing="https://a/id2", fetchable=True
+        ),
     )
     monkeypatch.setattr(cli, "SOURCES", two)
     code = main(["scrape", "--confirm=yes", "--confirm-origin=command line"])
@@ -231,3 +237,14 @@ def test_a_capture_holding_only_refused_pages_still_gets_the_no_captures_hint(
     out = capsys.readouterr().out
     assert "no captures under" in out
     assert _count(out, "raw_reviews") == 0
+
+
+def test_cli_scrape_on_the_declared_source_refuses_before_the_network(capsys):
+    """`make scrape CONFIRM=yes` today, on the real declaration: one line, exit
+    2, and no socket (the suite would raise on one). The terms position holds
+    without a request."""
+    code = main(["scrape", "--confirm=yes", "--confirm-origin=command line"])
+    assert code == 2
+    err = capsys.readouterr().err
+    assert err.startswith("refusing:") and "not fetchable" in err
+    assert err.count("\n") == 1
