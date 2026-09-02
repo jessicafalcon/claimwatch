@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parent.parent
 def root(tmp_path: Path) -> Path:
     (tmp_path / "specs").mkdir()
     (tmp_path / "specs" / "ok.md").write_text("# ok\n")
+    (tmp_path / "outside.md").write_text("# an existing file outside specs/\n")
     return tmp_path
 
 
@@ -35,6 +36,8 @@ def test_spec_outside_specs_is_refused(root: Path):
         "",
         "   ",
         "specs/nope.md",
+        "outside.md",  # exists, is a file — only the specs-parent check refuses it
+        "specs/../outside.md",
     ):
         with pytest.raises(Refused) as exc:
             resolve_spec(bad, root)
