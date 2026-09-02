@@ -254,6 +254,49 @@ of our full `USER_AGENT` lowercased; `*` stays the fallback. Pinned by:
 `friction-ledger/0.1`, `friction` and `FRICTION-LEDGER` select the group,
 `other-bot` does not, and the empty value selects nothing.
 
+### Fix amendment — review round 3 (2026-09-02): the review cap
+
+Rounds 2 and 3 each reported correctness findings only in the previous round's
+fixes, so the cap (CLAUDE.md → Workflow rules) applies to the robots gate:
+stop patching, state the invariant, re-implement once, one scoped re-review.
+
+**A6 — the robots gate, re-implemented against its invariant** (round 3:
+code-reviewer #1 #3 #4 #5 #6 #8, security-reviewer #1 #2, functionality-tester
+F1–F5). Invariant 5, restated for the gate: *for every robots response, a feed
+request is made only if the body reads as a robots file on its own terms and
+the path is allowed by both the groups written for us and the `*` group.*
+Three consequences, one mechanism:
+(a) *What counts as a robots file is decided by the body alone.* The
+content-type is recorded, never trusted: a 200 body is a robots file when
+every non-blank, non-comment line is directive-shaped (`<key>: <value>` with a
+letter-or-hyphen key) and, if it carries any `Allow`/`Disallow`, it also
+carries a `User-agent:` group for them to belong to. An empty body is a robots
+file with no rules. Anything else — an HTML or JSON page under any
+content-type, a plain-text error, a rule line before any group — is a one-line
+refusal like the 503 branch. The status and content-type are archived as
+`robots.meta.json` beside `robots.txt`, so a capture shows why its run
+proceeded.
+(b) *Our group never displaces the catch-all group.* The groups written for us
+are those whose non-empty User-agent value is a case-insensitive substring of
+our product token (`friction-ledger`) or has it as a substring (so
+`friction-ledger`, `friction-ledger/0.1`, `FRICTION-LEDGER`, `friction` all
+select; `study`, `github`, `ai`, `f` and `0.1` do not); `*` applies as well,
+always. A path is allowed only if both verdicts allow it; the Crawl-delay is
+the longer of the two. An over-broad selector can therefore only tighten.
+(c) *No caller decides which rules bind us.* `Robots.parse(text)` reads the
+product token from `politeness.USER_AGENT`; the parameter goes.
+Pinned by: an HTML page with colons in it, a JSON error, a plain-text error
+and a `Disallow:` line before any group are each refused before any feed
+request under `text/plain`, `text/html` and no content-type alike; an empty
+body allows; a `Sitemap:`-only body allows; `*` Disallow-all beside an empty
+`study`, `ai`, `f` or `0.1` group refuses; `*` Disallow-all beside a
+`friction-ledger` Allow-all group still refuses (both must allow); `*`
+Crawl-delay 10 beside our group's 2 yields 10; each of the four required
+forms of our token selects our group; the refusal tests assert that only
+`/robots.txt` was requested; `robots.meta.json` carries status and
+content-type; `urllib.robotparser` stays absent; the `DIRECTIVES` closed set
+is pinned by a colon-bearing negative.
+
 *Not amended, disposed as fixes or accepted:* page order past page-9, the
 literal 2 s pin, the whole-repo layout grep, no directory before robots
 answers, one client per run (five fix commits, one finding each); `sleep`
