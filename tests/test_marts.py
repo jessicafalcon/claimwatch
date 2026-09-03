@@ -268,6 +268,59 @@ def test_a_hand_read_and_a_fetched_point_reach_the_marts_as_measured(tmp_path):
     assert tags == {"Documented", "Measured"}
 
 
+def test_a_same_day_measured_point_stands_in_front_of_an_anchor_in_every_mart(
+    tmp_path,
+):
+    """A2 (b): when two points share a day, `precedence` puts the figure we
+    measured in front of the anchor — in every mart, not only channel_gap.
+    The measured row's address sorts AFTER the anchor's root, so without
+    `precedence` the anchor would win on the address alone (round 2,
+    functionality-tester F2)."""
+    from pipeline.build import build_derived, load_snapshots
+
+    db = tmp_path / "w.duckdb"
+    rebuild("duckdb", "synthetic", database=db)
+    conn = connect("duckdb", database=db)
+    try:
+        # the unsolicited studied-insurer anchor of 2026-06-15, re-read by hand
+        # the same day under an address that sorts after the platform root
+        load_snapshots(
+            conn,
+            [
+                {
+                    "source": "trustpilot",
+                    "profile": "fr-digital-first",
+                    "segment": "digital-first",
+                    "channel": "unsolicited",
+                    "origin": "manual",
+                    "rating": Decimal("3.9"),
+                    "review_count": 975,
+                    "one_star_share": None,
+                    "response_rate": None,
+                    "response_delay_days": None,
+                    "source_url": "https://www.trustpilot.com/review/x",
+                    "captured_at": "2026-06-15",
+                    "seeded_from": "",
+                }
+            ],
+            "test",
+        )
+        build_derived(conn)
+        where = "source = 'trustpilot' and profile = 'fr-digital-first'"
+        for mart, extra in (
+            ("rating_trend", " and month = '2026-06'"),
+            ("channel_gap", ""),
+            ("peer_ratings", ""),
+            ("platform_stats", " and stat = 'review_count'"),
+        ):
+            rows = conn.execute(
+                f"select tag, source_url from {mart} where {where}{extra}"
+            ).fetchall()
+            assert rows == [("Measured", "https://www.trustpilot.com/review/x")], mart
+    finally:
+        conn.close()
+
+
 def _no_clock(cls: type) -> type:
     """A date/datetime class whose `today()` and `now()` raise: reaching either
     on the data path is the failure. Parsing (`fromisoformat`, `strptime`)
