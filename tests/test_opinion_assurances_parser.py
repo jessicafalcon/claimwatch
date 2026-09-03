@@ -268,6 +268,29 @@ def test_two_rating_values_in_one_review_refuse_the_page():
         parse(twice, PAGE_URL, CAPTURED, SRC)
 
 
+@pytest.mark.parametrize(
+    ("bound", "first", "then"),
+    [("worstRating", "0", "1"), ("bestRating", "10", "5")],
+)
+def test_a_bound_declared_twice_in_one_review_refuses_the_page(bound, first, then):
+    """A bound declared twice in a review scope was resolved last-wins, so
+    `worstRating 0` then `worstRating 1` parsed as the declared 1..5 while the
+    aggregate scope counted its duplicates and refused; a bound is declared
+    once, like a ratingValue (round 5, code-reviewer #3)."""
+    original = f'<meta itemprop="{bound}" content="{then}">'
+    html = _second_review(
+        _page(1),
+        lambda s: s.replace(
+            original, f'<meta itemprop="{bound}" content="{first}">' + original, 1
+        ),
+    )
+    assert html != _page(1)
+    with pytest.raises(
+        PageShapeError, match=f"review 2': field '{bound}' appears 2 times, not once"
+    ):
+        parse(html, PAGE_URL, CAPTURED, SRC)
+
+
 def test_a_nested_review_scope_refuses_the_page():
     """A review scope inside another used to be dropped without a word; it is
     outside the declared shape and refuses the page."""

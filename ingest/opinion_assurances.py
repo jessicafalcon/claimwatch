@@ -123,6 +123,9 @@ class _Review:
         self.ratings_seen = 0  # more than one ratingValue is outside the shape
         self.worst: str | None = None  # the scale the review declares (A6)
         self.best: str | None = None
+        # A bound declared twice is outside the shape, as a second ratingValue
+        # is — counted, never resolved last-wins (round 5, code-reviewer #3).
+        self.bounds_seen: dict[str, int] = {"worstRating": 0, "bestRating": 0}
         self.sentence: list[str] = []
         self.body: list[str] = []
         self.bodies_seen = 0  # more than one oa_text is outside the shape (A5)
@@ -183,8 +186,10 @@ class _Walker(HTMLParser):
                     self.current.ratings_seen += 1
                     self.current.rating = attrs.get("content")
                 elif itemprop == "worstRating":
+                    self.current.bounds_seen[itemprop] += 1
                     self.current.worst = attrs.get("content")
                 elif itemprop == "bestRating":
+                    self.current.bounds_seen[itemprop] += 1
                     self.current.best = attrs.get("content")
         if tag in _VOID:
             return
@@ -297,6 +302,9 @@ def _review_row(
             "ratingValue",
             f"appears {review.ratings_seen} times, not once",
         )
+    for bound, seen in review.bounds_seen.items():
+        if seen > 1:
+            raise refuse(page_url, item, bound, f"appears {seen} times, not once")
     if _declared_scale(review.worst, review.best) != REVIEW_SCALE:
         # The site declares each review's scale; ours admits exactly it. A
         # page declaring another (a 0, a 10) refuses here, so a value the
