@@ -561,24 +561,26 @@ renamed the rebuild input, closed five BACKLOG rows.
   public feed, and disallowed).
 - **`platform_snapshots`: anchors Documented, our captures and hand-read
   rows Measured (D2, D3).** `raw_platform_snapshots` keyed on `(source,
-  profile, captured_at)` + a hash of five measures (rating, count, one-star
-  share, response rate, response delay); `origin` ∈ {anchor, manual, fetch}
-  decides the tag in staging by an exact comparison. `fixtures/anchors/` was
-  re-frozen (`Freeze:` in the spec, MANIFEST regenerated): the Phase 1 file
-  had no profile (two peers collided on every key), carried a channel where a
-  segment belongs on the two app rows, and omitted the brief's Opinion
-  Assurances anchor (534 reviews, 23.1 % one-star, 82 % answered, 1.5 days, no
-  rating) — nine anchors now, not eight; PROJECT_BRIEF.md §6 says Documented
-  on the developer's call. Rejected: Measured for anchors (a person's reading
-  at scoping, without a capture time of ours); repairing the seed's meaning in
-  SQL; keeping the page's full-precision rating as text (`decimal(4,3)`,
-  rounded half-even, keeps every displayed value exactly). The anchors'
-  addresses are platform roots, not profile pages: a profile address spells
-  the brand and may sit only in `ingest/sources.py` (D1), so a Documented
-  point opens to its platform and to the brief's §6, not to a page — the trade
-  D1 makes, stated in BACKING's note on the rating rows. An anchor dated only
-  to a month or a season is placed on the 15th of that month ("early 2025" is
-  2025-01-15); the day is a placement, not a reading.
+  profile, origin, source_url, captured_at)` (A2; `(source, profile,
+  captured_at)` before round 1) + a hash of five measures (rating, count,
+  one-star share, response rate, response delay); `origin` ∈ {anchor, manual,
+  fetch} decides the tag in staging by an exact comparison.
+  `fixtures/anchors/` was re-frozen (`Freeze:` in the spec, MANIFEST
+  regenerated): the Phase 1 file had no profile (two peers collided on every
+  key), carried a channel where a segment belongs on the two app rows, and
+  omitted the brief's Opinion Assurances anchor (534 reviews, 23.1 % one-star,
+  82 % answered, 1.5 days, no rating) — nine anchors now, not eight;
+  PROJECT_BRIEF.md §6 says Documented on the developer's call. Rejected:
+  Measured for anchors (a person's reading at scoping, without a capture time
+  of ours); repairing the seed's meaning in SQL; keeping the page's
+  full-precision rating as text (`decimal(4,3)`, rounded half-even, keeps
+  every displayed value exactly). The anchors' addresses are platform roots,
+  not profile pages: a profile address spells the brand and may sit only in
+  `ingest/sources.py` (D1), so a Documented point opens to its platform and to
+  the brief's §6, not to a page — the trade D1 makes, stated in BACKING's note
+  on the rating rows. An anchor dated only to a month or a season is placed on
+  the 15th of that month ("early 2025" is 2025-01-15); the day is a placement,
+  not a reading.
 - **Four marts, four flips to Documented.** `rating_trend` (B1.2),
   `channel_gap` (B1.3), `platform_stats` (B1.4), `peer_ratings` (B2.3) are
   window selects over `stg_platform_snapshots`, each row carrying its point's
@@ -630,6 +632,28 @@ renamed the rebuild input, closed five BACKLOG rows.
   with one fallback to the last `*`; time is bounded by pattern × path
   length; the matching table is unchanged. Rejected: a cap on `*` per pattern
   (a denylist on the input); `fnmatch` (the same regex underneath).
+- **A2 (after review round 1): the snapshot key names its declaration, a
+  same-key pair refuses, the stat row is one row per stat.** The natural key
+  of `raw_platform_snapshots` gains `origin` and `source_url` — the address a
+  row was read from is its declaration: a platform root for an anchor, the
+  listing address for a hand-read row, the page for a capture — so a hand-read
+  figure equal to an anchor's is a row of its own and two hand-entered sources
+  cannot collide (a check at declaration pins that none share a platform and
+  listing). A row whose key already sits in raw under other figures is refused
+  at load with one line naming the line and the fix (`make reset CONFIRM=yes`,
+  then `make rebuild`): that arises only from a corrected hand entry or a
+  re-frozen seed, and the corpus is rebuilt from tracked inputs. Staging
+  therefore keeps every raw row and no `order by` carries `content_hash`;
+  when two points share a day in a mart, `precedence` (a capture, then a hand
+  entry, then an anchor — a closed `case`, exact and portable) and the
+  address decide. `platform_stats` is one row per (segment, source, profile,
+  stat) over a closed set of four stats, each the latest reading of that stat
+  with its own provenance, so a capture that reads one figure never blanks
+  another. Rejected: a load-sequence column so the later entry wins (a second
+  order on the data path, a number no page produced); coalescing each stat
+  column from its own latest row inside one row (three provenances in one
+  row); DuckDB's `unpivot` for the stat rows (a dialect word; four selects
+  stacked with `union all` say the same in ANSI).
 - **The Opinion Assurances parser reads schema.org microdata, and its review
   id is a content hash (A1).** `ingest/opinion_assurances.py` walks the page
   once with the stdlib HTML parser: each `itemscope` of type `review` yields

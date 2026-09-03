@@ -453,23 +453,23 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 **Phase 3a — Snapshots and the remaining polite sources**
 (`phase-3a-snapshots`, spec `specs/phase-3a-snapshots.md`, APPROVED 2026-09-02
-with amendment A1): being built; review round 1 done, its code fixes
-committed, the fix amendments awaiting approval. What a reader sees: the
-rating each platform shows is now a table of its own, seeded from the brief's
-public figures (Documented) and extended by the figures we capture or read off
-a page ourselves (Measured), with four Beat 1–2 charts built from it. How:
-every source is one declaration — which parser reads it, where its pages are,
+with amendment A1): being built; review round 1 done, its fixes and amendment
+A2 (the snapshot key names its declaration and a same-key pair refuses; the
+stat row is one row per stat) built. What a reader sees: the rating each
+platform shows is now a table of its own, seeded from the brief's public
+figures (Documented) and extended by the figures we capture or read off a page
+ourselves (Measured), with four Beat 1–2 charts built from it. How: every
+source is one declaration — which parser reads it, where its pages are,
 whether its site lets us fetch it — and `ROWS` names what a rebuild loads. Of
 the three sites checked, Google Play's listing may be fetched, Apple's may not
 (its terms), and Opinion Assurances gave written authorization for its review
 pages (recorded beside the source in `ingest/sources.py` and in DECISIONS →
 Phase 3a). The first real review rows come from there, read from the page's
 machine-readable marks with the reviewer's name never read. Remaining: the
-amendments, the first live run, review round 2, the exit audit. The DONE
-command is `make rebuild && make idempotency-check ROWS=captured`; Phase 1's
-line stays green (raw 40 / staging 39); CI runs `ROWS=synthetic` and
-`ROWS=samples`. Phase 2 merged (PR #4). Next: the Phase 3a PR; then Phase 3b —
-Trustpilot.
+first live run, review round 2, the exit audit. The DONE command is `make
+rebuild && make idempotency-check ROWS=captured`; Phase 1's line stays green
+(raw 40 / staging 39); CI runs `ROWS=synthetic` and `ROWS=samples`. Phase 2
+merged (PR #4). Next: the Phase 3a PR; then Phase 3b — Trustpilot.
 
 Open BACKLOG rows: **13**.
 
