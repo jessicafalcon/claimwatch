@@ -631,7 +631,20 @@ def read_fixture(name: str) -> list[dict[str, str]]:
 def load_reviews(conn, rows: list[dict[str, str]], run_id: str) -> None:
     """Append each review not already present under its natural key + content
     hash. ANSI `insert ... select ... where not exists (...)`, parameterized — no
-    reader function in SQL, so the load stays portable."""
+    reader function in SQL, so the load stays portable. The batch is one
+    transaction, as a snapshot batch is (A4 (a)): a refused rating in the
+    fifth row leaves rows one to four uncommitted, so a refused rebuild never
+    leaves raw partly written (A8 (b))."""
+    conn.execute("begin transaction")
+    try:
+        _load_reviews(conn, rows, run_id)
+    except BaseException:
+        conn.execute("rollback")
+        raise
+    conn.execute("commit")
+
+
+def _load_reviews(conn, rows: list[dict[str, str]], run_id: str) -> None:
     for r in rows:
         rating = review_rating(r["rating"])
         if rating is None:

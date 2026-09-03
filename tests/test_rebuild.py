@@ -135,6 +135,25 @@ def test_loader_refuses_a_rating_outside_the_half_steps(rating):
         conn.close()
 
 
+def test_a_refused_review_batch_loads_nothing():
+    """A8 (b): the review loader loads a batch or nothing — four good rows
+    and a fifth outside the half-steps leave zero rows in raw, where a
+    row-by-row load committed the first four (round 4, code-reviewer #1)."""
+    conn = connect("duckdb", database=":memory:")
+    try:
+        create_raw(conn)
+        rows = [
+            {**_review("4"), "external_id": f"r{k}", "body": f"b{k}"} for k in range(4)
+        ] + [{**_review("4.25"), "external_id": "r4"}]
+        with pytest.raises(PageShapeError, match="field 'rating' is not a half-step"):
+            load_reviews(conn, rows, run_id="t")
+        assert conn.execute("select count(*) from raw_reviews").fetchone() == (0,)
+        load_reviews(conn, rows[:4], run_id="t")  # the same good rows, alone: all four
+        assert conn.execute("select count(*) from raw_reviews").fetchone() == (4,)
+    finally:
+        conn.close()
+
+
 @pytest.mark.parametrize("rating", ["4.5", Decimal("4.5"), 4, "4", Decimal("4.0")])
 def test_loader_stores_a_half_step_as_the_column_spells_it(rating):
     """A6: a member of the set, however spelled by its source, lands as one
