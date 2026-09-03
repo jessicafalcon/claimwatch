@@ -189,9 +189,9 @@ def test_a_review_page_source_stops_at_the_first_page_with_no_review(tmp_path):
     assert len(parsed.reviews) == sum(
         pins.OA_SAMPLE_REVIEWS_ON_PAGES
     )  # before the guard
-    assert (
-        len(parsed.snapshots) == 2
-    )  # pages 1 and 2 carry the aggregate; the guard dedups
+    # pages 1 and 2 both carry the aggregate; the capture yields ONE snapshot
+    # row, page 1's (round 1, code-reviewer: a moving figure lands once)
+    assert [r["source_url"] for r in parsed.snapshots] == [profile.page_url(1)]
     assert all(r["title"] == "" for r in parsed.reviews)
 
 

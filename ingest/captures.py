@@ -93,7 +93,14 @@ def read_captures(root: Path, source: Source) -> list[tuple[str, Parsed]]:
     [(capture_id, Parsed)], captures in name order, pages in page order, items
     in page order. A capture is any directory holding `page-<n>.<ext>` files;
     `root` itself may be one (a frozen sample). A missing root is zero
-    captures, not an error (a fresh clone)."""
+    captures, not an error (a fresh clone).
+
+    Reviews come from every page; the snapshot comes from the first page that
+    carries one. A profile's aggregate is a fact about the profile at the
+    capture's instant, not about each page, and every page repeats it — so a
+    capture yields ONE snapshot row, and an aggregate that moves between page
+    1 and page 14 of a live run cannot land twice under one `captured_at`
+    (round 1, code-reviewer)."""
     if not root.is_dir() or source.parser is None:
         return []
     mod = parser_module(source.parser)
@@ -110,14 +117,15 @@ def read_captures(root: Path, source: Source) -> list[tuple[str, Parsed]]:
                     page.with_name(page.name[: -len(mod.EXTENSION) - 1] + ".meta.json"),
                     source.host,
                 )
-                parsed.extend(
-                    mod.parse(
-                        page.read_bytes(),
-                        str(meta["source_url"]),
-                        str(meta["captured_at"]),
-                        source,
-                    )
+                one = mod.parse(
+                    page.read_bytes(),
+                    str(meta["source_url"]),
+                    str(meta["captured_at"]),
+                    source,
                 )
+                parsed.reviews.extend(one.reviews)
+                if not parsed.snapshots:
+                    parsed.snapshots.extend(one.snapshots)
             except PageShapeError as exc:
                 # Which file to fix: the capture directory, then the page's own line.
                 raise PageShapeError(f"capture {d}: {exc}") from exc

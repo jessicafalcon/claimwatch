@@ -187,6 +187,48 @@ def test_manual_and_fetched_rows_read_back_as_measured(tmp_path):
     assert manual_row[9] == "2026-09-02" and manual_row[10] == "manual"
 
 
+def test_a_profile_capture_yields_one_snapshot_row_from_its_first_page(tmp_path):
+    """The aggregate repeats on every page of a profile; if the live figure
+    moves between page 1 and page 2 of one run, the capture still yields ONE
+    snapshot row — page 1's, under the capture's instant — never two rows for
+    one `captured_at` left to a hash tiebreak (round 1, code-reviewer)."""
+    from ingest.opinion_assurances import SAMPLE_DIR as OA_SAMPLE
+
+    oa = by_name("fr-digital-first-opinion-assurances")
+    stamp = "2026-09-02T11:00:00"
+    d = tmp_path / "cache" / oa.platform / oa.name / stamp.replace(":", "-")
+    shutil.copytree(OA_SAMPLE, d)
+    (d / "MANIFEST.sha256").unlink()
+    for n in (1, 2, 3):
+        (d / f"page-{n}.meta.json").write_text(
+            json.dumps(
+                {"source_url": oa.page_url(n), "captured_at": stamp, "status": 200}
+            )
+        )
+    page2 = d / "page-2.html"
+    moved = page2.read_text(encoding="utf-8").replace(
+        '<meta itemprop="ratingValue" content="3.6">',
+        '<meta itemprop="ratingValue" content="3.7">',
+        1,
+    )
+    assert moved != page2.read_text(encoding="utf-8")
+    page2.write_text(moved, encoding="utf-8")
+    db = tmp_path / "w.duckdb"
+    rebuild(
+        "duckdb",
+        "captured",
+        database=db,
+        cache_dir=tmp_path / "cache",
+        manual_file=tmp_path / "none.csv",
+    )
+    rows = _query(
+        db,
+        "select rating, review_count, source_url from raw_platform_snapshots "
+        "where origin = 'fetch'",
+    )
+    assert rows == [(Decimal("3.600"), 512, oa.page_url(1))]
+
+
 def test_reseeding_reentering_and_rebuilding_add_no_snapshot_row(tmp_path):
     cache = tmp_path / "cache"
     _play_capture(cache, "2026-09-02T10:00:00")
