@@ -168,6 +168,12 @@ def test_peer_ratings_matches_pins(anchors_db):
     assert all(
         r[1] == "trustpilot" for r in rows
     )  # the unsolicited anchors with a rating
+    peers = _query(
+        anchors_db,
+        "select profile, rating, review_count from peer_ratings "
+        "where profile <> 'fr-digital-first'",
+    )
+    assert {p: (str(r), c) for p, r, c in peers} == pins.PEER_RATINGS_ANCHOR_VALUES
 
 
 def test_a_hand_read_and_a_fetched_point_reach_the_marts_as_measured(tmp_path):

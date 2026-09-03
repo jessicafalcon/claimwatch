@@ -165,7 +165,11 @@ def _decimal(value: str, *, where: str, line: int, field: str) -> Decimal | None
     return number
 
 
-def _count(value: str, *, where: str, line: int, field: str) -> int:
+def _count(value: str, *, where: str, line: int, field: str) -> int | None:
+    """An optional count (A4 (e): a figure the brief does not give is empty,
+    like the other measures); a present one fits the column's shape."""
+    if value == "":
+        return None
     count = count_in_range(value)  # the column's shape: never a traceback
     if count is None:
         raise _refuse_row(

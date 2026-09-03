@@ -40,6 +40,7 @@ from (
             cast(review_count as decimal(12, 3)) as value,
             tag, precedence, source_url, captured_at, run_id
         from stg_platform_snapshots
+        where review_count is not null
         union all
         select
             segment, source, profile, 'one_star_share' as stat,

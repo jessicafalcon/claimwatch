@@ -51,8 +51,10 @@ years is placed at mid-year of the span's first year ("2025–2026" is
 2025-06-15); one it does not date is placed on the day of the figure it was
 gathered beside (the Google
 Play figure beside the App Store's, 2024-09-15; the Opinion Assurances figures
-beside the June 2026 reading, 2026-06-15). The day is a placement, not a
-reading.
+beside the June 2026 reading, 2026-06-15). A figure the brief gives as a range
+is stored at the range's midpoint, rounded to the column ("~2.7–3.8" is
+3.250), and a figure it does not give at all is left empty. The day, and a
+midpoint, are placements, not readings.
 
 - **B1.1 — The hero case.** One documented refund put on hold pending extra
   documents — a roughly €340 emergency-room claim reported unresolved for

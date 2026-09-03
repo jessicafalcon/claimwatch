@@ -106,6 +106,15 @@ def test_anchors_seed_nine_documented_rows_with_provenance(tmp_path):
     assert _query(
         db, "select review_count from stg_platform_snapshots where rating is null"
     ) == [(534,)]
+    # the peers the brief gives a range or no count (A4 (e)): the midpoint,
+    # rounded to the column, and an empty count — placements, never a number
+    # no source gave
+    peers = _query(
+        db,
+        "select profile, rating, review_count from stg_platform_snapshots "
+        "where profile <> 'fr-digital-first' order by profile",
+    )
+    assert {p: (str(r), c) for p, r, c in peers} == pins.PEER_RATINGS_ANCHOR_VALUES
 
 
 def test_anchors_seed_identically_in_every_input_but_none(tmp_path):
@@ -635,6 +644,10 @@ def test_a_measure_beyond_its_columns_scale_or_range_refuses(tmp_path):
         Decimal("4.123"),
         Decimal("9999.9"),
     )
+    (blank,) = read_manual_snapshots(
+        _write_csv(tmp_path / "b.csv", MANUAL_COLUMNS, [_store_row(review_count="")])
+    )
+    assert blank["review_count"] is None  # an absent count, like the other measures
     db = tmp_path / "w.duckdb"
     rebuild(
         "duckdb",
@@ -802,7 +815,6 @@ def test_manual_file_columns_are_exactly_the_declared_eight(tmp_path):
         ("rating", "5.5", "outside the range"),
         ("rating", "four", "not a number"),
         ("review_count", "-1", "not a non-negative integer"),
-        ("review_count", "", "not a non-negative integer"),
         ("review_count", "9" * 5000, "not a non-negative integer"),
         ("review_count", "2147483648", "not a non-negative integer"),  # column ceiling
         ("rating", "4." + "9" * 5000, "not a number"),

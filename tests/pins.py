@@ -81,8 +81,17 @@ ANCHOR_PROFILES = {
 # The marts on the anchors alone (`ROWS=synthetic` or `none`+anchors):
 RATING_TREND_ANCHOR_ROWS = 8  # every anchor with a rating, one per month
 CHANNEL_GAP_ANCHOR_ROWS = 6  # latest rating per segment × channel × platform × profile
-PLATFORM_STATS_ANCHOR_ROWS = 11  # one row per stat (A2): a count per key + 4 stats
+PLATFORM_STATS_ANCHOR_ROWS = (
+    9  # one row per stat (A2): a count per key with one + 4 stats
+)
 PEER_RATINGS_ANCHOR_ROWS = 4  # unsolicited: the studied insurer + three peers
+# The three peers as the brief states them (A4 (e)): a range is stored at its
+# midpoint, rounded to the column; a count the brief does not give is empty.
+PEER_RATINGS_ANCHOR_VALUES = {
+    "peer-traditional-1": ("4.500", 3000),  # "~4.4–4.6 (1k–5k reviews)"
+    "peer-traditional-2": ("3.250", None),  # "~2.7–3.8", no count
+    "peer-digital-challenger-1": ("3.100", None),  # "~3.1", no count
+}
 # The studied insurer's latest unsolicited point and its invited ones.
 CHANNEL_GAP_DIGITAL_FIRST = {
     ("unsolicited", "trustpilot"): ("3.900", 975, "2026-06-15"),

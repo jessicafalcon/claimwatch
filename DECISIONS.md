@@ -597,8 +597,12 @@ renamed the rebuild input, closed five BACKLOG rows.
   2025-06-15); one it
   does not date is placed on the day of the figure it was gathered beside (the
   Google Play figure beside the App Store's, 2024-09-15; the Opinion
-  Assurances figures beside the June 2026 reading, 2026-06-15). The day is a
-  placement, not a reading.
+  Assurances figures beside the June 2026 reading, 2026-06-15). A figure the
+  brief gives as a range is stored at the range's midpoint, rounded to the
+  column ("~2.7–3.8" is 3.250), and a figure it does not give at all is left
+  empty (two peers' review counts; `review_count` is nullable like the other
+  measures — A4 (e), re-frozen 2026-09-03). The day, and a midpoint, are
+  placements, not readings.
 - **Four marts, four flips to Documented.** `rating_trend` (B1.2),
   `channel_gap` (B1.3), `platform_stats` (B1.4), `peer_ratings` (B2.3) are
   window selects over `stg_platform_snapshots`, each row carrying its point's

@@ -39,7 +39,10 @@ every rule below except the last sentence, which is editorial (PROJECT_BRIEF.md
   under `data/cache/`, gitignored). An anchor's address is its platform's
   root, not a profile page: a profile address spells the brand and may sit
   only in `ingest/sources.py` (DECISIONS, D1), so a Documented point opens to
-  its platform and to PROJECT_BRIEF.md §6, not to a page. The row's own tag
+  its platform and to PROJECT_BRIEF.md §6, not to a page. An anchor the brief
+  gives as a range is stored at the range's midpoint, rounded to the column,
+  and a figure the brief does not give is left empty; a placed day or midpoint
+  is a placement, not a reading (SPEC.md Beat 1 states the rule). The row's own tag
   stays Documented until the points we measure make the series.
 
 | Study claim (beat, chart/sentence) | Mart table (where the number lives) | SQL file (the query that builds it) | Upstream source (where the data came from) | Tag (what kind of evidence) |

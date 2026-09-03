@@ -26,7 +26,7 @@ create table if not exists raw_platform_snapshots (
     channel              text          not null,
     origin               text          not null,
     rating               decimal(4, 3),
-    review_count         integer       not null,
+    review_count         integer,
     one_star_share       decimal(4, 3),
     response_rate        decimal(4, 3),
     response_delay_days  decimal(5, 1),
