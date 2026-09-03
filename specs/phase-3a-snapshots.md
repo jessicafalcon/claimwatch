@@ -910,7 +910,12 @@ New code:
   `pipeline/warehouse.py` — `DriverError`; `ingest/opinion_assurances.py` —
   `bounds_seen`; every shape guard in `pipeline/build.py`,
   `ingest/sources.py`, `ingest/captures.py`, `ingest/app_store.py` and
-  `ingest/parsed.py` matches the whole value (`fullmatch`).
+  `ingest/parsed.py` matches the whole value (`fullmatch`). A9:
+  `pipeline/cli.py` — `GATED`, `--goals-origin`, `confirmed()` first in
+  `reset` and `scrape`; `Makefile` — `$(origin MAKECMDGOALS)` beside the goal
+  list; `pipeline/build.py` — `write_source_pages` in one transaction,
+  `attribution_labels(rows_input, profile)`; `ingest/sources.py` — the
+  sample-profile guard.
 - `sql/raw/raw_platform_snapshots.sql`, `sql/raw/raw_source_pages.sql`,
   `sql/staging/stg_platform_snapshots.sql`, `sql/marts/rating_trend.sql`,
   `sql/marts/channel_gap.sql`, `sql/marts/platform_stats.sql`,
@@ -944,7 +949,10 @@ New and extended tests:
   `tests/test_opinion_assurances_parser.py`, `tests/test_rebuild.py`,
   `tests/test_cli.py` and `tests/test_makefile.py`; round 5's in
   `tests/test_rebuild.py`, `tests/test_opinion_assurances_parser.py`,
-  `tests/test_ingest_layout.py` and `tests/test_snapshots.py`.
+  `tests/test_ingest_layout.py` and `tests/test_snapshots.py`; A9's in
+  `tests/test_cli.py`, `tests/test_makefile.py`,
+  `tests/test_ingest_rebuild.py`, `tests/test_snapshots.py` and
+  `tests/test_ingest_layout.py`.
 
 Records (see Record updates): `DECISIONS.md`, `BACKLOG.md`, `CLAUDE.md`,
 `BACKING.md`, `SPEC.md`, `PROJECT_BRIEF.md`, `docs/PLAN.md`, this spec.
@@ -957,22 +965,21 @@ Freeze: fixtures/opinion-assurances/
 ## Record updates (REQUIRED)
 
 - [ ] `DECISIONS.md` — Phase 3a entry: the snapshot shape, the anchors
-      re-freeze (D2) and tag (D3); the four marts and the Documented flip;
-      the source declaration and parser dispatch; under "Scrape politely",
-      the position of each source as checked on 2026-09-02 (Google Play
-      listing allowed by robots and terms, its reviews disallowed; App Store
-      listing forbidden by Apple's site terms; Opinion Assurances: CGU V.3
-      forbids automated extraction without written authorization, and the
-      developer holds that authorization — A1, with its date) and the
-      hand-entry path; D1 as
-      a standing neutrality decision; the `ROWS` rename with a supersede
-      pointer on Phase 2's `FIXTURE` decision; the linear matcher; the
-      `like` widening of the lint; Gotchas from the checks (the by-id App
-      Store address redirects; the checks ran from the session, not by hand)
-      and from the first live run; the A2 through A8 entries with their
-      rejected alternatives; the Gotchas on `$(origin)` and `MAKEFLAGS`, on a
-      structure dump naming the fields and not their nesting, and on `create
-      table if not exists` keeping the old column
+      re-freeze (D2) and tag (D3); the four marts and the Documented flip; the
+      source declaration and parser dispatch; under "Scrape politely", the
+      position of each source as checked on 2026-09-02 (Google Play listing
+      allowed by robots and terms, its reviews disallowed; App Store listing
+      forbidden by Apple's site terms; Opinion Assurances: CGU V.3 forbids
+      automated extraction without written authorization, and the developer
+      holds that authorization — A1, with its date) and the hand-entry path;
+      D1 as a standing neutrality decision; the `ROWS` rename with a supersede
+      pointer on Phase 2's `FIXTURE` decision; the linear matcher; the `like`
+      widening of the lint; Gotchas from the checks (the by-id App Store
+      address redirects; the checks ran from the session, not by hand) and
+      from the first live run; the A2 through A9 entries with their rejected
+      alternatives; the Gotchas on `$(origin)` and `MAKEFLAGS`, on a structure
+      dump naming the fields and not their nesting, and on `create table if
+      not exists` keeping the old column
 - [ ] `BACKLOG.md` — five rows closed (struck + "DONE Phase 3a"): the wildcard
       bound, the `DEFAULT_CACHE` / `ALLOWED_HOSTS` binding, the
       `FIXTURE=cache` naming, the hardwired capture path, the permissive

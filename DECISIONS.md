@@ -434,12 +434,13 @@ scraper, no model.
   Python. The gate was `$(origin CONFIRM)` from Phase 1 to Phase 3a's review
   round 3, when a definition supplied through `MAKEFLAGS` in the environment
   was shown to report `command line` (GNU Make 3.81 and 4.x alike); a goal
-  cannot arrive that way, so `make confirm reset` stamps the make process's
-  id and `reset` runs only in that process (A4 (d), [Phase 3a](#phase-3a)).
-  The stamp is created exclusively and a trailing `confirm` refuses; what the
-  gate does not hold against — a same-user process writing `data/` while
-  make runs — is written in the spec's Threat model (A8 (d)).
-  Mirrors the SPEC/BASE shape for the variables.
+  cannot arrive that way, so `make confirm reset` stamps the make process's id
+  and `reset` runs only in that process (A4 (d), [Phase 3a](#phase-3a)). The
+  stamp is created exclusively (A8 (d)); `confirm` arms `reset` or `scrape`
+  alone and reads a goal list of make's own origin only (A9 (a)); what the
+  gate does not hold against — a same-user process writing `data/` while make
+  runs — is written in the spec's Threat model. Mirrors the SPEC/BASE shape
+  for the variables.
 
 **Gotchas:** none — DuckDB's `create or replace`, `insert … where not exists`
 and `information_schema.tables` behaved as the official docs describe.
@@ -887,3 +888,28 @@ renamed the rebuild input, closed five BACKLOG rows.
   file's name is the input's (a spelling, not a derivation); a marker table
   naming the input inside each file (a row no source produced, counted by the
   idempotency check). Found by review round 4 (2026-09-03).
+- **A9 (after review round 5, approved and built 2026-09-03): the confirm gate
+  arms a gated goal or nothing, from make's own goal list; the declared-page
+  writer writes a batch or nothing; the `sample` label is the sample
+  declaration's row's.** (a) `confirm` arms only when the goal after it is
+  `reset` or `scrape` — a closed set, so `make confirm help` refuses and
+  leaves no stamp — and only from a goal list whose origin is make's own: the
+  recipe passes `$(origin MAKECMDGOALS)` and anything but `default` is
+  refused, since a `MAKECMDGOALS` definition from the environment
+  (`environment`), from `MAKEFLAGS` or from the command line (`command line`)
+  overrides the list make built (probed against GNU Make 3.81); `reset` and
+  `scrape` consume the stamp before their own refusals; a stamp create that
+  fails for any reason but "already there" refuses with one line. What the
+  gate still does not hold against is a same-user process writing `data/`
+  while make runs (A8 (d)). (b) `write_source_pages` runs its batch in one
+  transaction, as the two loaders do. (c) `attribution_labels` takes the input
+  and the row's profile: the literal `sample` is admitted under `samples` on a
+  row whose profile is the sample declaration's, and a real declaration may
+  not carry that profile. Rejected: dropping the goal-list check and widening
+  the residual (a leaked stamp becomes the ordinary case); a Makefile-side
+  `$(filter …)` (it runs on the same overridable variable); a denylist of
+  goals that may not follow `confirm`; keying the label on the row's `source`
+  (a sample row's source is the real platform's name, as an anchor's is);
+  dropping `rows_input` (the input still decides where a sample declaration
+  exists). Found by review round 5 (2026-09-03); built in place of a sixth
+  round, with one exit pass.

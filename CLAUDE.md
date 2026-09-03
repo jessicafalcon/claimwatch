@@ -182,12 +182,15 @@ in the middle, and come out on the right as the numbers the study shows.
   the SAME invocation and nothing else: `make confirm reset`, `make confirm
   scrape`. The recipe stamps its make process's id; the gated target passes
   its own and runs only when the two are one process; the stamp is consumed
-  either way, so an earlier `confirm` confirms nothing later. The stamp is
-  written only when none is there, so a file already sitting in `data/` makes
-  `confirm` refuse rather than overwrite it; a `confirm` with no goal after it
-  refuses and leaves none. The gate holds against a variable, an environment,
-  `MAKEFLAGS` and a stale invocation, not against a same-user process writing
-  `data/` while make runs (the spec's Threat model says so).
+  either way, so an earlier `confirm` confirms nothing later. `confirm` arms
+  only when `reset` or `scrape` follows it — `make confirm help` refuses and
+  leaves no stamp — and only from the goal list make itself built (a
+  `MAKECMDGOALS` value from the environment, `MAKEFLAGS` or the command line
+  has another origin and is refused). The stamp is written only when none is
+  there, so a file already sitting in `data/` makes `confirm` refuse rather
+  than overwrite it. The gate holds against a variable, an environment,
+  `MAKEFLAGS`, a stale invocation and a typo, not against a same-user process
+  writing `data/` while make runs (the spec's Threat model says so).
 - `make reset [TARGET=duckdb]` — DESTRUCTIVE: drop every DuckDB file this repo
   built, the corpus and one per rebuild input; needs `make confirm reset` (no
   variable and no environment value counts).
@@ -511,16 +514,17 @@ derived from the input. Review rounds 1–5 done and their plain fixes built
 (round 5's six: a column's position is the catalog's ordinal, the schema
 filters are pinned, a declaration the engine cannot run refuses with one line,
 a doubled bound refuses, every shape guard matches the whole value, one name
-for the capture directory). A9 is proposed after round 5 and awaits approval:
-the confirm gate arms a gated goal or nothing and reads a goal list of make's
-own origin only; the declared-page writer writes a batch or nothing; the
-`sample` label is the sample declaration's row's.
+for the capture directory). A9, approved and built after round 5: the confirm
+gate arms a gated goal or nothing and reads a goal list of make's own origin
+only; the declared-page writer writes a batch or nothing; the `sample` label
+is the sample declaration's row's.
 
-Remaining: A9's approval and build, its scoped re-review, the exit audit. The
-DONE command is `make rebuild && make idempotency-check ROWS=captured`; Phase
-1's line stays green (raw 40 / staging 39); CI runs `ROWS=synthetic` and
-`ROWS=samples`. Phase 2 merged (PR #4). Next: the Phase 3a PR; then Phase 3b —
-Trustpilot.
+Remaining: the exit pass (the coherence audit over the repo, with code and
+security review scoped to A9's diff, in place of a sixth round), the Delivered
+paragraph, the PR. The DONE command is `make rebuild && make idempotency-check
+ROWS=captured`; Phase 1's line stays green (raw 40 / staging 39); CI runs
+`ROWS=synthetic` and `ROWS=samples`. Phase 2 merged (PR #4). Next: the Phase
+3a PR; then Phase 3b — Trustpilot.
 
 Open BACKLOG rows: **16**.
 
