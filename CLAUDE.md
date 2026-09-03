@@ -149,7 +149,12 @@ in the middle, and come out on the right as the numbers the study shows.
   `data/snapshots/manual_snapshots.csv` and every capture under `data/cache/`
   (with no capture it says so); `none` runs it end to end with zero rows;
   `synthetic` loads the review fixture and the anchors; `samples` runs every
-  frozen sample through its real parser (CI does). The Phase 3a DONE command
+  frozen sample through its real parser (CI does). A raw table already in
+  the file must be the one its `sql/raw/` file declares, column for column
+  through the engine's own catalog; otherwise the rebuild refuses naming the
+  column and both types, since `create table if not exists` would keep the
+  old column and the engine would cast into it silently (`make confirm
+  reset` first). The Phase 3a DONE command
   is `make rebuild && make idempotency-check ROWS=captured`.
 - `make idempotency-check [TARGET=] [ROWS=synthetic]` — rebuild twice, diff
   per-table row counts (the run-twice property as a command); same `ROWS`
@@ -470,8 +475,10 @@ source with no parser), A4 (every measure's bound is its column's and a
 refused batch loads nothing; the loader checks its closed sets; a capture's
 address is a declared page; `make confirm <target>` replaces the CONFIRM
 variable; the ranged peer anchors are placements), A5 (the review text is a
-child of the review scope, not of the description) and A6 (a review's rating
-is a half-step, 1 to 5) all approved and built. What a reader sees: the rating
+child of the review scope, not of the description), A6 (a review's rating
+is a half-step, 1 to 5, exactly the scale the site declares) and A7 (a
+rebuild refuses a raw table that is not its declaration) all approved and
+built. What a reader sees: the rating
 each platform shows is now a table of its own, seeded from the brief's public
 figures (Documented) and extended by the figures we capture or read off a page
 ourselves (Measured), with four Beat 1–2 charts built from it. How: every
@@ -484,9 +491,9 @@ Phase 3a). The first live run (2026-09-03) captured Google Play's listing (one
 Measured row) and the profile's first page, which refused twice against a
 shape the hand-written sample had guessed — the text's nesting and the
 half-star ratings (DECISIONS → Gotchas); A5 and A6 corrected the shape and the
-page parses: 40 reviews and the aggregate. Remaining: the full 14-page scrape
-(`make confirm scrape`) and the DONE command on it, a scoped re-review of the
-A3–A6 commits, the exit audit. The DONE command is `make rebuild && make
+page parses: 40 reviews and the aggregate. The full 14-page scrape then
+ran (14 pages, 534 reviews, aggregate 3.8 on 534) and the DONE command passes
+on it. Remaining: a scoped re-review of the A3–A7 commits, the exit audit. The DONE command is `make rebuild && make
 idempotency-check ROWS=captured`; Phase 1's line stays green (raw 40 / staging
 39); CI runs `ROWS=synthetic` and `ROWS=samples`. Phase 2 merged (PR #4).
 Next: the Phase 3a PR; then Phase 3b — Trustpilot.

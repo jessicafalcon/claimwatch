@@ -244,6 +244,16 @@ Each entry: the surprise, the official-docs check, what we did.
   environment `MAKECMDGOALS` changes the variable's text, not the goal list),
   which is what Phase 3a's A4 (d) builds on. Found by review round 3
   (security-reviewer), 2026-09-02.
+- **`create table if not exists` keeps the old column, and the engine casts
+  into it.** After A6 widened `raw_reviews.rating` to `decimal(2, 1)`, a
+  rebuild on the file built before it left the `integer` column in place
+  and DuckDB rounded every half-step on insert (109 of 534) — no error, no
+  warning, counts unchanged twice. Official-docs check: DuckDB's `if not
+  exists` is a no-op on an existing table; an insert casts implicitly
+  between numeric types. What we did: A7 — the rebuild reads the existing
+  table's columns and the file's back through `information_schema` and
+  refuses on a difference. Found by the first `make confirm scrape`,
+  2026-09-03.
 - **A structure dump names the fields, not their nesting or their values'
   shape.** The Opinion Assurances dump of 2026-09-02 listed the classes and
   microdata properties a review carries; the hand-written sample then
@@ -821,3 +831,20 @@ renamed the rebuild input, closed five BACKLOG rows.
   give); refusing the page (loses the phase's only review source over a
   value the site gives by design); a free `decimal` in 0–5 (wider than the
   site's shape; admits a malformed value).
+- **A7 (first live run, approved and built 2026-09-03): a rebuild refuses a
+  raw table that is not its declaration.** The first rebuild after A6 loaded
+  into the DuckDB file made before it; `create table if not exists` kept the
+  `integer` rating column and the engine rounded 109 half-steps on insert
+  without a word — nothing refused, the idempotency check green. A4 (a)
+  closes that class at the parse, which cannot see a table whose column is
+  not the file's. Now `create_raw` compares every raw table that already
+  exists with its file: the declaration is created as a temporary table
+  under a scratch name on the same connection, both column lists are read
+  back from `information_schema.columns` in the engine's own vocabulary, the
+  scratch table dropped, and the first difference refuses the rebuild naming
+  table, column and both types, pointing at `make confirm reset`. Rejected:
+  dropping and recreating raw on every rebuild (append-only history);
+  altering the column in place (engine-specific, and it rewrites history's
+  values); a CLAUDE.md note alone (a silent failure; a note stops no build);
+  comparing the file's text with a stored copy (a comment edit is not a
+  schema change; a schema change can hide in equal bytes across engines).
