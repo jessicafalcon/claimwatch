@@ -209,12 +209,27 @@ def test_no_module_branches_on_a_platform_name():
     assert hits == {}, hits
 
 
-@pytest.mark.parametrize("day", ["", "2026-9-1", "2026-02-30", "today"])
+@pytest.mark.parametrize(
+    "day",
+    [
+        "",
+        "2026-9-1",
+        "2026-02-30",
+        "today",
+        # Spellings `date.fromisoformat` accepts and the declared `YYYY-MM-DD`
+        # shape does not — written verbatim as `captured_at` if let through
+        # (round 4, functionality-tester #4).
+        "20260902",
+        "2026-09-02T00:00",
+        "2026-09-02\n",
+        "2026-W36-3",
+    ],
+)
 def test_a_declaration_without_a_real_declared_on_day_is_refused(day):
     """`declared_on` is provenance — it becomes `captured_at` on every page
     address in raw_source_pages — so a declaration carries a real day or does
     not exist; the empty string is no longer a default (round 1, code-reviewer
-    #6)."""
+    #6). The shape is the one spelling, not whatever the stdlib parses."""
     with pytest.raises(ValueError, match="declared_on"):
         app_store_source(
             name="x",
