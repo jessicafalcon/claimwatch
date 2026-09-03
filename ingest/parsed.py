@@ -7,7 +7,35 @@ whole page loads nothing."""
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
+
+# `raw_platform_snapshots.review_count` is an `integer` column (32-bit signed):
+# the shape every count must fit, whatever brought it — a store page's JSON
+# number or digit string, a profile page's meta content, a hand entry's cell.
+# It is checked at the parse, so a value the column cannot hold is a one-line
+# refusal there, never a driver exception at the load (round 2, code-reviewer
+# #2 #3, security-reviewer #1 #2).
+MAX_COUNT = 2**31 - 1
+_COUNT = re.compile(
+    r"^[0-9]{1,10}$"
+)  # ten digits cover MAX_COUNT; longer never reaches int()
+
+
+def count_in_range(value: object) -> int | None:
+    """`value` as a non-negative integer the count column holds — a JSON
+    integer (never a bool) or a digit string — or None when it is neither."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, str):
+        if not _COUNT.match(value):
+            return None
+        number = int(value)
+    elif isinstance(value, int):
+        number = value
+    else:
+        return None
+    return number if 0 <= number <= MAX_COUNT else None
 
 
 class PageShapeError(ValueError):

@@ -21,7 +21,7 @@ import re
 from decimal import ROUND_HALF_EVEN, Decimal, InvalidOperation
 from html.parser import HTMLParser
 
-from ingest.parsed import Parsed, refuse
+from ingest.parsed import Parsed, count_in_range, refuse
 from ingest.sources import ROOT, Source
 
 EXTENSION = "html"
@@ -29,12 +29,11 @@ SAMPLE_PLATFORM = "google-play"  # the frozen sample is written in that store's 
 SAMPLE_HOST = "play.google.com"
 SAMPLE_DIR = ROOT / "fixtures" / "listings"
 # Bounded runs: a rating has at most two digits before the point and at most
-# thirty-two after (a store prints fifteen); a count has at most twelve digits.
-# A longer string is outside the shape and refuses; it never reaches int() or
-# Decimal(), whose own limits would surface as a traceback (round 1,
-# security-reviewer #2).
+# thirty-two after (a store prints fifteen). A longer string is outside the
+# shape and refuses; it never reaches Decimal(), whose own limits would
+# surface as a traceback (round 1, security-reviewer #2). A count, as a JSON
+# number or a digit string, must fit the column: `parsed.count_in_range`.
 _NUMBER = re.compile(r"^[0-9]{1,2}(\.[0-9]{1,32})?$")
-_DIGITS = re.compile(r"^[0-9]{1,12}$")
 _PLACES = Decimal("0.001")
 
 
@@ -104,13 +103,15 @@ def _count(aggregate: dict[str, object], page_url: str) -> int:
         )
     field_name = present[0]
     value = aggregate[field_name]
-    if isinstance(value, bool) or not (
-        (isinstance(value, str) and _DIGITS.match(value)) or isinstance(value, int)
-    ):
+    count = count_in_range(value)
+    if count is None:
         raise refuse(
-            page_url, None, field_name, f"is not a non-negative integer: {value!r}"
+            page_url,
+            None,
+            field_name,
+            f"is not a non-negative integer the count column holds: {value!r}",
         )
-    return int(value)
+    return count
 
 
 def parse(body: bytes | str, page_url: str, captured_at: str, source: Source) -> Parsed:

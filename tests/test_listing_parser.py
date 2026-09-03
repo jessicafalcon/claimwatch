@@ -94,12 +94,32 @@ def test_rating_outside_the_shape_is_refused(value):
         parse(_with_block(doc), PAGE_URL, CAPTURED, SRC)
 
 
-@pytest.mark.parametrize("value", ["-1", "12.5", "", True, None, "many", 3.5])
+@pytest.mark.parametrize(
+    "value",
+    ["-1", "12.5", "", True, None, "many", 3.5, -5, 2**31, "2147483648", 10**11],
+)
 def test_count_outside_the_shape_is_refused(value):
+    """The shape is the column's: a non-negative integer up to 2^31 - 1, as a
+    JSON number or a digit string alike — a negative number, or one the
+    column cannot hold, refuses at the parse, never as a driver exception at
+    the load (round 2, code-reviewer #2 #3, security-reviewer #1 #2)."""
     doc = _block()
     doc["aggregateRating"]["ratingCount"] = value
     with pytest.raises(PageShapeError, match="'ratingCount'"):
         parse(_with_block(doc), PAGE_URL, CAPTURED, SRC)
+
+
+def test_the_count_bound_is_the_columns_and_its_edge_loads():
+    """MAX_COUNT is the `integer` column's ceiling; a count exactly there, as a
+    number or a string, is inside the shape."""
+    from ingest.parsed import MAX_COUNT
+
+    assert MAX_COUNT == 2**31 - 1
+    for value in (MAX_COUNT, str(MAX_COUNT), 0, "0"):
+        doc = _block()
+        doc["aggregateRating"]["ratingCount"] = value
+        row = parse(_with_block(doc), PAGE_URL, CAPTURED, SRC).snapshots[0]
+        assert row["review_count"] == int(value)
 
 
 def test_count_may_be_review_count_and_values_may_be_numbers():

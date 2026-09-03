@@ -410,6 +410,7 @@ def test_manual_file_columns_are_exactly_the_declared_eight(tmp_path):
         ("review_count", "-1", "not a non-negative integer"),
         ("review_count", "", "not a non-negative integer"),
         ("review_count", "9" * 5000, "not a non-negative integer"),
+        ("review_count", "2147483648", "not a non-negative integer"),  # column ceiling
         ("rating", "4." + "9" * 5000, "not a number"),
         ("one_star_share", "1.5", "outside the range"),
         ("response_rate", "82", "outside the range"),

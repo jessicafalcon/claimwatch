@@ -198,10 +198,12 @@ def test_aggregate_rating_outside_the_shape_is_refused(value):
         parse(html, PAGE_URL, CAPTURED, SRC)
 
 
-def test_aggregate_count_outside_the_shape_is_refused():
+@pytest.mark.parametrize("value", ["many", "-1", "2147483648", "100000000000"])
+def test_aggregate_count_outside_the_shape_is_refused(value):
+    """Including a count past the column's ceiling (round 2)."""
     html = _page(1).replace(
         '<meta itemprop="ratingCount" content="512">',
-        '<meta itemprop="ratingCount" content="many">',
+        f'<meta itemprop="ratingCount" content="{value}">',
     )
     with pytest.raises(PageShapeError, match="'ratingCount'"):
         parse(html, PAGE_URL, CAPTURED, SRC)

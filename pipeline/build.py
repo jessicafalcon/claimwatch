@@ -36,7 +36,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from ingest.captures import parser_module, read_captures
-from ingest.parsed import PageShapeError
+from ingest.parsed import PageShapeError, count_in_range
 from ingest.sources import (
     CHANNELS,
     PARSERS,
@@ -135,11 +135,15 @@ def _decimal(
 
 
 def _count(value: str, *, where: str, line: int, field: str) -> int:
-    if not re.fullmatch(r"[0-9]{1,12}", value):  # bounded: never a traceback
+    count = count_in_range(value)  # the column's shape: never a traceback
+    if count is None:
         raise _refuse_row(
-            where, line, field, f"is not a non-negative integer: {value!r}"
+            where,
+            line,
+            field,
+            f"is not a non-negative integer the count column holds: {value!r}",
         )
-    return int(value)
+    return count
 
 
 def _day(value: str, *, where: str, line: int, field: str) -> str:

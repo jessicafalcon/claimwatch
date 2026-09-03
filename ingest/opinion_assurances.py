@@ -43,7 +43,7 @@ from datetime import date
 from decimal import ROUND_HALF_EVEN, Decimal, InvalidOperation
 from html.parser import HTMLParser
 
-from ingest.parsed import Parsed, refuse
+from ingest.parsed import Parsed, count_in_range, refuse
 from ingest.sources import ROOT, Source
 
 EXTENSION = "html"
@@ -266,10 +266,14 @@ def _snapshot_row(
         ) from exc
     if not Decimal(0) <= rating <= Decimal(5):
         raise refuse(page_url, None, "ratingValue", f"is outside 0..5: {value!r}")
-    count = aggregate.get("ratingCount")
-    if count is None or not re.fullmatch(r"[0-9]{1,12}", count):
+    count = count_in_range(aggregate.get("ratingCount"))
+    if count is None:
         raise refuse(
-            page_url, None, "ratingCount", f"is not a non-negative integer: {count!r}"
+            page_url,
+            None,
+            "ratingCount",
+            "is not a non-negative integer the count column holds: "
+            f"{aggregate.get('ratingCount')!r}",
         )
     return {
         "source": source.platform,
@@ -278,7 +282,7 @@ def _snapshot_row(
         "channel": source.channel,
         "origin": "fetch",
         "rating": rating,
-        "review_count": int(count),
+        "review_count": count,
         "one_star_share": None,
         "response_rate": None,
         "response_delay_days": None,
