@@ -465,7 +465,19 @@ def write_source_pages(
     REFUSES the rebuild (A3 (a)): a page's attribution is one fact, not a
     series, and the review join must stay one-to-one, so a re-declaration
     never appends a second row for one address; the fix is `make confirm
-    reset` then `make rebuild`."""
+    reset` then `make rebuild`. The batch is one transaction, as the review
+    and snapshot loaders' are: a refusal on the third declaration leaves the
+    first two's pages uncommitted (A9 (b))."""
+    conn.execute("begin transaction")
+    try:
+        _write_source_pages(conn, run_id, sources)
+    except BaseException:
+        conn.execute("rollback")
+        raise
+    conn.execute("commit")
+
+
+def _write_source_pages(conn, run_id: str, sources: tuple[Source, ...]) -> None:
     for r in source_pages(sources):
         h = hashlib.sha256(
             _SEP.join((r["profile"], r["segment"], r["channel"])).encode("utf-8")

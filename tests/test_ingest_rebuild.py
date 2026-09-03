@@ -546,3 +546,45 @@ def test_a_redeclared_attribution_refuses_the_rebuild(tmp_path):
         assert after == before
     finally:
         conn.close()
+
+
+def test_a_refused_page_batch_writes_nothing(tmp_path):
+    """A9 (b): the declared-page writer is one transaction like the review and
+    snapshot loaders, so two fresh declarations followed by a re-declared one
+    leave zero new page rows — not the two fresh sources' pages committed
+    ahead of the refusal (round 5, code-reviewer #1)."""
+    import dataclasses
+
+    from ingest.sources import app_store_source
+    from pipeline.build import write_source_pages
+
+    db = database_for("synthetic", tmp_path)
+    rebuild("duckdb", "synthetic", root=tmp_path)
+    conn = connect("duckdb", database=db)
+    try:
+        before = conn.execute("select count(*) from raw_source_pages").fetchone()[0]
+        fresh = tuple(
+            app_store_source(
+                name=f"fresh-{k}",
+                app_id=900000 + k,
+                country="fr",
+                listing="",
+                fetchable=True,
+                declared_on="2026-09-03",
+            )
+            for k in (1, 2)
+        )
+        changed = dataclasses.replace(FEED, segment="traditional")
+        with pytest.raises(PageShapeError, match="another attribution"):
+            write_source_pages(conn, "batch", fresh + (changed,))
+        after = conn.execute("select count(*) from raw_source_pages").fetchone()[0]
+        assert after == before
+        assert conn.execute(
+            "select count(*) from raw_source_pages where source like 'fresh-%'"
+        ).fetchone() == (0,)
+        write_source_pages(conn, "batch", fresh)  # the same two alone load
+        assert (
+            conn.execute("select count(*) from raw_source_pages").fetchone()[0] > before
+        )
+    finally:
+        conn.close()
