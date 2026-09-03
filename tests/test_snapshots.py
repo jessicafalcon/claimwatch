@@ -793,16 +793,67 @@ def test_a_row_outside_a_closed_set_or_with_empty_provenance_refuses_the_load(
             == 0
         )
         if value == "sample":  # the label the frozen samples carry: theirs alone
+            with pytest.raises(PageShapeError, match=why):  # not this profile's
+                load_snapshots(conn, [row], "sample:test", "samples")
+            row["profile"] = "sample"  # the sample declaration's row (A9 (c))
             load_snapshots(conn, [row], "sample:test", "samples")
             assert conn.execute(
                 f"select {field} from raw_platform_snapshots where origin = 'manual'"
             ).fetchall() == [("sample",)]
     finally:
         conn.close()
-    assert attribution_labels("samples")[0] == SEGMENTS + ("sample",)
-    assert attribution_labels("captured") == (SEGMENTS, CHANNELS)
+    assert attribution_labels("samples", "sample")[0] == SEGMENTS + ("sample",)
+    assert attribution_labels("samples", "fr-digital-first") == (SEGMENTS, CHANNELS)
+    assert attribution_labels("captured", "sample") == (SEGMENTS, CHANNELS)
     with pytest.raises(ValueError, match="not in"):
-        attribution_labels("anything")
+        attribution_labels("anything", "sample")
+
+
+def test_the_sample_label_is_the_sample_declarations_rows(tmp_path):
+    """A9 (c): under `samples` the literal `sample` is admitted on a row whose
+    profile is the sample declaration's and on no other — an anchor-shaped
+    row with a real profile and `segment=sample` refuses naming the field,
+    while the same row under the sample profile loads; under any other input
+    both refuse (round 5, code-reviewer #4; invariant 1's "on a row a sample
+    declaration wrote", as a property of the row)."""
+    from pipeline.build import load_snapshots
+
+    row = {
+        "source": "google-play",
+        "profile": "fr-digital-first",
+        "segment": "sample",
+        "channel": "sample",
+        "origin": "anchor",
+        "rating": Decimal("4.1"),
+        "review_count": 100,
+        "one_star_share": None,
+        "response_rate": None,
+        "response_delay_days": None,
+        "source_url": "https://play.google.com/x",
+        "captured_at": "2026-09-03",
+        "seeded_from": "test",
+    }
+    db = database_for("samples", tmp_path)
+    rebuild("duckdb", "samples", root=tmp_path)
+    conn = connect("duckdb", database=db)
+    try:
+        before = conn.execute("select count(*) from raw_platform_snapshots").fetchone()
+        with pytest.raises(PageShapeError, match="'segment' is not in"):
+            load_snapshots(conn, [row], "test", "samples")
+        assert (
+            conn.execute("select count(*) from raw_platform_snapshots").fetchone()
+            == before
+        )
+        sample_row = {**row, "profile": "sample"}
+        load_snapshots(conn, [sample_row], "test", "samples")
+        assert conn.execute(
+            "select count(*) from raw_platform_snapshots where profile = 'sample' "
+            "and seeded_from = 'test'"
+        ).fetchone() == (1,)
+        with pytest.raises(PageShapeError, match="'segment' is not in"):
+            load_snapshots(conn, [sample_row], "test", "captured")
+    finally:
+        conn.close()
 
 
 def test_manual_file_columns_are_exactly_the_declared_eight(tmp_path):

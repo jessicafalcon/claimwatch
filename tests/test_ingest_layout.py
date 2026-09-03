@@ -243,6 +243,22 @@ def test_a_declaration_without_a_real_declared_on_day_is_refused(day):
         app_store_source(name="x", app_id=1, country="fr", listing="", fetchable=True)
 
 
+def test_only_the_sample_declaration_carries_the_sample_profile():
+    """A9 (c): the loader keys the `sample` labels on the row's profile, so a
+    real declaration may not carry that profile — the shape refuses at the
+    declaration, like the name (A3 (b))."""
+    with pytest.raises(ValueError, match="profile is the sample declaration's"):
+        app_store_source(
+            name="x",
+            app_id=1,
+            country="fr",
+            listing="",
+            fetchable=True,
+            declared_on="2026-09-03",
+            profile="sample",
+        )
+
+
 def test_brand_carrying_strings_appear_only_in_the_declarations():
     """D1, enforced over the tree: every string that spells the studied
     insurer (`ingest/sources.py::BRAND_TOKENS`) appears in no other tracked

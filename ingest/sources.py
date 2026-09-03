@@ -100,6 +100,13 @@ class Source:
                 f"source {self.name!r}: the name is the sample declaration's; "
                 "declare it with sample=True or choose another name"
             )
+        # The profile is the row-level fact the loader keys the `sample`
+        # labels on (A9 (c)): only the sample declaration may carry it.
+        if self.profile == SAMPLE and not self.sample:
+            raise ValueError(
+                f"source {self.name!r}: the profile is the sample declaration's; "
+                "declare it with sample=True or choose another profile"
+            )
         if not self.sample and (
             self.segment not in SEGMENTS or self.channel not in CHANNELS
         ):

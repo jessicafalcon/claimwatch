@@ -323,14 +323,19 @@ SNAPSHOT_KEY = ("source", "profile", "origin", "source_url", "captured_at")
 _NON_EMPTY = ("source", "profile", "source_url", "captured_at")
 
 
-def attribution_labels(rows_input: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
-    """The `segment` and `channel` values the loader accepts for one rebuild
-    input (A4 (b)): the closed sets, plus the literal `sample` iff the input
-    is `samples` — derived from the closed `INPUTS` set, never a caller's
-    flag — so that label exists only in the samples database."""
+def attribution_labels(
+    rows_input: str, profile: object
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """The `segment` and `channel` values the loader accepts for one row: the
+    closed sets, plus the literal `sample` iff the input is `samples` — the
+    file a sample declaration exists in, derived from the closed `INPUTS`
+    set (A4 (b)) — AND the row's `profile` is the sample declaration's
+    (`SAMPLE`, the one profile only a `sample=True` declaration may carry),
+    so the label is a sample row's alone: an anchor or a hand-entered row
+    under `samples` refuses it like any other input does (A9 (c))."""
     if rows_input not in INPUTS:
         raise ValueError(f"rows input {rows_input!r} not in {INPUTS}")
-    extra = (SAMPLE,) if rows_input == "samples" else ()
+    extra = (SAMPLE,) if rows_input == "samples" and profile == SAMPLE else ()
     return SEGMENTS + extra, CHANNELS + extra
 
 
@@ -338,7 +343,7 @@ def _check_row(r: dict[str, object], run_id: str, rows_input: str) -> None:
     """A row outside a closed set, or with an empty provenance column, refuses
     naming the field — whatever produced it (A4 (b))."""
     where = r.get("where", r.get("source_url", "?"))
-    segments, channels = attribution_labels(rows_input)
+    segments, channels = attribution_labels(rows_input, r.get("profile"))
     for field, allowed in (
         ("origin", ORIGINS),
         ("segment", segments),
