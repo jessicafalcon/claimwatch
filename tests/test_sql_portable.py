@@ -58,3 +58,8 @@ def test_pattern_matching_is_refused_in_sql():
     assert find_nonportable("where like('a', url)")
     assert find_nonportable("where url similar\n  to 'a'")
     assert find_nonportable("select unlike_count from t") == []
+    # the keywords both engines accept for a pattern, every one (round 2)
+    assert find_nonportable("where url ilike 'a%'") == ["ilike"]
+    assert find_nonportable("where url rlike 'a.*'") == ["rlike"]
+    assert find_nonportable("where url similar to 'a'") == ["similar to"]
+    assert find_nonportable("where url like 'a%'") == ["like"]  # the word, not a regex

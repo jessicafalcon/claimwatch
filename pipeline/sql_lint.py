@@ -44,10 +44,18 @@ CLOCK = (
 )
 
 
-# Pattern matching by keyword: matched as whole words, so `like(`, `like` before
-# a newline or a tab, and `LIKE` are caught alike and `unlike_count` is not
-# (round 1, code-reviewer on the spaced needle).
-PATTERN_WORDS = (r"\blike\b", r"\bsimilar\s+to\b")
+# Pattern matching by keyword: the closed set of keywords both engines accept
+# for a pattern, each matched as a whole word, so `like(`, `like` before a
+# newline or a tab, and `LIKE` are caught alike and `unlike_count` is not
+# (round 1, code-reviewer on the spaced needle; round 2: `ilike` and `rlike`,
+# which both engines accept and the first set missed). The keyword, not the
+# regex, is what a hit reports — it is what a reader must remove.
+PATTERN_WORDS = (
+    ("like", r"\blike\b"),
+    ("ilike", r"\bilike\b"),
+    ("rlike", r"\brlike\b"),
+    ("similar to", r"\bsimilar\s+to\b"),
+)
 
 
 def _scan(text: str, needles: tuple[str, ...]) -> list[str]:
@@ -59,7 +67,7 @@ def find_nonportable(text: str) -> list[str]:
     """DuckDB-only / non-portable forms and pattern keywords present in `text`
     (comments stripped)."""
     body = _COMMENT.sub("", text).lower()
-    words = [w for w in PATTERN_WORDS if re.search(w, body)]
+    words = [word for word, rx in PATTERN_WORDS if re.search(rx, body)]
     return _scan(text, NONPORTABLE) + words
 
 
