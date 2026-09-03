@@ -57,3 +57,12 @@ def run_sql_file(conn, path: str | Path) -> None:
     comment names the grain, the provenance columns and the BACKING rows it
     feeds (CLAUDE.md -> Conventions)."""
     conn.execute(Path(path).read_text(encoding="utf-8"))
+
+
+def default_schema(conn) -> str:
+    """The schema an unqualified table name resolves to on `conn`, read from
+    the engine itself (`main` on DuckDB, the session schema on Snowflake), so
+    no other module spells an engine's schema name — a `'main'` literal
+    outside this file lists nothing on Snowflake and `idempotency-check`
+    would diff two empty maps and say OK (round 4, code-reviewer #3)."""
+    return conn.execute("select current_schema()").fetchone()[0]

@@ -134,6 +134,16 @@ def test_the_only_clock_is_the_fetch_stamp():
     assert set(hits) == {"ingest/fetch.py"}, hits
 
 
+def test_no_module_spells_an_engines_schema_name():
+    """Portability: `pipeline/warehouse.py` is the one file that knows DuckDB
+    from Snowflake, and it reads the default schema from the engine. A
+    `table_schema = 'main'` literal anywhere else lists nothing on Snowflake,
+    so `idempotency-check` would diff two empty maps and report OK (round 4,
+    code-reviewer #3)."""
+    hits = _lines_matching(r"table_schema\s*=\s*'[A-Za-z_]+'")
+    assert hits == {}, hits
+
+
 def test_the_phase_2_feed_source_is_declared_as_before():
     src = by_name("fr-digital-first")
     assert re.fullmatch(r"[a-z0-9-]+", src.name)

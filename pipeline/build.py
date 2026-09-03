@@ -627,12 +627,14 @@ def load_reviews(conn, rows: list[dict[str, str]], run_id: str) -> None:
 
 def table_counts(conn) -> dict[str, int]:
     """Row count per table in the default schema — the reproducibility signal
-    `idempotency-check` diffs."""
+    `idempotency-check` diffs. The schema is the engine's own answer
+    (`warehouse.default_schema`), never a name spelled here."""
     names = [
         row[0]
         for row in conn.execute(
             "select table_name from information_schema.tables "
-            "where table_schema = 'main' order by table_name"
+            "where table_schema = ? order by table_name",
+            [warehouse.default_schema(conn)],
         ).fetchall()
     ]
     return {n: conn.execute(f"select count(*) from {n}").fetchone()[0] for n in names}

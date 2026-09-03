@@ -20,8 +20,9 @@ from pipeline.build import (  # noqa: E402
     create_raw,
     load_reviews,
     rebuild,
+    table_counts,
 )
-from pipeline.warehouse import connect  # noqa: E402
+from pipeline.warehouse import connect, default_schema  # noqa: E402
 
 _INSERT_RAW = (
     "insert into raw_reviews (source, external_id, source_url, captured_at, "
@@ -225,5 +226,23 @@ def test_a_matching_raw_table_passes_and_leaves_no_scratch_table():
             "select table_name from information_schema.tables order by 1"
         ).fetchall()
         assert after == before and not any(n.startswith("declared_") for (n,) in after)
+    finally:
+        conn.close()
+
+
+def test_table_counts_reads_the_default_schema_from_the_engine():
+    """The counts `idempotency-check` diffs are the default schema's tables,
+    the schema named by the engine (`warehouse.default_schema`), not a
+    literal: a table in another schema is not counted, one in the default
+    schema is (round 4, code-reviewer #3)."""
+    conn = connect("duckdb", database=":memory:")
+    try:
+        create_raw(conn)
+        conn.execute("create schema elsewhere")
+        conn.execute("create table elsewhere.stray (x integer)")
+        conn.execute("insert into elsewhere.stray values (1)")
+        counts = table_counts(conn)
+        assert "stray" not in counts and counts["raw_reviews"] == 0
+        assert default_schema(conn) == "main"  # DuckDB's answer, read, not spelled
     finally:
         conn.close()
