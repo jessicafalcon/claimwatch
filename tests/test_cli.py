@@ -86,10 +86,10 @@ def test_rebuild_from_the_sample_prints_the_metric(isolated_paths, capsys):
     out = capsys.readouterr().out
     assert f"{'raw_reviews':24} {pins.SAMPLES_RAW_REVIEWS}" in out
     assert "reviews per month" in out
-    for source, month, n in (
-        pins.APP_STORE_SAMPLE_REVIEWS_PER_MONTH + pins.OA_SAMPLE_REVIEWS_PER_MONTH
-    ):
-        assert f"{source:14} {month}  {n}" in out
+    months = pins.APP_STORE_SAMPLE_REVIEWS_PER_MONTH + pins.OA_SAMPLE_REVIEWS_PER_MONTH
+    width = max(len(source) for source, _, _ in months)  # the month column lines up
+    for source, month, n in months:
+        assert f"  {source:{width}} {month}  {n}\n" in out
 
 
 def test_rebuild_from_captures_under_the_cache(isolated_paths, capsys):

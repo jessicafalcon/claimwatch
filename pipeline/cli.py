@@ -77,8 +77,9 @@ def _do_rebuild(args: argparse.Namespace) -> int:
     finally:
         conn.close()
     print("reviews per month (stg_reviews, by the review's own date):")
+    width = max((len(source) for source, _, _ in months), default=0)
     for source, month, n in months:
-        print(f"  {source:14} {month}  {n}")
+        print(f"  {source:{width}} {month}  {n}")
     if not months:
         print("  (none)")
     return 0
