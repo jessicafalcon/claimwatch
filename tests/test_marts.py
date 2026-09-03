@@ -377,6 +377,46 @@ def test_the_latest_day_in_a_month_is_the_months_point_in_rating_trend(tmp_path)
         conn.close()
 
 
+def test_a_same_day_capture_stands_in_front_of_a_hand_entry_in_every_mart(
+    tmp_path,
+):
+    """The declared precedence, a capture (fetch) before a hand entry
+    (manual) before an anchor: a fetched and a hand-read point on one key and
+    one day, the hand-read address sorting FIRST, and the fetched row reaches
+    all four marts — only `precedence` can put it there (round 3,
+    functionality-tester F5)."""
+    from pipeline.build import build_derived, load_snapshots
+
+    db = tmp_path / "w.duckdb"
+    rebuild("duckdb", "synthetic", database=db)
+    conn = connect("duckdb", database=db)
+    try:
+        load_snapshots(
+            conn,
+            [
+                _measured(
+                    "manual", "2026-06-15", "https://www.trustpilot.com/a", "3.1"
+                ),
+                _measured("fetch", "2026-06-15", "https://www.trustpilot.com/b", "3.7"),
+            ],
+            "test",
+        )
+        build_derived(conn)
+        where = "source = 'trustpilot' and profile = 'fr-digital-first'"
+        for mart, extra in (
+            ("rating_trend", " and month = '2026-06'"),
+            ("channel_gap", ""),
+            ("peer_ratings", ""),
+            ("platform_stats", " and stat = 'review_count'"),
+        ):
+            rows = conn.execute(
+                f"select tag, source_url from {mart} where {where}{extra}"
+            ).fetchall()
+            assert rows == [("Measured", "https://www.trustpilot.com/b")], mart
+    finally:
+        conn.close()
+
+
 def _no_clock(cls: type) -> type:
     """A date/datetime class whose `today()` and `now()` raise: reaching either
     on the data path is the failure. Parsing (`fromisoformat`, `strptime`)
