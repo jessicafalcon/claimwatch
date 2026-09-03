@@ -31,8 +31,10 @@ from ingest.captures import parser_module
 from ingest.parsed import PageShapeError
 from ingest.politeness import (
     ALLOWED_HOSTS,
+    MAX_BYTES,
     MAX_CRAWL_DELAY_S,
     MAX_PAGES,
+    MAX_RESPONSE_S,
     MIN_INTERVAL_S,
     TIMEOUT_S,
     USER_AGENT,
@@ -42,8 +44,9 @@ from ingest.sources import Source
 
 
 class FetchRefused(Exception):
-    """One line, exit 2, no retry: robots said no, a bad status, a timeout, an
-    unfilled source, or a host outside the allowed set."""
+    """One line, exit 2, no retry: robots said no, a bad status, a timeout, a
+    response past the size or duration ceiling, an unfilled source, or a host
+    outside the allowed set."""
 
 
 def utc_stamp() -> str:
@@ -98,12 +101,48 @@ class PoliteClient:
             if wait > 0:
                 self._sleep(wait)
         try:
-            response = self._client.get(url)
+            with self._client.stream("GET", url) as streamed:
+                body = self._read_bounded(streamed, url)
         except httpx.HTTPError as exc:
             raise FetchRefused(f"refusing: {url}: {type(exc).__name__}") from exc
         finally:
             self._last[host] = self._clock()
-        return response
+        # The body is already decoded, so the encoding and length headers of
+        # the wire form are dropped; the rest (content-type) is kept as served.
+        headers = [
+            (k, v)
+            for k, v in streamed.headers.items()
+            if k.lower()
+            not in ("content-encoding", "content-length", "transfer-encoding")
+        ]
+        return httpx.Response(
+            streamed.status_code,
+            headers=headers,
+            content=body,
+            request=streamed.request,
+        )
+
+    def _read_bounded(self, response: httpx.Response, url: str) -> bytes:
+        """The body in pieces, refused the moment it passes MAX_BYTES or the
+        clock passes MAX_RESPONSE_S since the first byte was asked for. TIMEOUT_S
+        bounds each socket read; this bounds the whole answer, so a page that
+        never ends or drips a byte at a time is a one-line refusal."""
+        started = self._clock()
+        size = 0
+        pieces: list[bytes] = []
+        for piece in response.iter_bytes():
+            size += len(piece)
+            if size > MAX_BYTES:
+                raise FetchRefused(
+                    f"refusing: {url}: the response passed {MAX_BYTES} bytes"
+                )
+            if self._clock() - started > MAX_RESPONSE_S:
+                raise FetchRefused(
+                    f"refusing: {url}: the response did not finish within "
+                    f"{MAX_RESPONSE_S} s"
+                )
+            pieces.append(piece)
+        return b"".join(pieces)
 
 
 def polite_client() -> PoliteClient:

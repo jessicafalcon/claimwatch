@@ -65,7 +65,7 @@ def test_httpx_is_imported_only_by_the_fetcher():
 
 
 def test_politeness_knobs_live_in_one_module():
-    """The five knobs are assigned in politeness.py and nowhere else; the
+    """The knobs are assigned in politeness.py and nowhere else; the
     User-Agent header is set in the fetcher only, from that constant."""
     knobs = (
         "MIN_INTERVAL_S",
@@ -74,6 +74,8 @@ def test_politeness_knobs_live_in_one_module():
         "MAX_PAGES",
         "ALLOWED_HOSTS",
         "MAX_CRAWL_DELAY_S",
+        "MAX_BYTES",
+        "MAX_RESPONSE_S",
     )
     for name in knobs:
         assert hasattr(politeness, name), name
@@ -85,6 +87,8 @@ def test_politeness_knobs_live_in_one_module():
     assert politeness.MAX_PAGES == 60  # Phase 3a, D6: the per-source ceiling
     assert politeness.TIMEOUT_S == 20.0
     assert politeness.MAX_CRAWL_DELAY_S == 60.0
+    assert politeness.MAX_BYTES == 4 * 1024 * 1024
+    assert politeness.MAX_RESPONSE_S == 60.0
     assert "friction-ledger" in politeness.USER_AGENT
     assert politeness.ALLOWED_HOSTS == (
         "itunes.apple.com",

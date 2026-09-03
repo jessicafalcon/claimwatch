@@ -33,6 +33,14 @@ MAX_PAGES = 60
 # requests is a one-line refusal, not a silent day-long sleep.
 MAX_CRAWL_DELAY_S = 60.0
 
+# The most a single response may be, in bytes, and the most a whole response
+# may take to arrive. TIMEOUT_S bounds one socket operation; a page that keeps
+# sending, or drips a byte at a time, is bounded here instead: the body is read
+# in pieces and the fetch refuses the moment either ceiling is crossed. The
+# largest page we read is a profile page of a few hundred kilobytes.
+MAX_BYTES = 4 * 1024 * 1024
+MAX_RESPONSE_S = 60.0
+
 # The only hosts the fetcher will ever contact; a URL elsewhere is refused
 # before any request. A test pins that every fetchable declared source's host
 # is here; a capture's meta is checked against its source's declared host, not

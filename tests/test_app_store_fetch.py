@@ -136,6 +136,65 @@ def test_a_crawl_delay_above_the_ceiling_is_a_one_line_refusal(tmp_path):
     assert clock.sleeps == []
 
 
+class _Dripping(httpx.SyncByteStream):
+    """A body that arrives in pieces, the clock moving between them."""
+
+    def __init__(self, pieces: list[bytes], clock: Clock, seconds: float) -> None:
+        self.pieces, self.clock, self.seconds = pieces, clock, seconds
+        self.served = 0
+
+    def __iter__(self):
+        for piece in self.pieces:
+            self.served += len(piece)
+            yield piece
+            self.clock.t += self.seconds
+
+
+def test_a_page_past_the_size_ceiling_is_a_one_line_refusal(tmp_path):
+    """Round 1, security-reviewer #4: TIMEOUT_S bounds one socket read, not
+    the answer. A page one byte past MAX_BYTES is refused with one line the
+    moment the ceiling is crossed; robots.txt was archived, the page is not."""
+    from ingest.politeness import MAX_BYTES
+
+    server = Served()
+    big = httpx.Response(200, content=b"x" * (MAX_BYTES + 1))
+
+    def site(request: httpx.Request) -> httpx.Response:
+        return big if "rss" in request.url.path else server(request)
+
+    polite = PoliteClient(make_client(httpx.MockTransport(site)), sleep=lambda s: None)
+    with pytest.raises(FetchRefused, match=f"passed {MAX_BYTES} bytes") as exc:
+        scrape(SRC, tmp_path, client=polite, stamp=lambda: STAMP)
+    assert "\n" not in str(exc.value)
+    capture = tmp_path / CAPTURE
+    assert (capture / "robots.txt").exists()
+    assert not list(capture.glob("page-*"))
+
+
+def test_a_page_that_drips_past_the_duration_ceiling_is_a_one_line_refusal(
+    tmp_path,
+):
+    """A body arriving in small pieces thirty seconds apart never trips the
+    socket timeout; the whole-answer ceiling refuses it after MAX_RESPONSE_S,
+    having read only the pieces that arrived by then."""
+    from ingest.politeness import MAX_RESPONSE_S
+
+    server, clock = Served(), Clock()
+    drip = _Dripping([b"{" + b" " * 9] * 10, clock, 30.0)
+
+    def site(request: httpx.Request) -> httpx.Response:
+        if "rss" in request.url.path:
+            return httpx.Response(200, stream=drip)
+        return server(request)
+
+    polite = _polite(site, clock)  # type: ignore[arg-type]
+    with pytest.raises(FetchRefused, match=f"within {MAX_RESPONSE_S} s") as exc:
+        scrape(SRC, tmp_path, client=polite, stamp=lambda: STAMP)
+    assert "\n" not in str(exc.value)
+    assert drip.served == 40  # pieces at 0, 30, 60 s pass; the one at 90 s is refused
+    assert not list((tmp_path / CAPTURE).glob("page-*"))
+
+
 class _RobotsAs:
     """A server whose robots.txt answer has a chosen body and content-type;
     feed pages come from the sample. Logs every request."""
