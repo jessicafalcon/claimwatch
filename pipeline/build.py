@@ -272,11 +272,13 @@ def read_anchors(path: Path = ANCHORS) -> list[dict[str, object]]:
 
 def read_manual_snapshots(path: Path = MANUAL_SNAPSHOTS) -> list[dict[str, object]]:
     """Hand-read figures -> snapshot rows with `origin = manual` (Measured
-    downstream). The row names a declared source that is NOT fetchable —
-    platform, address, profile, segment and channel come from the declaration,
-    so the file carries no address and no name; a fetched source's figures
-    come from its capture, never from a hand entry. A missing file is zero
-    rows (a clone before any reading)."""
+    downstream). The row names a declared source with NO parser — exactly the
+    set `hand_entries_are_unique` covers (A3 (c)), so two hand entries can
+    never collapse onto one snapshot key — and platform, address, profile,
+    segment and channel come from the declaration, so the file carries no
+    address and no name; a source with a parser gets its figures from its
+    capture, never from a hand entry. A missing file is zero rows (a clone
+    before any reading)."""
     if not path.is_file():
         return []
     where = str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path)
@@ -288,12 +290,13 @@ def read_manual_snapshots(path: Path = MANUAL_SNAPSHOTS) -> list[dict[str, objec
             raise _refuse_row(
                 where, i, "source", f"is not a declared source: {row['source']!r}"
             ) from exc
-        if source.fetchable:
+        if source.parser is not None:
             raise _refuse_row(
                 where,
                 i,
                 "source",
-                f"{row['source']!r} is fetchable: its figures come from its capture",
+                f"{row['source']!r} has a parser: a hand entry names a source with "
+                "no parser, since a parsed source's figures come from its capture",
             )
         if row["read_from"] != "page":
             raise _refuse_row(

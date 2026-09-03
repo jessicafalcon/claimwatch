@@ -553,6 +553,39 @@ def test_the_tracked_manual_file_loads_and_names_no_address():
     assert text.splitlines()[0] == ",".join(MANUAL_COLUMNS)
 
 
+def test_a_hand_entry_names_a_source_with_no_parser(tmp_path):
+    """A3 (c): the set of sources a hand entry may name is exactly the set
+    `hand_entries_are_unique` checks — those with no parser — so the App
+    Store feed (a parsed source declared not fetchable) can no longer receive
+    a hand-read row that collapses onto the store listing's key (round 2,
+    functionality-tester F6)."""
+    from ingest.sources import SOURCES, hand_entries_are_unique
+
+    feed = by_name("fr-digital-first")
+    assert feed.parser is not None and feed.fetchable is False
+    path = _write_csv(
+        tmp_path / "m.csv", MANUAL_COLUMNS, [_store_row(source=feed.name)]
+    )
+    with pytest.raises(
+        PageShapeError, match="a hand entry names a source with no parser"
+    ):
+        read_manual_snapshots(path)
+    accepted = set()
+    for src in SOURCES:
+        try:
+            read_manual_snapshots(
+                _write_csv(
+                    tmp_path / "s.csv", MANUAL_COLUMNS, [_store_row(source=src.name)]
+                )
+            )
+        except PageShapeError:
+            continue
+        accepted.add(src.name)
+    assert accepted == {s.name for s in SOURCES if s.parser is None}
+    hand_entries_are_unique(SOURCES)  # the same set, checked for collisions
+    assert accepted, "at least one hand-entered source is declared"
+
+
 def test_manual_file_columns_are_exactly_the_declared_eight(tmp_path):
     assert len(MANUAL_COLUMNS) == 8
     bad = _write_csv(tmp_path / "m.csv", MANUAL_COLUMNS + ("note",), [])
@@ -568,7 +601,8 @@ def test_manual_file_columns_are_exactly_the_declared_eight(tmp_path):
     ("field", "value", "why"),
     [
         ("source", "nobody", "not a declared source"),
-        ("source", "fr-digital-first-google-play-listing", "is fetchable"),
+        ("source", "fr-digital-first-google-play-listing", "has a parser"),
+        ("source", "fr-digital-first", "has a parser"),  # a feed, not fetchable
         ("captured_at", "yesterday", "not YYYY-MM-DD"),
         ("captured_at", "2026-02-30", "not a real day"),
         ("rating", "5.5", "outside the range"),
