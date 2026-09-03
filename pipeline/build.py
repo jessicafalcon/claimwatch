@@ -106,10 +106,22 @@ def content_hash(row: dict[str, str]) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def _canonical(value: object) -> str:
+    """A measure's one spelling: an absent measure is the empty string, a
+    decimal drops trailing zeros and never takes exponent form, so `4.9` and
+    `4.90` — one figure, two spellings — hash alike and a re-spelling of a
+    tracked file is not a corrected figure (round 2, code-reviewer #12)."""
+    if value is None:
+        return ""
+    if isinstance(value, Decimal):
+        return format(value.normalize(), "f")
+    return str(value)
+
+
 def snapshot_hash(row: dict[str, object]) -> str:
-    """sha256 of the five measures, in a fixed order; an absent measure is the
-    empty string, so a row is its numbers and nothing else."""
-    payload = _SEP.join("" if row[c] is None else str(row[c]) for c in _MEASURES)
+    """sha256 of the five measures, in a fixed order and one spelling each, so
+    a row is its numbers and nothing else."""
+    payload = _SEP.join(_canonical(row[c]) for c in _MEASURES)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 

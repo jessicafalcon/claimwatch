@@ -286,6 +286,48 @@ def test_a_corrected_figure_for_an_entered_day_refuses_the_load(tmp_path):
     assert later["raw_platform_snapshots"] == pins.ANCHOR_ROWS + 2
 
 
+def test_a_respelled_figure_is_the_same_figure_not_a_correction(tmp_path):
+    """`4.90` for `4.9`, `13000.0` is outside the shape but `4.900` is not:
+    one figure hashes alike however it is spelled, so re-formatting the
+    tracked file never refuses a rebuild; a different figure still does
+    (round 2, code-reviewer #12)."""
+    from pipeline.build import snapshot_hash
+
+    first = _manual(tmp_path, "m1.csv", [_store_row(rating="4.9")])
+    db = tmp_path / "w.duckdb"
+    rebuild(
+        "duckdb", "captured", database=db, cache_dir=tmp_path / "no", manual_file=first
+    )
+    respelled = _manual(
+        tmp_path, "m2.csv", [_store_row(rating="4.900", response_rate="")]
+    )
+    counts = rebuild(
+        "duckdb",
+        "captured",
+        database=db,
+        cache_dir=tmp_path / "no",
+        manual_file=respelled,
+    )
+    assert counts["raw_platform_snapshots"] == pins.ANCHOR_ROWS + 1
+    rows = read_manual_snapshots(respelled)
+    assert snapshot_hash(rows[0]) == snapshot_hash(read_manual_snapshots(first)[0])
+    assert snapshot_hash(
+        read_manual_snapshots(_manual(tmp_path, "m3.csv", [_store_row(rating="4.91")]))[
+            0
+        ]
+    ) != snapshot_hash(rows[0])
+    big = {
+        "rating": Decimal("13000"),
+        "review_count": 13000,
+        "one_star_share": None,
+        "response_rate": None,
+        "response_delay_days": Decimal("1.50"),
+    }
+    assert snapshot_hash(big) == snapshot_hash(
+        {**big, "rating": Decimal("13000.000"), "response_delay_days": Decimal("1.5")}
+    )
+
+
 def test_two_entries_for_one_day_in_one_file_refuse_naming_the_second_line(tmp_path):
     db = tmp_path / "w.duckdb"
     both = _manual(tmp_path, "m.csv", [_store_row(), _store_row(rating="4.8")])
