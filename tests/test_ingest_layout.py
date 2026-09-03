@@ -401,8 +401,23 @@ def test_every_non_fetchable_source_states_its_reason():
             profile="x",
             segment="invited",
             channel="unsolicited",
-            listing="",
+            listing="https://h/x",
             fetchable=False,
             terms="t",
             declared_on="2026-09-01",
         )
+
+
+def test_a_hand_entered_declaration_needs_a_listing():
+    """A4 (b): a source with no parser writes its listing address as every
+    hand-read row's `source_url`, a provenance column, so the declaration
+    refuses an empty one; a parsed source may leave it empty (round 3,
+    code-reviewer #2)."""
+    store = by_name("fr-digital-first-app-store-listing")
+    assert store.parser is None and store.listing
+    import dataclasses
+
+    for empty in ("", "  "):
+        with pytest.raises(ValueError, match="needs a listing address"):
+            dataclasses.replace(store, name="twin", listing=empty)
+    assert dataclasses.replace(store, name="twin", listing="https://h/x").listing

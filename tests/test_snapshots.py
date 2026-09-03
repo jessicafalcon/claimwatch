@@ -711,6 +711,75 @@ def test_a_refused_batch_loads_nothing(tmp_path):
         conn.close()
 
 
+@pytest.mark.parametrize(
+    ("field", "value", "why"),
+    [
+        ("origin", "guess", "'origin' is not in"),
+        ("segment", "NOT-A-SEGMENT", "'segment' is not in"),
+        ("segment", "sample", "'segment' is not in"),  # the samples label, elsewhere
+        ("channel", "sample", "'channel' is not in"),
+        ("channel", "", "'channel' is not in"),
+        ("source", "", "'source' is empty"),
+        ("profile", " ", "'profile' is empty"),
+        ("source_url", "", "'source_url' is empty"),
+        ("captured_at", "", "'captured_at' is empty"),
+        ("run_id", "", "'run_id' is empty"),
+    ],
+)
+def test_a_row_outside_a_closed_set_or_with_empty_provenance_refuses_the_load(
+    tmp_path, field, value, why
+):
+    """A4 (b): the loader itself checks every row — whatever produced it —
+    against the closed sets and the non-empty provenance columns, naming the
+    field; the literal `sample` is accepted only under the `samples` input,
+    derived from the closed INPUTS set (round 3, code-reviewer #1, #2)."""
+    from pipeline.build import attribution_labels, load_snapshots
+
+    row = {
+        "source": "app-store",
+        "profile": "fr-digital-first",
+        "segment": "digital-first",
+        "channel": "invited",
+        "origin": "manual",
+        "rating": Decimal("4.9"),
+        "review_count": 13000,
+        "one_star_share": None,
+        "response_rate": None,
+        "response_delay_days": None,
+        "source_url": "https://apps.apple.com/x",
+        "captured_at": "2026-09-02",
+        "seeded_from": "",
+    }
+    run_id = "test"
+    if field == "run_id":
+        run_id = value
+    else:
+        row[field] = value
+    db = tmp_path / "w.duckdb"
+    rebuild("duckdb", "synthetic", database=db)
+    conn = connect("duckdb", database=db)
+    try:
+        with pytest.raises(PageShapeError, match=why):
+            load_snapshots(conn, [row], run_id)
+        assert (
+            conn.execute(
+                "select count(*) from raw_platform_snapshots where origin <> 'anchor'"
+            ).fetchone()[0]
+            == 0
+        )
+        if value == "sample":  # the label the frozen samples carry: theirs alone
+            load_snapshots(conn, [row], "sample:test", "samples")
+            assert conn.execute(
+                f"select {field} from raw_platform_snapshots where origin = 'manual'"
+            ).fetchall() == [("sample",)]
+    finally:
+        conn.close()
+    assert attribution_labels("samples")[0] == SEGMENTS + ("sample",)
+    assert attribution_labels("captured") == (SEGMENTS, CHANNELS)
+    with pytest.raises(ValueError, match="not in"):
+        attribution_labels("anything")
+
+
 def test_manual_file_columns_are_exactly_the_declared_eight(tmp_path):
     assert len(MANUAL_COLUMNS) == 8
     bad = _write_csv(tmp_path / "m.csv", MANUAL_COLUMNS + ("note",), [])

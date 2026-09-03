@@ -3,6 +3,8 @@ Offline, temp file via the synthetic_conn fixture."""
 
 from __future__ import annotations
 
+import pytest
+
 PROVENANCE = ("source", "source_url", "captured_at", "run_id")
 
 
@@ -28,9 +30,24 @@ def test_raw_reviews_has_four_provenance_columns(synthetic_conn):
     assert blank_run == 0
 
 
-def test_every_raw_table_has_four_provenance_columns(synthetic_conn):
+@pytest.mark.parametrize("rows", ["synthetic", "samples"])
+def test_every_raw_table_has_four_provenance_columns(tmp_path, rows):
     """Phase 3a, invariant 1: every `raw_*` table, not only reviews, carries the
-    four provenance columns and no row leaves one empty."""
+    four provenance columns and no row leaves one empty — under the samples
+    input too, where every parser writes (A4 (b))."""
+    from pipeline.build import rebuild
+    from pipeline.warehouse import connect
+
+    db = tmp_path / "w.duckdb"
+    rebuild("duckdb", rows, database=db, run_id="test")
+    conn = connect("duckdb", database=db)
+    try:
+        _check_tables(conn)
+    finally:
+        conn.close()
+
+
+def _check_tables(synthetic_conn) -> None:
     tables = [
         row[0]
         for row in synthetic_conn.execute(

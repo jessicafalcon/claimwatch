@@ -88,6 +88,12 @@ class Source:
             raise ValueError(f"source {self.name!r}: fetchable=False needs terms")
         if self.fetchable and self.parser is None:
             raise ValueError(f"source {self.name!r}: a fetchable source needs a parser")
+        # A hand-read row's source_url is its declaration's listing address,
+        # a provenance column that may never be empty (A4 (b)).
+        if self.parser is None and not self.listing.strip():
+            raise ValueError(
+                f"source {self.name!r}: a hand-entered source needs a listing address"
+            )
         if self.name == SAMPLE and not self.sample:
             raise ValueError(
                 f"source {self.name!r}: the name is the sample declaration's; "

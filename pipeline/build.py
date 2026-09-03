@@ -40,7 +40,9 @@ from ingest.captures import parser_module, read_captures
 from ingest.parsed import MEASURES, PageShapeError, count_in_range
 from ingest.sources import (
     CHANNELS,
+    ORIGINS,
     PARSERS,
+    SAMPLE,
     SEGMENTS,
     SOURCES,
     Source,
@@ -303,9 +305,46 @@ def read_manual_snapshots(path: Path = MANUAL_SNAPSHOTS) -> list[dict[str, objec
 
 
 SNAPSHOT_KEY = ("source", "profile", "origin", "source_url", "captured_at")
+# The columns a snapshot row may never leave empty: the four provenance
+# columns and the profile (invariant 1).
+_NON_EMPTY = ("source", "profile", "source_url", "captured_at")
 
 
-def load_snapshots(conn, rows: list[dict[str, object]], run_id: str) -> None:
+def attribution_labels(rows_input: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """The `segment` and `channel` values the loader accepts for one rebuild
+    input (A4 (b)): the closed sets, plus the literal `sample` iff the input
+    is `samples` — derived from the closed `INPUTS` set, never a caller's
+    flag — so that label exists only in the samples database."""
+    if rows_input not in INPUTS:
+        raise ValueError(f"rows input {rows_input!r} not in {INPUTS}")
+    extra = (SAMPLE,) if rows_input == "samples" else ()
+    return SEGMENTS + extra, CHANNELS + extra
+
+
+def _check_row(r: dict[str, object], run_id: str, rows_input: str) -> None:
+    """A row outside a closed set, or with an empty provenance column, refuses
+    naming the field — whatever produced it (A4 (b))."""
+    where = r.get("where", r.get("source_url", "?"))
+    segments, channels = attribution_labels(rows_input)
+    for field, allowed in (
+        ("origin", ORIGINS),
+        ("segment", segments),
+        ("channel", channels),
+    ):
+        if r.get(field) not in allowed:
+            raise PageShapeError(
+                f"{where}: field {field!r} is not in {allowed}: {r.get(field)!r}"
+            )
+    for field in _NON_EMPTY:
+        if not isinstance(r.get(field), str) or not r[field].strip():
+            raise PageShapeError(f"{where}: field {field!r} is empty")
+    if not run_id.strip():
+        raise PageShapeError(f"{where}: field 'run_id' is empty")
+
+
+def load_snapshots(
+    conn, rows: list[dict[str, object]], run_id: str, rows_input: str = "captured"
+) -> None:
     """Append each snapshot not already present under its natural key + hash —
     the same guard shape as `load_reviews`. The key (A2) names what produced
     the row: the platform, the profile, how the row came to be and the address
@@ -322,15 +361,18 @@ def load_snapshots(conn, rows: list[dict[str, object]], run_id: str) -> None:
     corpus partly written."""
     conn.execute("begin transaction")
     try:
-        _load_snapshots(conn, rows, run_id)
+        _load_snapshots(conn, rows, run_id, rows_input)
     except BaseException:
         conn.execute("rollback")
         raise
     conn.execute("commit")
 
 
-def _load_snapshots(conn, rows: list[dict[str, object]], run_id: str) -> None:
+def _load_snapshots(
+    conn, rows: list[dict[str, object]], run_id: str, rows_input: str
+) -> None:
     for r in rows:
+        _check_row(r, run_id, rows_input)
         h = snapshot_hash(r)
         key = [r[c] for c in SNAPSHOT_KEY]
         seen = {
@@ -567,17 +609,17 @@ def rebuild(
         create_raw(conn)
         if rows != "none":
             write_source_pages(conn, run_id or "declared")
-            load_snapshots(conn, read_anchors(), run_id or "anchors")
+            load_snapshots(conn, read_anchors(), run_id or "anchors", rows)
         if rows == "synthetic":
             load_reviews(conn, read_fixture("synthetic"), run_id or "synthetic")
         if rows == "captured":
             path = Path(manual_file) if manual_file is not None else MANUAL_SNAPSHOTS
-            load_snapshots(conn, read_manual_snapshots(path), run_id or "manual")
+            load_snapshots(conn, read_manual_snapshots(path), run_id or "manual", rows)
         for source, root, prefix in captures_for(rows, cache_dir):
             for capture_id, parsed in read_captures(root, source):
                 stamp = prefix if rows == "samples" else f"{prefix}/{capture_id}"
                 load_reviews(conn, parsed.reviews, run_id or stamp)
-                load_snapshots(conn, parsed.snapshots, run_id or stamp)
+                load_snapshots(conn, parsed.snapshots, run_id or stamp, rows)
         build_derived(conn)
         return table_counts(conn)
     finally:
