@@ -138,7 +138,12 @@ def test_cli_scrape_refuses_an_unfilled_source_before_any_request(capsys, monkey
     from pipeline import cli
 
     blank = app_store_source(
-        name="blank", app_id=0, country="fr", listing="", fetchable=True
+        name="blank",
+        app_id=0,
+        country="fr",
+        listing="",
+        fetchable=True,
+        declared_on="2026-09-01",
     )
     monkeypatch.setattr(cli, "SOURCES", (blank,))
     code = main(["scrape", "--confirm=yes", "--confirm-origin=command line"])
@@ -161,10 +166,20 @@ def test_cli_scrape_keeps_the_host_interval_across_sources(
     monkeypatch.setattr(fetch, "polite_client", lambda: _polite(server, clock))
     two = (
         app_store_source(
-            name="one", app_id=1, country="fr", listing="https://a/id1", fetchable=True
+            name="one",
+            app_id=1,
+            country="fr",
+            listing="https://a/id1",
+            fetchable=True,
+            declared_on="2026-09-01",
         ),
         app_store_source(
-            name="two", app_id=2, country="fr", listing="https://a/id2", fetchable=True
+            name="two",
+            app_id=2,
+            country="fr",
+            listing="https://a/id2",
+            fetchable=True,
+            declared_on="2026-09-01",
         ),
     )
     monkeypatch.setattr(cli, "SOURCES", two)
@@ -296,9 +311,15 @@ def _two_sources():
             listing="",
             fetchable=False,
             terms="asked",
+            declared_on="2026-09-01",
         ),
         app_store_source(
-            name="yes", app_id=2, country="fr", listing="", fetchable=True
+            name="yes",
+            app_id=2,
+            country="fr",
+            listing="",
+            fetchable=True,
+            declared_on="2026-09-01",
         ),
     )
 

@@ -33,6 +33,7 @@ LISTING = Source(
     channel="invited",
     listing="https://play.google.com/store/apps/details?id=example.fictional.app",
     fetchable=True,
+    declared_on="2026-09-01",
 )
 APP_STORE_SAMPLE = Path(__file__).resolve().parent.parent / "fixtures" / "app-store"
 
@@ -107,7 +108,12 @@ def test_two_sources_on_two_hosts_keep_two_clocks(tmp_path):
     """The interval is per host: the second host's first request waits for
     nothing, and each host's own requests stay two seconds apart."""
     feed = app_store_source(
-        name="feed", app_id=1, country="fr", listing="", fetchable=True
+        name="feed",
+        app_id=1,
+        country="fr",
+        listing="",
+        fetchable=True,
+        declared_on="2026-09-01",
     )
     sites, clock = Sites(), Clock()
     polite = _polite(sites, clock)
@@ -126,7 +132,12 @@ def test_a_disallow_on_one_host_stops_that_source_only(tmp_path):
     with pytest.raises(FetchRefused, match="robots.txt disallows"):
         scrape(LISTING, tmp_path, client=polite, stamp=lambda: STAMP)
     feed = app_store_source(
-        name="feed", app_id=1, country="fr", listing="", fetchable=True
+        name="feed",
+        app_id=1,
+        country="fr",
+        listing="",
+        fetchable=True,
+        declared_on="2026-09-01",
     )
     _, pages = scrape(feed, tmp_path, client=polite, stamp=lambda: STAMP)
     assert pages == pins.APP_STORE_SAMPLE_PAGES
@@ -152,6 +163,7 @@ def test_a_review_page_source_stops_at_the_first_page_with_no_review(tmp_path):
         channel="unsolicited",
         listing=base,
         fetchable=True,
+        declared_on="2026-09-01",
     )
 
     def site(request: httpx.Request) -> httpx.Response:

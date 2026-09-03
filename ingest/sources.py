@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 
 from ingest.politeness import MAX_PAGES
@@ -54,8 +55,8 @@ class Source:
     channel: str  # CHANNELS
     listing: str  # the address the id or figure is read from (D1: here only)
     fetchable: bool  # the recorded terms position; False is refused before any request
+    declared_on: str  # the real day (YYYY-MM-DD) the declaration was recorded
     terms: str = ""  # why, when not fetchable — a reason and a date, never a name
-    declared_on: str = ""  # YYYY-MM-DD the declaration was recorded
 
     def __post_init__(self) -> None:
         if not _SLUG.match(self.name) or not _SLUG.match(self.platform):
@@ -78,8 +79,17 @@ class Source:
             raise ValueError(
                 f"source {self.name!r}: segment in {SEGMENTS} and channel in {CHANNELS}"
             )
-        if self.declared_on and not _DATE.match(self.declared_on):
+        # The day is provenance: it is written as `captured_at` on every page
+        # address the declaration puts in raw_source_pages, so it is required
+        # and must be a real day — never empty, never 2026-02-30.
+        if not _DATE.match(self.declared_on):
             raise ValueError(f"source {self.name!r}: declared_on is YYYY-MM-DD")
+        try:
+            date.fromisoformat(self.declared_on)
+        except ValueError as exc:
+            raise ValueError(
+                f"source {self.name!r}: declared_on is not a real day"
+            ) from exc
 
     def page_url(self, page: int) -> str:
         """The address of page `page` (1-based) — also the row's `source_url`."""
@@ -102,10 +112,10 @@ def app_store_source(
     fetchable: bool,
     terms: str = "",
     *,
+    declared_on: str,
     profile: str = "fr-digital-first",
     segment: str = "digital-first",
     channel: str = "invited",
-    declared_on: str = "",
 ) -> Source:
     """An app's public customer-reviews feed on one storefront (Phase 2's
     shape): ten pages at most, the feed's own cap. An app id of 0 is a source
@@ -126,8 +136,8 @@ def app_store_source(
         channel=channel,
         listing=listing,
         fetchable=fetchable,
-        terms=terms,
         declared_on=declared_on,
+        terms=terms,
     )
 
 
@@ -158,8 +168,8 @@ def sample_source(parser: str) -> Source:
         channel=SAMPLE,
         listing="",
         fetchable=False,
-        terms="a frozen sample, read from fixtures/, never fetched",
         declared_on="2026-09-01",
+        terms="a frozen sample, read from fixtures/, never fetched",
     )
 
 

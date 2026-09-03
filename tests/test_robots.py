@@ -10,7 +10,12 @@ from ingest.robots import PRODUCT_TOKEN, Robots, reads_as_robots
 from ingest.sources import app_store_source
 
 FEED = app_store_source(
-    name="t", app_id=1, country="fr", listing="", fetchable=True
+    name="t",
+    app_id=1,
+    country="fr",
+    listing="",
+    fetchable=True,
+    declared_on="2026-09-01",
 ).page_url(1)
 LIVE_FILE = "User-agent: *\nDisallow: /*/rss/*\n\nUser-agent: Googlebot\nDisallow:\n"
 

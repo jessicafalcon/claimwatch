@@ -194,6 +194,25 @@ def test_no_module_branches_on_a_platform_name():
     assert hits == {}, hits
 
 
+@pytest.mark.parametrize("day", ["", "2026-9-1", "2026-02-30", "today"])
+def test_a_declaration_without_a_real_declared_on_day_is_refused(day):
+    """`declared_on` is provenance — it becomes `captured_at` on every page
+    address in raw_source_pages — so a declaration carries a real day or does
+    not exist; the empty string is no longer a default (round 1, code-reviewer
+    #6)."""
+    with pytest.raises(ValueError, match="declared_on"):
+        app_store_source(
+            name="x",
+            app_id=1,
+            country="fr",
+            listing="",
+            fetchable=True,
+            declared_on=day,
+        )
+    with pytest.raises(TypeError):  # the field has no default at all
+        app_store_source(name="x", app_id=1, country="fr", listing="", fetchable=True)
+
+
 def test_every_non_fetchable_source_states_its_reason():
     """The property over every declaration, not today's: fetchable=False
     implies a reason naming robots or a terms clause and a date; the
@@ -203,10 +222,23 @@ def test_every_non_fetchable_source_states_its_reason():
             assert re.search(r"robots\.txt|terms|conditions", src.terms), src.name
             assert re.search(r"20[0-9]{2}-[0-9]{2}-[0-9]{2}", src.terms), src.name
     with pytest.raises(ValueError, match="needs terms"):
-        app_store_source(name="x", app_id=1, country="fr", listing="", fetchable=False)
+        app_store_source(
+            name="x",
+            app_id=1,
+            country="fr",
+            listing="",
+            fetchable=False,
+            declared_on="2026-09-01",
+        )
     with pytest.raises(ValueError, match="needs terms"):
         app_store_source(
-            name="x", app_id=1, country="fr", listing="", fetchable=False, terms="  "
+            name="x",
+            app_id=1,
+            country="fr",
+            listing="",
+            fetchable=False,
+            terms="  ",
+            declared_on="2026-09-01",
         )
     with pytest.raises(ValueError, match="needs a parser"):
         Source(
@@ -220,6 +252,7 @@ def test_every_non_fetchable_source_states_its_reason():
             channel="unsolicited",
             listing="",
             fetchable=True,
+            declared_on="2026-09-01",
         )
     with pytest.raises(ValueError, match="segment"):
         Source(
@@ -234,4 +267,5 @@ def test_every_non_fetchable_source_states_its_reason():
             listing="",
             fetchable=False,
             terms="t",
+            declared_on="2026-09-01",
         )

@@ -24,6 +24,7 @@ SRC = app_store_source(
     country="fr",
     listing="https://apps.apple.com/fr/app/id1",
     fetchable=True,
+    declared_on="2026-09-01",
 )
 STAMP = "2026-09-02T10:00:00"
 CAPTURE = Path(SRC.platform) / SRC.name / STAMP.replace(":", "-")  # under a cache root
@@ -362,7 +363,12 @@ def test_host_outside_the_allowlist_is_refused_before_any_request():
 def test_unfilled_source_is_refused_before_any_request(tmp_path):
     server = Served()
     unfilled = app_store_source(
-        name="blank", app_id=0, country="fr", listing="", fetchable=True
+        name="blank",
+        app_id=0,
+        country="fr",
+        listing="",
+        fetchable=True,
+        declared_on="2026-09-01",
     )
     with pytest.raises(FetchRefused, match="has no page address"):
         scrape(unfilled, tmp_path, client=_polite(server, Clock()), stamp=lambda: STAMP)

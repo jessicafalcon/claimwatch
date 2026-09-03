@@ -362,6 +362,12 @@ def test_every_captured_review_joins_exactly_one_declared_page(tmp_path):
     assert len(joined) == pins.APP_STORE_SAMPLE_STG_ROWS
     assert all(n == 1 for _, n, _, _ in joined), joined
     assert {(p, s) for _, _, p, s in joined} == {(FEED.profile, FEED.segment)}
+    # every declared page carries the real day its declaration was recorded —
+    # never an empty provenance column (round 1, code-reviewer #6)
+    from datetime import date
+
+    days = _query(db, "select distinct captured_at from raw_source_pages")
+    assert days and all(date.fromisoformat(d) for (d,) in days)
     # a second rebuild re-declares the same pages and adds nothing
     again = rebuild("duckdb", "captured", database=db, cache_dir=cache, run_id="again")
     assert again["raw_source_pages"] == counts["raw_source_pages"]
