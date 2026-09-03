@@ -15,15 +15,16 @@ docs/PLAN.md §4 decision 2). The stages:
                   file under data/snapshots/ or a capture (Measured) — Phase 3a
   build_derived-> run sql/staging/*.sql then sql/marts/*.sql (`create or replace`)
 
-Idempotency: raw is append-only keyed on the natural key + a content fingerprint,
-so a re-run of an unchanged review inserts nothing and an edited review (new
-fingerprint) appends a new row; staging keeps the latest capture. `run_id` is
-stamped here in Python (never in SQL — no clock on the data path) and is in no
-natural key and no mart, so a changing `run_id` never duplicates a row or moves a
+Idempotency: raw is append-only keyed on the natural key + a content
+fingerprint, so a re-run of an unchanged review inserts nothing and an edited
+review (new fingerprint) appends a new row; staging keeps the latest capture.
+`run_id` is stamped here in Python (never in SQL — no clock on the data path)
+and is in no natural key and no mart's sort or key — a mart carries it through
+as provenance only — so a changing `run_id` never duplicates a row or moves a
 number; for a fixture input it is the input name and for captures the capture
 id, making every rebuild from the same input byte-stable, not merely
-count-stable. A rebuild reads captures from disk and never imports the fetcher:
-no network on the data path."""
+count-stable. A rebuild reads captures from disk and never imports the
+fetcher: no network on the data path."""
 
 from __future__ import annotations
 

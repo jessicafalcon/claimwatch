@@ -67,10 +67,10 @@ in the middle, and come out on the right as the numbers the study shows.
 - `.claude/` — agents (report-only), commands, the run-tests hook. Settings
   are local-only and gitignored.
 - `.github/workflows/ci.yml` — lint, check-docs, check-backing, test, then
-  rebuild + idempotency-check twice: once on the synthetic fixture, once on the
-  frozen App Store sample. `weekly.yml` *(Phase 4)* — the scheduled scrape +
-  snapshot commit.
-  `.github/pull_request_template.md` — the PR body.
+  rebuild + idempotency-check twice: once on the synthetic reviews, once on
+  every frozen sample through its real parser. `weekly.yml` *(Phase 4)* — the
+  scheduled scrape + snapshot commit. `.github/pull_request_template.md` — the
+  PR body.
 - `pyproject.toml`, `uv.lock`, `.python-version`, `.pre-commit-config.yaml` —
   the toolchain (uv, ruff, pytest, pre-commit), versions pinned in lockstep.
 - `sql/raw/`, `sql/staging/`, `sql/marts/` — plain SQL, one file per table:
@@ -161,11 +161,11 @@ in the middle, and come out on the right as the numbers the study shows.
   robots.txt first and every page checked against it, ≥ 2 s apart per host
   (more if the site asks), identifying User-Agent, no proxy, no retry, at most
   60 pages per source. Needs `CONFIRM=yes` on the command line (`$(origin
-  CONFIRM)`, as `reset`); skips, with one line, a source we have recorded as
-  one not to fetch (its robots file or its terms say no; the reason and date
-  sit beside the source in code and in DECISIONS) and refuses it when
-  `SOURCE=` names it; refuses one with no page address filled in and one whose
-  page robots.txt disallows; exit 2 means a refusal met during the run.
+  CONFIRM)`, as `reset`). A plain run skips, with one line, any source we have
+  recorded as one not to fetch (its robots file or its terms say no; the
+  reason and date sit beside the source in code and in DECISIONS). It refuses
+  — exit 2 — a source named by `SOURCE=` that we do not fetch, one with no
+  page address filled in, and one whose page robots.txt disallows.
 - `make reset [TARGET=duckdb]` — DESTRUCTIVE: drop every DuckDB file this repo
   built, the corpus and one per rebuild input; needs `CONFIRM=yes` on the command
   line (`$(origin CONFIRM)`; an environment `CONFIRM=yes` does not count).
@@ -471,6 +471,6 @@ rebuild && make idempotency-check ROWS=captured`; Phase 1's line stays green
 (raw 40 / staging 39); CI runs `ROWS=synthetic` and `ROWS=samples`. Phase 2
 merged (PR #4). Next: the Phase 3a PR; then Phase 3b — Trustpilot.
 
-Open BACKLOG rows: **13**.
+Open BACKLOG rows: **14**.
 
 (Update this section at the end of every working day.)

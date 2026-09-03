@@ -59,7 +59,3 @@ class Parsed:
 
     def is_empty(self) -> bool:
         return not self.reviews and not self.snapshots
-
-    def extend(self, other: Parsed) -> None:
-        self.reviews.extend(other.reviews)
-        self.snapshots.extend(other.snapshots)

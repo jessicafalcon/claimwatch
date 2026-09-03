@@ -159,7 +159,7 @@ make rebuild && make idempotency-check ROWS=captured
 ```
 
 - `make rebuild` — `ROWS` defaults to `captured`: the anchors seed
-  `raw_platform_snapshots` (8 rows, Documented); the hand-entered rows in
+  `raw_platform_snapshots` (9 rows, Documented); the hand-entered rows in
   `data/snapshots/manual_snapshots.csv` load (Measured); every capture under
   `data/cache/` is parsed by its source's declared parser (Measured); staging
   and the four marts are built; the per-table counts print, followed by
@@ -176,7 +176,7 @@ make rebuild && make idempotency-check ROWS=captured
   ROWS=samples` (CI: every frozen sample through its real parser, offline,
   pinned in `tests/pins.py`); `make rebuild ROWS=synthetic && make
   idempotency-check` (Phase 1's line: raw 40 / staging 39, now with
-  `raw_platform_snapshots` 8); `make rebuild ROWS=none` (zero rows, every
+  `raw_platform_snapshots` 9); `make rebuild ROWS=none` (zero rows, every
   table present); `make test`; `make check-backing` (19 rows, 4 marts, 0
   orphans); `make check-docs`.
 

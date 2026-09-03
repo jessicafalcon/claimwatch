@@ -85,18 +85,21 @@ place and never deleted.
   - *Google Play listing (Phase 3a).* The app's store page, read for its
     machine-readable rating block (schema.org JSON-LD `AggregateRating`) and
     nothing else — one page, no reviews. **Position as of 2026-09-02:** the
-    host's `robots.txt` catch-all group disallows `/_`, `/store/getreviews`
-    and `/store/xhr` and does not disallow the details page; Google's terms
-    forbid automated access only where it breaches robots.txt. Fetchable. Its
-    reviews load through the disallowed `/_` call and are never fetched.
-    ([Phase 3a](#phase-3a))
+    host's `robots.txt` (https://play.google.com/robots.txt) catch-all group
+    disallows `/_`, `/store/getreviews` and `/store/xhr` and does not disallow
+    the details page; the Google Play Terms of Service
+    (https://play.google.com/about/play-terms/) forbid automated access only
+    where it breaches robots.txt. Fetchable. Its reviews load through the
+    disallowed `/_` call and are never fetched. ([Phase 3a](#phase-3a))
   - *App Store listing (Phase 3a).* Allowed by `robots.txt`, **forbidden by
-    Apple's website terms of use** ("Your Use of the Site": no robot, spider,
-    page-scrape or automated means to access or copy the site; no robots.txt
-    carve-out; read 2026-09-02). Declared not fetchable; its rating and count
-    are read by hand and entered in `data/snapshots/manual_snapshots.csv`,
-    tagged Measured. The by-id address also answers a redirect to a slug
-    address (Gotchas). ([Phase 3a](#phase-3a))
+    Apple's website terms of use**
+    (https://www.apple.com/legal/internet-services/terms/site.html, "Your Use
+    of the Site": no robot, spider, page-scrape or automated means to access
+    or copy the site; no robots.txt carve-out; read 2026-09-02). Declared not
+    fetchable; its rating and count are read by hand and entered in
+    `data/snapshots/manual_snapshots.csv`, tagged Measured. The by-id address
+    also answers a redirect to a slug address (Gotchas). ([Phase
+    3a](#phase-3a))
   - *Opinion Assurances profile pages (Phase 3a).* `robots.txt` allows the
     profile and its path-based pages (`…-page<n>.html`) and disallows every
     address with a query string; the site's conditions générales (V.3) forbid
@@ -578,9 +581,13 @@ renamed the rebuild input, closed five BACKLOG rows.
   not profile pages: a profile address spells the brand and may sit only in
   `ingest/sources.py` (D1), so a Documented point opens to its platform and to
   the brief's §6, not to a page — the trade D1 makes, stated in BACKING's note
-  on the rating rows. An anchor dated only to a month or a season is placed on
-  the 15th of that month ("early 2025" is 2025-01-15); the day is a placement,
-  not a reading.
+  on the rating rows. A figure the brief dates to a month or a season is
+  placed on the 15th of that month; one it dates to a span of years is placed
+  at mid-year of the span's first year ("2025–2026" is 2025-06-15); one it
+  does not date is placed on the day of the figure it was gathered beside (the
+  Google Play figure beside the App Store's, 2024-09-15; the Opinion
+  Assurances figures beside the June 2026 reading, 2026-06-15). The day is a
+  placement, not a reading.
 - **Four marts, four flips to Documented.** `rating_trend` (B1.2),
   `channel_gap` (B1.3), `platform_stats` (B1.4), `peer_ratings` (B2.3) are
   window selects over `stg_platform_snapshots`, each row carrying its point's

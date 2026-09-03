@@ -7,17 +7,19 @@ those parts and the exact charts inside them. Each panel below names two things:
 the kind of evidence it carries, and the `BACKING.md` row (`B<beat>.<n>`) that
 holds its query and its source. Nothing else is a chart in this study.
 
-**How to read a panel.** Every panel wears exactly one evidence tag —
-*Measured* (we captured it), *Documented* (a sourced public report), *Modeled*
-(arithmetic we show), or *Pending* (an honest placeholder that shows no
-number). Most rows are still Pending: the contracts were written before the
-data, so each panel names the tag it will wear once its data lands and shows a
-gray "not yet" state until then. The rating panels of Beat 1 and the peer
-context of Beat 2 show numbers today. Most are the public figures gathered
-when the study was scoped — we call them the *anchors* — tagged *Documented*.
-The figures we capture or read off a page ourselves land beside them, tagged
-*Measured*. Each point carries its own tag, so a chart can be read point by
-point. A panel never invents a number to fill itself.
+**How to read a panel.** Every number in a panel wears exactly one evidence
+tag — *Measured* (we captured it), *Documented* (a sourced public report),
+*Modeled* (arithmetic we show), or *Pending* (an honest placeholder that shows
+no number); a panel that mixes kinds of point names each tag it carries, and
+every point is marked. Most rows are still Pending: the contracts were written
+before the data, so each panel names the tag it will wear once its data lands
+and shows a gray "not yet" state until then. The rating panels of Beat 1 and
+the peer context of Beat 2 show numbers today. Those numbers are mostly the
+public figures gathered when the study was scoped — we call them the *anchors*
+— tagged *Documented*. The figures we capture or read off a page ourselves
+land beside them, tagged *Measured*. Each point carries its own tag, so a
+chart can be read point by point. A panel never invents a number to fill
+itself.
 
 **The classification grain (settled here, before any theme chart is frozen).** A
 review can be about more than one thing, so the classifier writes **one row per
@@ -42,8 +44,13 @@ they do not.
 *Under the hood:* ratings live in `platform_snapshots`: the anchors from
 PROJECT_BRIEF.md §6, the figures a person read off a page whose terms forbid a
 robot, and our own captures, each row marked with how it came to be. Repeated
-captures start in Phase 4. An anchor dated only to a month or a season is
-placed on the 15th of that month; the day is a placement, not a reading.
+captures start in Phase 4. A figure the brief dates to a month or a season is
+placed on the 15th of that month; one it dates to a span of years is placed at
+mid-year of the span's first year ("2025–2026" is 2025-06-15); one it does not
+date is placed on the day of the figure it was gathered beside (the Google
+Play figure beside the App Store's, 2024-09-15; the Opinion Assurances figures
+beside the June 2026 reading, 2026-06-15). The day is a placement, not a
+reading.
 
 - **B1.1 — The hero case.** One documented refund put on hold pending extra
   documents — a roughly €340 emergency-room claim reported unresolved for
@@ -51,20 +58,18 @@ placed on the 15th of that month; the day is a placement, not a reading.
   confirmed date (never a live counter, because we cannot verify it daily). Tag:
   *Documented* (Pending until the case is curated with its public link).
 - **B1.2 — The rating trend.** The studied segment's public rating over time,
-  as a monthly series. Tag: *Documented* for the anchors, *Measured* for a
-  figure we captured or read off a page ourselves, each point marked.
+  as a monthly series. Tag: *Documented* for the anchors, *Measured* for our
+  own points (see *How to read a panel*).
   *Sampling bias, stated beside the chart:* unsolicited review platforms are
   negatively self-selected — a company that stops inviting reviews drifts down
   — so part of any decline is a sampling choice, not only a service change.
 - **B1.3 — The channel gap.** Ratings on channels a company controls or invites
   versus unsolicited platforms, side by side. Tag: *Documented* for the
-  anchors, *Measured* for a figure we captured or read off a page ourselves,
-  each point marked.
+  anchors, *Measured* for our own points (see *How to read a panel*).
 - **B1.4 — The stat row.** One-star share on independent platforms, review
   counts, and the difference in how quickly companies answer reviews. Each
   stat is its own latest point, with its own tag and day. Tag: *Documented*
-  for the anchors, *Measured* for a figure we captured or read off a page
-  ourselves, each point marked.
+  for the anchors, *Measured* for our own points (see *How to read a panel*).
 
 ## Beat 2 — The complaints have a shape
 
@@ -79,16 +84,16 @@ reviews we labeled by hand before any chart uses it. The five themes are the
 document loop, silent rejections, second-payer failures, support without
 traction, and coverage-and-price frustration (PROJECT_BRIEF.md §5).
 
-- **B2.1 — The five kinds of complaint.** The five themes, each with paraphrased examples from
-  public reviews. Tag: *Documented* (Pending until the examples are curated with
-  links).
+- **B2.1 — The five kinds of complaint.** The five themes, each with
+  paraphrased examples from public reviews. Tag: *Documented* (Pending until
+  the examples are curated with links).
 - **B2.2 — Theme share over time, by segment.** The share of negative reviews in
   each theme, month by month, split digital-first versus traditional. Counts
   theme rows under the grain above. Tag: *Measured* via the gated classifier
   (Pending until its mart lands — never faked).
 - **B2.3 — Peer context.** Public ratings across the market segment, so no one
   insurer is read in isolation. Tag: *Documented* for the anchors, *Measured*
-  for a figure we captured or read off a page ourselves, each point marked.
+  for our own points (see *How to read a panel*).
 - **B2.4 — Classifier quality.** How often each theme label is right and how many
   true cases it catches, measured against the hand labels and shown next to the
   charts it feeds. Tag: *Measured* (Pending until the eval gate writes its mart).

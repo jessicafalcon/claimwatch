@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from ingest.app_store import FeedShapeError
 from ingest.captures import capture_pages, read_captures
+from ingest.parsed import PageShapeError
 from ingest.sources import SOURCES, by_name, sample_source
 from pipeline.build import idempotency_check, rebuild
 from pipeline.metrics import reviews_per_month
@@ -235,7 +235,7 @@ def test_refused_page_loads_nothing_from_the_capture(tmp_path):
     del bad["feed"]["entry"][1]["im:rating"]
     page2.write_text(json.dumps(bad, ensure_ascii=False), encoding="utf-8")
     db = tmp_path / "w.duckdb"
-    with pytest.raises(FeedShapeError, match="'im:rating' is missing") as exc:
+    with pytest.raises(PageShapeError, match="'im:rating' is missing") as exc:
         rebuild("duckdb", "captured", database=db, cache_dir=cache)
     assert str(exc.value).startswith("capture ") and "2026-09-0" in str(exc.value)
     assert "\n" not in str(exc.value)
@@ -246,10 +246,10 @@ def test_missing_or_malformed_meta_is_refused(tmp_path):
     cache = tmp_path / "cache"
     d = _capture(cache, "2026-09-01T08-00-00", "2026-09-01T08:00:00")
     (d / "page-1.meta.json").write_text('{"source_url": "x"}')
-    with pytest.raises(FeedShapeError, match="meta must have exactly"):
+    with pytest.raises(PageShapeError, match="meta must have exactly"):
         read_captures(cache / FEED_DIR, FEED)
     (d / "page-1.meta.json").unlink()
-    with pytest.raises(FeedShapeError, match="meta is missing"):
+    with pytest.raises(PageShapeError, match="meta is missing"):
         read_captures(cache / FEED_DIR, FEED)
 
 
@@ -285,10 +285,10 @@ def test_meta_value_outside_the_declared_shape_refuses_the_capture(
     meta = json.loads(meta_path.read_text())
     meta[field] = value
     meta_path.write_text(json.dumps(meta))
-    with pytest.raises(FeedShapeError, match=f"field '{field}'"):
+    with pytest.raises(PageShapeError, match=f"field '{field}'"):
         read_captures(cache / FEED_DIR, FEED)
     db = tmp_path / "w.duckdb"
-    with pytest.raises(FeedShapeError):
+    with pytest.raises(PageShapeError):
         rebuild("duckdb", "captured", database=db, cache_dir=cache)
     assert _query(db, "select count(*) from raw_reviews") == [(0,)]
 
@@ -302,7 +302,7 @@ def test_meta_with_an_extra_key_is_refused(tmp_path):
     meta = json.loads(meta_path.read_text())
     meta["extra"] = 1
     meta_path.write_text(json.dumps(meta))
-    with pytest.raises(FeedShapeError, match="meta must have exactly"):
+    with pytest.raises(PageShapeError, match="meta must have exactly"):
         read_captures(cache / FEED_DIR, FEED)
 
 
@@ -327,7 +327,7 @@ def test_meta_is_validated_against_the_sources_declared_host(tmp_path, monkeypat
         "https://play.google.com/fr/rss/x/page=1/json"  # allowed, not ours
     )
     meta_path.write_text(json.dumps(meta))
-    with pytest.raises(FeedShapeError, match="field 'source_url'.*itunes.apple.com"):
+    with pytest.raises(PageShapeError, match="field 'source_url'.*itunes.apple.com"):
         read_captures(cache / FEED_DIR, FEED)
     meta["source_url"] = FEED.page_url(1)
     meta_path.write_text(json.dumps(meta))

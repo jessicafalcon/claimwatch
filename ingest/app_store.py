@@ -30,7 +30,7 @@ import json
 import re
 from datetime import datetime
 
-from ingest.parsed import PageShapeError, Parsed, refuse
+from ingest.parsed import Parsed, refuse
 from ingest.sources import ROOT, Source
 
 SOURCE = "app-store"  # the platform slug, as in fixtures/anchors/
@@ -41,20 +41,17 @@ SAMPLE_DIR = ROOT / "fixtures" / "app-store"
 RATING_MIN, RATING_MAX = 1, 5
 _DIGITS = re.compile(r"^[0-9]+$")
 
-FeedShapeError = PageShapeError  # the Phase 2 name; one refusal class for every parser
-_refuse = refuse
-
 
 def _label(item: object, field: str, page_url: str, item_id: str | None) -> str:
     """`item[field]["label"]` as a string, or a refusal naming the field."""
     if not isinstance(item, dict) or field not in item:
-        raise _refuse(page_url, item_id, field, "is missing")
+        raise refuse(page_url, item_id, field, "is missing")
     holder = item[field]
     if not isinstance(holder, dict) or "label" not in holder:
-        raise _refuse(page_url, item_id, field, "has no 'label'")
+        raise refuse(page_url, item_id, field, "has no 'label'")
     label = holder["label"]
     if not isinstance(label, str):
-        raise _refuse(
+        raise refuse(
             page_url, item_id, field, f"is {type(label).__name__}, not a string"
         )
     return label
@@ -62,12 +59,12 @@ def _label(item: object, field: str, page_url: str, item_id: str | None) -> str:
 
 def _rating(label: str, page_url: str, item_id: str) -> int:
     if not _DIGITS.match(label):
-        raise _refuse(
+        raise refuse(
             page_url, item_id, "im:rating", f"is not a digit string: {label!r}"
         )
     value = int(label)
     if not RATING_MIN <= value <= RATING_MAX:
-        raise _refuse(page_url, item_id, "im:rating", f"is outside 1..5: {value}")
+        raise refuse(page_url, item_id, "im:rating", f"is outside 1..5: {value}")
     return value
 
 
@@ -78,14 +75,14 @@ def _review_date(label: str, page_url: str, item_id: str) -> str:
     try:
         parsed = datetime.fromisoformat(label)
     except ValueError as exc:
-        raise _refuse(
+        raise refuse(
             page_url, item_id, "updated", f"is not ISO 8601: {label!r}"
         ) from exc
     if parsed.tzinfo is None:
-        raise _refuse(page_url, item_id, "updated", f"has no offset: {label!r}")
+        raise refuse(page_url, item_id, "updated", f"has no offset: {label!r}")
     date = label[:10]
     if parsed.date().isoformat() != date:
-        raise _refuse(page_url, item_id, "updated", f"date part unreadable: {label!r}")
+        raise refuse(page_url, item_id, "updated", f"date part unreadable: {label!r}")
     return date
 
 
@@ -97,7 +94,7 @@ def parse_item(
     comes from a default (round 2, code-reviewer #9)."""
     item_id = _label(item, "id", page_url, None)
     if not _DIGITS.match(item_id):
-        raise _refuse(page_url, item_id, "id", "is not a digit string")
+        raise refuse(page_url, item_id, "id", "is not a digit string")
     return {
         "source": platform,
         "external_id": item_id,
@@ -122,15 +119,15 @@ def parse_page(
     try:
         doc = json.loads(body)
     except ValueError as exc:
-        raise _refuse(page_url, None, "<body>", "is not JSON") from exc
+        raise refuse(page_url, None, "<body>", "is not JSON") from exc
     if not isinstance(doc, dict) or not isinstance(doc.get("feed"), dict):
-        raise _refuse(page_url, None, "feed", "is missing or not an object")
+        raise refuse(page_url, None, "feed", "is missing or not an object")
     feed = doc["feed"]
     if "entry" not in feed:
         return []
     entries = feed["entry"]
     if not isinstance(entries, list):
-        raise _refuse(
+        raise refuse(
             page_url, None, "entry", f"is {type(entries).__name__}, not a list"
         )
     return [parse_item(item, page_url, captured_at, platform) for item in entries]
