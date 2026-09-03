@@ -235,6 +235,15 @@ Each entry: the surprise, the official-docs check, what we did.
   defines the attributes. What we did: a second parser walking microdata with
   the stdlib HTML parser (`ingest/opinion_assurances.py`), the field
   addresses declared in its header from the structure dump.
+- **GNU Make reports a `MAKEFLAGS` definition as `command line`.** With
+  `MAKEFLAGS='CONFIRM=yes'` in the environment, `$(origin CONFIRM)` is
+  `command line` and the recipe sees the value exactly as if typed — 3.81 on
+  macOS and 4.x alike, by design: a definition in `MAKEFLAGS` is a
+  command-line definition. So `$(origin)` cannot gate a destructive target.
+  Goals cannot travel that way (`MAKEFLAGS='confirm'` adds no goal; an
+  environment `MAKECMDGOALS` changes the variable's text, not the goal list),
+  which is what Phase 3a's A4 (d) builds on. Found by review round 3
+  (security-reviewer), 2026-09-02.
 
 ## Appendix — by phase
 
@@ -705,3 +714,56 @@ renamed the rebuild input, closed five BACKLOG rows.
   (BACKLOG). Rejected: the member id as the key (reads the author and
   identifies the reviewer); the position on the page (unstable); parsing the
   layout percentages (presentation, not a declared shape).
+- **A3 (after review round 2, approved and built 2026-09-03): attribution
+  joins the guards; the sample declaration is a property; a hand entry names
+  a source with no parser.** (a) `raw_source_pages` refuses a declared page
+  already in raw under another profile, segment or channel, naming the
+  address and the fix (`make confirm reset`, then `make rebuild`), so one
+  address has one row and the review join is one-to-one by construction; the
+  snapshot fingerprint gains `segment`, `channel` and `seeded_from`, so a
+  corrected attribution on an existing key is a same-key pair and refuses
+  like a corrected figure. (b) `Source.sample`, set only by `sample_source`,
+  is what the closed-set check on `segment` and `channel` keys on; a source
+  named `sample` without it refuses at declaration; invariant 1 says the
+  literal `sample` exists only in the samples database. (c) A hand entry
+  names a source with no parser — the set `hand_entries_are_unique` covers —
+  so a parsed source declared not fetchable can never take a hand-read row
+  that collapses onto its listing's key. Rejected: widening the uniqueness
+  check to every non-fetchable source (two declarations would share one key
+  by design); `origin` and the attribution in `raw_source_pages` (a page's
+  attribution is one fact, not a series); replace-on-change for either table
+  (raw is append-only and a replaced row loses its provenance).
+- **A4 (after review round 3, approved and built 2026-09-03): every measure's
+  bound is its column's; the loader checks its closed sets; a capture's
+  address is a declared page; the confirmation is a goal; a ranged anchor is
+  a placement.** (a) `ingest/parsed.py::MEASURES` declares the four decimal
+  measures once with their columns' precision, scale and range; a hand entry
+  loads exactly as written or refuses past the column's digit shape (never
+  rounded for the person), a page's figure is rounded half-even to the scale
+  at the parse, so the fingerprint is the stored value, pinned by
+  re-fingerprinting every loaded row; `load_snapshots` runs a batch in one
+  transaction, so a refused batch loads nothing. (b) The loader refuses a
+  row whose `origin`, `segment` or `channel` is outside its set — `sample`
+  accepted only under the `samples` input, derived from the closed `INPUTS`
+  — or whose provenance or profile is empty; a parser-less declaration needs
+  a listing address. (c) `read_meta` accepts a page iff its address is one
+  of the declaration's pages, exactly; each parser declares `SAMPLE_PAGES`,
+  the sample declaration carries them, and `raw_source_pages` is written for
+  the sample declarations under `samples`, so every sample review joins one
+  page where CI runs it. (d) `make confirm reset` / `make confirm scrape`
+  (Gotchas: `$(origin)` cannot tell `MAKEFLAGS` from the command line): the
+  `confirm` recipe stamps its make process's id under `data/`, the gated
+  recipe passes its own `$$PPID`, Python confirms only when they are one
+  process and consumes the stamp either way; pinned against the installed
+  make on this machine and in CI. (e) `fixtures/anchors/` re-frozen: the
+  three peer rows carry a range's midpoint rounded to the column and an
+  empty count where the brief gives none; `review_count` is nullable; the
+  placement rule in SPEC's Beat 1, this file and BACKING gains the value
+  side. Rejected: bounding by the digit run and letting the engine round
+  (the fingerprint would not be the stored value); a per-call `sample` flag
+  on the loader (a caller's value); deriving the sample pages from the meta
+  files (a declaration read from data); reading make's own argv through `ps`
+  (a process tree the recipe does not own); a stamp age check (a clock in
+  the CLI; the process id and the consumed stamp suffice); a zero count for
+  a peer the brief does not count (a number no source gave); dropping the
+  two peers (two Documented ratings the brief does state).

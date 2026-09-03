@@ -644,7 +644,11 @@ New code:
   loading iterates `SOURCES`. `pipeline/cli.py` — `--rows`; the no-captures
   hint names the cache root; reviews per month per source; `scrape` lists the fetchable
   sources' hosts in its prompt. `pipeline/warehouse.py` — `database_for(rows)`.
-  `pipeline/sql_lint.py` — `like`, `similar to`.
+  `pipeline/sql_lint.py` — `like`, `similar to` (rounds 2 and 3: `ilike`,
+  `rlike`, `glob`, the tilde operators). `ingest/parsed.py` — `Measure`,
+  `MEASURES`, `rating_from_page`, `decode_json` (A4 (a), round 3);
+  `pipeline/cli.py` — `confirm` and `CONFIRM_STAMP` (A4 (d));
+  `ingest/captures.py` — the declared-page check (A4 (c)).
 - `sql/raw/raw_platform_snapshots.sql`, `sql/raw/raw_source_pages.sql`,
   `sql/staging/stg_platform_snapshots.sql`, `sql/marts/rating_trend.sql`,
   `sql/marts/channel_gap.sql`, `sql/marts/platform_stats.sql`,
@@ -652,11 +656,13 @@ New code:
 - `data/snapshots/manual_snapshots.csv` — the header row and the 2026-09-02
   App Store reading, entered by the developer.
 - `Makefile` — `ROWS` replaces `FIXTURE` (`unexport`, help lines, the two
-  recipes). `.github/workflows/ci.yml` — `ROWS=synthetic`, `ROWS=samples`.
+  recipes); the `confirm` goal replaces `CONFIRM` (A4 (d)).
+  `.github/workflows/ci.yml` — `ROWS=synthetic`, `ROWS=samples`.
 
 Fixtures (frozen this phase; see the `Freeze:` lines):
 - `fixtures/anchors/platform_snapshots_seed.csv` re-frozen with `profile`,
-  `channel` and the three B1.4 columns (D2); `fixtures/app-store/robots.txt`
+  `channel` and the three B1.4 columns (D2), and again with the peer
+  placements (A4 (e)); `fixtures/app-store/robots.txt`
   re-frozen to the real rule; `fixtures/listings/` and
   `fixtures/opinion-assurances/` new; each with `MANIFEST.sha256`.
 
@@ -694,7 +700,8 @@ Freeze: fixtures/opinion-assurances/
       pointer on Phase 2's `FIXTURE` decision; the linear matcher; the
       `like` widening of the lint; Gotchas from the checks (the by-id App
       Store address redirects; the checks ran from the session, not by hand)
-      and from the first live run
+      and from the first live run; the A2, A3 and A4 entries with their
+      rejected alternatives; the Gotcha on `$(origin)` and `MAKEFLAGS`
 - [ ] `BACKLOG.md` — five rows closed (struck + "DONE Phase 3a"): the
       wildcard bound, the `DEFAULT_CACHE` / `ALLOWED_HOSTS` binding, the
       `FIXTURE=cache` naming, the hardwired capture path, the permissive
@@ -716,6 +723,10 @@ Freeze: fixtures/opinion-assurances/
 - [ ] `PROJECT_BRIEF.md` — §6: anchors "appear in the study with Documented
       tags, marked as seeded" (D3); §9 Phase 3 unchanged in meaning
 - [ ] `docs/PLAN.md` — §5 row 3a: the DONE command and the sources as built
+- [ ] `specs/TEMPLATE.md` — Threat model: goal gating (`make confirm
+      <target>`) replaces `$(origin)` gating as the settled shape (A4 (d))
+- [ ] `.claude/agents/security-reviewer.md` — the destructive-target
+      checklist item names the `confirm` goal (A4 (d))
 - [ ] README — none (Phase 9)
 - [ ] `specs/phase-3a-snapshots.md` — this spec; the "Delivered" paragraph at
       exit
