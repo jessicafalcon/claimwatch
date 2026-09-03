@@ -9,7 +9,8 @@ The declared shape, from the structure dump of 2026-09-02 (DECISIONS -> Phase
 
   [itemscope itemtype=".../review"]            one scope per review, in page order
     [itemscope itemprop=reviewRating]            <meta itemprop=ratingValue content=N>
-                                                 N a digit 1..5   -> rating
+                                                 N a half-step 1..5, a digit or a
+                                                 digit and `.5` (A6) -> rating
     [itemscope itemprop=author]                  NEVER READ (a Person: a pseudonym
                                                  and a member link)
     div.oa_description, its own text             "Avis publié le dd/mm/yyyy suite à une
@@ -28,10 +29,11 @@ The declared shape, from the structure dump of 2026-09-02 (DECISIONS -> Phase
     <meta itemprop=ratingCount content=N>        -> snapshot review_count
 
 A review missing its rating, its sentence or its body, carrying two ratings or
-two bodies, a rating outside 1..5, a date that does not parse, or a page with
-two aggregates refuses the WHOLE page naming page, review (its position on the
-page) and field. A page with an aggregate and no review scope is the end of the
-list (an empty page); a page with neither is not a profile page and is refused.
+two bodies, a rating outside the half-steps 1..5, a date that does not parse,
+or a page with two aggregates refuses the WHOLE page naming page, review (its
+position on the page) and field. A page with an aggregate and no review scope
+is the end of the list (an empty page); a page with neither is not a profile
+page and is refused.
 
 `external_id`: the page marks no stable review identifier (the only per-review
 link is the reviewer's member page, an author field), so the id is a content
@@ -48,7 +50,13 @@ import re
 from datetime import date
 from html.parser import HTMLParser
 
-from ingest.parsed import Parsed, count_in_range, rating_from_page, refuse
+from ingest.parsed import (
+    Parsed,
+    count_in_range,
+    rating_from_page,
+    refuse,
+    review_rating,
+)
 from ingest.sources import ROOT, Source, profile_pages
 
 EXTENSION = "html"
@@ -244,9 +252,13 @@ def _review_row(
             "ratingValue",
             f"appears {review.ratings_seen} times, not once",
         )
-    if not re.fullmatch(r"[1-5]", review.rating):
+    rating = review_rating(review.rating)
+    if rating is None:
         raise refuse(
-            page_url, item, "ratingValue", f"is not a digit 1..5: {review.rating!r}"
+            page_url,
+            item,
+            "ratingValue",
+            f"is not a half-step 1..5: {review.rating!r}",
         )
     if len(review.sentence) != 1:
         raise refuse(
@@ -274,7 +286,7 @@ def _review_row(
         "source_url": page_url,
         "captured_at": captured_at,
         "review_date": published,
-        "rating": int(review.rating),
+        "rating": rating,
         "title": "",
         "body": body,
     }

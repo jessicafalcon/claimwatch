@@ -110,6 +110,34 @@ def rating_from_page(value: str) -> Decimal | None:
     return rating if MEASURES["rating"].in_range(rating) else None
 
 
+# `raw_reviews.rating` is `decimal(2,1)`: a review's rating is a half-step, 1
+# to 5 — the closed set a review source's value must belong to, declared once
+# beside the snapshot measures (A6: the profile site rates in half stars; the
+# App Store feed in digits, which are members). A digit, or a digit and `.5`,
+# written so; `4.0`, `4.25`, `0.5` and `6` are outside it.
+REVIEW_RATINGS: frozenset[Decimal] = frozenset(Decimal(n) / 2 for n in range(2, 11))
+_REVIEW_RATING = re.compile(r"^(?:[1-4](?:\.5)?|5)$")
+
+
+def review_rating(value: object) -> Decimal | None:
+    """A review's rating as a parser or a fixture hands it — a string as
+    written, an integer, or a Decimal — as the column's value iff it is one of
+    `REVIEW_RATINGS`; None otherwise (the caller names item and field)."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, Decimal):
+        text = format(value.normalize(), "f") if value.is_finite() else ""
+    elif isinstance(value, (int, str)):
+        text = str(value)
+    else:
+        return None
+    if not _REVIEW_RATING.fullmatch(text):
+        return None
+    rating = Decimal(text)
+    assert rating in REVIEW_RATINGS
+    return rating
+
+
 class PageShapeError(ValueError):
     """The page is not the declared shape; nothing from it is loaded."""
 

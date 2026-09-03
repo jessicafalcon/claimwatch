@@ -130,6 +130,10 @@ OA_SAMPLE_REVIEWS_PER_MONTH = (
     ("opinion-assurances", "2026-08", 2),
 )
 OA_SAMPLE_SNAPSHOT = ("3.600", 512)
+# Page 1's second review rates 4.5: the one half-step in the sample, so
+# `ROWS=samples` carries a half star through the real parser and the real
+# `decimal(2, 1)` column (A6). (review_date, rating as the column spells it.)
+OA_SAMPLE_HALF_STEP = ("2026-08-18", "4.5")
 # `ROWS=samples`: every frozen sample through its parser, plus the anchors.
 SAMPLES_RAW_REVIEWS = APP_STORE_SAMPLE_RAW_ROWS + OA_SAMPLE_RAW_ROWS
 SAMPLES_RAW_SNAPSHOTS = ANCHOR_ROWS + 1 + 1  # the listing's row and the profile's

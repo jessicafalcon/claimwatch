@@ -11,7 +11,7 @@ from decimal import Decimal
 import pytest
 
 from ingest.opinion_assurances import SAMPLE_DIR, parse
-from ingest.parsed import PageShapeError
+from ingest.parsed import REVIEW_RATINGS, PageShapeError
 from ingest.sources import sample_source
 from tests import pins
 
@@ -50,7 +50,7 @@ def test_well_formed_page_maps_to_reviews_and_one_snapshot():
     assert len(parsed.snapshots) == 1
     for row in parsed.reviews:
         assert tuple(row) == RAW_COLUMNS
-        assert isinstance(row["rating"], int) and 1 <= row["rating"] <= 5
+        assert row["rating"] in REVIEW_RATINGS
         assert re.fullmatch(r"[0-9a-f]{64}", row["external_id"])  # a content hash
         assert row["body"].startswith("EXEMPLE FICTIF.") and row["title"] == ""
     first = {k: parsed.reviews[0][k] for k in pins.OA_SAMPLE_FIRST_ROW}
@@ -119,17 +119,17 @@ def test_author_scope_is_never_read():
     [
         (
             "ratingValue",
-            lambda s: s.replace('<meta itemprop="ratingValue" content="5">', "", 1),
+            lambda s: s.replace('<meta itemprop="ratingValue" content="4.5">', "", 1),
             "is missing",
         ),
         (
             "ratingValue",
             lambda s: s.replace(
-                '<meta itemprop="ratingValue" content="5">',
+                '<meta itemprop="ratingValue" content="4.5">',
                 '<meta itemprop="ratingValue" content="6">',
                 1,
             ),
-            "not a digit 1..5",
+            "not a half-step 1..5",
         ),
         (
             "oa_description",
@@ -164,7 +164,7 @@ def test_missing_required_field_refuses_the_page(field, mutate, why):
 def test_refusal_names_page_item_and_field():
     html = _second_review(
         _page(1),
-        lambda s: s.replace('<meta itemprop="ratingValue" content="5">', "", 1),
+        lambda s: s.replace('<meta itemprop="ratingValue" content="4.5">', "", 1),
     )
     with pytest.raises(PageShapeError) as exc:
         parse(html, PAGE_URL, CAPTURED, SRC)
@@ -249,8 +249,8 @@ def test_two_rating_values_in_one_review_refuse_the_page():
     html = _second_review(
         _page(1),
         lambda s: s.replace(
-            '<meta itemprop="ratingValue" content="5">',
-            '<meta itemprop="ratingValue" content="5">'
+            '<meta itemprop="ratingValue" content="4.5">',
+            '<meta itemprop="ratingValue" content="4.5">'
             '<meta itemprop="ratingValue" content="1">',
             1,
         ),
@@ -350,6 +350,51 @@ def test_a_body_inside_the_author_markup_is_neither_read_nor_counted():
     )
     rows = parse(html, PAGE_URL, CAPTURED, SRC).reviews
     assert rows[1] == parse(_page(1), PAGE_URL, CAPTURED, SRC).reviews[1]
+
+
+@pytest.mark.parametrize("value", ["1", "1.5", "2", "2.5", "3", "3.5", "4", "4.5", "5"])
+def test_every_half_step_is_a_review_rating(value):
+    """A6: the site rates in half stars; each member of the closed set maps
+    to the column's value, exactly."""
+    html = _second_review(
+        _page(1),
+        lambda s: s.replace(
+            '<meta itemprop="ratingValue" content="4.5">',
+            f'<meta itemprop="ratingValue" content="{value}">',
+            1,
+        ),
+    )
+    assert html != _page(1) or value == "4.5"
+    rows = parse(html, PAGE_URL, CAPTURED, SRC).reviews
+    assert rows[1]["rating"] == Decimal(value)
+    assert rows[1]["rating"] in REVIEW_RATINGS
+
+
+@pytest.mark.parametrize("value", ["4.0", "4.25", "0.5", "6", "5.5", "", "4,5", " 4"])
+def test_a_rating_outside_the_half_steps_refuses_the_page(value):
+    """A6: the set is closed and the parse strict — a spelling the site does
+    not use, or a value off the scale, refuses naming the value."""
+    html = _second_review(
+        _page(1),
+        lambda s: s.replace(
+            '<meta itemprop="ratingValue" content="4.5">',
+            f'<meta itemprop="ratingValue" content="{value}">',
+            1,
+        ),
+    )
+    with pytest.raises(
+        PageShapeError, match="review 2': field 'ratingValue' is not a half-step 1..5"
+    ):
+        parse(html, PAGE_URL, CAPTURED, SRC)
+
+
+def test_the_sample_carries_one_half_step():
+    """The frozen sample's second review rates 4.5 (pins.OA_SAMPLE_HALF_STEP),
+    so the samples rebuild exercises the half-step end to end."""
+    rows = parse(_page(1), PAGE_URL, CAPTURED, SRC).reviews
+    day, rating = pins.OA_SAMPLE_HALF_STEP
+    assert (rows[1]["review_date"], rows[1]["rating"]) == (day, Decimal(rating))
+    assert [r["rating"] for r in rows].count(Decimal(rating)) == 1
 
 
 AGGREGATE_OPEN = (

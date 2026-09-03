@@ -37,7 +37,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from ingest.captures import parser_module, read_captures
-from ingest.parsed import MEASURES, PageShapeError, count_in_range
+from ingest.parsed import MEASURES, PageShapeError, count_in_range, review_rating
 from ingest.sources import (
     CHANNELS,
     ORIGINS,
@@ -110,7 +110,7 @@ _DAY = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
 def content_hash(row: dict[str, str]) -> str:
     """sha256 of the content fields, in a fixed order, so it is stable across runs
     and machines."""
-    payload = _SEP.join(str(row[c]) for c in _CONTENT)
+    payload = _SEP.join(_canonical(row[c]) for c in _CONTENT)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -523,6 +523,14 @@ def load_reviews(conn, rows: list[dict[str, str]], run_id: str) -> None:
     hash. ANSI `insert ... select ... where not exists (...)`, parameterized — no
     reader function in SQL, so the load stays portable."""
     for r in rows:
+        rating = review_rating(r["rating"])
+        if rating is None:
+            raise _refuse_row(
+                f"{r['source']}/{r['external_id']}",
+                0,
+                "rating",
+                f"is not a half-step 1..5 (parsed.REVIEW_RATINGS): {r['rating']!r}",
+            )
         h = content_hash(r)
         conn.execute(
             "insert into raw_reviews "
@@ -538,7 +546,7 @@ def load_reviews(conn, rows: list[dict[str, str]], run_id: str) -> None:
                 r["captured_at"],
                 run_id,
                 r["review_date"],
-                int(r["rating"]),
+                rating,
                 r["title"],
                 r["body"],
                 h,

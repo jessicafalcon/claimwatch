@@ -8,6 +8,7 @@ from __future__ import annotations
 import copy
 import json
 import shutil
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -70,6 +71,25 @@ def test_rebuild_from_sample_matches_pins(tmp_path):
         ("app-store", "sample:app-store", pins.APP_STORE_SAMPLE_CAPTURED_AT),
         ("opinion-assurances", "sample:opinion-assurances", pins.OA_SAMPLE_CAPTURED_AT),
     ]
+
+
+def test_a_half_step_rating_is_stored_as_parsed(tmp_path):
+    """A6: the sample's 4.5 lands in `raw_reviews.rating` (decimal(2, 1)) and
+    reads back as the parsed value; a digit reads back as itself."""
+    rebuild("duckdb", "samples", database=tmp_path / "w.duckdb")
+    day, rating = pins.OA_SAMPLE_HALF_STEP
+    rows = _query(
+        tmp_path / "w.duckdb",
+        "select rating from stg_reviews where source = 'opinion-assurances' "
+        f"and review_date = '{day}'",
+    )
+    assert rows == [(Decimal(rating),)]
+    first = _query(
+        tmp_path / "w.duckdb",
+        "select rating from stg_reviews where source = 'opinion-assurances' "
+        f"and review_date = '{pins.OA_SAMPLE_FIRST_ROW['review_date']}'",
+    )
+    assert first == [(Decimal(pins.OA_SAMPLE_FIRST_ROW["rating"]),)]
 
 
 def test_samples_load_every_frozen_sample_through_its_parser(tmp_path):
