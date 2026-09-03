@@ -522,15 +522,18 @@ def _columns(conn, table: str) -> list[tuple[str, str, str]]:
     """(name, type, is_nullable) per column in position order, in the engine's
     own vocabulary, read from the schema the engine names as its default
     (`warehouse.default_schema`): a same-named table in another schema is not
-    this one (A8)."""
+    this one (A8). The position is the catalog's `ordinal_position`, a value
+    read and sorted on here, never the order the engine happens to return
+    rows in (round 5, functionality-tester #1)."""
+    rows = conn.execute(
+        "select ordinal_position, column_name, data_type, is_nullable "
+        "from information_schema.columns "
+        "where table_schema = ? and table_name = ?",
+        [warehouse.default_schema(conn), table],
+    ).fetchall()
     return [
         (name, kind, nullable)
-        for name, kind, nullable in conn.execute(
-            "select column_name, data_type, is_nullable "
-            "from information_schema.columns "
-            "where table_schema = ? and table_name = ? order by ordinal_position",
-            [warehouse.default_schema(conn), table],
-        ).fetchall()
+        for _, name, kind, nullable in sorted(rows, key=lambda r: int(r[0]))
     ]
 
 

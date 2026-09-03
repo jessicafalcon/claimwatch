@@ -342,6 +342,47 @@ def test_the_scratch_declaration_is_listed_in_the_engines_default_schema():
         conn.close()
 
 
+class _ReversedRows:
+    """A connection that hands every result set back in reverse — the order an
+    engine returns catalog rows in is not a promise, and this stands in for
+    one that keeps none."""
+
+    def __init__(self, conn) -> None:
+        self._conn = conn
+
+    def execute(self, *args, **kwargs):
+        return _ReversedCursor(self._conn.execute(*args, **kwargs))
+
+
+class _ReversedCursor:
+    def __init__(self, cursor) -> None:
+        self._cursor = cursor
+
+    def fetchall(self):
+        return list(reversed(self._cursor.fetchall()))
+
+    def fetchone(self):
+        return self._cursor.fetchone()
+
+
+def test_column_positions_are_the_catalogs_ordinals_not_the_row_order():
+    """A8 (a)'s positional comparison rests on `ordinal_position` as a value
+    read from the catalog and sorted on, not on the order the engine returns
+    rows in: through a connection that reverses every result set, the columns
+    still come back in the declaration's order (round 5, functionality-tester
+    #1 — the `order by` alone survived removal on DuckDB, which happens to
+    list columns in order)."""
+    conn = connect("duckdb", database=":memory:")
+    try:
+        create_raw(conn)
+        straight = _columns(conn, "raw_reviews")
+        assert [name for name, _, _ in straight][:2] == ["source", "external_id"]
+        assert _columns(_ReversedRows(conn), "raw_reviews") == straight
+        create_raw(_ReversedRows(conn))  # the check passes through it too
+    finally:
+        conn.close()
+
+
 def test_a_matching_raw_table_passes_and_leaves_no_scratch_table():
     """A7's happy path: a second create_raw on a database the files built is
     a no-op that leaves nothing behind, so a rebuild on the corpus file is
