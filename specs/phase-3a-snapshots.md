@@ -245,6 +245,37 @@ Freeze (A5): `fixtures/opinion-assurances/page-1.html`, `page-2.html`,
 moved out of `div.oa_description` to follow it; every text, date, rating and
 meta file unchanged.
 
+**Amendment A6 (2026-09-03, first live run) — a review's rating is a
+half-step, 1 to 5.** With A5 built the same live page refused at its sixth
+review: `ratingValue` `'1.5'` "is not a digit 1..5". The site rates a review
+in half stars (page 1: sixteen 1s, one 1.5, five 4s, four 4.5s, fourteen
+5s), and the declared shape, the parser and the reviews table (`rating
+integer not null`) all allowed a digit only. What changes: the review rating
+becomes a value of the closed set {1, 1.5, 2, … 4.5, 5}, declared once in
+`ingest/parsed.py` beside the snapshot measures, and `raw_reviews.rating`
+becomes `decimal(2,1) not null` (`stg_reviews` carries it); the Opinion
+Assurances parser accepts exactly that set by a strict parse — a digit, or a
+digit followed by `.5` — and refuses anything else naming the value; the App
+Store parser keeps its digit rule, since that feed gives digits, and the
+digit lands in the wider column unchanged; `content_hash` spells a decimal
+one way (trailing zeros dropped, as `snapshot_hash` already does), so a
+digit read as `1`, `1.0` or the integer 1 is one fingerprint and the
+synthetic corpus's hashes do not move. Nothing downstream reads a review's
+rating yet: the Beat 1–2 marts read snapshots, and Phase 5's theme marts
+count rows. The sample is re-frozen with one half-step rating (page 1's
+second review, 5 → 4.5) so `ROWS=samples` carries one through the real
+parser and the real column. Restores invariant 6's property that a page in
+the declared shape loads: the shape now is the site's. Pinned by the sample,
+each half-step accepted, and `4.0`, `4.25`, `0.5` and `6` refused naming the
+value; the loaded row read back equals the parsed value. Not taken: rounding
+a half-step to a digit (an altered figure — the study would show a rating
+the reviewer did not give); refusing the page (loses the phase's only review
+source over a value the site gives by design); a free `decimal` in 0–5 (wider
+than the site's shape; it admits a malformed value).
+
+Freeze (A6): `fixtures/opinion-assurances/page-1.html` and `MANIFEST.sha256`
+— the second review's `ratingValue` `5` → `4.5`; every other byte unchanged.
+
 ## Why
 
 Phase 2 built the collector and proved it on a frozen sample, but the one
