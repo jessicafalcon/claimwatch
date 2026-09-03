@@ -177,7 +177,7 @@ make rebuild && make idempotency-check ROWS=captured
    two fetches and one hand entry (A1).** After the developer's `make scrape
    CONFIRM=yes` and the entry in `data/snapshots/manual_snapshots.csv`, the
    DONE command prints `raw_reviews` > 0 from the Opinion Assurances profile
-   through the unchanged `load_reviews` guard, `raw_platform_snapshots` = 8 +
+   through the unchanged `load_reviews` guard, `raw_platform_snapshots` = 9 +
    the entered row + one snapshot per fetched profile and listing, the four
    marts populated, reviews per month for the new source, and every count
    unchanged on the second rebuild; a second `make scrape` of unchanged pages
