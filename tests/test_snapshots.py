@@ -924,6 +924,10 @@ def test_manual_row_outside_the_declared_shape_is_refused(tmp_path, field, value
         ("captured_at", "2025-01"),
         ("source_url", "trustpilot.com"),
         ("profile", "Peer One"),
+        (
+            "profile",
+            "sample",
+        ),  # the sample declaration's profile, its alone (exit pass)
         ("platform", "play\n"),  # the slug is the whole value (round 5)
         ("seeded_from", ""),
     ],

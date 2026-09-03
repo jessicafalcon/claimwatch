@@ -104,11 +104,12 @@ MANUAL_COLUMNS = (
     "response_delay_days",
     "read_from",
 )
-# A shape guard matches the whole value (`fullmatch`): an anchored `$` under
+# A shape guard matches the whole value: `fullmatch` at the call, and `\A…\Z`
+# in the shape itself so any other call matches whole too — a `$` under
 # `match` accepts a trailing newline, so `x\n` would pass as the slug `x`
-# (round 5, code-reviewer #6).
-_SLUG = re.compile(r"[a-z0-9-]+")
-_DAY = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
+# (round 5, code-reviewer #6; exit pass, #8).
+_SLUG = re.compile(r"\A[a-z0-9-]+\Z")
+_DAY = re.compile(r"\A[0-9]{4}-[0-9]{2}-[0-9]{2}\Z")
 
 
 def content_hash(row: dict[str, str]) -> str:
@@ -235,6 +236,8 @@ def read_anchors(path: Path = ANCHORS) -> list[dict[str, object]]:
         for field in ("platform", "profile"):
             if not _SLUG.fullmatch(row[field]):
                 raise _refuse_row(where, i, field, f"is not a slug: {row[field]!r}")
+        if row["profile"] == SAMPLE:  # the sample declaration's profile, its alone
+            raise _refuse_row(where, i, "profile", "is the sample declaration's")
         if row["segment"] not in SEGMENTS:
             raise _refuse_row(
                 where, i, "segment", f"not in {SEGMENTS}: {row['segment']!r}"
