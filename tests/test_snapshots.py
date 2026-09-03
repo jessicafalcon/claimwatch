@@ -252,8 +252,11 @@ def test_reseeding_reentering_and_rebuilding_add_no_snapshot_row(tmp_path):
 def test_the_tracked_manual_file_loads_and_names_no_address():
     rows = read_manual_snapshots()
     assert rows and all(r["origin"] == "manual" for r in rows)
+    from ingest.sources import BRAND_TOKENS
+
     text = MANUAL_SNAPSHOTS.read_text(encoding="utf-8")
-    assert "http" not in text and "alan" not in text.lower()
+    assert "http" not in text
+    assert not any(token in text.lower() for token in BRAND_TOKENS)
     assert text.splitlines()[0] == ",".join(MANUAL_COLUMNS)
 
 

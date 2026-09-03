@@ -217,6 +217,39 @@ def test_a_declaration_without_a_real_declared_on_day_is_refused(day):
         app_store_source(name="x", app_id=1, country="fr", listing="", fetchable=True)
 
 
+def test_brand_carrying_strings_appear_only_in_the_declarations():
+    """D1, enforced over the tree: every string that spells the studied
+    insurer (`ingest/sources.py::BRAND_TOKENS`) appears in no other tracked
+    file — not a doc, a comment, a test name, a fixture or a record — as a
+    whole word, in any case. Binary files are skipped by decoding (round 1,
+    code-reviewer #9, security-reviewer #5)."""
+    import subprocess
+
+    from ingest.sources import BRAND_TOKENS
+
+    tracked = subprocess.run(
+        ["git", "ls-files", "-z"], cwd=ROOT, capture_output=True, check=True
+    ).stdout.decode("utf-8", errors="replace")
+    hits: list[str] = []
+    for rel in filter(None, tracked.split("\0")):
+        if rel == "ingest/sources.py":
+            continue
+        path = ROOT / rel
+        if not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        for n, line in enumerate(text.splitlines(), 1):
+            for token in BRAND_TOKENS:
+                if re.search(
+                    rf"(?<![a-z0-9]){re.escape(token)}(?![a-z0-9])", line, re.I
+                ):
+                    hits.append(f"{rel}:{n}: {token}")
+    assert hits == [], hits
+
+
 def test_every_non_fetchable_source_states_its_reason():
     """The property over every declaration, not today's: fetchable=False
     implies a reason naming robots or a terms clause and a date; the

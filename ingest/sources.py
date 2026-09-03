@@ -39,6 +39,11 @@ SAMPLE = "sample"  # the name and attribution of a frozen sample's declaration
 _SLUG = re.compile(r"^[a-z0-9-]+$")
 _DATE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
 FEED_HOST = "itunes.apple.com"
+# The strings that spell the studied insurer (D1): its name as it appears in
+# a profile path or a package id, and its store id. This file is the one place
+# they may appear; a test walks every tracked file for them, as words, and
+# fails on any other hit — the guard is mechanical, not a reading.
+BRAND_TOKENS = ("alan", "1277025964")
 
 
 @dataclass(frozen=True)
