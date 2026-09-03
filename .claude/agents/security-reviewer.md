@@ -58,8 +58,10 @@ When invoked:
 
 **Destructive and variable-taking make targets:**
 - [ ] Anything that drops a DuckDB file, truncates a table or overwrites a
-      committed artifact prompts on a tty unless `CONFIRM=yes` from the
-      COMMAND LINE (`$(origin CONFIRM)`); validates its variable in Python;
+      committed artifact prompts on a tty unless the `confirm` GOAL precedes
+      it in the same invocation (`make confirm reset`; a variable's origin is
+      forgeable through MAKEFLAGS — Phase 3a, A4 (d)); validates its variable
+      in Python;
       derives paths from it (no path argument); one-line recipe; the variable
       reaches Python via `$(call _Q,$(value VAR))` and is `unexport`ed. The
       spec's Threat model table exists and each cell is pinned by a test.

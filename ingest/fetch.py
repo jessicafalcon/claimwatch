@@ -1,5 +1,5 @@
 """The fetcher — the ONLY `httpx` import in the repo (spec Phase 2, invariant
-6). Developer-run through `make scrape CONFIRM=yes`; never called by CI, a
+6). Developer-run through `make confirm scrape`; never called by CI, a
 test, or a rebuild.
 
 httpx is a small HTTP client; the manners are ours, from `politeness.py`: read

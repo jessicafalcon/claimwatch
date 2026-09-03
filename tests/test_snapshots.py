@@ -272,7 +272,7 @@ def test_a_corrected_figure_for_an_entered_day_refuses_the_load(
     )
     changed = _manual(tmp_path, "m2.csv", [_store_row(**{field: corrected})])
     with pytest.raises(
-        PageShapeError, match=r"line 2: a snapshot for .*make reset"
+        PageShapeError, match=r"line 2: a snapshot for .*make confirm reset"
     ) as exc:
         rebuild(
             "duckdb",

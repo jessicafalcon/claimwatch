@@ -160,15 +160,22 @@ in the middle, and come out on the right as the numbers the study shows.
   a store listing) into a new capture under `data/cache/<platform>/<source>/`,
   robots.txt first and every page checked against it, ≥ 2 s apart per host
   (more if the site asks), identifying User-Agent, no proxy, no retry, at most
-  60 pages per source. Needs `CONFIRM=yes` on the command line (`$(origin
-  CONFIRM)`, as `reset`). A plain run skips, with one line, any source we have
+  60 pages per source. Needs the `confirm` goal before it in the same
+  invocation, `make confirm scrape`, as `reset` does (a goal cannot come from
+  the environment; a variable's "command line" origin can, through
+  `MAKEFLAGS`). A plain run skips, with one line, any source we have
   recorded as one not to fetch (its robots file or its terms say no; the
   reason and date sit beside the source in code and in DECISIONS). It refuses
   — exit 2 — a source named by `SOURCE=` that we do not fetch, one with no
   page address filled in, and one whose page robots.txt disallows.
+- `make confirm` — arms the destructive or network target that follows it in
+  the SAME invocation and nothing else: `make confirm reset`, `make confirm
+  scrape`. The recipe stamps its make process's id; the gated target passes
+  its own and runs only when the two are one process; the stamp is consumed
+  either way, so an earlier `confirm` confirms nothing later.
 - `make reset [TARGET=duckdb]` — DESTRUCTIVE: drop every DuckDB file this repo
-  built, the corpus and one per rebuild input; needs `CONFIRM=yes` on the command
-  line (`$(origin CONFIRM)`; an environment `CONFIRM=yes` does not count).
+  built, the corpus and one per rebuild input; needs `make confirm reset` (no
+  variable and no environment value counts).
 
 ## Deterministic first (the number one rule — brief §2.1)
 
@@ -312,8 +319,10 @@ one, and write one sentence in the README about why.
   DECISIONS.md → Gotchas.
 - Do not add a feature that surfaces in none of the five parts.
 - Destructive commands (dropping a DuckDB file, truncating a table): only via
-  a `make` target that prompts unless `CONFIRM=yes` is given on the command
-  line — tested with `$(origin CONFIRM)`.
+  a `make` target that prompts unless the `confirm` goal precedes it in the
+  same invocation (`make confirm reset`) — a goal, never a variable, since
+  `$(origin)` cannot tell a `MAKEFLAGS` definition from the command line;
+  tested against the installed make.
 - Paid or network commands (the model API, a live scrape, Snowflake): never
   run by an agent unasked; the developer runs them.
 - Fix amendments: a fix that changes a data structure, a write path, a label

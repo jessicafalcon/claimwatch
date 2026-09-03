@@ -155,7 +155,9 @@ Wiring for the hook (local only, `.claude/settings.local.json`, gitignored):
   SHA, use `persist-credentials` only for that push, and never run on
   `pull_request`. `ci.yml` stays `contents: read`.
 - **Destructive targets.** Anything that drops a DuckDB file or truncates a
-  table is a `make` target gated on `CONFIRM=yes` with command-line origin.
+  table is a `make` target gated on the `confirm` goal of the same invocation
+  (`make confirm reset`; Phase 3a's A4 (d) replaced the `CONFIRM=yes`
+  variable, whose command-line origin `MAKEFLAGS` can forge).
 
 ### 3.3 `study-editor` — the new agent (report-only)
 

@@ -354,7 +354,7 @@ def load_snapshots(
     another attribution is refused with one line: that arises from a corrected
     hand entry, a re-frozen seed or a parser whose fingerprint changed, and
     the fix is
-    `make reset CONFIRM=yes` then `make rebuild`, since the corpus is rebuilt
+    `make confirm reset` then `make rebuild`, since the corpus is rebuilt
     from tracked inputs. Nothing is tiebroken downstream: the key is unique
     in raw. The batch is one transaction (A4 (a)): a refusal on any row
     leaves none of the batch in raw, so a refused rebuild never leaves the
@@ -390,7 +390,7 @@ def _load_snapshots(
                 f"{where}: a snapshot for ({r['source']}, {r['profile']}, "
                 f"{r['origin']}, {r['captured_at']}) is already in the corpus with "
                 "other figures or another attribution — a corrected entry, a "
-                "re-frozen seed or a changed parse needs `make reset CONFIRM=yes` "
+                "re-frozen seed or a changed parse needs `make confirm reset` "
                 "then `make rebuild`"
             )
         conn.execute(
@@ -449,8 +449,8 @@ def write_source_pages(
     A declared page whose attribution differs from the row already in raw
     REFUSES the rebuild (A3 (a)): a page's attribution is one fact, not a
     series, and the review join must stay one-to-one, so a re-declaration
-    never appends a second row for one address; the fix is `make reset
-    CONFIRM=yes` then `make rebuild`."""
+    never appends a second row for one address; the fix is `make confirm
+    reset` then `make rebuild`."""
     for r in source_pages(sources):
         h = hashlib.sha256(
             _SEP.join((r["profile"], r["segment"], r["channel"])).encode("utf-8")
@@ -467,7 +467,7 @@ def write_source_pages(
             raise PageShapeError(
                 f"{r['source_url']}: the declared page is already in the corpus "
                 "under another attribution (profile, segment or channel) — a "
-                "re-declaration needs `make reset CONFIRM=yes` then `make rebuild`"
+                "re-declaration needs `make confirm reset` then `make rebuild`"
             )
         conn.execute(
             "insert into raw_source_pages "
@@ -680,8 +680,9 @@ def built_databases() -> list[Path]:
 def reset(target: str = "duckdb", *, database: str | Path | None = None) -> list[Path]:
     """Delete the DuckDB files (and their write-ahead logs): with no `database`,
     every file this repo built — the real corpus and one per rebuild input,
-    past or present (`built_databases`). The CLI gates this on CONFIRM=yes from
-    the command line; this function does the deletion once confirmed. Returns
+    past or present (`built_databases`). The CLI gates this on the `confirm`
+    goal of the same invocation; this function does the deletion once
+    confirmed. Returns
     the files removed."""
     if target != "duckdb":
         raise ValueError(f"reset only handles the DuckDB file, not {target!r}")

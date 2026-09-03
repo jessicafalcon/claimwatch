@@ -5,10 +5,13 @@ passes each value UNEXPANDED and single-quoted via `$(call _Q,$(value VAR))`;
 this process is the guard. A bad value is one line on stderr and exit 2, never a
 traceback.
 
-CONFIRM counts only from the command line: Make passes `$(origin CONFIRM)` and
-this process requires it to be `command line` — an environment `CONFIRM=yes`
-does not confirm a destructive `reset` or a network `scrape`. The fetcher is
-imported only inside `scrape`, so a rebuild never loads `httpx`."""
+A destructive `reset` or a network `scrape` is confirmed by the `confirm` goal
+in the same make invocation (`make confirm reset`): the `confirm` recipe stamps
+its make process's id, the gated recipe passes its own, and `confirmed` says
+yes only when they are one process — a goal cannot arrive through MAKEFLAGS
+in the environment, where a variable's "command line" origin can (spec Phase
+3a, A4 (d)). The fetcher is imported only inside `scrape`, so a rebuild never
+loads `httpx`."""
 
 from __future__ import annotations
 
@@ -22,7 +25,12 @@ from ingest.politeness import MAX_PAGES
 from ingest.sources import SOURCES
 from pipeline.build import INPUTS, captures_for, idempotency_check, rebuild, reset
 from pipeline.metrics import reviews_per_month
-from pipeline.warehouse import TARGETS, connect, database_for
+from pipeline.warehouse import ROOT, TARGETS, connect, database_for
+
+# The one binding of the confirmation stamp: under the gitignored data/ root,
+# never tracked, written by `make confirm` and consumed by the next `reset` or
+# `scrape` of the same invocation.
+CONFIRM_STAMP = ROOT / "data" / ".confirm"
 
 
 class Refused(Exception):
@@ -40,10 +48,35 @@ def resolve_choice(value: str, allowed: tuple[str, ...], default: str) -> str:
     return value
 
 
-def confirmed(value: str, origin: str) -> bool:
-    """A destructive action is confirmed only by `CONFIRM=yes` on the command
-    line (its `$(origin)`)."""
-    return origin == "command line" and value == "yes"
+def confirmed(make_pid: str) -> bool:
+    """A destructive or network action is confirmed only by the `confirm` goal
+    of the SAME make invocation: the stamp `make confirm` wrote names this
+    recipe's make process. The stamp is consumed either way, so a `confirm`
+    left over from an earlier invocation confirms nothing later (a different
+    process id), and no environment can supply a goal."""
+    try:
+        stamped = CONFIRM_STAMP.read_text(encoding="utf-8").strip()
+    except OSError:
+        return False
+    try:
+        CONFIRM_STAMP.unlink()
+    except OSError:
+        pass
+    return bool(make_pid) and make_pid.isdigit() and stamped == make_pid
+
+
+def _do_confirm(args: argparse.Namespace) -> int:
+    """`make confirm`: stamp this invocation's make process id for the `reset`
+    or `scrape` goal that follows it in the same command."""
+    if not args.make_pid.isdigit():
+        raise Refused("refusing: --make-pid is not a process id")
+    CONFIRM_STAMP.parent.mkdir(parents=True, exist_ok=True)
+    CONFIRM_STAMP.write_text(args.make_pid + "\n", encoding="utf-8")
+    print(
+        "confirm: armed for this make invocation — `reset` or `scrape` must follow "
+        "in the same command (`make confirm reset`, `make confirm scrape`)"
+    )
+    return 0
 
 
 def _prompt(question: str, refusal: str) -> bool:
@@ -66,7 +99,7 @@ def _do_rebuild(args: argparse.Namespace) -> int:
         shown = sources.CACHE_ROOT.relative_to(sources.CACHE_ROOT.parents[1])
         print(
             f"no captures under {shown} — nothing to load from the scraper; "
-            "`make scrape CONFIRM=yes` fetches them (developer-run)"
+            "`make confirm scrape` fetches them (developer-run)"
         )
     db = database_for(rows)  # one file per input; a sample never touches the corpus
     for name, n in rebuild(target, rows, database=db).items():
@@ -92,8 +125,8 @@ def _do_scrape(args: argparse.Namespace) -> int:
     with one line, not refused, so a plain run's exit code speaks only of
     refusals met during the run (a robots rule, a status, a page shape).
     Naming such a source with SOURCE= asks for it on purpose: that is a
-    refusal, exit 2. CONFIRM gates like `reset`, so an agent's non-interactive
-    call refuses."""
+    refusal, exit 2. The `confirm` goal gates it like `reset`, so an agent's
+    non-interactive call refuses."""
     names = tuple(s.name for s in SOURCES)
     if args.source:
         wanted = resolve_choice(args.source, names, "")
@@ -105,14 +138,14 @@ def _do_scrape(args: argparse.Namespace) -> int:
                 print(f"scrape: {s.name}: skipped — declared not fetchable: {s.terms}")
     if not chosen:
         raise Refused("refusing: no fetchable source is declared in ingest/sources.py")
-    if not confirmed(args.confirm, args.confirm_origin):
+    if not confirmed(args.make_pid):
         listed = ", ".join(s.name for s in chosen)
         hosts = ", ".join(sorted({s.host for s in chosen if s.fetchable})) or "no host"
         ok = _prompt(
             f"Fetch robots.txt + up to {MAX_PAGES} pages per source from {hosts} "
             f"for {listed}, >= 2 s apart? [y/N] ",
-            "scrape: refusing — pass CONFIRM=yes on the command line "
-            "(an environment CONFIRM=yes does not count); nothing fetched",
+            "scrape: refusing — run `make confirm scrape` (the confirm goal in the "
+            "same invocation; no variable and no environment counts); nothing fetched",
         )
         if not ok:
             return 2
@@ -154,13 +187,13 @@ def _do_reset(args: argparse.Namespace) -> int:
     # reset handles only the DuckDB file; TARGET=snowflake is refused with one
     # line here, not a traceback from reset() downstream.
     target = resolve_choice(args.target, ("duckdb",), "duckdb")
-    if not confirmed(args.confirm, args.confirm_origin):
+    if not confirmed(args.make_pid):
         ok = _prompt(
             "Drop every DuckDB file this repo built (the corpus and one per "
             "rebuild input, past or present)? "
             "This deletes data. [y/N] ",
-            "reset: refusing — pass CONFIRM=yes on the command line "
-            "(an environment CONFIRM=yes does not count)",
+            "reset: refusing — run `make confirm reset` (the confirm goal in the "
+            "same invocation; no variable and no environment counts)",
         )
         if not ok:
             print("reset: not confirmed; nothing deleted")
@@ -177,19 +210,20 @@ def main(argv: list[str] | None = None) -> int:
         p = sub.add_parser(name, add_help=False)
         p.add_argument("--target", default="")
         p.add_argument("--rows", default="")
+    p = sub.add_parser("confirm", add_help=False)
+    p.add_argument("--make-pid", dest="make_pid", default="")
     p = sub.add_parser("reset", add_help=False)
     p.add_argument("--target", default="")
-    p.add_argument("--confirm", default="")
-    p.add_argument("--confirm-origin", dest="confirm_origin", default="undefined")
+    p.add_argument("--make-pid", dest="make_pid", default="")
     p = sub.add_parser("scrape", add_help=False)
     p.add_argument("--source", default="")
-    p.add_argument("--confirm", default="")
-    p.add_argument("--confirm-origin", dest="confirm_origin", default="undefined")
+    p.add_argument("--make-pid", dest="make_pid", default="")
 
     args = ap.parse_args(argv)
     dispatch = {
         "rebuild": _do_rebuild,
         "idempotency-check": _do_idempotency,
+        "confirm": _do_confirm,
         "reset": _do_reset,
         "scrape": _do_scrape,
     }

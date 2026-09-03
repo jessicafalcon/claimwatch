@@ -397,9 +397,14 @@ scraper, no model.
   (raw table creation is SQL, scanned by the portability guard), added to the
   Repo map and the SQL-file convention.
 - **One validating CLI behind `make`; `reset` is the only destructive target,
-  gated by `$(origin CONFIRM)`.** `rebuild`/`idempotency-check` take
-  `TARGET`/`FIXTURE` as a closed set validated in Python; an environment
-  `CONFIRM=yes` does not confirm a `reset`. Mirrors the SPEC/BASE shape.
+  gated by the `confirm` goal of the same invocation.** `rebuild`/
+  `idempotency-check` take `TARGET`/`ROWS` as a closed set validated in
+  Python. The gate was `$(origin CONFIRM)` from Phase 1 to Phase 3a's review
+  round 3, when a definition supplied through `MAKEFLAGS` in the environment
+  was shown to report `command line` (GNU Make 3.81 and 4.x alike); a goal
+  cannot arrive that way, so `make confirm reset` stamps the make process's
+  id and `reset` runs only in that process (A4 (d), [Phase 3a](#phase-3a)).
+  Mirrors the SPEC/BASE shape for the variables.
 
 **Gotchas:** none — DuckDB's `create or replace`, `insert … where not exists`
 and `information_schema.tables` behaved as the official docs describe.
@@ -514,8 +519,8 @@ mart, no model.
   committed. `Freeze: fixtures/app-store/` in the spec; MANIFEST in the diff.
   Rejected: a sample under `ingest/` or `tests/` (outside the MANIFEST
   discipline); a scrubbed real page.
-- **`make scrape` is CONFIRM-gated like `reset` and developer-run.** Prompt on
-  a tty, otherwise `CONFIRM=yes` from the command line only; SOURCE is a closed
+- **`make scrape` is gated like `reset` and developer-run.** Prompt on a tty,
+  otherwise `make confirm scrape` only (A4 (d)); SOURCE is a closed
   set of declared names; the fetcher is imported only inside the command, so a
   rebuild never loads `httpx`; the test suite blocks every socket (conftest).
 - **`httpx` added (pre-approved); `pyyaml` deferred** to `rules.yaml` (5b) —
@@ -659,7 +664,7 @@ renamed the rebuild input, closed five BACKLOG rows.
   figure equal to an anchor's is a row of its own and two hand-entered sources
   cannot collide (a check at declaration pins that none share a platform and
   listing). A row whose key already sits in raw under other figures is refused
-  at load with one line naming the line and the fix (`make reset CONFIRM=yes`,
+  at load with one line naming the line and the fix (`make confirm reset`,
   then `make rebuild`): that arises only from a corrected hand entry or a
   re-frozen seed, and the corpus is rebuilt from tracked inputs. Staging
   therefore keeps every raw row and no `order by` carries `content_hash`;

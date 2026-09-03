@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from review_common import make_targets  # noqa: E402
 
 from pipeline.build import INPUTS  # noqa: E402
-from pipeline.cli import Refused, confirmed, resolve_choice  # noqa: E402
+from pipeline.cli import CONFIRM_STAMP, Refused, confirmed, resolve_choice  # noqa: E402
 from pipeline.warehouse import TARGETS  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -168,19 +168,69 @@ def test_pipeline_variables_reach_python_as_one_literal(target, var, flag):
         assert "pwned" not in out.replace(value, "")
 
 
-def test_reset_requires_command_line_confirm():
-    """`confirmed` gates on the value AND its origin; the recipe passes the true
-    `$(origin CONFIRM)`, so an environment CONFIRM=yes cannot pose as one from
-    the command line."""
-    assert confirmed("yes", "command line") is True
-    assert confirmed("yes", "environment") is False
-    assert confirmed("", "command line") is False
-    assert confirmed("no", "command line") is False
-    from_cmdline = _make_n("reset", {"CONFIRM": "yes"}, {})
-    assert "--confirm='yes'" in from_cmdline
-    assert "--confirm-origin='command line'" in from_cmdline
-    from_env = _make_n("reset", {}, {"CONFIRM": "yes"})
-    assert "--confirm-origin='environment'" in from_env
+def test_reset_and_scrape_take_the_make_pid_not_a_confirm_variable():
+    """A4 (d): the gated recipes pass their make process's id (`$$PPID`, the
+    recipe shell's parent) and no CONFIRM value of any origin — the variable
+    is gone from the recipes, so nothing an environment defines reaches the
+    gate."""
+    for target in ("reset", "scrape"):
+        for origin in ("cmdline", "env"):
+            out = _make_n(
+                target,
+                {"CONFIRM": "yes"} if origin == "cmdline" else {},
+                {"CONFIRM": "yes"} if origin == "env" else {},
+            )
+            assert "--make-pid=$PPID" in out, (target, origin, out)
+            assert "--confirm" not in out and "yes" not in out, (target, origin, out)
+    assert "--make-pid=$PPID" in _make_n("confirm", {}, {})
+
+
+PROBE = (
+    "include Makefile\n"
+    "probe:\n"
+    '\t@uv run python -c "import sys; from pipeline.cli import confirmed; '
+    "sys.exit(0 if confirmed('$$PPID') else 3)\"\n"
+)
+
+
+def _probe(goals: list[str], env: dict[str, str]) -> int:
+    """Run the real Makefile plus a `probe` goal that asks `confirmed` with
+    its own make process id: 0 when the invocation was confirmed, otherwise
+    make's 2 (the recipe exits 3 and make reports a failed goal as 2)."""
+    res = subprocess.run(
+        ["make", "-s", "-f", "-", *goals],
+        cwd=ROOT,
+        input=PROBE,
+        capture_output=True,
+        text=True,
+        env=_env(env),
+    )
+    return res.returncode
+
+
+def test_confirm_is_a_goal_of_the_same_invocation():
+    """A4 (d): `make confirm <target>` confirms; the target alone, the goals in
+    the other order, a CONFIRM variable from any origin, MAKEFLAGS carrying
+    `CONFIRM=yes` or the word `confirm`, MAKECMDGOALS from the environment,
+    and a stamp left by an earlier invocation each confirm nothing — a goal
+    cannot arrive through the environment, and the stamp names one process
+    (round 3, security-reviewer #1)."""
+    try:
+        assert _probe(["confirm", "probe"], {}) == 0
+        assert not CONFIRM_STAMP.exists()  # consumed
+        assert _probe(["probe"], {}) == 2
+        assert _probe(["probe", "confirm"], {}) == 2  # probe runs first: no stamp yet
+        assert _probe(["probe", "CONFIRM=yes"], {}) == 2
+        assert _probe(["probe"], {"CONFIRM": "yes"}) == 2
+        assert _probe(["probe"], {"MAKEFLAGS": "CONFIRM=yes"}) == 2
+        assert _probe(["probe"], {"MAKEFLAGS": "confirm"}) == 2
+        assert _probe(["probe"], {"MAKECMDGOALS": "confirm"}) == 2
+        assert _probe(["confirm"], {}) == 0  # a confirm with nothing after it
+        assert CONFIRM_STAMP.exists()
+        assert _probe(["probe"], {}) == 2  # another invocation: another process
+        assert not CONFIRM_STAMP.exists()  # and the stale stamp is gone
+    finally:
+        CONFIRM_STAMP.unlink(missing_ok=True)
 
 
 # --- Phase 2: the network target (scrape) ---
@@ -197,24 +247,19 @@ def test_scrape_source_is_a_closed_set():
             resolve_choice(bad, names, names[0])
 
 
-def test_scrape_requires_command_line_confirm():
-    """The recipe passes SOURCE unexpanded and the true `$(origin CONFIRM)`; an
-    environment CONFIRM=yes reaches Python as origin `environment`, which
-    `confirmed()` rejects — so an agent's or a CI's non-interactive call never
-    fetches."""
+def test_scrape_passes_source_unexpanded_and_its_make_pid():
+    """The recipe passes SOURCE unexpanded and the make process id; no CONFIRM
+    value of any origin reaches Python, so an agent's or a CI's
+    non-interactive call never fetches (A4 (d))."""
     from_cmdline = _make_n("scrape", {"CONFIRM": "yes", "SOURCE": "x"}, {})
-    assert "--source='x'" in from_cmdline
-    assert "--confirm='yes'" in from_cmdline
-    assert "--confirm-origin='command line'" in from_cmdline
+    assert "--source='x'" in from_cmdline and "--make-pid=$PPID" in from_cmdline
+    assert "--confirm" not in from_cmdline
     from_env = _make_n("scrape", {}, {"CONFIRM": "yes", "SOURCE": "x"})
-    assert "--source='x'" in from_env
-    assert "--confirm-origin='environment'" in from_env
-    assert confirmed("yes", "environment") is False
+    assert "--source='x'" in from_env and "--confirm" not in from_env
+    assert confirmed("") is False and confirmed("not-a-pid") is False
 
 
-@pytest.mark.parametrize(
-    "var, flag", [("SOURCE", "--source"), ("CONFIRM", "--confirm")]
-)
+@pytest.mark.parametrize("var, flag", [("SOURCE", "--source")])
 def test_scrape_variables_reach_python_as_one_literal(var, flag):
     value = "$(shell echo pwned)"
     quoted = "'" + value.replace("'", "'\\''") + "'"

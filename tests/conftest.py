@@ -1,5 +1,6 @@
 """Session-wide guards: the make user-variables (SPEC, BASE, TARGET, ROWS,
-CONFIRM, SOURCE) and MAKEFLAGS are scrubbed so the Makefile-invoking tests
+SOURCE, and CONFIRM, a name the Makefile no longer reads) and MAKEFLAGS are
+scrubbed so the Makefile-invoking tests
 (tests/test_makefile.py) see a clean environment; UV_OFFLINE=1 is set so a test
 that spawns `uv run` (the gate, `make test`) can never resolve or download; and
 every socket connection in the process raises (Phase 2, invariant 6), so a test

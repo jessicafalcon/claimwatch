@@ -11,6 +11,22 @@ from pipeline.build import reset
 from pipeline.cli import main
 
 
+@pytest.fixture(autouse=True)
+def _stamp_in_tmp(tmp_path, monkeypatch):
+    """The confirmation stamp lives under the repo's data/; tests write theirs
+    in a temp dir."""
+    import pipeline.cli as cli
+
+    monkeypatch.setattr(cli, "CONFIRM_STAMP", tmp_path / ".confirm")
+
+
+def armed(argv: list[str]) -> int:
+    """`make confirm <target>` as the CLI sees it: the stamp of make process 1,
+    then the target with the same id (A4 (d))."""
+    assert main(["confirm", "--make-pid=1"]) == 0
+    return main([*argv, "--make-pid=1"])
+
+
 def test_cli_refuses_bad_rows_with_exit_2(capsys):
     """A refused value goes all the way through main(): exit 2, one line on
     stderr, nothing built."""
@@ -37,14 +53,7 @@ def test_reset_removes_only_the_db_and_wal(tmp_path):
 def test_cli_reset_refuses_non_duckdb_target(capsys):
     """TARGET=snowflake is refused with one line at the CLI, not a traceback from
     reset() downstream."""
-    code = main(
-        [
-            "reset",
-            "--target=snowflake",
-            "--confirm=yes",
-            "--confirm-origin=command line",
-        ]
-    )
+    code = armed(["reset", "--target=snowflake"])
     assert code == 2
     err = capsys.readouterr().err
     assert err.startswith("refusing:") and err.count("\n") <= 1
@@ -74,7 +83,7 @@ def test_rebuild_defaults_to_the_cache_and_says_when_it_is_empty(
     assert main(["rebuild"]) == 0
     out = capsys.readouterr().out
     assert "no captures under data/cache" in out
-    assert "make scrape CONFIRM=yes" in out
+    assert "make confirm scrape" in out
     assert f"{'raw_reviews':24} 0" in out
     assert "(none)" in out
 
@@ -105,23 +114,47 @@ def test_rebuild_from_captures_under_the_cache(isolated_paths, capsys):
     assert f"{'stg_reviews':24} {pins.APP_STORE_SAMPLE_STG_ROWS}" in out
 
 
-def test_cli_scrape_refuses_without_command_line_confirm(capsys, monkeypatch):
-    """Non-interactive and unconfirmed: one line, exit 2, no fetch attempted
-    (conftest would raise on a socket; nothing is imported from the fetcher)."""
+def test_cli_scrape_refuses_without_the_confirm_goal(capsys, monkeypatch):
+    """Non-interactive and unconfirmed — no stamp, or a stamp of another make
+    process: one line, exit 2, no fetch attempted (conftest would raise on a
+    socket; nothing is imported from the fetcher)."""
     import sys
 
+    import pipeline.cli as cli
+
     monkeypatch.setattr(sys.stdin, "isatty", lambda: False)
-    code = main(["scrape", "--confirm=yes", "--confirm-origin=environment"])
+    code = main(["scrape", "--make-pid=1"])
     assert code == 2
     out = capsys.readouterr().out
-    assert "pass CONFIRM=yes on the command line" in out
-    assert "nothing fetched" in out
+    assert "run `make confirm scrape`" in out and "nothing fetched" in out
+    assert main(["confirm", "--make-pid=2"]) == 0  # another invocation's stamp
+    assert main(["scrape", "--make-pid=1"]) == 2
+    assert not cli.CONFIRM_STAMP.exists()  # consumed by the refusal
+
+
+def test_confirm_stamps_one_invocation_and_reset_consumes_it(capsys, isolated_paths):
+    """A4 (d): `confirm` writes the make process id; `reset` with the same id
+    is confirmed once and the stamp is gone; a missing stamp, another id or a
+    non-numeric id refuses and deletes nothing."""
+    import pipeline.cli as cli
+    import pipeline.warehouse as warehouse
+
+    assert main(["confirm", "--make-pid=x"]) == 2  # not a process id
+    assert "not a process id" in capsys.readouterr().err
+    corpus = warehouse.DEFAULT_DB
+    corpus.write_text("x")
+    assert main(["reset", "--make-pid=1"]) == 2 and corpus.exists()  # no stamp
+    assert main(["confirm", "--make-pid=1"]) == 0 and cli.CONFIRM_STAMP.exists()
+    assert main(["reset", "--make-pid=2"]) == 2 and corpus.exists()  # another
+    assert not cli.CONFIRM_STAMP.exists()  # consumed by the mismatch
+    assert armed(["reset"]) == 0 and not corpus.exists()
+    assert not cli.CONFIRM_STAMP.exists()
+    corpus.write_text("x")
+    assert main(["reset", "--make-pid=1"]) == 2 and corpus.exists()  # once only
 
 
 def test_cli_scrape_refuses_a_bad_source_with_exit_2(capsys):
-    code = main(
-        ["scrape", "--source=../x", "--confirm=yes", "--confirm-origin=command line"]
-    )
+    code = armed(["scrape", "--source=../x"])
     assert code == 2
     err = capsys.readouterr().err
     assert err.startswith("refusing:") and err.count("\n") <= 1
@@ -142,7 +175,7 @@ def test_cli_scrape_refuses_an_unfilled_source_before_any_request(capsys, monkey
         declared_on="2026-09-01",
     )
     monkeypatch.setattr(cli, "SOURCES", (blank,))
-    code = main(["scrape", "--confirm=yes", "--confirm-origin=command line"])
+    code = armed(["scrape"])
     assert code == 2
     err = capsys.readouterr().err
     assert "has no page address" in err
@@ -179,7 +212,7 @@ def test_cli_scrape_keeps_the_host_interval_across_sources(
         ),
     )
     monkeypatch.setattr(cli, "SOURCES", two)
-    code = main(["scrape", "--confirm=yes", "--confirm-origin=command line"])
+    code = armed(["scrape"])
     assert code == 0
     n = len(server.requests)
     assert n == 2 * (1 + 3)  # robots + three sample pages, per source
@@ -211,7 +244,7 @@ def test_each_input_builds_its_own_database(capsys, isolated_paths):
     assert corpus.exists() and all(f.exists() for f in files)
     assert main(["rebuild", "--rows=samples"]) == 0  # again: the same, not double
     assert _count(capsys.readouterr().out, "raw_reviews") == pins.SAMPLES_RAW_REVIEWS
-    assert main(["reset", "--confirm=yes", "--confirm-origin=command line"]) == 0
+    assert armed(["reset"]) == 0
     out = capsys.readouterr().out
     assert not corpus.exists() and not any(f.exists() for f in files)
     assert all(str(f) in out for f in files | {corpus})
@@ -235,7 +268,7 @@ def test_reset_removes_every_database_this_repo_built_past_or_present(
     theirs = [corpus.with_name("other.duckdb"), corpus.with_name(f"{corpus.stem}.txt")]
     for p in ours + theirs:
         p.write_text("x")
-    assert main(["reset", "--confirm=yes", "--confirm-origin=command line"]) == 0
+    assert armed(["reset"]) == 0
     out = capsys.readouterr().out
     assert not any(p.exists() for p in ours)
     assert all(p.exists() for p in theirs)
@@ -278,17 +311,10 @@ def test_a_capture_holding_only_refused_pages_still_gets_the_no_captures_hint(
 
 
 def test_cli_scrape_on_the_declared_source_refuses_before_the_network(capsys):
-    """`make scrape CONFIRM=yes SOURCE=<the feed>` today, on the real
+    """`make confirm scrape SOURCE=<the feed>` today, on the real
     declaration: one line, exit 2, and no socket (the suite would raise on
     one). The terms position holds without a request."""
-    code = main(
-        [
-            "scrape",
-            "--source=fr-digital-first",
-            "--confirm=yes",
-            "--confirm-origin=command line",
-        ]
-    )
+    code = armed(["scrape", "--source=fr-digital-first"])
     assert code == 2
     err = capsys.readouterr().err
     assert err.startswith("refusing:") and "not fetchable" in err
@@ -320,7 +346,7 @@ def _two_sources():
 def test_cli_scrape_skips_a_source_declared_not_fetchable_and_exits_0(
     capsys, monkeypatch, isolated_paths
 ):
-    """A plain `make scrape CONFIRM=yes`: the source declared not fetchable is
+    """A plain `make confirm scrape`: the source declared not fetchable is
     one stdout line naming its terms, no request is made for it, the next
     source is fetched, and the exit code is 0 — nothing was refused during the
     run (round 1, security-reviewer #3)."""
@@ -331,7 +357,7 @@ def test_cli_scrape_skips_a_source_declared_not_fetchable_and_exits_0(
     server, clock = Served(), Clock()
     monkeypatch.setattr(fetch, "polite_client", lambda: _polite(server, clock))
     monkeypatch.setattr(cli, "SOURCES", _two_sources())
-    code = main(["scrape", "--confirm=yes", "--confirm-origin=command line"])
+    code = armed(["scrape"])
     out, err = capsys.readouterr()
     assert code == 0
     assert err == ""
@@ -353,7 +379,7 @@ def test_cli_scrape_exits_2_only_on_a_refusal_met_during_the_run(
     server.page_status[1] = 500
     monkeypatch.setattr(fetch, "polite_client", lambda: _polite(server, clock))
     monkeypatch.setattr(cli, "SOURCES", _two_sources())
-    code = main(["scrape", "--confirm=yes", "--confirm-origin=command line"])
+    code = armed(["scrape"])
     out, err = capsys.readouterr()
     assert code == 2
     assert err.count("\n") == 1 and "returned 500" in err
@@ -372,9 +398,7 @@ def test_cli_scrape_naming_a_source_declared_not_fetchable_is_a_refusal(
     server, clock = Served(), Clock()
     monkeypatch.setattr(fetch, "polite_client", lambda: _polite(server, clock))
     monkeypatch.setattr(cli, "SOURCES", _two_sources())
-    code = main(
-        ["scrape", "--source=no", "--confirm=yes", "--confirm-origin=command line"]
-    )
+    code = armed(["scrape", "--source=no"])
     out, err = capsys.readouterr()
     assert code == 2
     assert err.count("\n") == 1 and "'no' is declared not fetchable" in err

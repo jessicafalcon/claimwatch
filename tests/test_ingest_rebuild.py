@@ -519,7 +519,9 @@ def test_a_redeclared_attribution_refuses_the_rebuild(tmp_path):
             changed = dataclasses.replace(FEED, **{field: value})
             with pytest.raises(PageShapeError, match="another attribution") as exc:
                 write_source_pages(conn, "redeclared", (changed,))
-            assert FEED.page_url(1) in str(exc.value) and "make reset" in str(exc.value)
+            assert FEED.page_url(1) in str(exc.value) and "make confirm reset" in str(
+                exc.value
+            )
             assert "\n" not in str(exc.value)
         write_source_pages(conn, "again", (FEED,))  # the same attribution: nothing
         after = conn.execute("select count(*) from raw_source_pages").fetchone()[0]
