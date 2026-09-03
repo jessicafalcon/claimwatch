@@ -128,6 +128,87 @@ putting `origin` and the attribution into `raw_source_pages` (a page's
 attribution is one fact, not a series); a replace-on-change for either table
 (raw is append-only, and a replaced row would lose its provenance).
 
+**Proposed after review round 3 (2026-09-02) — A4: every measure's bound is
+its column's and a refused batch loads nothing; the loader checks its closed
+sets; a capture's address is a declared page; the confirmation is a goal, not
+a variable; a ranged peer anchor is stored as a placement.** *Status:
+PROPOSED, awaiting approval; nothing in it is built.* Restores invariant 1 (a
+row is its figures, stored as fingerprinted, and a rebuild changes no count
+by chance), invariant 3 (a row's attribution and address come from the
+declaration), invariant 4 (a captured review joins exactly one declared
+page) and the Threat model's one gate on the destructive and network targets.
+(a) *Every measure's bound is its column's* (round 3, finding 1, with 13):
+the five measures are declared once, beside the count, with the precision,
+scale and range of their columns — `rating`, `one_star_share` and
+`response_rate` `decimal(4,3)` in 0–5 and 0–1, `response_delay_days`
+`decimal(5,1)` in 0–9999.9 — and every reader derives its check from that
+declaration the way `count_in_range` does: a hand entry with more decimals
+than the scale, or outside the range, refuses at the parse naming line and
+field (a person's reading is exact, never rounded for them); a fetched value
+is rounded half-even to the scale at the parse, as the listing parser does
+today; so nothing reaches the loader that the column would rescale, and the
+fingerprint is the stored value — pinned by a test that recomputes every
+loaded row's fingerprint from the row read back and matches `content_hash`,
+over `synthetic` and `samples`. `load_snapshots` runs a batch in one
+transaction: a refusal on any row leaves none of the batch in raw — pinned by
+a batch whose second row is a same-key pair. (b) *The loader checks its
+closed sets* (findings 5 and 6): `load_snapshots` refuses a row whose
+`origin` is outside `ORIGINS`, or whose `segment` or `channel` is outside its
+set — the set being `SEGMENTS`/`CHANNELS` plus the literal `sample` iff the
+rebuild input is `samples`, derived from the closed `INPUTS` set, never a
+caller's flag — or whose `source`, `profile`, `source_url`, `captured_at` or
+`run_id` is empty, naming the field; and a declaration with no parser
+requires a non-empty `listing`, since that address is every hand-read row's
+`source_url`. Pinned by a row outside each set refused at load, a
+parser-less declaration with an empty listing refused at declaration, and
+`test_provenance` run over `samples` as well as `synthetic`. (c) *A capture's
+address is a declared page* (finding 7): `read_captures` accepts a page iff
+its meta's `source_url` is one of the declaring source's `pages`, exactly,
+not merely on its host, refusing otherwise and naming the address; each
+parser module declares `SAMPLE_PAGES`, the addresses its frozen meta files
+carry (a test pins them equal), and `sample_source` declares them as its
+pages; `raw_source_pages` is written for every declaration the input loads,
+the sample declarations under `samples` included; the join test runs over
+`samples` too, so the zero-join half of invariant 4 is pinned where CI runs
+it. (d) *The confirmation is a goal in the same invocation* (finding 4):
+`$(origin CONFIRM)` reports `command line` for a value that arrived through
+`MAKEFLAGS` in the environment (GNU Make 3.81 and 4.x alike — a variable
+definition in `MAKEFLAGS` is a command-line definition by design), so no
+origin check can keep an environment off `reset` and `scrape`. Goals cannot
+arrive that way: `MAKEFLAGS` carries flags and definitions only. So the gate
+becomes `make confirm reset` and `make confirm scrape [SOURCE=]`: the
+`confirm` recipe writes its make process's id (`$$PPID`) to a stamp under
+`data/`; the `reset` and `scrape` recipes pass the stamp and their own
+`$$PPID` to Python, which confirms iff the two ids are one make invocation
+and removes the stamp either way; `CONFIRM` and `--confirm-origin` go. A
+missing or stale stamp, `MAKEFLAGS='CONFIRM=yes'`, `MAKEFLAGS='confirm'` and
+`MAKECMDGOALS=confirm` in the environment each refuse before any deletion or
+request — pinned by `tests/test_makefile.py` running each against the
+installed make, on this machine and in CI. CLAUDE.md's Commands and the
+Threat model rows say `make confirm <target>`. (e) *A ranged peer anchor is
+stored as a placement* (finding 15): three peer rows carry a rating or a
+count brief §6 does not state as one figure. The seed is re-frozen so that a
+figure the brief gives as a range is stored at the range's midpoint, rounded
+to the column (the traditional mutuelles at 4.500 on 3000; the other
+traditional insurers at 3.250), a figure the brief does not give is empty
+(the two peers' review counts), and `review_count` becomes nullable in raw
+like the other measures — a `platform_stats` row exists only for a stat the
+row carries, as A2 (c) already makes it. The rule "a ranged figure is stored
+at its midpoint and an absent one is empty; both are placements, like the
+day" joins the placement sentence in SPEC's Beat 1, DECISIONS and BACKING's
+note; `Freeze:` line and a DECISIONS entry; the pins follow (nine anchors
+still). Not taken: bounding by the digit run and letting the engine round
+(the fingerprint would not be the stored value); a per-call `sample` flag on
+the loader (a caller's value); deriving the sample pages from the meta files
+(a declaration read from data); reading make's own argv through `ps` (a
+process tree the recipe does not own); a zero count for a peer the brief
+does not count (a number no source gave); dropping the two peers (two
+Documented ratings the brief does state).
+
+Freeze (proposed with A4 (e)): `fixtures/anchors/platform_snapshots_seed.csv`
+and its `MANIFEST.sha256` — the three peer rows' `rating` and `review_count`
+as stated above; every other cell unchanged.
+
 ## Why
 
 Phase 2 built the collector and proved it on a frozen sample, but the one
