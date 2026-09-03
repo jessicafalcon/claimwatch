@@ -16,13 +16,12 @@ average it."""
 
 from __future__ import annotations
 
-import json
 import math
 import re
 from decimal import ROUND_HALF_EVEN, Decimal, InvalidOperation
 from html.parser import HTMLParser
 
-from ingest.parsed import Parsed, count_in_range, refuse
+from ingest.parsed import PageShapeError, Parsed, count_in_range, decode_json, refuse
 from ingest.sources import ROOT, Source
 
 EXTENSION = "html"
@@ -127,9 +126,9 @@ def parse(body: bytes | str, page_url: str, captured_at: str, source: Source) ->
     carrying: list[dict[str, object]] = []
     for block in collector.blocks:
         try:
-            doc = json.loads(block)
-        except ValueError:
-            continue  # a block that is not JSON declares nothing
+            doc = decode_json(block, page_url, "<script>")
+        except PageShapeError:
+            continue  # a block the decoder cannot read declares nothing
         carrying.extend(o for o in _objects(doc) if "aggregateRating" in o)
     if not carrying:
         raise refuse(

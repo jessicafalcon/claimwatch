@@ -7,6 +7,7 @@ whole page loads nothing."""
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
 
@@ -47,6 +48,21 @@ def refuse(
 ) -> PageShapeError:
     where = f"item {item_id!r}" if item_id is not None else "page"
     return PageShapeError(f"{page_url}: {where}: field {field_name!r} {why}")
+
+
+def decode_json(text: bytes | str, page_url: str, field_name: str) -> object:
+    """`text` decoded as JSON, or a refusal naming `field_name`. The decoder
+    fails in exactly two ways — malformed text (`ValueError`) and nesting
+    deeper than the interpreter's stack (`RecursionError`) — and both are the
+    page being outside the shape: a refusal at the boundary, never a
+    traceback out of `make scrape` or `make rebuild` (round 3,
+    security-reviewer #3)."""
+    try:
+        return json.loads(text)
+    except (ValueError, RecursionError) as exc:
+        raise refuse(
+            page_url, None, field_name, "is not JSON the decoder can read"
+        ) from exc
 
 
 @dataclass

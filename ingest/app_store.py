@@ -26,11 +26,10 @@ the provenance stamped at fetch — a rebuild reads no clock."""
 
 from __future__ import annotations
 
-import json
 import re
 from datetime import datetime
 
-from ingest.parsed import Parsed, refuse
+from ingest.parsed import Parsed, decode_json, refuse
 from ingest.sources import ROOT, Source
 
 SOURCE = "app-store"  # the platform slug, as in fixtures/anchors/
@@ -116,10 +115,7 @@ def parse_page(
 ) -> list[dict[str, object]]:
     """A feed page -> raw-shape rows. Refuses the whole page on the first item
     that is not the declared shape; an absent `entry` is the end of the feed."""
-    try:
-        doc = json.loads(body)
-    except ValueError as exc:
-        raise refuse(page_url, None, "<body>", "is not JSON") from exc
+    doc = decode_json(body, page_url, "<body>")
     if not isinstance(doc, dict) or not isinstance(doc.get("feed"), dict):
         raise refuse(page_url, None, "feed", "is missing or not an object")
     feed = doc["feed"]

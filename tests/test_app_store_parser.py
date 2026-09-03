@@ -197,3 +197,11 @@ def test_sample_is_obviously_fake_and_nameless():
     assert "id=0/" in PAGE_URL
     ids = [row["external_id"] for row in _parse(_page(2))]
     assert pins.APP_STORE_SAMPLE_DUPLICATE_ID in ids
+
+
+def test_a_body_nested_past_the_stack_is_refused_not_a_traceback():
+    """`json.loads` raises `RecursionError` on nesting past the interpreter's
+    stack; that is the page outside the shape and refuses in one line, the
+    same as malformed text (round 3, security-reviewer #3)."""
+    with pytest.raises(PageShapeError, match="'<body>'"):
+        parse_page("[" * 100_000, PAGE_URL, CAPTURED, SOURCE)

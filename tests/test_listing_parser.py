@@ -205,3 +205,13 @@ def test_an_absurdly_long_digit_string_refuses_not_tracebacks():
     doc["aggregateRating"]["ratingValue"] = "4." + "9" * 5000
     with pytest.raises(PageShapeError, match="'ratingValue'"):
         parse(_with_block(doc), PAGE_URL, CAPTURED, SRC)
+
+
+def test_a_block_nested_past_the_stack_declares_nothing_not_a_traceback():
+    """The decoder's second failure, nesting deeper than the interpreter's
+    stack, is `RecursionError`, not `ValueError`: the boundary is total, so
+    such a block declares nothing and the page refuses for its missing
+    aggregate in one line (round 3, security-reviewer #3)."""
+    html = _html().replace(_BLOCK.search(_html()).group(2), "[" * 100_000)
+    with pytest.raises(PageShapeError, match="'aggregateRating' is missing"):
+        parse(html, PAGE_URL, CAPTURED, SRC)
