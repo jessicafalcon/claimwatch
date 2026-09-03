@@ -251,23 +251,39 @@ def test_brand_carrying_strings_appear_only_in_the_declarations():
     assert hits == [], hits
 
 
+# The words an address of the studied insurer may carry WITHOUT being a brand
+# form: the scheme, the hosts' labels, the stores' path vocabulary, the query
+# keys. A closed set: a word outside it is a brand form and must be a
+# declared token, so a new form that shares no letter with today's tokens is
+# caught the day it is declared (round 3, code-reviewer #10).
+ADDRESS_WORDS = frozenset(
+    "https www com fr html json id hl gl "
+    "apple apps app itunes rss customerreviews sortby mostrecent "
+    "google play store details "
+    "opinion assurances assureur page".split()
+)
+
+
 def test_every_brand_form_in_the_declarations_is_a_declared_token():
-    """Completeness of the guard (round 2, security-reviewer #3): every
-    address a declaration carries that spells the brand contains a declared
-    token as a whole word — the bare name, the package-id form, the store
-    id — so a form the walk cannot match cannot hide in an address."""
+    """Completeness of the guard (round 2, security-reviewer #3; round 3,
+    code-reviewer #10): every word of every address a studied-insurer
+    declaration carries is a declared generic address word, a page number, or
+    a declared brand token — nothing else — and each such source spells the
+    brand at least once. A brand form is found by what it is NOT, so a form
+    sharing no substring with today's tokens cannot hide in an address."""
     from ingest.sources import BRAND_TOKENS
 
-    def forms(text: str) -> set[str]:
-        return set(re.findall(r"[a-z0-9]+", text.lower()))
+    def words(text: str) -> set[str]:
+        return set(re.findall(r"[a-z]+|[0-9]+", text.lower()))
 
     studied = [s for s in SOURCES if s.profile == "fr-digital-first"]
     assert studied
     for src in studied:
-        words = set().union(*(forms(u) for u in (src.listing, *src.pages)))
-        carrying = {w for w in words if any(t in w for t in BRAND_TOKENS)}
-        assert carrying, src.name  # each studied-insurer source spells the brand
-        assert carrying <= set(BRAND_TOKENS), (src.name, carrying - set(BRAND_TOKENS))
+        found = set().union(*(words(u) for u in (src.listing, *src.pages)))
+        page_numbers = {w for w in found if w.isdigit() and len(w) <= 2}
+        brand = found - ADDRESS_WORDS - page_numbers
+        assert brand, src.name  # each studied-insurer source spells the brand
+        assert brand <= set(BRAND_TOKENS), (src.name, brand - set(BRAND_TOKENS))
 
 
 def test_no_two_hand_entered_sources_share_a_platform_and_listing():
