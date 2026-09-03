@@ -731,7 +731,9 @@ Fixtures (frozen this phase; see the `Freeze:` lines):
   `channel` and the three B1.4 columns (D2), and again with the peer
   placements (A4 (e)); `fixtures/app-store/robots.txt`
   re-frozen to the real rule; `fixtures/listings/` and
-  `fixtures/opinion-assurances/` new; each with `MANIFEST.sha256`.
+  `fixtures/opinion-assurances/` new, the latter re-frozen twice after the
+  first live run (A5: the live nesting; A6: one half-step rating); each with
+  `MANIFEST.sha256`.
 
 New and extended tests:
 - `tests/test_snapshots.py`, `tests/test_marts.py`,

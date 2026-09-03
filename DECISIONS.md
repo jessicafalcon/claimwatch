@@ -244,6 +244,18 @@ Each entry: the surprise, the official-docs check, what we did.
   environment `MAKECMDGOALS` changes the variable's text, not the goal list),
   which is what Phase 3a's A4 (d) builds on. Found by review round 3
   (security-reviewer), 2026-09-02.
+- **A structure dump names the fields, not their nesting or their values'
+  shape.** The Opinion Assurances dump of 2026-09-02 listed the classes and
+  microdata properties a review carries; the hand-written sample then
+  guessed that `h4.oa_text` sits inside `div.oa_description` (it follows
+  it) and that `ratingValue` is a digit (the site rates in half stars:
+  `1.5`, `4.5`). Both guesses were pinned by tests against the sample, so
+  the tests were green and the first live page refused twice — the refusal
+  is the design working, the guesses were the cost. What we did: A5 and A6
+  (Phase 3a); and the rule for 3b's Trustpilot: freeze the sample from one
+  permitted real page, names replaced, before the parser is written — a
+  guessed nesting is a second shape the tests cannot see. Found by the first
+  `make confirm scrape`, 2026-09-03.
 
 ## Appendix — by phase
 
@@ -695,7 +707,7 @@ renamed the rebuild input, closed five BACKLOG rows.
   id is a content hash (A1).** `ingest/opinion_assurances.py` walks the page
   once with the stdlib HTML parser: each `itemscope` of type `review` yields
   one row — `rating` from the `reviewRating` scope's `<meta itemprop=
-  "ratingValue" content>` (a digit 1–5), `review_date` from the description's
+  "ratingValue" content>` (a half-step 1–5, A6), `review_date` from the description's
   own sentence "Avis publié le dd/mm/yyyy suite à une expérience le
   dd/mm/yyyy" (the first date; the second is the experience date), `body`
   from `h4.oa_text`, `title` empty (the page has none); the `author` scope
@@ -767,3 +779,39 @@ renamed the rebuild input, closed five BACKLOG rows.
   the CLI; the process id and the consumed stamp suffice); a zero count for
   a peer the brief does not count (a number no source gave); dropping the
   two peers (two Documented ratings the brief does state).
+- **A5 (first live run, approved and built 2026-09-03): the review text is a
+  child of the review scope, not of the description.** The first `make
+  confirm scrape` fetched the profile's first page and the parser refused
+  its first review's `oa_text` as missing: on the live page `h4.oa_text`
+  *follows* `div.oa_description` as a sibling (so does `div.oa_commands`),
+  while the parser's header, the hand-written sample and the guard (the body
+  opened only while the description was open) nested it inside — the
+  structure dump gave the fields, never their nesting (Gotchas). Now the
+  guard's kind is "this element is the review's text": `oa_text` opens the
+  body wherever it sits in the review scope outside the author markup, two
+  bodies in one review refuse the page naming the count, and
+  `fixtures/opinion-assurances/` is re-frozen in the live nesting. Rejected:
+  accepting the body at either place with the nested one preferred (a
+  preference is a second shape); the first `oa_text` after the description
+  in document order (a position, not a scope); a denylist of layout wrappers
+  to skip (a fix for the case).
+- **A6 (first live run, approved and built 2026-09-03): a review's rating is
+  a half-step, 1 to 5.** With A5 built the same page refused its sixth
+  review: `ratingValue` `1.5`. The site rates in half stars (page 1: sixteen
+  1s, one 1.5, five 4s, four 4.5s, fourteen 5s); the shape, the parser and
+  `raw_reviews.rating integer` allowed a digit only. Now
+  `ingest/parsed.py::REVIEW_RATINGS` declares the closed set {1, 1.5, …, 5}
+  once beside the snapshot measures; `review_rating` parses a digit or a
+  digit and `.5` strictly; the profile parser refuses anything else naming
+  the value; `load_reviews` checks every row it is handed against the set
+  and inserts nothing on a refusal; `raw_reviews.rating` is `decimal(2, 1)`
+  and `stg_reviews` carries it; `content_hash` spells a decimal one way
+  (trailing zeros dropped, as `snapshot_hash` does), so the synthetic
+  corpus's hashes do not move; the App Store parser keeps its digit rule
+  (its feed gives digits, members of the set). The sample is re-frozen with
+  one half-step so `ROWS=samples` carries one through the real parser and
+  column. Nothing downstream reads a review's rating yet. Rejected: rounding
+  a half-step to a digit (an altered figure — a rating the reviewer did not
+  give); refusing the page (loses the phase's only review source over a
+  value the site gives by design); a free `decimal` in 0–5 (wider than the
+  site's shape; admits a malformed value).

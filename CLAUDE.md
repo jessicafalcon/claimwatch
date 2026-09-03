@@ -466,26 +466,30 @@ with amendment A1): being built; review rounds 1, 2 and 3 done, their fixes
 built, and amendments A2 (the snapshot key names its declaration and a same-key
 pair refuses; the stat row is one row per stat), A3 (a changed attribution
 refuses; the sample declaration is a property, not a name; a hand entry names a
-source with no parser) and A4 (every measure's bound is its column's and a
+source with no parser), A4 (every measure's bound is its column's and a
 refused batch loads nothing; the loader checks its closed sets; a capture's
 address is a declared page; `make confirm <target>` replaces the CONFIRM
-variable; the ranged peer anchors are placements) all approved and built. What
-a reader sees: the rating each platform shows is now a table of its own, seeded
-from the brief's public figures (Documented) and extended by the figures we
-capture or read off a page ourselves (Measured), with four Beat 1–2 charts
-built from it. How: every source is one declaration — which parser reads it,
-where its pages are, whether its site lets us fetch it — and `ROWS` names what
-a rebuild loads. Of the three sites checked, Google Play's listing may be
-fetched, Apple's may not (its terms), and Opinion Assurances gave written
-authorization for its review pages (recorded beside the source in
-`ingest/sources.py` and in DECISIONS → Phase 3a). The first real review rows
-come from there, read from the page's machine-readable marks with the
-reviewer's name never read. Remaining: the first live run (`make confirm
-scrape`), a scoped re-review of the A3 and A4 commits, the exit audit. The DONE
-command is `make rebuild && make idempotency-check ROWS=captured`; Phase 1's
-line stays green (raw 40 / staging 39); CI runs `ROWS=synthetic` and
-`ROWS=samples`. Phase 2 merged (PR #4). Next: the Phase 3a PR; then Phase 3b —
-Trustpilot.
+variable; the ranged peer anchors are placements), A5 (the review text is a
+child of the review scope, not of the description) and A6 (a review's rating
+is a half-step, 1 to 5) all approved and built. What a reader sees: the rating
+each platform shows is now a table of its own, seeded from the brief's public
+figures (Documented) and extended by the figures we capture or read off a page
+ourselves (Measured), with four Beat 1–2 charts built from it. How: every
+source is one declaration — which parser reads it, where its pages are,
+whether its site lets us fetch it — and `ROWS` names what a rebuild loads. Of
+the three sites checked, Google Play's listing may be fetched, Apple's may not
+(its terms), and Opinion Assurances gave written authorization for its review
+pages (recorded beside the source in `ingest/sources.py` and in DECISIONS →
+Phase 3a). The first live run (2026-09-03) captured Google Play's listing (one
+Measured row) and the profile's first page, which refused twice against a
+shape the hand-written sample had guessed — the text's nesting and the
+half-star ratings (DECISIONS → Gotchas); A5 and A6 corrected the shape and the
+page parses: 40 reviews and the aggregate. Remaining: the full 14-page scrape
+(`make confirm scrape`) and the DONE command on it, a scoped re-review of the
+A3–A6 commits, the exit audit. The DONE command is `make rebuild && make
+idempotency-check ROWS=captured`; Phase 1's line stays green (raw 40 / staging
+39); CI runs `ROWS=synthetic` and `ROWS=samples`. Phase 2 merged (PR #4).
+Next: the Phase 3a PR; then Phase 3b — Trustpilot.
 
 Open BACKLOG rows: **14**.
 
