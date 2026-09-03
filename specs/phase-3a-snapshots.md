@@ -276,6 +276,35 @@ than the site's shape; it admits a malformed value).
 Freeze (A6): `fixtures/opinion-assurances/page-1.html` and `MANIFEST.sha256`
 — the second review's `ratingValue` `5` → `4.5`; every other byte unchanged.
 
+**Amendment A7 (2026-09-03, first live run) — a rebuild refuses a raw table
+that is not its declaration.** The first rebuild after A6 loaded the 534
+captured reviews into the DuckDB file made before it. `create_raw` runs
+`create table if not exists`, so the file's `raw_reviews` kept its `integer`
+rating column, and the engine cast every half-step on insert without a word:
+109 ratings rounded, nothing refused, the idempotency check green on the
+rounded rows. A4 (a) closed that class at the parse ("nothing reaches the
+loader that the column would rescale"); the parse cannot see a table whose
+column is not the one the file declares. What changes: `create_raw` compares
+every raw table that already exists with its file — the file's declaration is
+created as a temporary table under a scratch name on the same connection,
+both column lists (name and type, in order) are read back from
+`information_schema.columns` in the engine's own vocabulary, the scratch
+table is dropped — and refuses the rebuild on the first difference naming
+the table, the column, the type in the database and the type in the file,
+pointing at `make confirm reset` as the same-key refusal does; nothing is
+loaded. A table that does not exist yet is created as before. Restores
+invariant 3's premise (raw is what the files declare) and A4 (a)'s property
+end to end. Pinned by a database built under the previous declaration
+(`rating integer`) refused on rebuild with nothing inserted, a table with an
+extra column refused, and a second `create_raw` on a matching database
+passing and leaving no scratch table. Not taken: dropping and recreating the
+raw tables on every rebuild (raw is append-only history); altering the
+column in place (an engine-specific statement that also rewrites history's
+values); a CLAUDE.md note alone (the failure is silent; a note stops no
+build); comparing the file's text against a stored copy (a byte change in a
+comment is not a schema change, and a schema change can hide in equal bytes
+across engines).
+
 ## Why
 
 Phase 2 built the collector and proved it on a frozen sample, but the one
