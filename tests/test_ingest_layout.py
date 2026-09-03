@@ -250,6 +250,32 @@ def test_brand_carrying_strings_appear_only_in_the_declarations():
     assert hits == [], hits
 
 
+def test_no_two_hand_entered_sources_share_a_platform_and_listing():
+    """A2: a hand-read row's key carries its declaration's platform and listing
+    address, so two hand-entered sources may not share them; the declared
+    tuple passes, a colliding pair refuses at declaration."""
+    from ingest.sources import hand_entries_are_unique
+
+    hand_entries_are_unique(SOURCES)
+    store = by_name("fr-digital-first-app-store-listing")
+    twin = Source(
+        name="twin",
+        platform=store.platform,
+        host=store.host,
+        parser=None,
+        pages=(),
+        profile="peer-x",
+        segment="traditional",
+        channel="invited",
+        listing=store.listing,
+        fetchable=False,
+        declared_on="2026-09-02",
+        terms="terms say no (2026-09-02)",
+    )
+    with pytest.raises(ValueError, match="both hand-entered"):
+        hand_entries_are_unique(SOURCES + (twin,))
+
+
 def test_every_non_fetchable_source_states_its_reason():
     """The property over every declaration, not today's: fetchable=False
     implies a reason naming robots or a terms clause and a date; the

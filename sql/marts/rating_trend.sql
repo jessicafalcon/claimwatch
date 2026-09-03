@@ -24,7 +24,7 @@ from (
         stg_platform_snapshots.*,
         row_number() over (
             partition by channel, segment, source, profile, month
-            order by captured_at desc, content_hash desc
+            order by captured_at desc, precedence, source_url
         ) as row_in_month
     from stg_platform_snapshots
     where rating is not null

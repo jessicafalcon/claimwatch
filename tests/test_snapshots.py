@@ -228,6 +228,133 @@ def test_a_profile_capture_yields_one_snapshot_row_from_its_first_page(tmp_path)
     assert rows == [(Decimal("3.600"), 512, oa.page_url(1))]
 
 
+def _manual(tmp_path: Path, name: str, rows: list[dict[str, str]]) -> Path:
+    return _write_csv(tmp_path / name, MANUAL_COLUMNS, rows)
+
+
+def _store_row(**over: str) -> dict[str, str]:
+    row = {
+        "source": "fr-digital-first-app-store-listing",
+        "captured_at": "2026-09-02",
+        "rating": "4.9",
+        "review_count": "13000",
+        "one_star_share": "",
+        "response_rate": "",
+        "response_delay_days": "",
+        "read_from": "page",
+    }
+    row.update(over)
+    return row
+
+
+def test_a_corrected_figure_for_an_entered_day_refuses_the_load(tmp_path):
+    """A2 (round 1, finding 1): a hand-read row whose key is already in the
+    corpus under other figures is refused with one line naming its line and
+    the fix — never tiebroken by hash order. The same figures again add
+    nothing; a corrected figure on a NEW day is a new point."""
+    db = tmp_path / "w.duckdb"
+    first = _manual(tmp_path, "m1.csv", [_store_row()])
+    rebuild(
+        "duckdb", "captured", database=db, cache_dir=tmp_path / "no", manual_file=first
+    )
+    corrected = _manual(tmp_path, "m2.csv", [_store_row(rating="4.8")])
+    with pytest.raises(
+        PageShapeError, match=r"line 2: a snapshot for .*make reset"
+    ) as exc:
+        rebuild(
+            "duckdb",
+            "captured",
+            database=db,
+            cache_dir=tmp_path / "no",
+            manual_file=corrected,
+        )
+    assert "\n" not in str(exc.value)
+    again = rebuild(
+        "duckdb", "captured", database=db, cache_dir=tmp_path / "no", manual_file=first
+    )
+    assert again["raw_platform_snapshots"] == pins.ANCHOR_ROWS + 1
+    new_day = _manual(
+        tmp_path, "m3.csv", [_store_row(rating="4.8", captured_at="2026-09-03")]
+    )
+    later = rebuild(
+        "duckdb",
+        "captured",
+        database=db,
+        cache_dir=tmp_path / "no",
+        manual_file=new_day,
+    )
+    assert later["raw_platform_snapshots"] == pins.ANCHOR_ROWS + 2
+
+
+def test_two_entries_for_one_day_in_one_file_refuse_naming_the_second_line(tmp_path):
+    db = tmp_path / "w.duckdb"
+    both = _manual(tmp_path, "m.csv", [_store_row(), _store_row(rating="4.8")])
+    with pytest.raises(PageShapeError, match="line 3: a snapshot for"):
+        rebuild(
+            "duckdb",
+            "captured",
+            database=db,
+            cache_dir=tmp_path / "no",
+            manual_file=both,
+        )
+
+
+def test_a_hand_read_row_is_never_swallowed_by_an_anchor_with_its_numbers(tmp_path):
+    """A2 (round 1, finding 2): a hand-read row with the same platform,
+    profile, day and figures as an anchor is a row of its own — the key names
+    how it came to be and where it was read — and, sharing the day, it stands
+    in front of the anchor in the marts as the Measured point."""
+    db = tmp_path / "w.duckdb"
+    same = _manual(
+        tmp_path, "m.csv", [_store_row(captured_at="2024-09-15", review_count="5000")]
+    )
+    counts = rebuild(
+        "duckdb", "captured", database=db, cache_dir=tmp_path / "no", manual_file=same
+    )
+    assert counts["raw_platform_snapshots"] == pins.ANCHOR_ROWS + 1
+    assert counts["stg_platform_snapshots"] == pins.ANCHOR_ROWS + 1
+    rows = _query(
+        db,
+        "select origin, tag, source_url from stg_platform_snapshots "
+        "where source = 'app-store' and captured_at = '2024-09-15' order by origin",
+    )
+    store = by_name("fr-digital-first-app-store-listing")
+    assert rows == [
+        ("anchor", "Documented", "https://apps.apple.com/"),
+        ("manual", "Measured", store.listing),
+    ]
+    gap = _query(
+        db,
+        "select tag, source_url, captured_at from channel_gap "
+        "where source = 'app-store' and profile = 'fr-digital-first'",
+    )
+    assert gap == [("Measured", store.listing, "2024-09-15")]
+
+
+def test_the_snapshot_key_is_unique_in_raw(tmp_path):
+    """A2: with anchors, a capture and a hand entry loaded twice, no two raw
+    rows share (source, profile, origin, source_url, captured_at) — staging
+    and the marts have nothing to tiebreak."""
+    from pipeline.build import SNAPSHOT_KEY
+
+    cache = tmp_path / "cache"
+    _play_capture(cache, "2026-09-02T10:00:00")
+    manual = _manual(tmp_path, "m.csv", [_store_row()])
+    db = tmp_path / "w.duckdb"
+    for _ in range(2):
+        rebuild("duckdb", "captured", database=db, cache_dir=cache, manual_file=manual)
+    cols = ", ".join(SNAPSHOT_KEY)
+    dupes = _query(
+        db,
+        f"select {cols}, count(*) from raw_platform_snapshots "
+        f"group by {cols} having count(*) > 1",
+    )
+    assert dupes == []
+    assert _query(db, "select count(*) from stg_platform_snapshots") == _query(
+        db, "select count(*) from raw_platform_snapshots"
+    )
+
+
 def test_reseeding_reentering_and_rebuilding_add_no_snapshot_row(tmp_path):
     cache = tmp_path / "cache"
     _play_capture(cache, "2026-09-02T10:00:00")

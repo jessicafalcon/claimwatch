@@ -1,8 +1,11 @@
 -- raw_platform_snapshots — a platform page's headline numbers as they stood
 -- at a moment, append-only (spec Phase 3a, pinned decision 1).
--- Grain: one row per snapshot; natural key (source, profile, captured_at) plus
+-- Grain: one row per snapshot; natural key (source, profile, origin,
+--   source_url, captured_at) — what produced the row and when (A2) — plus
 --   content_hash over the five measures. A re-seed of the anchors, a re-entry
---   of a hand-read row or a re-capture of unchanged figures inserts nothing.
+--   of a hand-read row or a re-capture of unchanged figures inserts nothing;
+--   a same-key row with other figures is refused by the loader, so the key
+--   is unique here.
 -- Provenance: source, source_url, captured_at, run_id. captured_at is the
 --   anchor's or the reader's day (YYYY-MM-DD) or the fetch stamp — no clock in
 --   SQL; run_id is stamped by the loader in Python.

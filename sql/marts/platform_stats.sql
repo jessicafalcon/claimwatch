@@ -22,7 +22,7 @@ from (
         stg_platform_snapshots.*,
         row_number() over (
             partition by segment, source, profile
-            order by captured_at desc, content_hash desc
+            order by captured_at desc, precedence, source_url
         ) as row_in_key
     from stg_platform_snapshots
     where one_star_share is not null

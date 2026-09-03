@@ -184,13 +184,13 @@ make rebuild && make idempotency-check ROWS=captured
 
 1. **`platform_snapshots` lands, seeded from the anchors and marked as such.**
    `raw_platform_snapshots` (append-only, natural key `(source, profile,
-   captured_at)` + content hash of the measures) and `stg_platform_snapshots`
-   exist; the nine anchor rows load from the re-frozen `fixtures/anchors/`
-   with `origin = anchor` and read back as `Documented`; a hand-entered row
-   (`origin = manual`) and a captured row (`origin = fetch`) read back as
-   `Measured`; every row carries `source`, `source_url`, `captured_at`,
-   `run_id`, `profile`, `segment`, `channel`; a re-seed, a re-entry and a
-   second rebuild add no row. *Evidence: row 1.*
+   origin, source_url, captured_at)` + content hash of the measures, A2) and
+   `stg_platform_snapshots` exist; the nine anchor rows load from the
+   re-frozen `fixtures/anchors/` with `origin = anchor` and read back as
+   `Documented`; a hand-entered row (`origin = manual`) and a captured row
+   (`origin = fetch`) read back as `Measured`; every row carries `source`,
+   `source_url`, `captured_at`, `run_id`, `profile`, `segment`, `channel`; a
+   re-seed, a re-entry and a second rebuild add no row. *Evidence: row 1.*
 2. **Four marts land and four BACKING rows flip Pending → Documented.**
    `sql/marts/rating_trend.sql` (B1.2), `channel_gap.sql` (B1.3),
    `platform_stats.sql` (B1.4), `peer_ratings.sql` (B2.3) build from
@@ -260,7 +260,7 @@ make rebuild && make idempotency-check ROWS=captured
 
 | Invariant ("for all …, … holds") | Falsified by (scenario test) |
 |---|---|
-| 1. For all snapshot rows, the four provenance columns are non-empty, `origin`, `profile`, `segment` and `channel` are values from their closed sets, and the row reads back `Documented` iff `origin = anchor` and `Measured` otherwise; a re-seed, a re-entry or a second rebuild changes no count. | `tests/test_snapshots.py::test_anchors_seed_nine_documented_rows_with_provenance`, `::test_manual_and_fetched_rows_read_back_as_measured`, `::test_reseeding_reentering_and_rebuilding_add_no_snapshot_row` — anchors, a manual row and a capture each loaded twice: nine plus one plus one, both times |
+| 1. For all snapshot rows, the four provenance columns are non-empty, `origin`, `profile`, `segment` and `channel` are values from their closed sets, and the row reads back `Documented` iff `origin = anchor` and `Measured` otherwise; a re-seed, a re-entry or a second rebuild changes no count; the key `(source, profile, origin, source_url, captured_at)` is unique in raw, and a row whose key is already there under other figures refuses the load rather than being tiebroken (A2). | `tests/test_snapshots.py::test_anchors_seed_nine_documented_rows_with_provenance`, `::test_manual_and_fetched_rows_read_back_as_measured`, `::test_reseeding_reentering_and_rebuilding_add_no_snapshot_row` — anchors, a manual row and a capture each loaded twice: nine plus one plus one, both times; `::test_a_corrected_figure_for_an_entered_day_refuses_the_load`, `::test_two_entries_for_one_day_in_one_file_refuse_naming_the_second_line`, `::test_a_hand_read_row_is_never_swallowed_by_an_anchor_with_its_numbers`, `::test_the_snapshot_key_is_unique_in_raw`; `tests/test_ingest_layout.py::test_no_two_hand_entered_sources_share_a_platform_and_listing` (A2) |
 | 2. For all rebuild inputs but `none`, the anchors seed the same nine rows and the four marts are byte-identical across two rebuilds under different wall-clock times; a Pending row's mart does not exist. | `tests/test_marts.py::test_marts_are_byte_stable_across_rebuilds` (every clock the data path imports made to raise; every column compared, `run_id` included), `::test_rating_trend_matches_pins` and siblings; `make check-backing` (orphans) |
 | 3. For all declared sources, the parser, cache directory, host, page addresses, attribution and terms position are read from the declaration; a source declared not fetchable is never requested whatever its robots file says — a plain run skips it with one line, naming it refuses; no module outside `ingest/sources.py` and the parsers' own constants compares a platform or source name; a capture's meta is accepted iff its `source_url` host is the declaring source's host. | `tests/test_ingest_layout.py::test_no_module_branches_on_a_platform_name`, `::test_the_cache_root_is_bound_once`; `tests/test_fetch_sources.py::test_a_non_fetchable_source_is_refused_before_any_request_whatever_robots_says` — a permissive robots body and a non-fetchable source: only no request at all; `tests/test_ingest_rebuild.py::test_meta_is_validated_against_the_sources_declared_host` — a meta on another allowed host refuses; the allowlist shrunk in a test does not unload a declared source's capture |
 | 4. For all captured review rows, `(source, source_url)` joins exactly one `source_pages` row, and for all files under `sql/`, no `like`, `similar to` or regex function appears: attribution is exact-value or Python-written, never a pattern in SQL. | `tests/test_ingest_rebuild.py::test_every_captured_review_joins_exactly_one_declared_page` — a capture under a declared source joins; a page address outside the declaration is an unattributed row and the test fails; `tests/test_sql_portable.py::test_pattern_matching_is_refused_in_sql` |
@@ -278,32 +278,33 @@ make rebuild && make idempotency-check ROWS=captured
   (`invited | unsolicited`), `origin` (`anchor | manual | fetch`), `rating`
   (`decimal(4,3)`, 0–5; a page's longer value is rounded half-even to three
   places in Python at parse, stated in the parser), `review_count` (integer ≥
-  0), `one_star_share` (`decimal(4,3)`, 0–1, null when the page does not
-  show it), `response_rate` (same), `response_delay_days` (`decimal(5,1)`,
-  null when not shown), `source_url`, `captured_at` (text: the anchors' and
-  manual rows' `YYYY-MM-DD`, or the fetch stamp), `run_id`, `seeded_from`
+  0), `one_star_share` (`decimal(4,3)`, 0–1, null when the page does not show
+  it), `response_rate` (same), `response_delay_days` (`decimal(5,1)`, null
+  when not shown), `source_url`, `captured_at` (text: the anchors' and manual
+  rows' `YYYY-MM-DD`, or the fetch stamp), `run_id`, `seeded_from`
   (`PROJECT_BRIEF §6` for an anchor, empty otherwise), `content_hash` (over
-  the five measures). Natural key `(source, profile, captured_at)` + hash,
-  the Phase 1 guard shape; `stg_platform_snapshots` keeps the latest hash per
-  key and derives `tag` (`case when origin = 'anchor' then 'Documented' else
-  'Measured' end` — an exact comparison, portable) and `month`
-  (`substr(captured_at, 1, 7)`). The anchors CSV is parsed strictly in Python
-  (`csv`, closed sets, numeric ranges; a bad row refuses the seed);
-  `fixtures/anchors/` is re-frozen with `profile`, `channel`, the three B1.4
-  columns (filled where brief §6 gives them: the platform's 23.1 % one-star,
-  82 % and 1.5 days; the early-2025 18 % one-star; empty elsewhere) and
-  `digital-first` on the two app rows (`Freeze: fixtures/anchors/`, MANIFEST
-  in the diff, DECISIONS entry) — the frozen shape has no profile, so two
-  traditional peers collide on every key, and the app rows carry a channel
-  where a segment belongs. For a fetched or hand-entered row, `profile`,
-  `segment`, `channel`, `source` and `source_url` are written in Python from
-  the source declaration. The anchors seed in every input but `none`.
-  Satisfies invariants 1 and 2. Rejected: repairing the seed's meaning in
-  staging (a fixture fixed in SQL); Measured for anchors (a person's reading
-  at scoping, without a capture time of ours, is a documented public figure);
-  a Python-side dedup (the guard is the warehouse's, as in Phase 1); keeping
-  the page's full-precision rating as text (a mart cannot average text; three
-  places keep every platform's displayed value exactly).
+  the five measures). Natural key `(source, profile, origin, source_url,
+  captured_at)` + hash (A2), the Phase 1 guard shape; a row whose key is
+  already in raw under another hash refuses the load, so
+  `stg_platform_snapshots` keeps every raw row and derives `tag` (`case when
+  origin = 'anchor' then 'Documented' else 'Measured' end` — an exact
+  comparison, portable) and `month` (`substr(captured_at, 1, 7)`). The anchors
+  CSV is parsed strictly in Python (`csv`, closed sets, numeric ranges; a bad
+  row refuses the seed); `fixtures/anchors/` is re-frozen with `profile`,
+  `channel`, the three B1.4 columns (filled where brief §6 gives them: the
+  platform's 23.1 % one-star, 82 % and 1.5 days; the early-2025 18 % one-star;
+  empty elsewhere) and `digital-first` on the two app rows (`Freeze:
+  fixtures/anchors/`, MANIFEST in the diff, DECISIONS entry) — the frozen
+  shape has no profile, so two traditional peers collide on every key, and the
+  app rows carry a channel where a segment belongs. For a fetched or
+  hand-entered row, `profile`, `segment`, `channel`, `source` and `source_url`
+  are written in Python from the source declaration. The anchors seed in every
+  input but `none`. Satisfies invariants 1 and 2. Rejected: repairing the
+  seed's meaning in staging (a fixture fixed in SQL); Measured for anchors (a
+  person's reading at scoping, without a capture time of ours, is a documented
+  public figure); a Python-side dedup (the guard is the warehouse's, as in
+  Phase 1); keeping the page's full-precision rating as text (a mart cannot
+  average text; three places keep every platform's displayed value exactly).
 - **Four marts, four flips to Documented.** `rating_trend` (B1.2): one row
   per `(channel, segment, source, profile, month)`, the latest snapshot in
   that month with `rating`, `review_count`, `captured_at`, `tag` — the panel

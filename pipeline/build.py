@@ -8,9 +8,11 @@ docs/PLAN.md §4 decision 2). The stages:
                   source's through its declared parser (Phase 3a) — the SAME
                   guard for all
   load_snapshots-> insert each platform snapshot only if (source, profile,
-                  captured_at, content_hash) is unseen; the rows come from the
-                  anchors fixture (Documented), the hand-entry file under
-                  data/snapshots/ or a capture (Measured) — Phase 3a
+                  origin, source_url, captured_at, content_hash) is unseen —
+                  the key names what produced the row (A2) — and REFUSE a row
+                  whose key is already there under other figures; the rows
+                  come from the anchors fixture (Documented), the hand-entry
+                  file under data/snapshots/ or a capture (Measured) — Phase 3a
   build_derived-> run sql/staging/*.sql then sql/marts/*.sql (`create or replace`)
 
 Idempotency: raw is append-only keyed on the natural key + a content fingerprint,
@@ -228,6 +230,7 @@ def read_anchors(path: Path = ANCHORS) -> list[dict[str, object]]:
             raise _refuse_row(where, i, "seeded_from", "is empty")
         out.append(
             {
+                "where": f"{where}: line {i}",
                 "source": row["platform"],
                 "profile": row["profile"],
                 "segment": row["segment"],
@@ -275,6 +278,7 @@ def read_manual_snapshots(path: Path = MANUAL_SNAPSHOTS) -> list[dict[str, objec
             )
         out.append(
             {
+                "where": f"{where}: line {i}",
                 "source": source.platform,
                 "profile": source.profile,
                 "segment": source.segment,
@@ -291,11 +295,40 @@ def read_manual_snapshots(path: Path = MANUAL_SNAPSHOTS) -> list[dict[str, objec
     return out
 
 
+SNAPSHOT_KEY = ("source", "profile", "origin", "source_url", "captured_at")
+
+
 def load_snapshots(conn, rows: list[dict[str, object]], run_id: str) -> None:
     """Append each snapshot not already present under its natural key + hash —
-    the same guard shape as `load_reviews`."""
+    the same guard shape as `load_reviews`. The key (A2) names what produced
+    the row: the platform, the profile, how the row came to be and the address
+    it was read from — a platform root for an anchor, the declared listing
+    address for a hand-read row, the page address for a capture — and its day
+    or instant. A row whose key is already in raw under OTHER figures is
+    refused with one line: that arises only from a corrected hand entry or a
+    re-frozen seed, and the fix is `make reset CONFIRM=yes` then `make
+    rebuild`, since the corpus is rebuilt from tracked inputs. Nothing is
+    tiebroken downstream: the key is unique in raw."""
     for r in rows:
         h = snapshot_hash(r)
+        key = [r[c] for c in SNAPSHOT_KEY]
+        seen = {
+            row[0]
+            for row in conn.execute(
+                "select content_hash from raw_platform_snapshots "
+                "where source = ? and profile = ? and origin = ? "
+                "and source_url = ? and captured_at = ?",
+                key,
+            ).fetchall()
+        }
+        if seen and seen != {h}:
+            where = r.get("where", r["source_url"])
+            raise PageShapeError(
+                f"{where}: a snapshot for ({r['source']}, {r['profile']}, "
+                f"{r['origin']}, {r['captured_at']}) is already in the corpus with "
+                "other figures — a corrected entry needs `make reset CONFIRM=yes` "
+                "then `make rebuild`"
+            )
         conn.execute(
             "insert into raw_platform_snapshots "
             "(source, profile, segment, channel, origin, rating, review_count, "
@@ -303,8 +336,8 @@ def load_snapshots(conn, rows: list[dict[str, object]], run_id: str) -> None:
             " captured_at, run_id, seeded_from, content_hash) "
             "select ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? "
             "where not exists (select 1 from raw_platform_snapshots "
-            "where source = ? and profile = ? and captured_at = ? "
-            "and content_hash = ?)",
+            "where source = ? and profile = ? and origin = ? and source_url = ? "
+            "and captured_at = ? and content_hash = ?)",
             [
                 r["source"],
                 r["profile"],
@@ -321,9 +354,7 @@ def load_snapshots(conn, rows: list[dict[str, object]], run_id: str) -> None:
                 run_id,
                 r.get("seeded_from", ""),
                 h,
-                r["source"],
-                r["profile"],
-                r["captured_at"],
+                *key,
                 h,
             ],
         )

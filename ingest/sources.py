@@ -262,6 +262,27 @@ SOURCES: tuple[Source, ...] = (
 )
 
 
+def hand_entries_are_unique(sources: tuple[Source, ...]) -> None:
+    """A hand-read row keys on its declaration's platform and listing address
+    (A2), so two hand-entered sources (no parser) may not share them; an app's
+    feed and its store listing share theirs by design and only the listing
+    writes a snapshot from it. Checked when the tuple is declared."""
+    seen: dict[tuple[str, str], str] = {}
+    for s in sources:
+        if s.parser is not None:
+            continue
+        key = (s.platform, s.listing)
+        if key in seen:
+            raise ValueError(
+                f"sources {seen[key]!r} and {s.name!r} are both hand-entered on the "
+                f"same platform and listing address"
+            )
+        seen[key] = s.name
+
+
+hand_entries_are_unique(SOURCES)
+
+
 def source_names() -> tuple[str, ...]:
     return tuple(s.name for s in SOURCES)
 
