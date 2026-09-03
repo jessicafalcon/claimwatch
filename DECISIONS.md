@@ -50,8 +50,10 @@ place and never deleted.
 - **Raw is append-only, idempotent on `(source, external_id, content_hash)`;
   staging keeps the latest capture.** A re-run of an unchanged review inserts
   nothing, an edited review appends a new row, so "run twice, counts unchanged"
-  holds; `run_id` is stamped in Python (never in SQL) and is in no natural key
-  and no mart. ([PLAN §4 decision 2](docs/PLAN.md); [Phase 1](#phase-1))
+  holds; `run_id` is stamped in Python (never in SQL) and is in no natural
+  key; every mart carries it as provenance, so a displayed point can be
+  traced to the run that wrote it. ([PLAN §4 decision 2](docs/PLAN.md);
+  [Phase 1](#phase-1))
 
 **Data**
 
@@ -78,16 +80,57 @@ place and never deleted.
     and listing address) but marked not to fetch — `fetchable=False`, with
     this reason recorded as its `terms` — so the fetcher refuses it before
     any request, even if the host's file reads differently on a later day
-    (amendment A5); the fallback is the manual snapshot path above (Phase
+    (Phase 2's amendment A5); the fallback is the manual snapshot path above (Phase
     3a's `platform_snapshots`), never a different User-Agent or a
     "syndication feeds don't count" reading.
     ([Phase 2](#phase-2))
+  - *Google Play listing (Phase 3a).* The app's store page, read for its
+    machine-readable rating block (schema.org JSON-LD `AggregateRating`) and
+    nothing else — one page, no reviews. **Position as of 2026-09-02:** the
+    host's `robots.txt` (https://play.google.com/robots.txt) catch-all group
+    disallows `/_`, `/store/getreviews` and `/store/xhr` and does not disallow
+    the details page; the Google Play Terms of Service
+    (https://play.google.com/about/play-terms/) forbid automated access only
+    where it breaches robots.txt. Fetchable. Its reviews load through the
+    disallowed `/_` call and are never fetched. ([Phase 3a](#phase-3a))
+  - *App Store listing (Phase 3a).* Allowed by `robots.txt`, **forbidden by
+    Apple's website terms of use**
+    (https://www.apple.com/legal/internet-services/terms/site.html, "Your Use
+    of the Site": no robot, spider, page-scrape or automated means to access
+    or copy the site; no robots.txt carve-out; read 2026-09-02). Declared not
+    fetchable; its rating and count are read by hand and entered in
+    `data/snapshots/manual_snapshots.csv`, tagged Measured. The by-id address
+    also answers a redirect to a slug address (Gotchas). ([Phase
+    3a](#phase-3a))
+  - *Opinion Assurances profile pages (Phase 3a).* `robots.txt`
+    (https://www.opinion-assurances.fr/robots.txt) allows the profile and its
+    path-based pages (`…-page<n>.html`) and disallows every address with a
+    query string; the site's conditions générales, read 2026-09-02 on the
+    site's own terms page (its address is not recorded here), forbid in V.3
+    automated extraction **without prior written authorization**, and in V.1
+    reproduction without written agreement. **Position as of 2026-09-02: the
+    developer holds the site's written authorization** (requested and granted
+    2026-09-02), recorded as the source's `terms`; the study publishes
+    aggregates and paraphrases only (brief §2.5). Fetchable: the studied
+    insurer's profile, up to its own page count, ≥ 2 s apart; the reviewer
+    pseudonym is never read. ([Phase 3a](#phase-3a))
+- **An address that spells the brand is a sourced data point and lives in
+  `ingest/sources.py` only (Phase 3a, decision D1).** A store package id or a
+  profile path names the insurer where a numeric store id does not. It may
+  appear in the source declaration — the `pages` and `listing` fields — and
+  nowhere else: no prose, comment, commit message, test name, fixture or
+  tracked data file repeats it (the hand-entry file names the source by its
+  declared name). The future hashed naming check excludes those two fields.
+  ([Phase 3a](#phase-3a))
 - **A scraped page is parsed strictly to a declared shape; the page is the
   unit of refusal.** A feed item missing or mis-typing a required field, a
-  rating outside 1–5 or a non-ISO timestamp refuses the whole page, naming
-  page, item and field; nothing partial is loaded and nothing is defaulted.
-  Widening the shape is a tested change in `ingest/app_store.py`, never a
-  `.get(…, default)`. ([PLAN §2](docs/PLAN.md) Boundary row; [Phase 2](#phase-2))
+  rating outside the scale the shape declares, or a non-ISO timestamp refuses
+  the whole page, naming page, item and field; nothing partial is loaded and
+  nothing is defaulted. Widening a shape is a tested change in the parser that
+  declares it — `ingest/app_store.py`, and since Phase 3a `ingest/listing.py`
+  and `ingest/opinion_assurances.py` (the review half-steps and the
+  aggregate's 0..5, A6/A8) — never a `.get(…, default)`. ([PLAN
+  §2](docs/PLAN.md) Boundary row; [Phase 2](#phase-2))
 
 **Process**
 
@@ -149,7 +192,8 @@ Each entry: the surprise, the official-docs check, what we did.
 
 - **Phase 2 — the live feed, checked by the first run (2026-09-02).** An agent
   runs no fetch, so the build session could not check the feed; the developer's
-  first `make scrape CONFIRM=yes` was the check. Result: the field names match
+  first live `make scrape` was the check (gated then by `CONFIRM=yes`; since
+  Phase 3a's A4 (d) by `make confirm scrape`). Result: the field names match
   the declared shape (8 pages, 316 items, every page parsed, no widening
   needed); the feed ended at page 8 with an empty page, which the fetcher
   treats as the end.
@@ -165,6 +209,67 @@ Each entry: the surprise, the official-docs check, what we did.
   the real path; the disallowed capture and its database were deleted; the
   DONE command moved to the frozen-sample form; the terms position above
   records the disallow.
+
+- **Phase 3a — the candidate checks ran from the build session, not by hand
+  (2026-09-02).** The spec said the developer would check each candidate's
+  robots file, terms and page shape in a browser; the developer asked the
+  session to do it. Done with `curl` and the stdlib client, the project's
+  User-Agent, one request per page, ≥ 2 s per host, saved outside the repo.
+  Midway, the session's permission classifier blocked further downloads from
+  `apps.apple.com` and `opinion-assurances.fr` and every local script over the
+  saved profile page (it would print review text); two pages were read
+  through a text summary instead, and the profile page's structure was dumped
+  by the developer with a redacting script (`inspect_oa_structure.py`, text
+  nodes replaced by their lengths). Recorded because the spec's stack-risk
+  section assumed a hand check.
+- **Phase 3a — the App Store listing's by-id address redirects.**
+  `https://apps.apple.com/fr/app/id<n>` answers 301 to a slug address that
+  spells the app's name; the fetcher follows no redirect and refuses a non-200,
+  so even under permission the declared address would have to be the slug
+  (D1). Moot: Apple's terms forbid the fetch and the figures are hand-read.
+- **Phase 3a — Opinion Assurances carries no JSON-LD; it carries microdata.**
+  The listing parser's assumption (a `<script type="application/ld+json">`
+  block) does not hold there: the profile page marks its data inline with
+  schema.org `itemscope`/`itemprop` attributes — 40 `review` scopes a page,
+  each with a `reviewRating` (`ratingValue` as a `meta content`) and an
+  `author` scope (never read); one `AggregateRating` (`ratingValue`,
+  `ratingCount` as `meta content`); the star distribution and the response
+  figures are layout text (progress bars, labels), not data. Official-docs
+  check: schema.org documents both encodings; the WHATWG microdata spec
+  defines the attributes. What we did: a second parser walking microdata with
+  the stdlib HTML parser (`ingest/opinion_assurances.py`), the field
+  addresses declared in its header from the structure dump.
+- **GNU Make reports a `MAKEFLAGS` definition as `command line`.** With
+  `MAKEFLAGS='CONFIRM=yes'` in the environment, `$(origin CONFIRM)` is
+  `command line` and the recipe sees the value exactly as if typed — 3.81 on
+  macOS and 4.x alike, by design: a definition in `MAKEFLAGS` is a
+  command-line definition. So `$(origin)` cannot gate a destructive target.
+  Goals cannot travel that way (`MAKEFLAGS='confirm'` adds no goal; an
+  environment `MAKECMDGOALS` changes the variable's text, not the goal list),
+  which is what Phase 3a's A4 (d) builds on. Found by review round 3
+  (security-reviewer), 2026-09-02.
+- **`create table if not exists` keeps the old column, and the engine casts
+  into it.** After A6 widened `raw_reviews.rating` to `decimal(2, 1)`, a
+  rebuild on the file built before it left the `integer` column in place
+  and DuckDB rounded every half-step on insert (109 of 534) — no error, no
+  warning, counts unchanged twice. Official-docs check: DuckDB's `if not
+  exists` is a no-op on an existing table; an insert casts implicitly
+  between numeric types. What we did: A7 — the rebuild reads the existing
+  table's columns and the file's back through `information_schema` and
+  refuses on a difference. Found by the first `make confirm scrape`,
+  2026-09-03.
+- **A structure dump names the fields, not their nesting or their values'
+  shape.** The Opinion Assurances dump of 2026-09-02 listed the classes and
+  microdata properties a review carries; the hand-written sample then
+  guessed that `h4.oa_text` sits inside `div.oa_description` (it follows
+  it) and that `ratingValue` is a digit (the site rates in half stars:
+  `1.5`, `4.5`). Both guesses were pinned by tests against the sample, so
+  the tests were green and the first live page refused twice — the refusal
+  is the design working, the guesses were the cost. What we did: A5 and A6
+  (Phase 3a); and the rule for 3b's Trustpilot: freeze the sample from one
+  permitted real page, names replaced, before the parser is written — a
+  guessed nesting is a second shape the tests cannot see. Found by the first
+  `make confirm scrape`, 2026-09-03.
 
 ## Appendix — by phase
 
@@ -315,10 +420,11 @@ scraper, no model.
   `theme_share_by_segment` (B2.5).
 - **The warehouse seam and idempotent raw** — promoted to "Decisions still in
   force" above (Warehouse).
-- **`run_id` is stamped in Python, not SQL; in FIXTURE mode it is the fixture
-  name.** So `sql/` stays clock-free, a changing `run_id` never duplicates a row
-  or moves a number, and the synthetic rebuild is byte-stable, not merely
-  count-stable. Rejected: `run_id` from `now()` in SQL.
+- **`run_id` is stamped in Python, not SQL; for a fixture input (`FIXTURE`
+  then, `ROWS` since Phase 3a) it is the input's name.** So `sql/` stays
+  clock-free, a changing `run_id` never duplicates a row or moves a number,
+  and the synthetic rebuild is byte-stable, not merely count-stable. Rejected:
+  `run_id` from `now()` in SQL.
 - **The fixture is read in Python (stdlib csv) and inserted with a portable
   guard** — DuckDB's `read_csv` is dialect-bound, so the load lives in the
   driver, not in a `sql/` file (no pandas). `insert … select … where not exists`
@@ -327,9 +433,20 @@ scraper, no model.
   (raw table creation is SQL, scanned by the portability guard), added to the
   Repo map and the SQL-file convention.
 - **One validating CLI behind `make`; `reset` is the only destructive target,
-  gated by `$(origin CONFIRM)`.** `rebuild`/`idempotency-check` take
-  `TARGET`/`FIXTURE` as a closed set validated in Python; an environment
-  `CONFIRM=yes` does not confirm a `reset`. Mirrors the SPEC/BASE shape.
+  gated by the `confirm` goal of the same invocation.** `rebuild`/
+  `idempotency-check` take `TARGET`/`ROWS` as a closed set validated in
+  Python. The gate was `$(origin CONFIRM)` from Phase 1 to Phase 3a's review
+  round 3, when a definition supplied through `MAKEFLAGS` in the environment
+  was shown to report `command line` (GNU Make 3.81 and 4.x alike); a goal
+  cannot arrive that way, so `make confirm reset` stamps the make process's id
+  and `reset` runs only in that process (A4 (d), [Phase 3a](#phase-3a)). The
+  stamp is created exclusively (A8 (d)); `confirm` arms `reset` or `scrape`
+  alone and reads a goal list of make's own origin only (A9 (a)); what the
+  gate does not hold against — an environment that chooses what make reads or
+  runs (`MAKEFILES`, `PATH`), a same-user process writing `data/` while make
+  runs — is written in the spec's Threat model; goals run in order under `-j`
+  (`.NOTPARALLEL:`, exit pass 2026-09-03). Mirrors the SPEC/BASE shape for the
+  variables.
 
 **Gotchas:** none — DuckDB's `create or replace`, `insert … where not exists`
 and `information_schema.tables` behaved as the official docs describe.
@@ -375,11 +492,12 @@ mart, no model.
   rows. Rejected: one overwritten cache per source (loses the history the
   proof needs).
 - **`rebuild` reads captures by default; `FIXTURE` names the rebuild input:
-  `{cache, empty, synthetic, app-store}`.** `cache` is the real run (a clone
-  runs `make rebuild` and gets data once it has scraped), `app-store` runs the
-  frozen sample through the real parser (CI does, offline). `run_id` is the
-  capture id in cache mode, the fixture name otherwise — no clock. Rejected: a
-  second variable; keeping `empty` as the default.
+  `{cache, empty, synthetic, app-store}`.** *Superseded by Phase 3a's `ROWS`
+  entry: `{captured, none, synthetic, samples}`.* `cache` is the real run (a
+  clone runs `make rebuild` and gets data once it has scraped), `app-store`
+  runs the frozen sample through the real parser (CI does, offline). `run_id`
+  is the capture id in cache mode, the fixture name otherwise — no clock.
+  Rejected: a second variable; keeping `empty` as the default.
 - **Reviews per month is a query, not a mart** (`pipeline/metrics.py`, printed
   by `rebuild`, pinned by a test). No SPEC.md panel shows it, so a
   `sql/marts/` file would be an orphan under BACKING.md's rule; it surfaces in
@@ -444,8 +562,8 @@ mart, no model.
   committed. `Freeze: fixtures/app-store/` in the spec; MANIFEST in the diff.
   Rejected: a sample under `ingest/` or `tests/` (outside the MANIFEST
   discipline); a scrubbed real page.
-- **`make scrape` is CONFIRM-gated like `reset` and developer-run.** Prompt on
-  a tty, otherwise `CONFIRM=yes` from the command line only; SOURCE is a closed
+- **`make scrape` is gated like `reset` and developer-run.** Prompt on a tty,
+  otherwise `make confirm scrape` only (A4 (d)); SOURCE is a closed
   set of declared names; the fetcher is imported only inside the command, so a
   rebuild never loads `httpx`; the test suite blocks every socket (conftest).
 - **`httpx` added (pre-approved); `pyyaml` deferred** to `rules.yaml` (5b) —
@@ -476,3 +594,335 @@ mart, no model.
   design; the bypass was the drift).
 
 **Gotchas:** the live feed is unverified at build — see Gotchas above.
+
+### Phase 3a
+
+Branch `phase-3a-snapshots`, spec `specs/phase-3a-snapshots.md` (approved
+2026-09-02 with amendment A1). Depends on Phase 2 (PR #4) merged. Built the
+platform-snapshot table and its four marts, turned every source into a
+declaration, added the listing parser and the Opinion Assurances parser,
+renamed the rebuild input, closed five BACKLOG rows.
+
+- **The candidate checks, and what they decided (2026-09-02).** Three sites
+  were checked before approval (Gotchas; positions under "Scrape politely").
+  No candidate allowed reviews on its own terms: Opinion Assurances forbids
+  automated extraction without written authorization, Apple forbids robots
+  on its listing, Google Play allows its listing and not its reviews. The
+  spec was re-scoped to snapshots (its own disposition), then amended at
+  approval when the developer obtained Opinion Assurances' written
+  authorization (A1): its profile pages are the phase's review source.
+  Rejected: fetching a page whose terms say no because its robots file says
+  yes (both bind us); Google Play reviews through the internal call (not a
+  public feed, and disallowed).
+- **`platform_snapshots`: anchors Documented, our captures and hand-read
+  rows Measured (D2, D3).** `raw_platform_snapshots` keyed on `(source,
+  profile, origin, source_url, captured_at)` (A2; `(source, profile,
+  captured_at)` before round 1) + a hash of five measures (rating, count,
+  one-star share, response rate, response delay); `origin` ∈ {anchor, manual,
+  fetch} decides the tag in staging by an exact comparison.
+  `fixtures/anchors/` was re-frozen (`Freeze:` in the spec, MANIFEST
+  regenerated): the Phase 1 file had no profile (two peers collided on every
+  key), carried a channel where a segment belongs on the two app rows, and
+  omitted the brief's Opinion Assurances anchor (534 reviews, 23.1 % one-star,
+  82 % answered, 1.5 days, no rating) — nine anchors now, not eight;
+  PROJECT_BRIEF.md §6 says Documented on the developer's call. Rejected:
+  Measured for anchors (a person's reading at scoping, without a capture time
+  of ours); repairing the seed's meaning in SQL; keeping the page's
+  full-precision rating as text (`decimal(4,3)`, rounded half-even, keeps
+  every displayed value exactly). The anchors' addresses are platform roots,
+  not profile pages: a profile address spells the brand and may sit only in
+  `ingest/sources.py` (D1), so a Documented point opens to its platform and to
+  the brief's §6, not to a page — the trade D1 makes, stated in BACKING's note
+  on the rating rows. A figure the brief dates to a month is placed on the
+  15th of that month, and one it dates to a season on the 15th of that
+  season's first month ("early 2025" is 2025-01-15); one it dates to a span
+  of years is placed at mid-year of the span's first year ("2025–2026" is
+  2025-06-15); one it
+  does not date is placed on the day of the figure it was gathered beside (the
+  Google Play figure beside the App Store's, 2024-09-15; the Opinion
+  Assurances figures beside the June 2026 reading, 2026-06-15). A figure the
+  brief gives as a range is stored at the range's midpoint, rounded to the
+  column ("~2.7–3.8" is 3.250), and a figure it does not give at all is left
+  empty (two peers' review counts; `review_count` is nullable like the other
+  measures — A4 (e), re-frozen 2026-09-03). The day, and a midpoint, are
+  placements, not readings.
+- **Four marts, four flips to Documented.** `rating_trend` (B1.2),
+  `channel_gap` (B1.3), `platform_stats` (B1.4), `peer_ratings` (B2.3) are
+  window selects over `stg_platform_snapshots`, each row carrying its point's
+  tag; BACKING flips the four rows Pending → Documented with the anchors file
+  and the platform roots as sources; the flip to Measured is Phase 4's, when
+  scheduled captures make the series ours. SPEC.md's header and four panels
+  say so. Rejected: one shared mart under four rows; flipping to Measured on
+  a few 2026-09-02 points; leaving B1.4 Pending (the Opinion Assurances page
+  and the anchors carry its numbers).
+- **A source is a declaration (pinned decision 3).** `ingest/sources.py::Source`
+  carries platform, host, parser (a closed set of module names), the page
+  addresses (the closed set of `source_url` values), profile, segment,
+  channel, the listing address, `fetchable` and `terms`, `declared_on`;
+  `CACHE_ROOT` is the one binding of the cache root; `ingest/captures.py`
+  reads any parser's captures back and checks the meta's host against the
+  declaring source's host, not the fetch-time allowlist; `pipeline/build.py`
+  iterates the declarations and dispatches to the declared parser; nothing
+  compares a platform name (a test greps for it). Reviews get their segment
+  from `raw_source_pages` — one row per declared page address, written in
+  Python at every rebuild — joined on exact `source_url`; `pipeline/sql_lint.py`
+  refuses `like` and `similar to` beside `regexp`. The lint is a denylist by
+  design (Phase 1) and is widened only with a record here: review round 2
+  added `ilike` and `rlike`, the pattern keywords both engines accept that the
+  first set missed; round 3 added DuckDB's `glob` keyword and its tilde
+  operators (`~~` is `like`, `~` a regex match, `!~~` and `~~*` their
+  variants), caught by the one character all of them carry, which no portable
+  statement uses. Rejected: a `segment`
+  column on `raw_reviews` (Phase 1's shape); a pattern over the address in
+  SQL; deriving the allowlist from the declarations (a circular import; the
+  allowlist is a fetch-time knob).
+- **The listing parser reads one machine-readable block and nothing else.**
+  `ingest/listing.py`: the page's `<script type="application/ld+json">`
+  objects, exactly one carrying `aggregateRating`, its `ratingValue` (0–5)
+  and `ratingCount` or `reviewCount` as digit strings or numbers; a second
+  block, none, or a value outside the shape refuses the page naming the
+  field; `name`, `author`, `url` and review items are never read.
+  `fixtures/listings/` is its hand-written, fake sample (`Freeze:` in the
+  spec).
+- **The hand-entry path is a tracked CSV, not a make target.**
+  `data/snapshots/manual_snapshots.csv`: eight columns (a declared source name
+  whose `fetchable` is False, a day, five numbers, the word `page`), parsed
+  strictly by `make rebuild`; platform, address and attribution come from the
+  declaration, so the file carries no address and no name. Rejected: a `make
+  snapshot` target with eight variables (eight threat-model rows for a CSV
+  edit); the address in the file (D1); a clock stamp for a manual row (the
+  reader states the day).
+- **`ROWS` names the rebuild input (D4); `samples` runs every frozen sample.**
+  `captured | none | synthetic | samples` replace `cache | empty | synthetic |
+  app-store` (Phase 2's `FIXTURE` decision is superseded by this one); a
+  sample is read under a declaration whose profile, segment and channel are
+  the literal `sample`. `fixtures/app-store/robots.txt` re-frozen to the real
+  rule and read by a test. Rejected: keeping `FIXTURE` (the name called the
+  corpus a fixture); one value per sample.
+- **The robots matcher matches directly.** `_matches` is a two-pointer glob
+  with one fallback to the last `*`; time is bounded by pattern × path
+  length; the matching table is unchanged. Rejected: a cap on `*` per pattern
+  (a denylist on the input); `fnmatch` (the same regex underneath).
+- **A2 (after review round 1): the snapshot key names its declaration, a
+  same-key pair refuses, the stat row is one row per stat.** The natural key
+  of `raw_platform_snapshots` gains `origin` and `source_url` — the address a
+  row was read from is its declaration: a platform root for an anchor, the
+  listing address for a hand-read row, the page for a capture — so a hand-read
+  figure equal to an anchor's is a row of its own and two hand-entered sources
+  cannot collide (a check at declaration pins that none share a platform and
+  listing). A row whose key already sits in raw under other figures is refused
+  at load with one line naming the line and the fix (`make confirm reset`,
+  then `make rebuild`): that arises only from a corrected hand entry or a
+  re-frozen seed, and the corpus is rebuilt from tracked inputs. Staging
+  therefore keeps every raw row and no `order by` carries `content_hash`;
+  when two points share a day in a mart, `precedence` (a capture, then a hand
+  entry, then an anchor — a closed `case`, exact and portable) and the
+  address decide. `platform_stats` is one row per (segment, source, profile,
+  stat) over a closed set of four stats, each the latest reading of that stat
+  with its own provenance, so a capture that reads one figure never blanks
+  another. Rejected: a load-sequence column so the later entry wins (a second
+  order on the data path, a number no page produced); coalescing each stat
+  column from its own latest row inside one row (three provenances in one
+  row); DuckDB's `unpivot` for the stat rows (a dialect word; four selects
+  stacked with `union all` say the same in ANSI).
+- **The Opinion Assurances parser reads schema.org microdata, and its review
+  id is a content hash (A1).** `ingest/opinion_assurances.py` walks the page
+  once with the stdlib HTML parser: each `itemscope` of type `review` yields
+  one row — `rating` from the `reviewRating` scope's `<meta itemprop=
+  "ratingValue" content>` (a half-step 1–5, A6), `review_date` from the description's
+  own sentence "Avis publié le dd/mm/yyyy suite à une expérience le
+  dd/mm/yyyy" (the first date; the second is the experience date), `body`
+  from `h4.oa_text`, `title` empty (the page has none); the `author` scope
+  (a pseudonym and a member link) is skipped in full; the page's one
+  `AggregateRating` (`ratingValue`, `ratingCount` as `meta content`) yields
+  the snapshot row; a page with the aggregate and no review is the end of the
+  list; a page with neither is refused. **The page marks no stable review
+  identifier** (the only per-review link is the reviewer's member page — an
+  author field), so `external_id` is sha256 over the publication date, the
+  experience date, the rating and the body: deterministic and author-free,
+  taken on the build session's recommendation at the STOP-and-decide the
+  spec named (2026-09-02). Cost, in BACKLOG: an edited review is a new
+  review, not a new version of one. The one-star share, response rate and
+  response delay the page shows are layout text (progress bars, labels), not
+  data, and are not read — those figures stay Documented from the anchor
+  (BACKLOG). Rejected: the member id as the key (reads the author and
+  identifies the reviewer); the position on the page (unstable); parsing the
+  layout percentages (presentation, not a declared shape).
+- **A3 (after review round 2, approved and built 2026-09-03): attribution
+  joins the guards; the sample declaration is a property; a hand entry names
+  a source with no parser.** (a) `raw_source_pages` refuses a declared page
+  already in raw under another profile, segment or channel, naming the
+  address and the fix (`make confirm reset`, then `make rebuild`), so one
+  address has one row and the review join is one-to-one by construction; the
+  snapshot fingerprint gains `segment`, `channel` and `seeded_from`, so a
+  corrected attribution on an existing key is a same-key pair and refuses
+  like a corrected figure. (b) `Source.sample`, set only by `sample_source`,
+  is what the closed-set check on `segment` and `channel` keys on; a source
+  named `sample` without it refuses at declaration; invariant 1 says the
+  literal `sample` exists only in the samples database. (c) A hand entry
+  names a source with no parser — the set `hand_entries_are_unique` covers —
+  so a parsed source declared not fetchable can never take a hand-read row
+  that collapses onto its listing's key. Rejected: widening the uniqueness
+  check to every non-fetchable source (two declarations would share one key
+  by design); `origin` and the attribution in `raw_source_pages` (a page's
+  attribution is one fact, not a series); replace-on-change for either table
+  (raw is append-only and a replaced row loses its provenance).
+- **A4 (after review round 3, approved and built 2026-09-03): every measure's
+  bound is its column's; the loader checks its closed sets; a capture's
+  address is a declared page; the confirmation is a goal; a ranged anchor is
+  a placement.** (a) `ingest/parsed.py::MEASURES` declares the four decimal
+  measures once with their columns' precision, scale and range; a hand entry
+  loads exactly as written or refuses past the column's digit shape (never
+  rounded for the person), a page's figure is rounded half-even to the scale
+  at the parse, so the fingerprint is the stored value, pinned by
+  re-fingerprinting every loaded row; `load_snapshots` runs a batch in one
+  transaction, so a refused batch loads nothing. (b) The loader refuses a
+  row whose `origin`, `segment` or `channel` is outside its set — `sample`
+  accepted only under the `samples` input, derived from the closed `INPUTS`
+  — or whose provenance or profile is empty; a parser-less declaration needs
+  a listing address. (c) `read_meta` accepts a page iff its address is one
+  of the declaration's pages, exactly; each parser declares `SAMPLE_PAGES`,
+  the sample declaration carries them, and `raw_source_pages` is written for
+  the sample declarations under `samples`, so every sample review joins one
+  page where CI runs it. (d) `make confirm reset` / `make confirm scrape`
+  (Gotchas: `$(origin)` cannot tell `MAKEFLAGS` from the command line): the
+  `confirm` recipe stamps its make process's id under `data/`, the gated
+  recipe passes its own `$$PPID`, Python confirms only when they are one
+  process and consumes the stamp either way; pinned against the installed
+  make on this machine and in CI. (e) `fixtures/anchors/` re-frozen: the
+  three peer rows carry a range's midpoint rounded to the column and an
+  empty count where the brief gives none; `review_count` is nullable; the
+  placement rule in SPEC's Beat 1, this file and BACKING gains the value
+  side. Rejected: bounding by the digit run and letting the engine round
+  (the fingerprint would not be the stored value); a per-call `sample` flag
+  on the loader (a caller's value); deriving the sample pages from the meta
+  files (a declaration read from data); reading make's own argv through `ps`
+  (a process tree the recipe does not own); a stamp age check (a clock in
+  the CLI; the process id and the consumed stamp hold against a variable, an
+  environment, `MAKEFLAGS` and a stale invocation — the residual, a same-user
+  process writing `data/` while make runs, is stated in A8 (d)); a zero count for
+  a peer the brief does not count (a number no source gave); dropping the
+  two peers (two Documented ratings the brief does state).
+- **A5 (first live run, approved and built 2026-09-03): the review text is a
+  child of the review scope, not of the description.** The first `make
+  confirm scrape` fetched the profile's first page and the parser refused
+  its first review's `oa_text` as missing: on the live page `h4.oa_text`
+  *follows* `div.oa_description` as a sibling (so does `div.oa_commands`),
+  while the parser's header, the hand-written sample and the guard (the body
+  opened only while the description was open) nested it inside — the
+  structure dump gave the fields, never their nesting (Gotchas). Now the
+  guard's kind is "this element is the review's text": `oa_text` opens the
+  body wherever it sits in the review scope outside the author markup, two
+  bodies in one review refuse the page naming the count, and
+  `fixtures/opinion-assurances/` is re-frozen in the live nesting. Rejected:
+  accepting the body at either place with the nested one preferred (a
+  preference is a second shape); the first `oa_text` after the description
+  in document order (a position, not a scope); a denylist of layout wrappers
+  to skip (a fix for the case).
+- **A6 (first live run, approved and built 2026-09-03): a review's rating is
+  a half-step, 1 to 5.** With A5 built the same page refused its sixth
+  review: `ratingValue` `1.5`. The site rates in half stars (page 1: sixteen
+  1s, one 1.5, five 4s, four 4.5s, fourteen 5s); the shape, the parser and
+  `raw_reviews.rating integer` allowed a digit only. Now
+  `ingest/parsed.py::REVIEW_RATINGS` declares the closed set {1, 1.5, …, 5}
+  once beside the snapshot measures; `review_rating` parses a digit or a
+  digit and `.5` strictly; the profile parser refuses anything else naming
+  the value; `load_reviews` checks every row it is handed against the set
+  and inserts nothing on a refusal; `raw_reviews.rating` is `decimal(2, 1)`
+  and `stg_reviews` carries it; `content_hash` spells a decimal one way
+  (trailing zeros dropped, as `snapshot_hash` does), so the synthetic
+  corpus's hashes do not move; the App Store parser keeps its digit rule
+  (its feed gives digits, members of the set). The sample is re-frozen with
+  one half-step so `ROWS=samples` carries one through the real parser and
+  column. The set admits exactly the scale the site declares: each review
+  scope carries `worstRating` 1 and `bestRating` 5 (all 534 on the first
+  capture; the aggregate declares 0..5), the parser reads both and refuses a
+  page declaring another scale naming the bounds, so a value the site does
+  not admit (a 0.5, say) is admitted here only when the site admits it — by
+  widening the set by hand with that page as evidence, never by the parse.
+  Nothing downstream reads a review's rating yet. Rejected: rounding a
+  half-step to a digit (an altered figure — a rating the reviewer did not
+  give); refusing the page (loses the phase's only review source over a
+  value the site gives by design); a free `decimal` in 0–5 (wider than the
+  site's shape; admits a malformed value).
+- **A7 (first live run, approved and built 2026-09-03): a rebuild refuses a
+  raw table that is not its declaration.** The first rebuild after A6 loaded
+  into the DuckDB file made before it; `create table if not exists` kept the
+  `integer` rating column and the engine rounded 109 half-steps on insert
+  without a word — nothing refused, the idempotency check green. A4 (a)
+  closes that class at the parse, which cannot see a table whose column is
+  not the file's. Now `create_raw` compares every raw table that already
+  exists with its file: the declaration is created as a temporary table
+  under a scratch name on the same connection, both column lists are read
+  back from `information_schema.columns` in the engine's own vocabulary, the
+  scratch table dropped, and the first difference refuses the rebuild naming
+  table, column and both types, pointing at `make confirm reset`. Rejected:
+  dropping and recreating raw on every rebuild (append-only history);
+  altering the column in place (engine-specific, and it rewrites history's
+  values); a CLAUDE.md note alone (a silent failure; a note stops no build);
+  comparing the file's text with a stored copy (a comment edit is not a
+  schema change; a schema change can hide in equal bytes across engines).
+- **A8 (after review round 4, approved and built 2026-09-03): a raw table is
+  compared with its whole declaration; the review loader loads a batch or
+  nothing; the aggregate's declared scale is read like a review's; the confirm
+  gate says what it holds against; the database file and the label set are
+  derived from the input.** (a) `check_raw_declaration` reads name, type and
+  nullability by position, for the table and the scratch declaration alike,
+  from the schema the engine names (`warehouse.default_schema`); a nullability
+  drift refuses like a type — the case A4 (e)'s nullable `review_count`
+  opened, a driver `ConstraintException` out of `make rebuild` on a corpus
+  built before it; a table already sitting under the scratch name refuses
+  naming itself, not the corpus; a raw file is exactly one `create table if
+  not exists` statement, comments stripped, and only that statement runs for
+  the scratch. (b) `load_reviews` runs its batch in one transaction, as
+  `load_snapshots` has since A4 (a). (c) The Opinion Assurances parser reads
+  the aggregate scope's `worstRating` and `bestRating` and refuses an
+  aggregate declaring a scale other than the rating column's 0..5
+  (`AGGREGATE_SCALE`), the same kind of guard A6 gives each review scope
+  against its own 1..5 (`REVIEW_SCALE`); the frozen sample already carried 0
+  and 5. (d) The confirm stamp is created exclusively, owner-only, so a
+  planted file makes `confirm` refuse naming it; a `confirm` that is the last
+  goal refuses and leaves no stamp; the Threat model states the residual — a
+  same-user process writing `data/` while make runs — because the stamp is a
+  file and make has no channel between two recipes but a file. (e) `rebuild`
+  takes a root directory and the file is always `database_for(rows, root)`;
+  `load_snapshots` takes its input as a required argument. Rejected: comparing
+  in the order the catalog returns rows without reading `ordinal_position`
+  (unspecified on other engines; since round 5 the ordinal is read and sorted
+  on, never the row order); altering a column in place (rewrites history); a
+  nonce between the recipes (the channel is the same file); the process start
+  time via `ps` and an age check (both rejected in A4 (d)); a check that the
+  file's name is the input's (a spelling, not a derivation); a marker table
+  naming the input inside each file (a row no source produced, counted by the
+  idempotency check). Found by review round 4 (2026-09-03).
+- **A9 (after review round 5, approved and built 2026-09-03): the confirm gate
+  arms a gated goal or nothing, from make's own goal list; the declared-page
+  writer writes a batch or nothing; the `sample` label is the sample
+  declaration's row's.** (a) `confirm` arms only when the goal after it is
+  `reset` or `scrape` — a closed set, so `make confirm help` refuses and
+  leaves no stamp — and only from a goal list whose origin is make's own: the
+  recipe passes `$(origin MAKECMDGOALS)` and anything but `default` is
+  refused, since a `MAKECMDGOALS` definition from the environment
+  (`environment`), from `MAKEFLAGS` or from the command line (`command line`)
+  overrides the list make built (probed against GNU Make 3.81); `reset` and
+  `scrape` consume the stamp before their own refusals; a stamp create that
+  fails for any reason but "already there" refuses with one line. The exit
+  pass found two more edges: a parallel run (`make -j2 confirm reset` ran
+  `reset` before the stamp existed in 7 of 12 tries) is closed by
+  `.NOTPARALLEL:` with a `-j2` pin, and an environment that chooses what make
+  reads or runs (`MAKEFILES` with a `$(shell …)` planting the stamp, `PATH`)
+  is stated as a residual beside the same-user process (A8 (d)) — refusing
+  when `MAKEFILES` is set would only move that boundary one variable. A link
+  to nowhere planted at the stamp path is consumed by the next gated run
+  rather than wedging the gate. (b) `write_source_pages` runs its batch in one
+  transaction, as the two loaders do. (c) `attribution_labels` takes the input
+  and the row's profile: the literal `sample` is admitted under `samples` on a
+  row whose profile is the sample declaration's, and a real declaration may
+  not carry that profile. Rejected: dropping the goal-list check and widening
+  the residual (a leaked stamp becomes the ordinary case); a Makefile-side
+  `$(filter …)` (it runs on the same overridable variable); a denylist of
+  goals that may not follow `confirm`; keying the label on the row's `source`
+  (a sample row's source is the real platform's name, as an anchor's is);
+  dropping `rows_input` (the input still decides where a sample declaration
+  exists). Found by review round 5 (2026-09-03); built in place of a sixth
+  round, with one exit pass.

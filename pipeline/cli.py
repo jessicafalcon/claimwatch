@@ -5,29 +5,33 @@ passes each value UNEXPANDED and single-quoted via `$(call _Q,$(value VAR))`;
 this process is the guard. A bad value is one line on stderr and exit 2, never a
 traceback.
 
-CONFIRM counts only from the command line: Make passes `$(origin CONFIRM)` and
-this process requires it to be `command line` — an environment `CONFIRM=yes`
-does not confirm a destructive `reset` or a network `scrape`. The fetcher is
-imported only inside `scrape`, so a rebuild never loads `httpx`."""
+A destructive `reset` or a network `scrape` is confirmed by the `confirm` goal
+in the same make invocation (`make confirm reset`): the `confirm` recipe stamps
+its make process's id, the gated recipe passes its own, and `confirmed` says
+yes only when they are one process — a goal cannot arrive through MAKEFLAGS
+in the environment, where a variable's "command line" origin can (spec Phase
+3a, A4 (d)). The fetcher is imported only inside `scrape`, so a rebuild never
+loads `httpx`."""
 
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
-from ingest.app_store import FeedShapeError, has_pages
-from ingest.politeness import ALLOWED_HOSTS, MAX_PAGES
-from ingest.sources import SOURCES, by_name, source_names
-from pipeline.build import (
-    DEFAULT_CACHE,
-    FIXTURES,
-    capture_root,
-    idempotency_check,
-    rebuild,
-    reset,
-)
+from ingest import sources
+from ingest.captures import has_pages, parser_module
+from ingest.parsed import PageShapeError
+from ingest.politeness import MAX_PAGES
+from ingest.sources import SOURCES
+from pipeline.build import INPUTS, captures_for, idempotency_check, rebuild, reset
 from pipeline.metrics import reviews_per_month
-from pipeline.warehouse import TARGETS, connect, database_for
+from pipeline.warehouse import ROOT, TARGETS, connect, database_for
+
+# The one binding of the confirmation stamp: under the gitignored data/ root,
+# never tracked, written by `make confirm` and consumed by the next `reset` or
+# `scrape` of the same invocation.
+CONFIRM_STAMP = ROOT / "data" / ".confirm"
 
 
 class Refused(Exception):
@@ -45,10 +49,80 @@ def resolve_choice(value: str, allowed: tuple[str, ...], default: str) -> str:
     return value
 
 
-def confirmed(value: str, origin: str) -> bool:
-    """A destructive action is confirmed only by `CONFIRM=yes` on the command
-    line (its `$(origin)`)."""
-    return origin == "command line" and value == "yes"
+# The goals `confirm` may arm — a closed set; `make confirm <anything else>`
+# refuses and leaves no stamp (A9 (a)).
+GATED = ("reset", "scrape")
+
+
+def confirmed(make_pid: str) -> bool:
+    """A destructive or network action is confirmed only by the `confirm` goal
+    of the SAME make invocation: the stamp `make confirm` wrote names this
+    recipe's make process. The stamp is consumed either way, so a `confirm`
+    left over from an earlier invocation confirms nothing later (a different
+    process id). A gated target calls this as its first act, before its own
+    refusals, so no refusal on a gated path leaves the stamp armed (A9 (a))."""
+    try:
+        stamped = CONFIRM_STAMP.read_text(encoding="utf-8").strip()
+    except OSError:
+        stamped = None  # absent, unreadable, or a link to nowhere
+    try:
+        CONFIRM_STAMP.unlink()  # consumed whatever its state (exit pass)
+    except OSError:
+        pass
+    return stamped is not None and make_pid.isdigit() and stamped == make_pid
+
+
+def _do_confirm(args: argparse.Namespace) -> int:
+    """`make confirm`: stamp this invocation's make process id for the `reset`
+    or `scrape` goal that follows it in the same command. The goal after
+    `confirm` must be one of `GATED`, so `make confirm help` and a trailing
+    `confirm` refuse and leave no stamp — no ordinary command leaves an armed
+    stamp behind; the goal list is trusted only when its origin is make's own
+    (`$(origin MAKECMDGOALS)` is `default`): a list from the environment,
+    `MAKEFLAGS` or the command line is refused (A9 (a)). The stamp is created
+    exclusively with owner-only permissions, so a file already there —
+    planted, or left by a killed run — makes this recipe refuse naming it
+    rather than overwrite it (A8 (d)); a create that fails for any other
+    reason refuses with one line too. What the gate does not hold against —
+    an environment that chooses what make reads or runs (`MAKEFILES`, `PATH`),
+    a same-user process writing `data/` while make runs — the Threat model
+    states."""
+    if not args.make_pid.isdigit():
+        raise Refused("refusing: --make-pid is not a process id")
+    if args.goals_origin != "default":
+        raise Refused(
+            "refusing: the goal list did not come from make itself (origin "
+            f"{args.goals_origin!r}, not 'default'); a MAKECMDGOALS definition "
+            "from the environment, MAKEFLAGS or the command line confirms nothing"
+        )
+    goals = args.goals.split()
+    following = goals[goals.index("confirm") + 1 :] if "confirm" in goals else []
+    if not following or following[0] not in GATED:
+        after = f"`{following[0]}` follows" if following else "nothing follows"
+        raise Refused(
+            f"refusing: `confirm` arms {' or '.join(f'`{g}`' for g in GATED)} and "
+            f"nothing else; {after} (`make confirm reset`, `make confirm scrape`)"
+        )
+    try:
+        CONFIRM_STAMP.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(CONFIRM_STAMP, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError as exc:
+        raise Refused(
+            f"refusing: a confirmation stamp already exists at {CONFIRM_STAMP}; it "
+            "is not this invocation's — remove it and run the command again"
+        ) from exc
+    except OSError as exc:
+        raise Refused(
+            f"refusing: cannot write the confirmation stamp at {CONFIRM_STAMP}: "
+            f"{exc.strerror}"
+        ) from exc
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(args.make_pid + "\n")
+    print(
+        "confirm: armed for this make invocation — `reset` or `scrape` must follow "
+        "in the same command (`make confirm reset`, `make confirm scrape`)"
+    )
+    return 0
 
 
 def _prompt(question: str, refusal: str) -> bool:
@@ -62,49 +136,62 @@ def _prompt(question: str, refusal: str) -> bool:
 
 def _do_rebuild(args: argparse.Namespace) -> int:
     target = resolve_choice(args.target, TARGETS, "duckdb")
-    fixture = resolve_choice(args.fixture, FIXTURES, "cache")
-    root = capture_root(fixture)
-    if fixture == "cache" and not (root and has_pages(root)):
-        shown = DEFAULT_CACHE.relative_to(DEFAULT_CACHE.parents[2])
+    rows = resolve_choice(args.rows, INPUTS, "captured")
+    if rows == "captured" and not any(
+        has_pages(root, parser_module(src.parser).EXTENSION)
+        for src, root, _ in captures_for(rows)
+        if src.parser is not None
+    ):
+        shown = sources.CACHE_ROOT.relative_to(sources.CACHE_ROOT.parents[1])
         print(
             f"no captures under {shown} — nothing to load from the scraper; "
-            "`make scrape CONFIRM=yes` fetches them (developer-run)"
+            "`make confirm scrape` fetches them (developer-run)"
         )
-    db = database_for(fixture)  # one file per input; a fixture never touches the corpus
-    for name, n in rebuild(target, fixture, database=db).items():
+    for name, n in rebuild(target, rows).items():  # the file is the input's own
         print(f"{name:24} {n}")
-    conn = connect(target, database=db)
+    conn = connect(target, database=database_for(rows))
     try:
-        rows = reviews_per_month(conn)
+        months = reviews_per_month(conn)
     finally:
         conn.close()
     print("reviews per month (stg_reviews, by the review's own date):")
-    for source, month, n in rows:
-        print(f"  {source:14} {month}  {n}")
-    if not rows:
+    width = max((len(source) for source, _, _ in months), default=0)
+    for source, month, n in months:
+        print(f"  {source:{width}} {month}  {n}")
+    if not months:
         print("  (none)")
     return 0
 
 
 def _do_scrape(args: argparse.Namespace) -> int:
     """Developer-run, network: fetch each chosen source into a new capture.
-    SOURCE is a closed set of declared names (empty -> all of them); CONFIRM
-    gates like `reset`, so an agent's non-interactive call refuses."""
-    names = source_names()
-    chosen = (
-        [by_name(resolve_choice(args.source, names, ""))]
-        if args.source
-        else list(SOURCES)
-    )
+    SOURCE is a closed set of declared names; empty means every source whose
+    site lets us fetch it — a source declared not fetchable is then skipped
+    with one line, not refused, so a plain run's exit code speaks only of
+    refusals met during the run (a robots rule, a status, a page shape).
+    Naming such a source with SOURCE= asks for it on purpose: that is a
+    refusal, exit 2. The `confirm` goal gates it like `reset`, so an agent's
+    non-interactive call refuses."""
+    armed = confirmed(args.make_pid)  # consumed first, before any refusal (A9)
+    names = tuple(s.name for s in SOURCES)
+    if args.source:
+        wanted = resolve_choice(args.source, names, "")
+        chosen = [s for s in SOURCES if s.name == wanted]
+    else:
+        chosen = [s for s in SOURCES if s.fetchable]
+        for s in SOURCES:
+            if not s.fetchable:
+                print(f"scrape: {s.name}: skipped — declared not fetchable: {s.terms}")
     if not chosen:
-        raise Refused("refusing: no source is declared in ingest/sources.py")
-    if not confirmed(args.confirm, args.confirm_origin):
+        raise Refused("refusing: no fetchable source is declared in ingest/sources.py")
+    if not armed:
         listed = ", ".join(s.name for s in chosen)
+        hosts = ", ".join(sorted({s.host for s in chosen if s.fetchable})) or "no host"
         ok = _prompt(
-            f"Fetch robots.txt + up to {MAX_PAGES} feed pages from {ALLOWED_HOSTS[0]} "
+            f"Fetch robots.txt + up to {MAX_PAGES} pages per source from {hosts} "
             f"for {listed}, >= 2 s apart? [y/N] ",
-            "scrape: refusing — pass CONFIRM=yes on the command line "
-            "(an environment CONFIRM=yes does not count); nothing fetched",
+            "scrape: refusing — run `make confirm scrape` (the confirm goal in the "
+            "same invocation; no variable and no environment counts); nothing fetched",
         )
         if not ok:
             return 2
@@ -116,7 +203,7 @@ def _do_scrape(args: argparse.Namespace) -> int:
     try:
         for source in chosen:  # one source's refusal is its own line; the run goes on
             try:
-                capture_dir, pages = scrape(source, DEFAULT_CACHE, client=polite)
+                capture_dir, pages = scrape(source, sources.CACHE_ROOT, client=polite)
             except FetchRefused as exc:
                 print(str(exc), file=sys.stderr)
                 refused += 1
@@ -129,8 +216,8 @@ def _do_scrape(args: argparse.Namespace) -> int:
 
 def _do_idempotency(args: argparse.Namespace) -> int:
     target = resolve_choice(args.target, TARGETS, "duckdb")
-    fixture = resolve_choice(args.fixture, FIXTURES, "synthetic")
-    ok, first, second = idempotency_check(target, fixture)
+    rows = resolve_choice(args.rows, INPUTS, "synthetic")
+    ok, first, second = idempotency_check(target, rows)
     for name in sorted(set(first) | set(second)):
         a, b = first.get(name), second.get(name)
         flag = "" if a == b else "  <- CHANGED"
@@ -145,13 +232,15 @@ def _do_idempotency(args: argparse.Namespace) -> int:
 def _do_reset(args: argparse.Namespace) -> int:
     # reset handles only the DuckDB file; TARGET=snowflake is refused with one
     # line here, not a traceback from reset() downstream.
+    armed = confirmed(args.make_pid)  # consumed first, before any refusal (A9)
     target = resolve_choice(args.target, ("duckdb",), "duckdb")
-    if not confirmed(args.confirm, args.confirm_origin):
+    if not armed:
         ok = _prompt(
-            "Drop every DuckDB file (the corpus and one per fixture)? "
+            "Drop every DuckDB file this repo built (the corpus and one per "
+            "rebuild input, past or present)? "
             "This deletes data. [y/N] ",
-            "reset: refusing — pass CONFIRM=yes on the command line "
-            "(an environment CONFIRM=yes does not count)",
+            "reset: refusing — run `make confirm reset` (the confirm goal in the "
+            "same invocation; no variable and no environment counts)",
         )
         if not ok:
             print("reset: not confirmed; nothing deleted")
@@ -167,20 +256,23 @@ def main(argv: list[str] | None = None) -> int:
     for name in ("rebuild", "idempotency-check"):
         p = sub.add_parser(name, add_help=False)
         p.add_argument("--target", default="")
-        p.add_argument("--fixture", default="")
+        p.add_argument("--rows", default="")
+    p = sub.add_parser("confirm", add_help=False)
+    p.add_argument("--make-pid", dest="make_pid", default="")
+    p.add_argument("--goals", default="")  # make's own goal list, in order
+    p.add_argument("--goals-origin", dest="goals_origin", default="")  # $(origin)
     p = sub.add_parser("reset", add_help=False)
     p.add_argument("--target", default="")
-    p.add_argument("--confirm", default="")
-    p.add_argument("--confirm-origin", dest="confirm_origin", default="undefined")
+    p.add_argument("--make-pid", dest="make_pid", default="")
     p = sub.add_parser("scrape", add_help=False)
     p.add_argument("--source", default="")
-    p.add_argument("--confirm", default="")
-    p.add_argument("--confirm-origin", dest="confirm_origin", default="undefined")
+    p.add_argument("--make-pid", dest="make_pid", default="")
 
     args = ap.parse_args(argv)
     dispatch = {
         "rebuild": _do_rebuild,
         "idempotency-check": _do_idempotency,
+        "confirm": _do_confirm,
         "reset": _do_reset,
         "scrape": _do_scrape,
     }
@@ -189,7 +281,7 @@ def main(argv: list[str] | None = None) -> int:
     except Refused as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    except FeedShapeError as exc:
+    except PageShapeError as exc:
         # A stored capture that is not the declared shape (hand-edited, or a
         # parser tightened since it was written): one line, never a traceback.
         print(f"refusing: {exc}", file=sys.stderr)

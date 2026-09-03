@@ -1,5 +1,6 @@
-"""Session-wide guards: the make user-variables (SPEC, BASE, TARGET, FIXTURE,
-CONFIRM, SOURCE) and MAKEFLAGS are scrubbed so the Makefile-invoking tests
+"""Session-wide guards: the make user-variables (SPEC, BASE, TARGET, ROWS,
+SOURCE, and CONFIRM, a name the Makefile no longer reads) and MAKEFLAGS are
+scrubbed so the Makefile-invoking tests
 (tests/test_makefile.py) see a clean environment; UV_OFFLINE=1 is set so a test
 that spawns `uv run` (the gate, `make test`) can never resolve or download; and
 every socket connection in the process raises (Phase 2, invariant 6), so a test
@@ -13,6 +14,8 @@ from collections.abc import Iterator
 
 import pytest
 
+from pipeline.warehouse import database_for
+
 
 def _blocked(*_args, **_kwargs):
     raise RuntimeError("network blocked: the test suite opens no socket")
@@ -24,7 +27,7 @@ def _scrub_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
         "SPEC",
         "BASE",
         "TARGET",
-        "FIXTURE",
+        "ROWS",
         "CONFIRM",
         "SOURCE",
         "MAKEFLAGS",
@@ -50,8 +53,8 @@ def synthetic_conn(tmp_path):
     from pipeline.build import rebuild
     from pipeline.warehouse import connect
 
-    db = tmp_path / "warehouse.duckdb"
-    rebuild("duckdb", "synthetic", database=db, run_id="test")
+    db = database_for("synthetic", tmp_path)
+    rebuild("duckdb", "synthetic", root=tmp_path, run_id="test")
     conn = connect("duckdb", database=db)
     try:
         yield conn

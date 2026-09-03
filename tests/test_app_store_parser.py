@@ -1,6 +1,6 @@
 """The strict parser (spec Phase 2, invariants 1, 2 and 7; done-when 2 and 6).
 Every negative case is built in memory by mutating the frozen sample — no
-malformed page is committed. A refusal is a `FeedShapeError` that names the
+malformed page is committed. A refusal is a `PageShapeError` that names the
 page, the item and the field; nothing is guessed or defaulted."""
 
 from __future__ import annotations
@@ -11,7 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from ingest.app_store import SOURCE, FeedShapeError, parse_page
+from ingest.app_store import SOURCE, parse_page
+from ingest.parsed import PageShapeError
 from tests import pins
 
 SAMPLE = Path(__file__).resolve().parent.parent / "fixtures" / "app-store"
@@ -35,7 +36,7 @@ def _page(n: int = 1) -> dict:
 
 
 def _parse(doc: dict) -> list[dict]:
-    return parse_page(json.dumps(doc), PAGE_URL, CAPTURED)
+    return parse_page(json.dumps(doc), PAGE_URL, CAPTURED, SOURCE)
 
 
 def _mutated(mutate) -> dict:
@@ -66,13 +67,13 @@ def test_missing_required_field_refuses_the_page(field):
     def drop(item):
         del item[field]
 
-    with pytest.raises(FeedShapeError, match=f"'{field}' is missing"):
+    with pytest.raises(PageShapeError, match=f"'{field}' is missing"):
         _parse(_mutated(drop))
 
     def drop_label(item):
         del item[field]["label"]
 
-    with pytest.raises(FeedShapeError, match=f"'{field}' has no 'label'"):
+    with pytest.raises(PageShapeError, match=f"'{field}' has no 'label'"):
         _parse(_mutated(drop_label))
 
 
@@ -90,7 +91,7 @@ def test_mistyped_field_refuses_the_page(field, bad):
     def retype(item):
         item[field]["label"] = bad
 
-    with pytest.raises(FeedShapeError, match=f"'{field}' is .*not a string"):
+    with pytest.raises(PageShapeError, match=f"'{field}' is .*not a string"):
         _parse(_mutated(retype))
 
 
@@ -99,7 +100,7 @@ def test_rating_outside_1_to_5_is_refused(label):
     def set_rating(item):
         item["im:rating"]["label"] = label
 
-    with pytest.raises(FeedShapeError, match="'im:rating'"):
+    with pytest.raises(PageShapeError, match="'im:rating'"):
         _parse(_mutated(set_rating))
 
 
@@ -111,7 +112,7 @@ def test_non_digit_item_id_is_refused(label):
     def set_id(item):
         item["id"]["label"] = label
 
-    with pytest.raises(FeedShapeError, match="'id'"):
+    with pytest.raises(PageShapeError, match="'id'"):
         _parse(_mutated(set_id))
 
 
@@ -131,7 +132,7 @@ def test_malformed_timestamp_is_refused(label):
     def set_updated(item):
         item["updated"]["label"] = label
 
-    with pytest.raises(FeedShapeError, match="'updated'"):
+    with pytest.raises(PageShapeError, match="'updated'"):
         _parse(_mutated(set_updated))
 
 
@@ -150,7 +151,7 @@ def test_refusal_names_page_item_and_field():
     def drop(item):
         del item["im:rating"]
 
-    with pytest.raises(FeedShapeError) as exc:
+    with pytest.raises(PageShapeError) as exc:
         _parse(_mutated(drop))
     message = str(exc.value)
     assert PAGE_URL in message
@@ -159,11 +160,11 @@ def test_refusal_names_page_item_and_field():
 
 
 def test_non_json_and_missing_feed_are_refused():
-    with pytest.raises(FeedShapeError, match="is not JSON"):
-        parse_page(b"<html>blocked</html>", PAGE_URL, CAPTURED)
-    with pytest.raises(FeedShapeError, match="'feed' is missing"):
-        parse_page(json.dumps({"rss": {}}), PAGE_URL, CAPTURED)
-    with pytest.raises(FeedShapeError, match="'entry' is dict, not a list"):
+    with pytest.raises(PageShapeError, match="is not JSON"):
+        parse_page(b"<html>blocked</html>", PAGE_URL, CAPTURED, SOURCE)
+    with pytest.raises(PageShapeError, match="'feed' is missing"):
+        parse_page(json.dumps({"rss": {}}), PAGE_URL, CAPTURED, SOURCE)
+    with pytest.raises(PageShapeError, match="'entry' is dict, not a list"):
         doc = _page(1)
         doc["feed"]["entry"] = doc["feed"]["entry"][0]
         _parse(doc)
@@ -196,3 +197,11 @@ def test_sample_is_obviously_fake_and_nameless():
     assert "id=0/" in PAGE_URL
     ids = [row["external_id"] for row in _parse(_page(2))]
     assert pins.APP_STORE_SAMPLE_DUPLICATE_ID in ids
+
+
+def test_a_body_nested_past_the_stack_is_refused_not_a_traceback():
+    """`json.loads` raises `RecursionError` on nesting past the interpreter's
+    stack; that is the page outside the shape and refuses in one line, the
+    same as malformed text (round 3, security-reviewer #3)."""
+    with pytest.raises(PageShapeError, match="'<body>'"):
+        parse_page("[" * 100_000, PAGE_URL, CAPTURED, SOURCE)

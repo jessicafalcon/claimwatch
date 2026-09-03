@@ -57,6 +57,7 @@ agent.
 
 ```
 make rebuild FIXTURE=app-store && make idempotency-check FIXTURE=app-store
+# as run then; FIXTURE became ROWS in Phase 3a: make rebuild ROWS=samples && make idempotency-check ROWS=samples
 ```
 
 Amended 2026-09-02 (fix amendment A1, approved). It was `make rebuild && make

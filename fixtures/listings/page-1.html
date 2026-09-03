@@ -1,0 +1,16 @@
+<!doctype html>
+<!-- hand-written fixture: a FICTIONAL store listing page in the shape the
+     listing parser declares (one schema.org JSON-LD block carrying an
+     aggregateRating). No real app, developer or reviewer appears here. -->
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Exemple d'application (fixture fictive)</title>
+<script type="application/ld+json">{"@context": "https://schema.org", "@type": "SoftwareApplication", "name": "Exemple d'application (fixture fictive)", "url": "https://play.google.com/store/apps/details?id=example.fictional.app&hl=fr", "description": "EXEMPLE FICTIF. Une application inventee pour le test.", "operatingSystem": "ANDROID", "applicationCategory": "MEDICAL", "author": {"@type": "Person", "name": "developer-placeholder", "url": "https://example.invalid/"}, "aggregateRating": {"@type": "AggregateRating", "ratingValue": "4.123456789", "ratingCount": "1234"}, "offers": [{"@type": "Offer", "price": "0", "priceCurrency": "EUR"}]}</script>
+</head>
+<body>
+<h1>Exemple d'application (fixture fictive)</h1>
+<p>EXEMPLE FICTIF. Cette page est une fixture ecrite a la main.</p>
+<div class="review"><span class="author">reviewer-placeholder</span> <span class="rating">5</span> EXEMPLE FICTIF. Un avis invente, jamais lu par le parseur.</div>
+</body>
+</html>

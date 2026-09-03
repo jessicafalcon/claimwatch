@@ -20,16 +20,24 @@ TARGETS = ("duckdb", "snowflake")
 # The working warehouse lives under data/ (gitignored; `.gitignore` covers
 # `*.duckdb`). Callers pass `database=":memory:"` or a temp path in tests.
 DEFAULT_DB = ROOT / "data" / "friction_ledger.duckdb"
+# The engine's own error, named here so no other module spells the driver's
+# to catch it (round 5, security-reviewer #4).
+DriverError = duckdb.Error
 
 
-def database_for(fixture: str) -> Path:
-    """One file per rebuild input (spec Phase 2, fix amendment A2): the real
-    corpus (`cache`) is `friction_ledger.duckdb`; every other input builds
-    `friction_ledger.<input>.duckdb` beside it, so a fixture's rows can never
-    land in the real database and the counts a rebuild prints are its own."""
-    if fixture == "cache":
-        return DEFAULT_DB
-    return DEFAULT_DB.with_name(f"{DEFAULT_DB.stem}.{fixture}{DEFAULT_DB.suffix}")
+def database_for(rows: str, root: str | Path | None = None) -> Path:
+    """One file per rebuild input (spec Phase 2, fix amendment A2; named by
+    `ROWS` since Phase 3a): the real corpus (`captured`) is
+    `friction_ledger.duckdb`; every other input builds
+    `friction_ledger.<input>.duckdb` beside it, so a sample's rows can never
+    land in the real database and the counts a rebuild prints are its own.
+    `root` is the directory the files live in (data/ by default; a temp dir
+    in tests): a caller chooses where, never which file an input lands in
+    (A8 (e))."""
+    base = DEFAULT_DB if root is None else Path(root) / DEFAULT_DB.name
+    if rows == "captured":
+        return base
+    return base.with_name(f"{base.stem}.{rows}{base.suffix}")
 
 
 def connect(target: str = "duckdb", *, database: str | Path | None = None):
@@ -56,3 +64,12 @@ def run_sql_file(conn, path: str | Path) -> None:
     comment names the grain, the provenance columns and the BACKING rows it
     feeds (CLAUDE.md -> Conventions)."""
     conn.execute(Path(path).read_text(encoding="utf-8"))
+
+
+def default_schema(conn) -> str:
+    """The schema an unqualified table name resolves to on `conn`, read from
+    the engine itself (`main` on DuckDB, the session schema on Snowflake), so
+    no other module spells an engine's schema name — a `'main'` literal
+    outside this file lists nothing on Snowflake and `idempotency-check`
+    would diff two empty maps and say OK (round 4, code-reviewer #3)."""
+    return conn.execute("select current_schema()").fetchone()[0]

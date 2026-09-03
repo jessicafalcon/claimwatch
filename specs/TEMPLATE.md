@@ -99,9 +99,11 @@ the list is a WARN. A row that applies to no file is written WITHOUT backticks
 For each such target: behaviour and the test pinning it for an **empty value**,
 a **path-escaping value** (`../x`), a **shell-metacharacter value** (`"; `), the
 **variable exported from the environment** instead of the command line, and
-for any confirmation knob, **`$(origin)` gating** (`CONFIRM=yes` counts only
-from the command line). For a paid-API or network target: what it costs or
-fetches if run twice, and what it does with no credentials.
+for any confirmation, **goal gating** (`make confirm <target>`: the `confirm`
+goal of the same invocation, never a variable — `$(origin)` reports `command
+line` for a `MAKEFLAGS` definition; Phase 3a, A4 (d)). For a paid-API or
+network target: what it costs or fetches if run twice, and what it does with
+no credentials.
 
 Settled shape: one Python process validates the value, derives every path from
 it, prompts on a tty, then acts; every recipe is one line; every user variable

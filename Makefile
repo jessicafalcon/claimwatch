@@ -4,19 +4,37 @@
 # classify-eval (5); model (8); study (9).
 
 .PHONY: help setup test lint check-docs check-backing review-gate \
-        rebuild idempotency-check reset scrape
+        rebuild idempotency-check confirm reset scrape
 
 # User variables reach recipes ONLY as make values via `$(call _Q,$(value VAR))`
 # — UNEXPANDED and single-quoted — so a value like `SPEC='$(shell …)'` or
 # `"; rm x; "` from EITHER origin reaches Python as one literal argument and no
 # shell or make function runs on it; Python validates. `unexport` is hygiene
 # only (keeps the value out of the child's environment) — an environment-set
-# variable still reaches the recipe. The only way to tell command line from
-# environment is `$(origin VAR)`; the destructive `reset` passes
-# `$(origin CONFIRM)` to Python, which confirms only on `command line`; the
-# network `scrape` is gated the same way (developer-run, never by an agent)
-# (specs/TEMPLATE.md → Threat model; pinned by tests/test_makefile.py).
-unexport SPEC BASE TARGET FIXTURE CONFIRM SOURCE
+# variable still reaches the recipe. No variable can prove a command line:
+# `$(origin VAR)` reports `command line` for a definition that arrived through
+# MAKEFLAGS in the environment. A GOAL can — MAKEFLAGS carries flags and
+# definitions, never goals — so the destructive `reset` and the network
+# `scrape` are confirmed by the `confirm` goal in the SAME invocation:
+# `make confirm reset`. The `confirm` recipe stamps its make process's id
+# (`$$PPID`, the recipe shell's parent); `reset`/`scrape` pass their own and
+# Python confirms only when the two are one process, consuming the stamp
+# (spec Phase 3a, A4 (d); pinned by tests/test_makefile.py). The stamp is
+# created exclusively, so a planted file makes `confirm` itself refuse
+# (A8 (d)); `confirm` arms only when the goal after it is `reset` or
+# `scrape`, and only from a goal list whose origin is make's own
+# (`$(origin MAKECMDGOALS)` is `default` — a definition from the environment,
+# MAKEFLAGS or the command line is refused), so no ordinary command leaves an
+# armed stamp behind (A9 (a); goals run in order under -j, .NOTPARALLEL
+# below). What the gate holds against is a variable definition, an
+# environment value, MAKEFLAGS, a stale invocation and a typo; not an
+# environment that chooses what make reads or runs (MAKEFILES, PATH), not a
+# same-user process writing data/ while make runs — the spec's Threat model
+# states both.
+# Goals run in order even under -j: `reset` must not start before `confirm`
+# has stamped (exit pass, security-reviewer #1; pinned by a -j2 probe).
+.NOTPARALLEL:
+unexport SPEC BASE TARGET ROWS SOURCE
 _Q = '$(subst ','\'',$(1))'
 
 help: ## list the targets
@@ -41,14 +59,17 @@ check-backing: ## BACKING rows ↔ sql/marts files ↔ tags ↔ sources ↔ SPEC
 review-gate: ## offline gate [SPEC=specs/<f>.md] [BASE=main]; /review-round runs it first
 	uv run python scripts/review_gate.py $(if $(value SPEC),--spec=$(call _Q,$(value SPEC)),) --base=$(call _Q,$(if $(value BASE),$(value BASE),main))
 
-rebuild: ## build the warehouse from raw [TARGET=duckdb] [FIXTURE=cache|empty|synthetic|app-store]
-	uv run python -m pipeline rebuild --target=$(call _Q,$(value TARGET)) --fixture=$(call _Q,$(value FIXTURE))
+rebuild: ## build the warehouse from raw [TARGET=duckdb] [ROWS=captured|none|synthetic|samples]
+	uv run python -m pipeline rebuild --target=$(call _Q,$(value TARGET)) --rows=$(call _Q,$(value ROWS))
 
-idempotency-check: ## rebuild twice, diff per-table row counts (run-twice property)
-	uv run python -m pipeline idempotency-check --target=$(call _Q,$(value TARGET)) --fixture=$(call _Q,$(value FIXTURE))
+idempotency-check: ## rebuild twice, diff per-table row counts (run-twice property) [ROWS=synthetic]
+	uv run python -m pipeline idempotency-check --target=$(call _Q,$(value TARGET)) --rows=$(call _Q,$(value ROWS))
 
-reset: ## DESTRUCTIVE drop every DuckDB file (the corpus and one per fixture) — needs CONFIRM=yes on the command line
-	uv run python -m pipeline reset --target=$(call _Q,$(value TARGET)) --confirm=$(call _Q,$(value CONFIRM)) --confirm-origin=$(call _Q,$(origin CONFIRM))
+confirm: ## arm reset or scrape for THIS invocation only: `make confirm reset`, `make confirm scrape`
+	@uv run python -m pipeline confirm --make-pid=$$PPID --goals=$(call _Q,$(MAKECMDGOALS)) --goals-origin=$(call _Q,$(origin MAKECMDGOALS))
 
-scrape: ## NETWORK fetch the declared source(s) into data/cache [SOURCE=<name>] — needs CONFIRM=yes on the command line; developer-run
-	uv run python -m pipeline scrape --source=$(call _Q,$(value SOURCE)) --confirm=$(call _Q,$(value CONFIRM)) --confirm-origin=$(call _Q,$(origin CONFIRM))
+reset: ## DESTRUCTIVE drop every DuckDB file this repo built (the corpus and one per rebuild input, past or present) — needs `make confirm reset`
+	uv run python -m pipeline reset --target=$(call _Q,$(value TARGET)) --make-pid=$$PPID
+
+scrape: ## NETWORK fetch the declared source(s) into data/cache [SOURCE=<name>] — needs `make confirm scrape`; developer-run
+	uv run python -m pipeline scrape --source=$(call _Q,$(value SOURCE)) --make-pid=$$PPID

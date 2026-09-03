@@ -15,8 +15,8 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from review_common import make_targets  # noqa: E402
 
-from pipeline.build import FIXTURES  # noqa: E402
-from pipeline.cli import Refused, confirmed, resolve_choice  # noqa: E402
+from pipeline.build import INPUTS  # noqa: E402
+from pipeline.cli import CONFIRM_STAMP, Refused, confirmed, resolve_choice  # noqa: E402
 from pipeline.warehouse import TARGETS  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -24,7 +24,7 @@ SCRUB = (
     "SPEC",
     "BASE",
     "TARGET",
-    "FIXTURE",
+    "ROWS",
     "CONFIRM",
     "SOURCE",
     "MAKEFLAGS",
@@ -118,40 +118,41 @@ def test_make_targets_ignores_variable_assignments(tmp_path: Path):
 
 
 def test_rebuild_variables_are_a_closed_set():
-    """TARGET/FIXTURE validate against a closed set; a value is never a path, so
+    """TARGET/ROWS validate against a closed set; a value is never a path, so
     `../x` or a metacharacter is just a name not in the set."""
     assert resolve_choice("", TARGETS, "duckdb") == "duckdb"  # empty -> default
     assert resolve_choice("duckdb", TARGETS, "duckdb") == "duckdb"
-    # Phase 2: the closed set of rebuild inputs; `make rebuild` defaults to the
-    # scraper's captures (`cache`), the offline proof is `app-store`.
-    assert FIXTURES == ("cache", "empty", "synthetic", "app-store")
-    assert resolve_choice("", FIXTURES, "cache") == "cache"
-    assert resolve_choice("synthetic", FIXTURES, "cache") == "synthetic"
-    assert resolve_choice("app-store", FIXTURES, "cache") == "app-store"
-    assert resolve_choice("empty", FIXTURES, "cache") == "empty"
+    # Phase 3a: the closed set of rebuild inputs, named by what they are;
+    # `make rebuild` defaults to the scraper's captures, CI runs the samples.
+    assert INPUTS == ("captured", "none", "synthetic", "samples")
+    assert resolve_choice("", INPUTS, "captured") == "captured"
+    assert resolve_choice("synthetic", INPUTS, "captured") == "synthetic"
+    assert resolve_choice("samples", INPUTS, "captured") == "samples"
+    assert resolve_choice("none", INPUTS, "captured") == "none"
+    for old in ("cache", "empty", "app-store"):  # Phase 2's names are gone
+        with pytest.raises(Refused):
+            resolve_choice(old, INPUTS, "captured")
     for bad in BAD_VALUES:
         with pytest.raises(Refused):
             resolve_choice(bad, TARGETS, "duckdb")
 
 
 def test_idempotency_check_variables_are_a_closed_set():
-    assert resolve_choice("", FIXTURES, "synthetic") == "synthetic"  # its default
-    assert resolve_choice("empty", FIXTURES, "synthetic") == "empty"
+    assert resolve_choice("", INPUTS, "synthetic") == "synthetic"  # its default
+    assert resolve_choice("none", INPUTS, "synthetic") == "none"
     for bad in BAD_VALUES:
         with pytest.raises(Refused):
-            resolve_choice(bad, FIXTURES, "synthetic")
+            resolve_choice(bad, INPUTS, "synthetic")
 
 
-def test_fixture_outside_the_set_is_refused():
+def test_rows_outside_the_set_is_refused():
     for bad in ("../x", "prod", '"; rm -rf', "SYNTHETIC", "fixtures/app-store"):
         with pytest.raises(Refused):
-            resolve_choice(bad, FIXTURES, "empty")
+            resolve_choice(bad, INPUTS, "none")
 
 
 @pytest.mark.parametrize("target", ["rebuild", "idempotency-check"])
-@pytest.mark.parametrize(
-    "var, flag", [("TARGET", "--target"), ("FIXTURE", "--fixture")]
-)
+@pytest.mark.parametrize("var, flag", [("TARGET", "--target"), ("ROWS", "--rows")])
 def test_pipeline_variables_reach_python_as_one_literal(target, var, flag):
     """Whatever the origin, the recipe carries the UNEXPANDED value as one
     single-quoted token — no shell, no make function runs."""
@@ -167,19 +168,125 @@ def test_pipeline_variables_reach_python_as_one_literal(target, var, flag):
         assert "pwned" not in out.replace(value, "")
 
 
-def test_reset_requires_command_line_confirm():
-    """`confirmed` gates on the value AND its origin; the recipe passes the true
-    `$(origin CONFIRM)`, so an environment CONFIRM=yes cannot pose as one from
-    the command line."""
-    assert confirmed("yes", "command line") is True
-    assert confirmed("yes", "environment") is False
-    assert confirmed("", "command line") is False
-    assert confirmed("no", "command line") is False
-    from_cmdline = _make_n("reset", {"CONFIRM": "yes"}, {})
-    assert "--confirm='yes'" in from_cmdline
-    assert "--confirm-origin='command line'" in from_cmdline
-    from_env = _make_n("reset", {}, {"CONFIRM": "yes"})
-    assert "--confirm-origin='environment'" in from_env
+def test_reset_and_scrape_take_the_make_pid_not_a_confirm_variable():
+    """A4 (d): the gated recipes pass their make process's id (`$$PPID`, the
+    recipe shell's parent) and no CONFIRM value of any origin — the variable
+    is gone from the recipes, so nothing an environment defines reaches the
+    gate."""
+    for target in ("reset", "scrape"):
+        for origin in ("cmdline", "env"):
+            out = _make_n(
+                target,
+                {"CONFIRM": "yes"} if origin == "cmdline" else {},
+                {"CONFIRM": "yes"} if origin == "env" else {},
+            )
+            assert "--make-pid=$PPID" in out, (target, origin, out)
+            assert "--confirm" not in out and "yes" not in out, (target, origin, out)
+    out = _make_n("confirm", {}, {})
+    assert "--make-pid=$PPID" in out and "--goals='confirm'" in out  # A8 (d)
+    assert "--goals-origin='default'" in out  # A9 (a): make's own list, by origin
+
+
+PROBE = (
+    "include Makefile\n"
+    # `reset` re-defined as a probe (make warns "overriding commands" and uses
+    # this one): a gated goal that asks `confirmed` with its own make process
+    # id and deletes nothing — `confirm` arms `reset` or `scrape` alone (A9).
+    "reset:\n"
+    '\t@uv run python -c "import sys; from pipeline.cli import confirmed; '
+    "sys.exit(0 if confirmed('$$PPID') else 3)\"\n"
+)
+
+
+def _probe(goals: list[str], env: dict[str, str]) -> int:
+    """Run the real Makefile plus a `reset` goal redefined as a probe that
+    asks `confirmed` with its own make process id: 0 when the invocation was
+    confirmed, otherwise make's 2 (the recipe exits 3 and make reports a
+    failed goal as 2)."""
+    res = subprocess.run(
+        ["make", "-s", "-f", "-", *goals],
+        cwd=ROOT,
+        input=PROBE,
+        capture_output=True,
+        text=True,
+        env=_env(env),
+    )
+    return res.returncode
+
+
+def test_confirm_is_a_goal_of_the_same_invocation():
+    """A4 (d): `make confirm <target>` confirms; the target alone, the goals in
+    the other order, a CONFIRM variable from any origin, MAKEFLAGS carrying
+    `CONFIRM=yes` or the word `confirm`, MAKECMDGOALS from the environment,
+    and a stamp left by an earlier invocation each confirm nothing — a goal
+    cannot arrive through the environment, and the stamp names one process
+    (round 3, security-reviewer #1)."""
+    from pipeline.warehouse import DEFAULT_DB
+
+    existed = DEFAULT_DB.exists()  # the probe's `reset` deletes nothing (A9)
+    try:
+        assert _probe(["confirm", "reset"], {}) == 0
+        assert not CONFIRM_STAMP.exists()  # consumed
+        assert DEFAULT_DB.exists() == existed  # the override took: no delete
+        assert _probe(["reset"], {}) == 2
+        assert _probe(["reset", "confirm"], {}) == 2  # reset runs first: no stamp yet
+        assert _probe(["reset", "CONFIRM=yes"], {}) == 2
+        assert _probe(["reset"], {"CONFIRM": "yes"}) == 2
+        assert _probe(["reset"], {"MAKEFLAGS": "CONFIRM=yes"}) == 2
+        assert _probe(["reset"], {"MAKEFLAGS": "confirm"}) == 2
+        assert _probe(["reset"], {"MAKECMDGOALS": "confirm"}) == 2
+        # A8 (d): a confirm with nothing after it refuses and leaves no stamp,
+        # so no armed stamp outlives its invocation.
+        assert _probe(["confirm"], {}) == 2
+        assert not CONFIRM_STAMP.exists()
+        assert _probe(["reset", "confirm"], {}) == 2  # confirm last: refused too
+        assert not CONFIRM_STAMP.exists()
+        # A stale stamp (an earlier invocation's process id) confirms nothing
+        # and is consumed; a planted stamp makes `confirm` itself refuse.
+        CONFIRM_STAMP.write_text("99999\n", encoding="utf-8")
+        assert _probe(["reset"], {}) == 2  # another process: not this one
+        assert not CONFIRM_STAMP.exists()  # and the stale stamp is gone
+        CONFIRM_STAMP.write_text("99999\n", encoding="utf-8")
+        assert _probe(["confirm", "reset"], {}) == 2  # confirm refuses: file there
+        assert CONFIRM_STAMP.read_text(encoding="utf-8") == "99999\n"  # untouched
+    finally:
+        CONFIRM_STAMP.unlink(missing_ok=True)
+
+
+def test_a_parallel_run_still_stamps_before_the_gated_goal_runs():
+    """`.NOTPARALLEL:` — under `make -j2 confirm reset` make used to start
+    `reset` before `confirm` had stamped (7 of 12 runs left an armed stamp
+    behind and refused); with goals serialised every run is confirmed and
+    consumes its stamp (exit pass, security-reviewer #1, code-reviewer #1)."""
+    try:
+        for _ in range(8):
+            assert _probe(["-j2", "confirm", "reset"], {}) == 0
+            assert not CONFIRM_STAMP.exists()
+    finally:
+        CONFIRM_STAMP.unlink(missing_ok=True)
+
+
+def test_confirm_arms_a_gated_goal_or_nothing():
+    """A9 (a), against the installed make: `make confirm help` refuses and
+    leaves no stamp; a MAKECMDGOALS definition from the environment, from
+    MAKEFLAGS or from the command line has an origin that is not make's own
+    and confirms nothing, leaving no stamp; `make confirm reset` still arms
+    (round 5, code-reviewer #2, security-reviewer #1 #2, functionality-tester
+    #4 #5)."""
+    try:
+        assert _probe(["confirm", "help"], {}) == 2
+        assert not CONFIRM_STAMP.exists()
+        assert _probe(["confirm", "reset"], {"MAKECMDGOALS": "confirm reset"}) == 2
+        assert not CONFIRM_STAMP.exists()
+        assert _probe(["confirm", "reset", "MAKECMDGOALS=confirm reset"], {}) == 2
+        assert not CONFIRM_STAMP.exists()
+        env = {"MAKEFLAGS": "MAKECMDGOALS=confirm reset"}
+        assert _probe(["confirm", "reset"], env) == 2
+        assert not CONFIRM_STAMP.exists()
+        assert _probe(["confirm", "reset"], {}) == 0
+        assert not CONFIRM_STAMP.exists()  # consumed by the probe
+    finally:
+        CONFIRM_STAMP.unlink(missing_ok=True)
 
 
 # --- Phase 2: the network target (scrape) ---
@@ -196,24 +303,19 @@ def test_scrape_source_is_a_closed_set():
             resolve_choice(bad, names, names[0])
 
 
-def test_scrape_requires_command_line_confirm():
-    """The recipe passes SOURCE unexpanded and the true `$(origin CONFIRM)`; an
-    environment CONFIRM=yes reaches Python as origin `environment`, which
-    `confirmed()` rejects — so an agent's or a CI's non-interactive call never
-    fetches."""
+def test_scrape_passes_source_unexpanded_and_its_make_pid():
+    """The recipe passes SOURCE unexpanded and the make process id; no CONFIRM
+    value of any origin reaches Python, so an agent's or a CI's
+    non-interactive call never fetches (A4 (d))."""
     from_cmdline = _make_n("scrape", {"CONFIRM": "yes", "SOURCE": "x"}, {})
-    assert "--source='x'" in from_cmdline
-    assert "--confirm='yes'" in from_cmdline
-    assert "--confirm-origin='command line'" in from_cmdline
+    assert "--source='x'" in from_cmdline and "--make-pid=$PPID" in from_cmdline
+    assert "--confirm" not in from_cmdline
     from_env = _make_n("scrape", {}, {"CONFIRM": "yes", "SOURCE": "x"})
-    assert "--source='x'" in from_env
-    assert "--confirm-origin='environment'" in from_env
-    assert confirmed("yes", "environment") is False
+    assert "--source='x'" in from_env and "--confirm" not in from_env
+    assert confirmed("") is False and confirmed("not-a-pid") is False
 
 
-@pytest.mark.parametrize(
-    "var, flag", [("SOURCE", "--source"), ("CONFIRM", "--confirm")]
-)
+@pytest.mark.parametrize("var, flag", [("SOURCE", "--source")])
 def test_scrape_variables_reach_python_as_one_literal(var, flag):
     value = "$(shell echo pwned)"
     quoted = "'" + value.replace("'", "'\\''") + "'"

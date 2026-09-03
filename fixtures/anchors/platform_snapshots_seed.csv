@@ -1,9 +1,10 @@
-platform,segment,rating,review_count,captured_at,source_url,seeded_from
-trustpilot,digital-first,4.2,524,2025-01-15,https://www.trustpilot.com/,PROJECT_BRIEF §6
-trustpilot,digital-first,3.8,840,2025-09-15,https://www.trustpilot.com/,PROJECT_BRIEF §6
-trustpilot,digital-first,3.9,975,2026-06-15,https://www.trustpilot.com/,PROJECT_BRIEF §6
-app-store,invited,4.9,5000,2024-09-15,https://apps.apple.com/,PROJECT_BRIEF §6
-google-play,invited,4.5,765,2024-09-15,https://play.google.com/,PROJECT_BRIEF §6
-trustpilot,traditional,4.5,3000,2025-06-15,https://www.trustpilot.com/,PROJECT_BRIEF §6
-trustpilot,traditional,2.7,1200,2025-06-15,https://www.trustpilot.com/,PROJECT_BRIEF §6
-trustpilot,digital-challenger,3.1,600,2025-06-15,https://www.trustpilot.com/,PROJECT_BRIEF §6
+platform,profile,segment,channel,rating,review_count,one_star_share,response_rate,response_delay_days,captured_at,source_url,seeded_from
+trustpilot,fr-digital-first,digital-first,unsolicited,4.2,524,0.18,,,2025-01-15,https://www.trustpilot.com/,PROJECT_BRIEF §6
+trustpilot,fr-digital-first,digital-first,unsolicited,3.8,840,,,,2025-09-15,https://www.trustpilot.com/,PROJECT_BRIEF §6
+trustpilot,fr-digital-first,digital-first,unsolicited,3.9,975,,,,2026-06-15,https://www.trustpilot.com/,PROJECT_BRIEF §6
+opinion-assurances,fr-digital-first,digital-first,unsolicited,,534,0.231,0.82,1.5,2026-06-15,https://www.opinion-assurances.fr/,PROJECT_BRIEF §6
+app-store,fr-digital-first,digital-first,invited,4.9,5000,,,,2024-09-15,https://apps.apple.com/,PROJECT_BRIEF §6
+google-play,fr-digital-first,digital-first,invited,4.5,765,,,,2024-09-15,https://play.google.com/,PROJECT_BRIEF §6
+trustpilot,peer-traditional-1,traditional,unsolicited,4.5,3000,,,,2025-06-15,https://www.trustpilot.com/,PROJECT_BRIEF §6
+trustpilot,peer-traditional-2,traditional,unsolicited,3.25,,,,,2025-06-15,https://www.trustpilot.com/,PROJECT_BRIEF §6
+trustpilot,peer-digital-challenger-1,digital-challenger,unsolicited,3.1,,,,,2025-06-15,https://www.trustpilot.com/,PROJECT_BRIEF §6

@@ -67,42 +67,66 @@ in the middle, and come out on the right as the numbers the study shows.
 - `.claude/` — agents (report-only), commands, the run-tests hook. Settings
   are local-only and gitignored.
 - `.github/workflows/ci.yml` — lint, check-docs, check-backing, test, then
-  rebuild + idempotency-check twice: once on the synthetic fixture, once on the
-  frozen App Store sample. `weekly.yml` *(Phase 4)* — the scheduled scrape +
-  snapshot commit.
-  `.github/pull_request_template.md` — the PR body.
+  rebuild + idempotency-check twice: once on the synthetic reviews, once on
+  every frozen sample through its real parser. `weekly.yml` *(Phase 4)* — the
+  scheduled scrape + snapshot commit. `.github/pull_request_template.md` — the
+  PR body.
 - `pyproject.toml`, `uv.lock`, `.python-version`, `.pre-commit-config.yaml` —
   the toolchain (uv, ruff, pytest, pre-commit), versions pinned in lockstep.
-- `sql/raw/`, `sql/staging/`, `sql/marts/` — plain SQL, one file per table
-  (`sql/marts/` empty until a mart lands in its phase); `pipeline/` —
+- `sql/raw/`, `sql/staging/`, `sql/marts/` — plain SQL, one file per table:
+  reviews (`raw_reviews`, `stg_reviews`), platform snapshots
+  (`raw_platform_snapshots`, `stg_platform_snapshots` with each row's tag),
+  the declared page addresses with their attribution (`raw_source_pages`,
+  joined on exact `source_url`), and the four Beat 1–2 marts they feed
+  (`rating_trend`, `channel_gap`, `platform_stats`, `peer_ratings`);
+  `pipeline/` —
   `warehouse.py` (the one place that knows DuckDB from Snowflake), `build.py`
   (raw→staging→marts), `cli.py`/`__main__.py` (the validating `make` entry),
   `sql_lint.py` (the portability/clock denylist the tests use),
   `metrics.py` (reviews per month — a pinned query, not a mart; folds into
   B5.2 in Beat 5).
   `fixtures/synthetic/` — hand-written fake reviews, read-only after Phase 1;
-  `fixtures/anchors/` — the brief's §6 public figures with source URLs
-  (frozen in Phase 1; first read by `platform_snapshots` in Phase 3);
+  `fixtures/anchors/` — the brief's §6 public figures with source URLs, one
+  row per snapshot with its profile, segment, channel and the stat-row
+  figures (frozen in Phase 1, re-frozen in Phase 3a; seeded into
+  `platform_snapshots` in every rebuild but `ROWS=none`, tagged Documented);
   `fixtures/app-store/` — a hand-written capture of the App Store feed in its
-  exact shape: three pages, their meta files and the robots file (frozen in
-  Phase 2; what CI parses). All three carry a `MANIFEST.sha256`.
+  exact shape: three pages, their meta files and the host's real robots rule
+  (frozen in Phase 2, robots re-frozen in 3a); `fixtures/listings/` — a
+  hand-written store listing page with its machine-readable rating block
+  (frozen in Phase 3a);
+  `fixtures/opinion-assurances/` — a hand-written review profile in the page's
+  microdata shape, three pages of a fake, nameless profile (frozen in Phase
+  3a). Every set carries a `MANIFEST.sha256`; `ROWS=samples`
+  runs each through its real parser.
 - `ingest/` — the scrapers. A *capture* is one run's saved copy of the pages
   exactly as they arrived, with each page's address and time beside it and the
   robots file they were checked against. `politeness.py` (the good manners of
   a fetch in one place: read robots.txt first, say who we are, wait between
-  requests), `robots.py` (the robots.txt matcher, RFC 9309: `*`, `$`, longest
-  match wins, Crawl-delay), `sources.py` (the declared sources, a closed set;
-  each a sourced data point — id and listing address, never a name),
-  `app_store.py` (the strict parser to the raw shape; reads captures back),
-  `fetch.py` (the
-  only `httpx` import; writes captures under `data/cache/`). *(Phase 3)*
-  snapshot capture and the other sources. *(Phase 5+)*
+  requests, the hosts we may contact), `robots.py` (the robots.txt matcher,
+  RFC 9309: `*`, `$`, longest match wins, Crawl-delay; matched directly, in
+  linear time), `sources.py` (every source as one declaration: platform,
+  host, parser, page addresses, cache directory, profile / segment / channel,
+  and whether its site lets us fetch it — the one place a brand-carrying
+  address may appear; the one binding of the cache root), `parsed.py` (what
+  every parser hands back and how it refuses; the one place the snapshot
+  measures and the review ratings — half-steps 1 to 5 — are declared with
+  their bounds), `captures.py` (reads captures
+  back for any parser; the meta checked against the source's declared host),
+  the parsers — `app_store.py` (the review feed), `listing.py` (a store or
+  platform page's rating block, one snapshot row), `opinion_assurances.py`
+  (a profile page's schema.org microdata: review rows and one snapshot row) —
+  and `fetch.py` (the only `httpx` import; writes captures under
+  `data/cache/<platform>/<source>/`). *(Phase 3b)* Trustpilot. *(Phase 5+)*
   `classify/` — `rules.yaml`, `rules.py`, `llm.py` (the ONE model call site),
   `eval/` (the only reader of `labels.csv`). *(Phase 8)* `models/` —
   `cost_model.py` (`FORMULAS`), `guardrail_sim.py`. *(Phase 9)* `study/` —
   Metabase setup + the HTML export. *(Phase 10)* `dags/friction_ledger.py`.
 - `data/` — gitignored working output (corpus, captured pages, `*.duckdb`);
-  `data/snapshots/` *(Phase 4)* is the one tracked subtree.
+  `data/snapshots/` is the one tracked subtree: today `manual_snapshots.csv`,
+  the figures a person read off a page whose terms forbid a robot (a declared
+  source name, a day, five numbers and the word `page`; it carries no address
+  and no person's name), loaded as Measured; *(Phase 4)* the weekly captures.
 
 ## Commands (macOS, uv)
 
@@ -119,30 +143,60 @@ in the middle, and come out on the right as the numbers the study shows.
   + check-docs + check-backing + fixtures; with SPEC, Evidence ids and
   Record-updates files. One line per check, exit 1 on FAIL, 2 on a refused
   SPEC/BASE. `/review-round N` runs it first.
-- `make rebuild [TARGET=duckdb] [FIXTURE=cache|empty|synthetic|app-store]` —
-  build the warehouse from raw (DuckDB; Snowflake defers to Phase 10) and print
-  reviews per month. Each input builds its own database file, so a fixture
-  never lands in the corpus. The default, `cache`, loads every capture under
-  `data/cache/app-store/` (with no capture it loads nothing and says so);
-  `empty` runs it end to end with zero rows; `synthetic` loads the fixture;
-  `app-store` runs the frozen sample through the real parser (CI does; the
-  Phase 2 DONE command).
-- `make idempotency-check [TARGET=] [FIXTURE=synthetic]` — rebuild twice, diff
-  per-table row counts (the run-twice property as a command); same `FIXTURE`
+- `make rebuild [TARGET=duckdb] [ROWS=captured|none|synthetic|samples]` —
+  build the warehouse from raw (DuckDB; Snowflake defers to Phase 10) and
+  print reviews per month. `ROWS` names what is loaded; each input builds its
+  own database file, so a sample never lands in the corpus. The default,
+  `captured`, loads the anchors, the hand-read rows in
+  `data/snapshots/manual_snapshots.csv` and every capture under `data/cache/`
+  (with no capture it says so); `none` runs it end to end with zero rows;
+  `synthetic` loads the review fixture and the anchors; `samples` runs every
+  frozen sample through its real parser (CI does). A raw table already in the
+  file must be the one its `sql/raw/` file declares — name, type and
+  nullability, column by column in the file's order, read from the engine's
+  own catalog; otherwise the rebuild refuses naming the column and both sides,
+  since `create table if not exists` would keep the old column and the engine
+  would cast into it silently (`make confirm reset` first). Each `sql/raw/`
+  file holds exactly one table definition, so nothing else in the file can run
+  while that check happens. The file a rebuild writes is always the input's
+  own, `friction_ledger[.<input>].duckdb` under `data/`. The Phase 3a DONE
+  command is `make rebuild && make idempotency-check ROWS=captured`.
+- `make idempotency-check [TARGET=] [ROWS=synthetic]` — rebuild twice, diff
+  per-table row counts (the run-twice property as a command); same `ROWS`
   values as `rebuild`, but this one defaults to `synthetic`; pass
-  `FIXTURE=cache` to prove it on real rows.
+  `ROWS=captured` to prove it on real rows.
 - `make scrape [SOURCE=<declared name>]` — NETWORK, developer-run, never by an
-  agent: fetch the declared source's public review feed into a new capture
-  under `data/cache/`, robots.txt first and every page checked against it,
-  ≥ 2 s apart (more if the site asks), identifying User-Agent, no proxy, no
-  retry. Needs `CONFIRM=yes` on the command line (`$(origin CONFIRM)`, as
-  `reset`); refuses a source we have recorded as one not to fetch (the site
-  asked us not to; the reason sits beside the source in code and in
-  DECISIONS), one whose app id is not filled in, and one whose feed path
-  robots.txt disallows.
+  agent: fetch each declared source's pages (a review feed, a review profile,
+  a store listing) into a new capture under `data/cache/<platform>/<source>/`,
+  robots.txt first and every page checked against it, ≥ 2 s apart per host
+  (more if the site asks), identifying User-Agent, no proxy, no retry, at most
+  60 pages per source. Needs the `confirm` goal before it in the same
+  invocation, `make confirm scrape`, as `reset` does (a goal cannot come from
+  the environment; a variable's "command line" origin can, through
+  `MAKEFLAGS`). A plain run skips, with one line, any source we have
+  recorded as one not to fetch (its robots file or its terms say no; the
+  reason and date sit beside the source in code and in DECISIONS). It refuses
+  — exit 2 — a source named by `SOURCE=` that we do not fetch, one with no
+  page address filled in, and one whose page robots.txt disallows.
+- `make confirm` — arms the destructive or network target that follows it in
+  the SAME invocation and nothing else: `make confirm reset`, `make confirm
+  scrape`. The recipe stamps its make process's id; the gated target passes
+  its own and runs only when the two are one process; the stamp is consumed
+  either way, so an earlier `confirm` confirms nothing later. `confirm` arms
+  only when `reset` or `scrape` follows it — `make confirm help` refuses and
+  leaves no stamp — and only from the goal list make itself built (a
+  `MAKECMDGOALS` value from the environment, `MAKEFLAGS` or the command line
+  has another origin and is refused). The stamp is written only when none is
+  there, so a file already sitting in `data/` makes `confirm` refuse rather
+  than overwrite it. The gate holds against a variable definition, an
+  environment value, `MAKEFLAGS`, a stale invocation and a typo. It does not
+  hold against an environment that chooses what make reads or runs
+  (`MAKEFILES`, `PATH`), or against a same-user process writing `data/` while
+  make runs (the spec's Threat model says so); goals run in order even under
+  `make -j`.
 - `make reset [TARGET=duckdb]` — DESTRUCTIVE: drop every DuckDB file this repo
-  built, the corpus and one per fixture; needs `CONFIRM=yes` on the command
-  line (`$(origin CONFIRM)`; an environment `CONFIRM=yes` does not count).
+  built, the corpus and one per rebuild input; needs `make confirm reset` (no
+  variable and no environment value counts).
 
 ## Deterministic first (the number one rule — brief §2.1)
 
@@ -286,8 +340,10 @@ one, and write one sentence in the README about why.
   DECISIONS.md → Gotchas.
 - Do not add a feature that surfaces in none of the five parts.
 - Destructive commands (dropping a DuckDB file, truncating a table): only via
-  a `make` target that prompts unless `CONFIRM=yes` is given on the command
-  line — tested with `$(origin CONFIRM)`.
+  a `make` target that prompts unless the `confirm` goal precedes it in the
+  same invocation (`make confirm reset`) — a goal, never a variable, since
+  `$(origin)` cannot tell a `MAKEFLAGS` definition from the command line;
+  tested against the installed make.
 - Paid or network commands (the model API, a live scrape, Snowflake): never
   run by an agent unasked; the developer runs them.
 - Fix amendments: a fix that changes a data structure, a write path, a label
@@ -356,8 +412,8 @@ one, and write one sentence in the README about why.
 - PR via `gh pr create` when Done-when passes AND verdicts are approved. Body:
   the PR template. Title `Phase N — <name>`.
 - CI runs `make lint`, `make check-docs`, `make check-backing`, `make test`,
-  `make rebuild FIXTURE=synthetic`, `make idempotency-check` and the same two
-  with `FIXTURE=app-store` (offline, DuckDB, no key, no fetch). Mergeable only
+  `make rebuild ROWS=synthetic`, `make idempotency-check` and the same two
+  with `ROWS=samples` (offline, DuckDB, no key, no fetch). Mergeable only
   when CI is green and the surface's agents have run.
 - The developer merges (squash), never Claude. After merge: `git checkout
   main && git pull`.
@@ -425,19 +481,58 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 ## Current status
 
-**Phase 2 — One scraper, end to end** (`phase-2-scraper`, spec
-`specs/phase-2-scraper.md`): built; review rounds 1 to 4 and the exit audit
-done, their fixes and amendments A1–A7 in (DECISIONS → Phase 2). We can now
-collect published reviews from an app store politely and count how many
-arrive each month, but the one source we tried asks crawlers not to read its
-review feed, so the counts so far come from a hand-written sample and the
-first real rows wait for a source that allows us (Phase 3a). The DONE
-command is `make rebuild FIXTURE=app-store && make idempotency-check
-FIXTURE=app-store` (raw 8 / staging 8); Phase 1's line stays green (raw 40 /
-staging 39). Phase 1 merged (PR #3). Next: the Phase 2 PR; then Phase 3a —
-snapshots and the remaining polite sources, starting with one whose robots
-file lets us read its reviews.
+**Phase 3a — Snapshots and the remaining polite sources**
+(`phase-3a-snapshots`, spec `specs/phase-3a-snapshots.md`, APPROVED 2026-09-02
+with amendment A1): being built. What a reader sees: the rating each platform
+shows is now a table of its own, seeded from the brief's public figures
+(Documented) and extended by the figures we capture or read off a page
+ourselves (Measured), with four Beat 1–2 charts built from it. How: every
+source is one declaration — which parser reads it, where its pages are,
+whether its site lets us fetch it — and `ROWS` names what a rebuild loads. Of
+the three sites checked, Google Play's listing may be fetched, Apple's may not
+(its terms), and Opinion Assurances gave written authorization for its review
+pages (recorded beside the source in `ingest/sources.py` and in DECISIONS →
+Phase 3a). The first live run (2026-09-03) captured Google Play's listing (one
+Measured row) and the profile's first page, which refused twice against a
+shape the hand-written sample had guessed — the text's nesting and the
+half-star ratings (DECISIONS → Gotchas); A5 and A6 corrected the shape and the
+page parses: 40 reviews and the aggregate. The full 14-page scrape then ran:
+14 pages, 534 reviews, and the profile's aggregate (3.8 on 534 reviews,
+Measured); the DONE command passes on it.
 
-Open BACKLOG rows: **14**.
+Amendments this phase, each approved and built: A2 (the snapshot key names its
+declaration and a same-key pair refuses; the stat row is one row per stat), A3
+(a changed attribution refuses; the sample declaration is a property, not a
+name; a hand entry names a source with no parser), A4 (every measure's bound
+is its column's and a refused batch loads nothing; the loader checks its
+closed sets; a capture's address is a declared page; `make confirm <target>`
+replaces the CONFIRM variable; the ranged peer anchors are placements), A5
+(the review text is a child of the review scope), A6 (a review's rating is a
+half-step, 1 to 5, exactly the scale the site declares) and A7 (a rebuild
+refuses a raw table that is not its declaration). A8, approved and built after
+round 4: the raw comparison is the whole declaration; the review loader loads
+a batch or nothing; the aggregate's declared scale is read; the confirm gate's
+claim is narrowed and written down; the database file and the label set are
+derived from the input. Review rounds 1–5 done and their plain fixes built
+(round 5's six: a column's position is the catalog's ordinal, the schema
+filters are pinned, a declaration the engine cannot run refuses with one line,
+a doubled bound refuses, every shape guard matches the whole value, one name
+for the capture directory). A9, approved and built after round 5: the confirm
+gate arms a gated goal or nothing and reads a goal list of make's own origin
+only; the declared-page writer writes a batch or nothing; the `sample` label
+is the sample declaration's row's.
+
+The exit pass ran 2026-09-03 in place of a sixth round (the coherence audit
+over the repo, code and security review scoped to A9): no blocker; its
+findings are fixed as suggested (goals serialised under `-j`, the stamp
+consumed in any state, the relay over the whole scratch block, every shape
+anchored, the anchors reader's profile guard) or stand as three BACKLOG rows
+with triggers, and the Delivered paragraph is appended. The PR is open. The
+DONE command is `make rebuild && make idempotency-check ROWS=captured`; Phase
+1's line stays green (raw 40 / staging 39); CI runs `ROWS=synthetic` and
+`ROWS=samples`. Phase 2 merged (PR #4). Next: the Phase 3a PR; then Phase 3b —
+Trustpilot.
+
+Open BACKLOG rows: **22**.
 
 (Update this section at the end of every working day.)

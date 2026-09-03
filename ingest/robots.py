@@ -128,12 +128,33 @@ def _merge(groups: list[_Group]) -> _Group:
 
 def _matches(pattern: str, path: str) -> bool:
     """`*` is any run of characters, a trailing `$` anchors the end; everything
-    else is literal. The pattern is anchored at the start of the path."""
-    anchored = pattern.endswith("$")
-    if anchored:
+    else is literal. The pattern is anchored at the path's start, so an
+    unanchored pattern matches a prefix — the same as matching `pattern*` in
+    full. Matched directly, two pointers and one fallback to the last `*`
+    (spec Phase 3a, pinned decision 6): time is bounded by pattern length ×
+    path length, never exponential, so a file with many wildcards cannot stall
+    a run. No regex."""
+    if pattern.endswith("$"):
         pattern = pattern[:-1]
-    rx = ".*".join(re.escape(part) for part in pattern.split("*"))
-    return re.match(rx + ("$" if anchored else ""), path) is not None
+    else:
+        pattern += "*"
+    p = s = 0
+    star, mark = -1, 0  # the last `*` seen, and where the path was then
+    while s < len(path):
+        if p < len(pattern) and pattern[p] == "*":
+            star, mark = p, s
+            p += 1
+        elif p < len(pattern) and pattern[p] == path[s]:
+            p += 1
+            s += 1
+        elif star != -1:  # let the last `*` swallow one more character
+            mark += 1
+            p, s = star + 1, mark
+        else:
+            return False
+    while p < len(pattern) and pattern[p] == "*":
+        p += 1
+    return p == len(pattern)
 
 
 def _allowed(rules: tuple[tuple[bool, str], ...], path: str) -> bool:

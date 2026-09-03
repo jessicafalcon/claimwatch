@@ -7,10 +7,15 @@ from __future__ import annotations
 import pytest
 
 from ingest.robots import PRODUCT_TOKEN, Robots, reads_as_robots
-from ingest.sources import AppStoreSource
+from ingest.sources import app_store_source
 
-FEED = AppStoreSource(
-    name="t", app_id=1, country="fr", listing="", fetchable=True
+FEED = app_store_source(
+    name="t",
+    app_id=1,
+    country="fr",
+    listing="",
+    fetchable=True,
+    declared_on="2026-09-01",
 ).page_url(1)
 LIVE_FILE = "User-agent: *\nDisallow: /*/rss/*\n\nUser-agent: Googlebot\nDisallow:\n"
 
@@ -207,3 +212,69 @@ def test_pattern_matching_and_precedence(robots: str, allowed: bool):
     """The rules of the game, pinned on their own: `*`, the `$` anchor,
     longest match wins, Allow wins a tie."""
     assert Robots.parse(robots).allows(FEED) is allowed
+
+
+def test_a_pathological_pattern_matches_in_linear_time():
+    """Phase 3a, pinned decision 6: thirty wildcards against a long path that
+    does not match answer in milliseconds (the regex form took seconds at
+    seven stars), and the verdicts of the matching table are unchanged."""
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    from ingest.robots import _matches
+
+    # A backtracking matcher would sit on this input for minutes, and a regex
+    # engine holds the interpreter lock for the whole match, so no in-process
+    # deadline can interrupt it. The pin must FAIL, not hang CI: the three
+    # calls run in a child process that is killed at 2 s (round 1,
+    # functionality-tester on the restored-regex mutation).
+    child = (
+        "import time; from ingest.robots import _matches\n"
+        "pattern = '/' + 'a*' * 30 + 'b'; path = '/' + 'a' * 300\n"
+        "t0 = time.perf_counter()\n"
+        "v = (_matches(pattern, path), _matches(pattern + '$', path),"
+        " _matches('/' + 'a*' * 30, path))\n"
+        "print(v, time.perf_counter() - t0)"
+    )
+    try:
+        res = subprocess.run(
+            [sys.executable, "-c", child],
+            cwd=Path(__file__).resolve().parents[1],
+            capture_output=True,
+            text=True,
+            timeout=2.0,
+        )
+    except subprocess.TimeoutExpired:
+        pytest.fail("the matcher did not answer within 2 s: not linear")
+    assert res.returncode == 0, res.stderr
+    verdicts, elapsed = res.stdout.rsplit(" ", 1)
+    assert verdicts == "(False, False, True)"
+    assert float(elapsed) < 0.05
+    # the four forms of the table, on their own
+    assert _matches("/fr/rss/", "/fr/rss/x") is True  # prefix
+    assert _matches("/fr/rss/$", "/fr/rss/x") is False  # anchored: exact only
+    assert _matches("/fr/rss/$", "/fr/rss/") is True
+    assert _matches("/*/rss/*", "/fr/rss/customerreviews") is True
+    assert _matches("/*json$", "/fr/rss/page=1/json") is True
+    assert _matches("/*json$", "/fr/rss/page=1/json?x") is False
+    assert _matches("", "/anything") is True  # an empty pattern is a prefix of all
+
+
+def test_the_frozen_app_store_robots_file_disallows_the_sample_feed():
+    """Phase 3a (BACKLOG row "permissive frozen robots.txt"): the frozen file is
+    the real rule, read through the matcher, and it refuses the sample's own
+    page address — the frozen capture documents why its source is not fetched."""
+    from pathlib import Path
+
+    from ingest.sources import by_name
+    from tests import pins
+
+    text = (
+        Path(__file__).resolve().parent.parent / "fixtures" / "app-store" / "robots.txt"
+    ).read_text()
+    rules = Robots.parse(text)
+    assert reads_as_robots(text)
+    assert rules.allows(pins.APP_STORE_SAMPLE_FIRST_ROW["source_url"]) is False
+    assert rules.allows(by_name("fr-digital-first").page_url(1)) is False
+    assert rules.allows("https://itunes.apple.com/fr/app/id1") is True

@@ -1,3 +1,6 @@
-# sample robots.txt (hand-written fixture): nothing disallowed for anyone
+# The rule the host publishes for its review feed, as read on 2026-09-02
+# (re-frozen in Phase 3a from the hand-written permissive sample): the feed
+# path is disallowed for every crawler, which is why the declared source is
+# not fetched. A rebuild never reads this file; tests/test_robots.py does.
 User-agent: *
-Disallow:
+Disallow: /*/rss/*

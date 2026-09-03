@@ -13,9 +13,8 @@ from pipeline.build import rebuild  # noqa: E402
 
 
 def test_second_rebuild_adds_no_rows(tmp_path):
-    db = tmp_path / "warehouse.duckdb"
-    first = rebuild("duckdb", "synthetic", database=db, run_id="run-1")
-    second = rebuild("duckdb", "synthetic", database=db, run_id="run-2")
+    first = rebuild("duckdb", "synthetic", root=tmp_path, run_id="run-1")
+    second = rebuild("duckdb", "synthetic", root=tmp_path, run_id="run-2")
     assert first == second  # a different run_id inserts nothing
 
 

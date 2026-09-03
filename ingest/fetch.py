@@ -1,5 +1,5 @@
 """The fetcher — the ONLY `httpx` import in the repo (spec Phase 2, invariant
-6). Developer-run through `make scrape CONFIRM=yes`; never called by CI, a
+6). Developer-run through `make confirm scrape`; never called by CI, a
 test, or a rebuild.
 
 httpx is a small HTTP client; the manners are ours, from `politeness.py`: read
@@ -12,9 +12,9 @@ False` ignores HTTP(S)_PROXY). Every page is archived byte-exact under the
 capture directory with its provenance beside it, so a rebuild reads no clock
 and asks the site nothing.
 
-`captured_at` is stamped here, once per run, in UTC as YYYY-MM-DDTHH:MM:SS (the
-synthetic fixture's format); it names the capture directory (colons replaced)
-and is written into every page's meta."""
+`captured_at` is stamped here, once per source per run, in UTC as
+YYYY-MM-DDTHH:MM:SS (the synthetic fixture's format); it names the capture
+directory (colons replaced) and is written into every page's meta."""
 
 from __future__ import annotations
 
@@ -27,22 +27,26 @@ from urllib.parse import urlsplit
 
 import httpx
 
-from ingest.app_store import FeedShapeError, parse_page
+from ingest.captures import parser_module
+from ingest.parsed import PageShapeError
 from ingest.politeness import (
     ALLOWED_HOSTS,
+    MAX_BYTES,
     MAX_CRAWL_DELAY_S,
     MAX_PAGES,
+    MAX_RESPONSE_S,
     MIN_INTERVAL_S,
     TIMEOUT_S,
     USER_AGENT,
 )
 from ingest.robots import Robots, reads_as_robots
-from ingest.sources import AppStoreSource
+from ingest.sources import Source
 
 
 class FetchRefused(Exception):
-    """One line, exit 2, no retry: robots said no, a bad status, a timeout, an
-    unfilled source, or a host outside the allowed set."""
+    """One line, exit 2, no retry: robots said no, a bad status, a timeout, a
+    response past the size or duration ceiling, an unfilled source, or a host
+    outside the allowed set."""
 
 
 def utc_stamp() -> str:
@@ -97,12 +101,48 @@ class PoliteClient:
             if wait > 0:
                 self._sleep(wait)
         try:
-            response = self._client.get(url)
+            with self._client.stream("GET", url) as streamed:
+                body = self._read_bounded(streamed, url)
         except httpx.HTTPError as exc:
             raise FetchRefused(f"refusing: {url}: {type(exc).__name__}") from exc
         finally:
             self._last[host] = self._clock()
-        return response
+        # The body is already decoded, so the encoding and length headers of
+        # the wire form are dropped; the rest (content-type) is kept as served.
+        headers = [
+            (k, v)
+            for k, v in streamed.headers.items()
+            if k.lower()
+            not in ("content-encoding", "content-length", "transfer-encoding")
+        ]
+        return httpx.Response(
+            streamed.status_code,
+            headers=headers,
+            content=body,
+            request=streamed.request,
+        )
+
+    def _read_bounded(self, response: httpx.Response, url: str) -> bytes:
+        """The body in pieces, refused the moment it passes MAX_BYTES or the
+        clock passes MAX_RESPONSE_S since the first byte was asked for. TIMEOUT_S
+        bounds each socket read; this bounds the whole answer, so a page that
+        never ends or drips a byte at a time is a one-line refusal."""
+        started = self._clock()
+        size = 0
+        pieces: list[bytes] = []
+        for piece in response.iter_bytes():
+            size += len(piece)
+            if size > MAX_BYTES:
+                raise FetchRefused(
+                    f"refusing: {url}: the response passed {MAX_BYTES} bytes"
+                )
+            if self._clock() - started > MAX_RESPONSE_S:
+                raise FetchRefused(
+                    f"refusing: {url}: the response did not finish within "
+                    f"{MAX_RESPONSE_S} s"
+                )
+            pieces.append(piece)
+        return b"".join(pieces)
 
 
 def polite_client() -> PoliteClient:
@@ -116,12 +156,14 @@ def _write_page(
     page: int,
     response: httpx.Response,
     captured_at: str,
+    ext: str,
     *,
     refused: bool = False,
 ) -> None:
-    """A page the strict parser accepted is `page-<n>.json`; one it refused is
-    kept as evidence under `page-<n>.refused.json`, a name no rebuild loads."""
-    name = f"page-{page}.refused.json" if refused else f"page-{page}.json"
+    """A page the strict parser accepted is `page-<n>.<ext>` (the parser's
+    extension); one it refused is kept as evidence under
+    `page-<n>.refused.<ext>`, a name no rebuild loads."""
+    name = f"page-{page}.refused.{ext}" if refused else f"page-{page}.{ext}"
     (capture_dir / name).write_bytes(response.content)
     meta = {
         "source_url": str(response.request.url),
@@ -134,28 +176,32 @@ def _write_page(
 
 
 def scrape(
-    source: AppStoreSource,
+    source: Source,
     cache_root: Path,
     *,
     client: PoliteClient | None = None,
     stamp: Callable[[], str] = utc_stamp,
 ) -> tuple[Path, int]:
-    """Fetch one source's feed into a new capture directory. Returns the
-    directory and the number of pages written. Refuses (one line) on an
-    unfilled source, a robots disallow, any non-200, or a page that is not the
-    declared shape; pages already written stay — each is a complete, honest
-    capture of what the site served — and a refused page is kept under a name
-    a rebuild never loads."""
+    """Fetch one source's pages into a new capture directory under
+    `cache_root / platform / name`. Returns the directory and the number of
+    pages written. Everything — host, robots address, page addresses, cap,
+    parser — is read from the declaration (Phase 3a, pinned decision 3).
+    Refuses (one line) on a source declared not fetchable, an unfilled source,
+    a robots disallow, any non-200, or a page that is not the declared shape;
+    pages already written stay — each is a complete, honest capture of what the
+    site served — and a refused page is kept under a name a rebuild never
+    loads."""
     if not source.fetchable:  # the recorded terms position, declared in code
         raise FetchRefused(
             f"refusing: source {source.name!r} is declared not fetchable — "
             f"{source.terms}"
         )
-    if source.app_id == 0:
+    if not source.pages or source.parser is None:
         raise FetchRefused(
-            f"refusing: source {source.name!r} has no app_id — "
+            f"refusing: source {source.name!r} has no page address — "
             "fill it in ingest/sources.py"
         )
+    parser = parser_module(source.parser)
     if client is None:
         own = polite_client()
         try:
@@ -164,7 +210,9 @@ def scrape(
             own.close()
     polite = client
     captured_at = stamp()
-    capture_dir = cache_root / source.name / captured_at.replace(":", "-")
+    capture_dir = (
+        cache_root / source.platform / source.name / captured_at.replace(":", "-")
+    )
     if capture_dir.exists():
         raise FetchRefused(
             f"refusing: capture {capture_dir} already exists (same second?)"
@@ -181,7 +229,8 @@ def scrape(
         ) from exc
     (capture_dir / "robots.txt").write_bytes(robots.content)
     content_type = robots.headers.get("content-type", "")
-    (capture_dir / "robots.meta.json").write_text(  # why the run proceeded (A6)
+    # Why the run proceeded (Phase 2, A6).
+    (capture_dir / "robots.meta.json").write_text(
         json.dumps(
             {"status": robots.status_code, "content_type": content_type}, indent=2
         )
@@ -191,7 +240,7 @@ def scrape(
     if robots.status_code == 200:
         # The body alone decides whether this is a robots file; the content-type
         # is recorded, never trusted. An error page served with a 200 is a
-        # refusal, never permission (A6).
+        # refusal, never permission (Phase 2, A6).
         if not reads_as_robots(robots.text):
             raise FetchRefused(
                 f"refusing: robots.txt returned 200 but its body is not a robots file "
@@ -211,20 +260,21 @@ def scrape(
         polite.raise_interval(source.host, rules.crawl_delay)
 
     written = 0
-    for page in range(1, MAX_PAGES + 1):
-        url = source.page_url(page)
+    for page, url in enumerate(source.pages[:MAX_PAGES], 1):
         if not rules.allows(url):  # every page's own address, before its request
             raise FetchRefused(f"refusing: robots.txt disallows {url}")
         response = polite.get(url)
         if response.status_code != 200:
             raise FetchRefused(f"refusing: {url} returned {response.status_code}")
         try:
-            rows = parse_page(response.content, url, captured_at)
-        except FeedShapeError as exc:
-            _write_page(capture_dir, page, response, captured_at, refused=True)
+            parsed = parser.parse(response.content, url, captured_at, source)
+        except PageShapeError as exc:
+            _write_page(
+                capture_dir, page, response, captured_at, parser.EXTENSION, refused=True
+            )
             raise FetchRefused(f"refusing: {exc}") from exc
-        _write_page(capture_dir, page, response, captured_at)
+        _write_page(capture_dir, page, response, captured_at, parser.EXTENSION)
         written += 1
-        if not rows:
-            break  # the end of the feed
+        if parsed.is_empty():
+            break  # the end of the list
     return capture_dir, written
