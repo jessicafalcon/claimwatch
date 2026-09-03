@@ -342,6 +342,28 @@ def test_the_scratch_declaration_is_listed_in_the_engines_default_schema():
         conn.close()
 
 
+def test_a_same_named_table_in_another_schema_is_not_this_one():
+    """A8 (a) reads the catalog filtered to the schema the engine names as its
+    default: a `raw_reviews` and a `declared_raw_reviews` sitting in another
+    schema are neither the corpus's table nor a stray scratch, so the check
+    passes, and a `raw_reviews` that exists only elsewhere is created here
+    (round 5, functionality-tester #2 #3 — both filters survived removal)."""
+    conn = connect("duckdb", database=":memory:")
+    try:
+        conn.execute("create schema elsewhere")
+        conn.execute("create table elsewhere.raw_reviews (a integer)")
+        create_raw(conn)  # exists only elsewhere: created in the default schema
+        assert len(_columns(conn, "raw_reviews")) == 10
+        conn.execute("create table elsewhere.declared_raw_reviews (a integer)")
+        create_raw(conn)  # the filtered read sees ten columns and no scratch
+        assert len(_columns(conn, "raw_reviews")) == 10
+        assert conn.execute(
+            "select count(*) from elsewhere.declared_raw_reviews"
+        ).fetchone() == (0,)
+    finally:
+        conn.close()
+
+
 class _ReversedRows:
     """A connection that hands every result set back in reverse — the order an
     engine returns catalog rows in is not a promise, and this stands in for
