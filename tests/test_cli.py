@@ -262,18 +262,8 @@ def test_cli_scrape_on_the_declared_source_refuses_before_the_network(capsys):
     assert err.count("\n") == 1
 
 
-def test_cli_scrape_reports_each_refused_source_and_fetches_the_rest(
-    capsys, monkeypatch, isolated_paths
-):
-    """A declared not-fetchable source is one stderr line; the next source is
-    still fetched; the exit code says something was refused."""
-    import ingest.fetch as fetch
-    from pipeline import cli
-    from tests.test_app_store_fetch import Clock, Served, _polite
-
-    server, clock = Served(), Clock()
-    monkeypatch.setattr(fetch, "polite_client", lambda: _polite(server, clock))
-    two = (
+def _two_sources():
+    return (
         app_store_source(
             name="no",
             app_id=1,
@@ -286,10 +276,67 @@ def test_cli_scrape_reports_each_refused_source_and_fetches_the_rest(
             name="yes", app_id=2, country="fr", listing="", fetchable=True
         ),
     )
-    monkeypatch.setattr(cli, "SOURCES", two)
+
+
+def test_cli_scrape_skips_a_source_declared_not_fetchable_and_exits_0(
+    capsys, monkeypatch, isolated_paths
+):
+    """A plain `make scrape CONFIRM=yes`: the source declared not fetchable is
+    one stdout line naming its terms, no request is made for it, the next
+    source is fetched, and the exit code is 0 — nothing was refused during the
+    run (round 1, security-reviewer #3)."""
+    import ingest.fetch as fetch
+    from pipeline import cli
+    from tests.test_app_store_fetch import Clock, Served, _polite
+
+    server, clock = Served(), Clock()
+    monkeypatch.setattr(fetch, "polite_client", lambda: _polite(server, clock))
+    monkeypatch.setattr(cli, "SOURCES", _two_sources())
+    code = main(["scrape", "--confirm=yes", "--confirm-origin=command line"])
+    out, err = capsys.readouterr()
+    assert code == 0
+    assert err == ""
+    assert "scrape: no: skipped — declared not fetchable: asked" in out
+    assert out.count("scrape: yes:") == 1
+    assert all("id=2/" in u for u in server.urls() if "rss" in u)
+
+
+def test_cli_scrape_exits_2_only_on_a_refusal_met_during_the_run(
+    capsys, monkeypatch, isolated_paths
+):
+    """The same two sources, the host now answering 500 on the fetchable one:
+    one stderr line, exit 2. The skipped source is still not a refusal."""
+    import ingest.fetch as fetch
+    from pipeline import cli
+    from tests.test_app_store_fetch import Clock, Served, _polite
+
+    server, clock = Served(), Clock()
+    server.page_status[1] = 500
+    monkeypatch.setattr(fetch, "polite_client", lambda: _polite(server, clock))
+    monkeypatch.setattr(cli, "SOURCES", _two_sources())
     code = main(["scrape", "--confirm=yes", "--confirm-origin=command line"])
     out, err = capsys.readouterr()
     assert code == 2
+    assert err.count("\n") == 1 and "returned 500" in err
+    assert "scrape: no: skipped" in out and "scrape: yes:" not in out
+
+
+def test_cli_scrape_naming_a_source_declared_not_fetchable_is_a_refusal(
+    capsys, monkeypatch, isolated_paths
+):
+    """SOURCE=<a source declared not fetchable> asks for it on purpose: one
+    stderr line, exit 2, no request."""
+    import ingest.fetch as fetch
+    from pipeline import cli
+    from tests.test_app_store_fetch import Clock, Served, _polite
+
+    server, clock = Served(), Clock()
+    monkeypatch.setattr(fetch, "polite_client", lambda: _polite(server, clock))
+    monkeypatch.setattr(cli, "SOURCES", _two_sources())
+    code = main(
+        ["scrape", "--source=no", "--confirm=yes", "--confirm-origin=command line"]
+    )
+    out, err = capsys.readouterr()
+    assert code == 2
     assert err.count("\n") == 1 and "'no' is declared not fetchable" in err
-    assert out.count("scrape: yes:") == 1
-    assert all("id=2/" in u for u in server.urls() if "rss" in u)
+    assert server.urls() == []

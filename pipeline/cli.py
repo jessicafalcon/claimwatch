@@ -19,7 +19,7 @@ from ingest import sources
 from ingest.captures import has_pages, parser_module
 from ingest.parsed import PageShapeError
 from ingest.politeness import MAX_PAGES
-from ingest.sources import SOURCES, by_name, source_names
+from ingest.sources import SOURCES
 from pipeline.build import INPUTS, captures_for, idempotency_check, rebuild, reset
 from pipeline.metrics import reviews_per_month
 from pipeline.warehouse import TARGETS, connect, database_for
@@ -87,16 +87,24 @@ def _do_rebuild(args: argparse.Namespace) -> int:
 
 def _do_scrape(args: argparse.Namespace) -> int:
     """Developer-run, network: fetch each chosen source into a new capture.
-    SOURCE is a closed set of declared names (empty -> all of them); CONFIRM
-    gates like `reset`, so an agent's non-interactive call refuses."""
-    names = source_names()
-    chosen = (
-        [by_name(resolve_choice(args.source, names, ""))]
-        if args.source
-        else list(SOURCES)
-    )
+    SOURCE is a closed set of declared names; empty means every source whose
+    site lets us fetch it — a source declared not fetchable is then skipped
+    with one line, not refused, so a plain run's exit code speaks only of
+    refusals met during the run (a robots rule, a status, a page shape).
+    Naming such a source with SOURCE= asks for it on purpose: that is a
+    refusal, exit 2. CONFIRM gates like `reset`, so an agent's non-interactive
+    call refuses."""
+    names = tuple(s.name for s in SOURCES)
+    if args.source:
+        wanted = resolve_choice(args.source, names, "")
+        chosen = [s for s in SOURCES if s.name == wanted]
+    else:
+        chosen = [s for s in SOURCES if s.fetchable]
+        for s in SOURCES:
+            if not s.fetchable:
+                print(f"scrape: {s.name}: skipped — declared not fetchable: {s.terms}")
     if not chosen:
-        raise Refused("refusing: no source is declared in ingest/sources.py")
+        raise Refused("refusing: no fetchable source is declared in ingest/sources.py")
     if not confirmed(args.confirm, args.confirm_origin):
         listed = ", ".join(s.name for s in chosen)
         hosts = ", ".join(sorted({s.host for s in chosen if s.fetchable})) or "no host"
