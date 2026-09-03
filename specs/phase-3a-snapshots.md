@@ -1223,7 +1223,7 @@ rating_trend 11, and `idempotency-check OK`, every count unchanged. A second
 scrape of unchanged pages adds no raw review row and one snapshot row per
 profile (`captured_at` is in the key). Phase 1's line stays raw 40 / staging
 39, now with 9 snapshots; CI runs `ROWS=synthetic` and `ROWS=samples`; `make
-review-gate SPEC=specs/phase-3a-snapshots.md` prints 7/7; 559 tests.
+review-gate SPEC=specs/phase-3a-snapshots.md` prints 7/7; 563 tests.
 
 **Reviews and the cap.** Five rounds and nine amendments: A1 (the profile's
 authorization), A2–A4 (the key, the attribution, the bounds, the `confirm`
