@@ -614,20 +614,21 @@ def check_raw_declaration(conn, path: Path) -> None:
         conn.execute(
             _CREATE_RAW.sub(f"create temporary table {scratch}", statements[0], count=1)
         )
+        try:
+            declared = _columns(conn, scratch)
+        finally:
+            conn.execute(f"drop table {scratch}")
+        existing = _columns(conn, table)
     except warehouse.DriverError as exc:
         # The one statement the file holds did not parse as one — a `--` or a
-        # `;` inside a literal, say — so the engine's refusal is relayed as
-        # this module's one line, never a traceback (round 5,
-        # security-reviewer #4, functionality-tester #7).
+        # `;` inside a literal, say — or the catalog read or the drop failed:
+        # the engine's refusal is relayed as this module's one line, never a
+        # traceback (round 5, security-reviewer #4, functionality-tester #7;
+        # the whole scratch block since the exit pass, code-reviewer #6).
         raise PageShapeError(
             f"{where_file}: the engine refused the declaration as one statement: "
             + " ".join(str(exc).split())
         ) from exc
-    try:
-        declared = _columns(conn, scratch)
-    finally:
-        conn.execute(f"drop table {scratch}")
-    existing = _columns(conn, table)
     where = f"{where_file}: the corpus's table {table}"
     tail = "a changed raw declaration needs `make confirm reset` then `make rebuild`"
     for position, (have, want) in enumerate(
