@@ -1,4 +1,4 @@
-# Phase 3b — Trustpilot (PROPOSED)
+# Phase 3b — Trustpilot (APPROVED)
 
 Contract for the `phase-3b-trustpilot` branch. Source: PROJECT_BRIEF.md §6
 (the Trustpilot figures) and §9's "remaining sources" step, plus the Phase 0a
@@ -8,7 +8,7 @@ refusal, the manual snapshot path; no evasion") and the Phase 3a Gotcha
 permitted real page, names replaced, before the parser is written"). Depends
 on Phase 3a merged (PR #5, 2026-09-03).
 
-**Status: PROPOSED — do not start until approved.** No new dependencies:
+**Status: APPROVED 2026-09-03 — in progress.** No new dependencies:
 `httpx` (fetch) and `pyyaml` are the Phase 2 allowlist; the parser uses the
 stdlib `json` decoder already in `ingest/parsed.py`. Trustpilot marks its
 data as JSON-LD, so no HTML-microdata code is added beyond what exists.
