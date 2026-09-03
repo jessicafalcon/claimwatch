@@ -299,6 +299,52 @@ def test_a_corrected_figure_for_an_entered_day_refuses_the_load(
     assert later["raw_platform_snapshots"] == pins.ANCHOR_ROWS + 2
 
 
+@pytest.mark.parametrize(
+    ("field", "corrected"),
+    [("segment", "traditional"), ("channel", "unsolicited"), ("seeded_from", "x")],
+)
+def test_a_corrected_attribution_for_an_entered_key_refuses_the_load(
+    tmp_path, field, corrected
+):
+    """A3 (a): `segment`, `channel` and `seeded_from` are outside the key, so
+    they are in the fingerprint — a row on an existing key with another
+    attribution is a same-key pair and refuses like a corrected figure, never
+    dropped by the not-exists guard (round 2, code-reviewer #4)."""
+    from pipeline.build import build_derived, load_snapshots
+
+    db = tmp_path / "w.duckdb"
+    rebuild("duckdb", "synthetic", database=db)
+    conn = connect("duckdb", database=db)
+    try:
+        row = {
+            "source": "app-store",
+            "profile": "fr-digital-first",
+            "segment": "digital-first",
+            "channel": "invited",
+            "origin": "manual",
+            "rating": Decimal("4.9"),
+            "review_count": 13000,
+            "one_star_share": None,
+            "response_rate": None,
+            "response_delay_days": None,
+            "source_url": "https://apps.apple.com/x",
+            "captured_at": "2026-09-02",
+            "seeded_from": "",
+        }
+        load_snapshots(conn, [row], "first")
+        load_snapshots(conn, [dict(row)], "again")  # the same row: nothing
+        with pytest.raises(PageShapeError, match="another attribution"):
+            load_snapshots(conn, [{**row, field: corrected}], "corrected")
+        build_derived(conn)
+        stored = conn.execute(
+            "select segment, channel, seeded_from from raw_platform_snapshots "
+            "where source_url = 'https://apps.apple.com/x'"
+        ).fetchall()
+        assert stored == [("digital-first", "invited", "")]
+    finally:
+        conn.close()
+
+
 def test_a_respelled_figure_is_the_same_figure_not_a_correction(tmp_path):
     """`4.90` for `4.9`, `13000.0` is outside the shape but `4.900` is not:
     one figure hashes alike however it is spelled, so re-formatting the

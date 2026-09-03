@@ -398,6 +398,16 @@ def test_every_captured_review_joins_exactly_one_declared_page(tmp_path):
     )
     assert len(joined) == pins.APP_STORE_SAMPLE_STG_ROWS
     assert all(n == 1 for _, n, _, _ in joined), joined
+    # one row per address, whatever was re-declared (A3 (a)): the join is
+    # one-to-one by construction, not by luck
+    assert (
+        _query(
+            db,
+            "select source, source_url, count(*) from raw_source_pages "
+            "group by source, source_url having count(*) > 1",
+        )
+        == []
+    )
     assert {(p, s) for _, _, p, s in joined} == {(FEED.profile, FEED.segment)}
     # every declared page carries the real day its declaration was recorded —
     # never an empty provenance column (round 1, code-reviewer #6)
@@ -408,3 +418,34 @@ def test_every_captured_review_joins_exactly_one_declared_page(tmp_path):
     # a second rebuild re-declares the same pages and adds nothing
     again = rebuild("duckdb", "captured", database=db, cache_dir=cache, run_id="again")
     assert again["raw_source_pages"] == counts["raw_source_pages"]
+
+
+def test_a_redeclared_attribution_refuses_the_rebuild(tmp_path):
+    """A3 (a): a declared page already in raw under another profile, segment
+    or channel refuses the rebuild with one line naming the address and the
+    fix — never a second row for one address, which would make the review
+    join two-to-one (round 2, code-reviewer #1, functionality-tester F5)."""
+    import dataclasses
+
+    from pipeline.build import write_source_pages
+
+    db = tmp_path / "w.duckdb"
+    rebuild("duckdb", "synthetic", database=db)
+    conn = connect("duckdb", database=db)
+    try:
+        before = conn.execute("select count(*) from raw_source_pages").fetchone()[0]
+        for field, value in (
+            ("segment", "traditional"),
+            ("channel", "unsolicited" if FEED.channel != "unsolicited" else "invited"),
+            ("profile", "peer-x"),
+        ):
+            changed = dataclasses.replace(FEED, **{field: value})
+            with pytest.raises(PageShapeError, match="another attribution") as exc:
+                write_source_pages(conn, "redeclared", (changed,))
+            assert FEED.page_url(1) in str(exc.value) and "make reset" in str(exc.value)
+            assert "\n" not in str(exc.value)
+        write_source_pages(conn, "again", (FEED,))  # the same attribution: nothing
+        after = conn.execute("select count(*) from raw_source_pages").fetchone()[0]
+        assert after == before
+    finally:
+        conn.close()

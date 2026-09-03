@@ -8,8 +8,9 @@
 --   Never a pattern over the address (the Portability contract keeps
 --   pattern-matching out of SQL).
 -- Provenance: source, source_url, captured_at (the day the source was
---   declared), run_id. content_hash covers profile, segment, channel, so a
---   re-declaration with a changed attribution appends a new row.
+--   declared), run_id. content_hash covers profile, segment, channel; a
+--   re-declaration with a changed attribution refuses the rebuild (spec
+--   Phase 3a, A3), so one address has one row.
 -- Feeds: theme_share_by_month (B2.2) and theme_share_by_segment (B2.5) via
 --   classified_reviews (Phase 5b+); nothing charts it yet.
 create table if not exists raw_source_pages (

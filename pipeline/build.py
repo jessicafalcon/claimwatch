@@ -59,7 +59,11 @@ _SEP = "\x1f"  # unit separator — cannot appear in the CSV content fields
 # The content fields whose hash is the fingerprint (provenance is excluded, so a
 # re-capture of the same review at a new time is NOT a new row).
 _CONTENT = ("rating", "review_date", "title", "body")
-# A snapshot's fingerprint: its five measures (spec Phase 3a, pinned decision 1).
+# A snapshot's five measures (spec Phase 3a, pinned decision 1) and, with
+# them, its fingerprint: the measures plus the attribution the key does not
+# carry — segment, channel, seeded_from — so a corrected attribution on an
+# existing key is a same-key pair and refuses like a corrected figure, never
+# silently dropped by the `where not exists` guard (A3 (a)).
 _MEASURES = (
     "rating",
     "review_count",
@@ -67,6 +71,7 @@ _MEASURES = (
     "response_rate",
     "response_delay_days",
 )
+_FINGERPRINT = _MEASURES + ("segment", "channel", "seeded_from")
 ANCHORS = ROOT / "fixtures" / "anchors" / "platform_snapshots_seed.csv"
 ANCHOR_COLUMNS = (
     "platform",
@@ -120,9 +125,10 @@ def _canonical(value: object) -> str:
 
 
 def snapshot_hash(row: dict[str, object]) -> str:
-    """sha256 of the five measures, in a fixed order and one spelling each, so
-    a row is its numbers and nothing else."""
-    payload = _SEP.join(_canonical(row[c]) for c in _MEASURES)
+    """sha256 of the five measures and the three attribution values outside
+    the key, in a fixed order and one spelling each, so a row is its numbers
+    and its attribution and nothing else."""
+    payload = _SEP.join(_canonical(row.get(c, "")) for c in _FINGERPRINT)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
@@ -321,9 +327,10 @@ def load_snapshots(conn, rows: list[dict[str, object]], run_id: str) -> None:
     the row: the platform, the profile, how the row came to be and the address
     it was read from — a platform root for an anchor, the declared listing
     address for a hand-read row, the page address for a capture — and its day
-    or instant. A row whose key is already in raw under OTHER figures is
-    refused with one line: that arises from a corrected hand entry, a
-    re-frozen seed or a parser whose fingerprint changed, and the fix is
+    or instant. A row whose key is already in raw under OTHER figures or
+    another attribution is refused with one line: that arises from a corrected
+    hand entry, a re-frozen seed or a parser whose fingerprint changed, and
+    the fix is
     `make reset CONFIRM=yes` then `make rebuild`, since the corpus is rebuilt
     from tracked inputs. Nothing is
     tiebroken downstream: the key is unique in raw."""
@@ -344,8 +351,9 @@ def load_snapshots(conn, rows: list[dict[str, object]], run_id: str) -> None:
             raise PageShapeError(
                 f"{where}: a snapshot for ({r['source']}, {r['profile']}, "
                 f"{r['origin']}, {r['captured_at']}) is already in the corpus with "
-                "other figures — a corrected entry, a re-frozen seed or a changed "
-                "parse needs `make reset CONFIRM=yes` then `make rebuild`"
+                "other figures or another attribution — a corrected entry, a "
+                "re-frozen seed or a changed parse needs `make reset CONFIRM=yes` "
+                "then `make rebuild`"
             )
         conn.execute(
             "insert into raw_platform_snapshots "
@@ -399,11 +407,30 @@ def write_source_pages(
     conn, run_id: str, sources: tuple[Source, ...] = SOURCES
 ) -> None:
     """Append each declared page not already present under (source, source_url)
-    + the hash of its attribution — the same guard shape as the other loaders."""
+    + the hash of its attribution — the same guard shape as the other loaders.
+    A declared page whose attribution differs from the row already in raw
+    REFUSES the rebuild (A3 (a)): a page's attribution is one fact, not a
+    series, and the review join must stay one-to-one, so a re-declaration
+    never appends a second row for one address; the fix is `make reset
+    CONFIRM=yes` then `make rebuild`."""
     for r in source_pages(sources):
         h = hashlib.sha256(
             _SEP.join((r["profile"], r["segment"], r["channel"])).encode("utf-8")
         ).hexdigest()
+        seen = {
+            row[0]
+            for row in conn.execute(
+                "select content_hash from raw_source_pages "
+                "where source = ? and source_url = ?",
+                [r["source"], r["source_url"]],
+            ).fetchall()
+        }
+        if seen and seen != {h}:
+            raise PageShapeError(
+                f"{r['source_url']}: the declared page is already in the corpus "
+                "under another attribution (profile, segment or channel) — a "
+                "re-declaration needs `make reset CONFIRM=yes` then `make rebuild`"
+            )
         conn.execute(
             "insert into raw_source_pages "
             "(source, source_url, profile, segment, channel, captured_at, run_id, "
