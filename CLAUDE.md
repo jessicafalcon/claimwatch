@@ -94,7 +94,10 @@ in the middle, and come out on the right as the numbers the study shows.
   exact shape: three pages, their meta files and the host's real robots rule
   (frozen in Phase 2, robots re-frozen in 3a); `fixtures/listings/` — a
   hand-written store listing page with its machine-readable rating block
-  (frozen in Phase 3a). Every set carries a `MANIFEST.sha256`; `ROWS=samples`
+  (frozen in Phase 3a);
+  `fixtures/opinion-assurances/` — a hand-written review profile in the page's
+  microdata shape, three pages of a fake, nameless profile (frozen in Phase
+  3a). Every set carries a `MANIFEST.sha256`; `ROWS=samples`
   runs each through its real parser.
 - `ingest/` — the scrapers. A *capture* is one run's saved copy of the pages
   exactly as they arrived, with each page's address and time beside it and the
@@ -118,11 +121,10 @@ in the middle, and come out on the right as the numbers the study shows.
   `cost_model.py` (`FORMULAS`), `guardrail_sim.py`. *(Phase 9)* `study/` —
   Metabase setup + the HTML export. *(Phase 10)* `dags/friction_ledger.py`.
 - `data/` — gitignored working output (corpus, captured pages, `*.duckdb`);
-  `data/snapshots/` is the one tracked subtree: today
-  `manual_snapshots.csv`, the figures a person read off a page whose terms
-  forbid a robot (a declared source name, a day, five numbers, the word
-  `page` — no address, no name), loaded as Measured; *(Phase 4)* the weekly
-  captures.
+  `data/snapshots/` is the one tracked subtree: today `manual_snapshots.csv`,
+  the figures a person read off a page whose terms forbid a robot (a declared
+  source name, a day, five numbers and the word `page`; it carries no address
+  and no person's name), loaded as Measured; *(Phase 4)* the weekly captures.
 
 ## Commands (macOS, uv)
 
@@ -157,12 +159,13 @@ in the middle, and come out on the right as the numbers the study shows.
   agent: fetch each declared source's pages (a review feed, a review profile,
   a store listing) into a new capture under `data/cache/<platform>/<source>/`,
   robots.txt first and every page checked against it, ≥ 2 s apart per host
-  (more if the site asks), identifying User-Agent, no proxy, no retry, at
-  most 60 pages per source. Needs `CONFIRM=yes` on the command line
-  (`$(origin CONFIRM)`, as `reset`); refuses a source we have recorded as one
-  not to fetch (its robots file or its terms say no; the reason and date sit
-  beside the source in code and in DECISIONS), one with no page address
-  filled in, and one whose page robots.txt disallows.
+  (more if the site asks), identifying User-Agent, no proxy, no retry, at most
+  60 pages per source. Needs `CONFIRM=yes` on the command line (`$(origin
+  CONFIRM)`, as `reset`); skips, with one line, a source we have recorded as
+  one not to fetch (its robots file or its terms say no; the reason and date
+  sit beside the source in code and in DECISIONS) and refuses it when
+  `SOURCE=` names it; refuses one with no page address filled in and one whose
+  page robots.txt disallows; exit 2 means a refusal met during the run.
 - `make reset [TARGET=duckdb]` — DESTRUCTIVE: drop every DuckDB file this repo
   built, the corpus and one per rebuild input; needs `CONFIRM=yes` on the command
   line (`$(origin CONFIRM)`; an environment `CONFIRM=yes` does not count).
@@ -449,21 +452,24 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 ## Current status
 
 **Phase 3a — Snapshots and the remaining polite sources**
-(`phase-3a-snapshots`, spec `specs/phase-3a-snapshots.md`, APPROVED
-2026-09-02 with amendment A1): being built. Done so far: the ratings each
-platform shows are now a table of their own, seeded from the brief's public
-figures (tagged Documented) and extended by our own captures and hand-read
-rows (Measured), with four Beat 1–2 charts built from it; every source is one
-declaration that says which parser reads it, where its pages are and whether
-its site lets us fetch it; `ROWS` names what a rebuild loads. Of the three
-sites checked, Google Play's listing may be fetched, Apple's listing may not
+(`phase-3a-snapshots`, spec `specs/phase-3a-snapshots.md`, APPROVED 2026-09-02
+with amendment A1): being built; review round 1 done, its code fixes
+committed, the fix amendments awaiting approval. What a reader sees: the
+rating each platform shows is now a table of its own, seeded from the brief's
+public figures (Documented) and extended by the figures we capture or read off
+a page ourselves (Measured), with four Beat 1–2 charts built from it. How:
+every source is one declaration — which parser reads it, where its pages are,
+whether its site lets us fetch it — and `ROWS` names what a rebuild loads. Of
+the three sites checked, Google Play's listing may be fetched, Apple's may not
 (its terms), and Opinion Assurances gave written authorization for its review
-pages — the first real review rows come from there, read from the page's
+pages (recorded beside the source in `ingest/sources.py` and in DECISIONS →
+Phase 3a). The first real review rows come from there, read from the page's
 machine-readable marks with the reviewer's name never read. Remaining: the
-first live run, the review rounds, the exit audit. The DONE command is
-`make rebuild && make idempotency-check ROWS=captured`; Phase 1's line stays
-green (raw 40 / staging 39); CI runs `ROWS=synthetic` and `ROWS=samples`.
-Phase 2 merged (PR #4). Next: the Phase 3a PR; then Phase 3b — Trustpilot.
+amendments, the first live run, review round 2, the exit audit. The DONE
+command is `make rebuild && make idempotency-check ROWS=captured`; Phase 1's
+line stays green (raw 40 / staging 39); CI runs `ROWS=synthetic` and
+`ROWS=samples`. Phase 2 merged (PR #4). Next: the Phase 3a PR; then Phase 3b —
+Trustpilot.
 
 Open BACKLOG rows: **13**.
 

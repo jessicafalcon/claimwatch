@@ -69,10 +69,9 @@ def _play_capture(cache: Path, stamp: str) -> None:
     (d / "MANIFEST.sha256").unlink()
 
 
-def test_anchors_seed_eight_documented_rows_with_provenance(tmp_path):
-    """Nine, since the re-freeze (the brief's Opinion Assurances anchor was
-    missing from the Phase 1 file); the spec's 'eight' is corrected in the
-    Delivered paragraph."""
+def test_anchors_seed_nine_documented_rows_with_provenance(tmp_path):
+    """Nine since the re-freeze: the brief's Opinion Assurances anchor was
+    missing from the Phase 1 file (round 1: the spec says nine everywhere)."""
     db = tmp_path / "w.duckdb"
     counts = rebuild("duckdb", "synthetic", database=db)
     assert counts["raw_platform_snapshots"] == pins.ANCHOR_ROWS

@@ -559,20 +559,26 @@ renamed the rebuild input, closed five BACKLOG rows.
   Rejected: fetching a page whose terms say no because its robots file says
   yes (both bind us); Google Play reviews through the internal call (not a
   public feed, and disallowed).
-- **`platform_snapshots`: anchors Documented, our captures Measured (D2,
-  D3).** `raw_platform_snapshots` keyed on `(source, profile, captured_at)` +
-  a hash of five measures (rating, count, one-star share, response rate,
-  response delay); `origin` ∈ {anchor, manual, fetch} decides the tag in
-  staging by an exact comparison. `fixtures/anchors/` was re-frozen
-  (`Freeze:` in the spec, MANIFEST regenerated): the Phase 1 file had no
-  profile (two peers collided on every key), carried a channel where a
+- **`platform_snapshots`: anchors Documented, our captures and hand-read
+  rows Measured (D2, D3).** `raw_platform_snapshots` keyed on `(source,
+  profile, captured_at)` + a hash of five measures (rating, count, one-star
+  share, response rate, response delay); `origin` ∈ {anchor, manual, fetch}
+  decides the tag in staging by an exact comparison. `fixtures/anchors/` was
+  re-frozen (`Freeze:` in the spec, MANIFEST regenerated): the Phase 1 file
+  had no profile (two peers collided on every key), carried a channel where a
   segment belongs on the two app rows, and omitted the brief's Opinion
-  Assurances anchor (534 reviews, 23.1 % one-star, 82 % answered, 1.5 days,
-  no rating) — nine anchors now, not eight; PROJECT_BRIEF.md §6 says
-  Documented on the developer's call. Rejected: Measured for anchors (a
-  person's reading at scoping, without a capture time of ours); repairing
-  the seed's meaning in SQL; keeping the page's full-precision rating as text
-  (`decimal(4,3)`, rounded half-even, keeps every displayed value exactly).
+  Assurances anchor (534 reviews, 23.1 % one-star, 82 % answered, 1.5 days, no
+  rating) — nine anchors now, not eight; PROJECT_BRIEF.md §6 says Documented
+  on the developer's call. Rejected: Measured for anchors (a person's reading
+  at scoping, without a capture time of ours); repairing the seed's meaning in
+  SQL; keeping the page's full-precision rating as text (`decimal(4,3)`,
+  rounded half-even, keeps every displayed value exactly). The anchors'
+  addresses are platform roots, not profile pages: a profile address spells
+  the brand and may sit only in `ingest/sources.py` (D1), so a Documented
+  point opens to its platform and to the brief's §6, not to a page — the trade
+  D1 makes, stated in BACKING's note on the rating rows. An anchor dated only
+  to a month or a season is placed on the 15th of that month ("early 2025" is
+  2025-01-15); the day is a placement, not a reading.
 - **Four marts, four flips to Documented.** `rating_trend` (B1.2),
   `channel_gap` (B1.3), `platform_stats` (B1.4), `peer_ratings` (B2.3) are
   window selects over `stg_platform_snapshots`, each row carrying its point's

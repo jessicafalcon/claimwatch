@@ -31,16 +31,26 @@ every rule below except the last sentence, which is editorial (PROJECT_BRIEF.md
   is out of scope and is removed.
 - Cells never contain `|` (write "or"). Written before code (Phase 0b); every
   later phase's work maps to a row.
+- The rating rows (B1.2, B1.3, B1.4, B2.3) mix three kinds of point, each
+  carrying its own tag: the public figures gathered when the study was scoped
+  (the *anchors*, Documented, `fixtures/anchors/platform_snapshots_seed.csv`);
+  the figures a person read off a page whose terms forbid a robot (Measured,
+  `data/snapshots/manual_snapshots.csv`); and our own captures (Measured,
+  under `data/cache/`, gitignored). An anchor's address is its platform's
+  root, not a profile page: a profile address spells the brand and may sit
+  only in `ingest/sources.py` (DECISIONS, D1), so a Documented point opens to
+  its platform and to PROJECT_BRIEF.md §6, not to a page. The row's own tag
+  stays Documented until the points we measure make the series.
 
 | Study claim (beat, chart/sentence) | Mart table (where the number lives) | SQL file (the query that builds it) | Upstream source (where the data came from) | Tag (what kind of evidence) |
 |---|---|---|---|---|
 | B1.1 Hero case: a roughly €340 ER refund on hold for months; "Day N" frozen at the last confirmed date (eventual Documented) | — (documented case) | — | — | Pending |
-| B1.2 The studied segment's public rating over time, monthly (Documented from the seeded anchors; Measured once our own captures accrue, Phase 4 — each point carries its own tag) | rating_trend | `sql/marts/rating_trend.sql` | `fixtures/anchors/platform_snapshots_seed.csv`; https://www.trustpilot.com/; https://www.opinion-assurances.fr/; https://apps.apple.com/; https://play.google.com/ | Documented |
-| B1.3 Channel gap: ratings on invited channels vs unsolicited platforms (Documented from the seeded anchors; Measured once our own captures accrue, Phase 4 — each point carries its own tag) | channel_gap | `sql/marts/channel_gap.sql` | `fixtures/anchors/platform_snapshots_seed.csv`; https://www.trustpilot.com/; https://www.opinion-assurances.fr/; https://apps.apple.com/; https://play.google.com/ | Documented |
-| B1.4 Stat row: one-star share, review counts, response-lag differences (Documented from the seeded anchors; Measured once our own captures accrue, Phase 4 — each point carries its own tag) | platform_stats | `sql/marts/platform_stats.sql` | `fixtures/anchors/platform_snapshots_seed.csv`; https://www.trustpilot.com/; https://www.opinion-assurances.fr/; https://apps.apple.com/; https://play.google.com/ | Documented |
+| B1.2 The studied segment's public rating over time, monthly (three kinds of point, each carrying its own tag — see the note above the table) | rating_trend | `sql/marts/rating_trend.sql` | `fixtures/anchors/platform_snapshots_seed.csv`; `data/snapshots/manual_snapshots.csv`; https://www.trustpilot.com/; https://www.opinion-assurances.fr/; https://apps.apple.com/; https://play.google.com/ | Documented |
+| B1.3 Channel gap: ratings on invited channels vs unsolicited platforms (three kinds of point, each carrying its own tag — see the note above the table) | channel_gap | `sql/marts/channel_gap.sql` | `fixtures/anchors/platform_snapshots_seed.csv`; `data/snapshots/manual_snapshots.csv`; https://www.trustpilot.com/; https://www.opinion-assurances.fr/; https://apps.apple.com/; https://play.google.com/ | Documented |
+| B1.4 Stat row: one-star share, review counts, response-lag differences (three kinds of point, each carrying its own tag — see the note above the table) | platform_stats | `sql/marts/platform_stats.sql` | `fixtures/anchors/platform_snapshots_seed.csv`; `data/snapshots/manual_snapshots.csv`; https://www.trustpilot.com/; https://www.opinion-assurances.fr/; https://apps.apple.com/; https://play.google.com/ | Documented |
 | B2.1 The five-theme taxonomy with paraphrased public examples (eventual Documented) | — (documented examples) | — | — | Pending |
 | B2.2 Theme share of negative reviews over time, by segment, via the gated classifier (eventual Measured) | theme_share_by_month | `sql/marts/theme_share_by_month.sql` | — | Pending |
-| B2.3 Peer context: public ratings across the market segment (Documented from the seeded anchors; Measured once our own captures accrue, Phase 4 — each point carries its own tag) | peer_ratings | `sql/marts/peer_ratings.sql` | `fixtures/anchors/platform_snapshots_seed.csv`; https://www.trustpilot.com/; https://www.opinion-assurances.fr/; https://apps.apple.com/; https://play.google.com/ | Documented |
+| B2.3 Peer context: public ratings across the market segment (three kinds of point, each carrying its own tag — see the note above the table) | peer_ratings | `sql/marts/peer_ratings.sql` | `fixtures/anchors/platform_snapshots_seed.csv`; `data/snapshots/manual_snapshots.csv`; https://www.trustpilot.com/; https://www.opinion-assurances.fr/; https://apps.apple.com/; https://play.google.com/ | Documented |
 | B2.4 Classifier quality: per-theme precision and recall vs hand labels (eventual Measured) | classifier_quality | `sql/marts/classifier_quality.sql` | — | Pending |
 | B2.5 Held-claim complaint share, digital-first vs traditional mutuelles (eventual Measured) | theme_share_by_segment | `sql/marts/theme_share_by_segment.sql` | — | Pending |
 | B3.1 Cost-model formulas printed next to their output (eventual Modeled) | cost_model_outputs | `sql/marts/cost_model_outputs.sql` | — | Pending |

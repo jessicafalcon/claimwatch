@@ -197,7 +197,7 @@ Plus: **positive** and **other/unclassified**. A review can carry multiple theme
 
 ## 6. Verified anchor data points (seed + validation set)
 
-These are real, sourced public figures gathered during scoping. They seed `platform_snapshots`, validate early pipeline output, and appear in the study as Documented figures marked as seeded (our own later captures are Measured — Phase 3a, decision D3). Re-verify each at build time and store with source URL + capture date.
+These are real, sourced public figures gathered during scoping. They seed `platform_snapshots`, validate early pipeline output, and appear in the study as Documented figures marked as seeded (our own later captures are Measured — Phase 3a, decision D3). Each is stored with its source and the day it was read (`fixtures/anchors/`); a rebuild loads them as they were read and does not check them against the live page — our own later captures land beside them as Measured.
 
 - Trustpilot France profile of the studied digital-first insurer: ~4.2/5 on 524 reviews (early 2025; then 75% five-star, 18% one-star) → 3.8/5 on 840 reviews (Sept 2025) → 3.9/5 on 975 reviews (June 2026). International profile: ~1,066 reviews (Aug 2026). Platform flags "no recent history of review invitations." Company answered ~76–84% of negative reviews, typical response time 1–2 weeks.
 - Opinion Assurances: 534 reviews, ~23.1% one-star, company response rate 82%, response delay ~1.5 days.
