@@ -11,7 +11,7 @@ from decimal import Decimal
 import pytest
 
 from ingest.opinion_assurances import REVIEW_SCALE, SAMPLE_DIR, parse
-from ingest.parsed import REVIEW_RATINGS, PageShapeError
+from ingest.parsed import REVIEW_RATINGS, PageShapeError, review_rating
 from ingest.sources import sample_source
 from tests import pins
 
@@ -406,6 +406,23 @@ def test_a_rating_outside_the_half_steps_refuses_the_page(value):
         PageShapeError, match="review 2': field 'ratingValue' is not a half-step 1..5"
     ):
         parse(html, PAGE_URL, CAPTURED, SRC)
+
+
+def test_review_rating_is_a_lookup_in_the_one_declared_set():
+    """A6, declared once: `review_rating` accepts a value iff its spelling is
+    a member's — no second copy of the nine values as a pattern, no text
+    reaching `Decimal()`. A member however its source spells a number (a
+    digit string, an int, a Decimal with a trailing zero) is the member; a
+    string with a trailing zero, a float, a bool, an exponent or a leading
+    zero is not (round 4, code-reviewer #6; functionality-tester #5)."""
+    assert {review_rating(str(r)) for r in REVIEW_RATINGS} == set(REVIEW_RATINGS)
+    assert review_rating(4) == Decimal(4) and review_rating("4") == Decimal(4)
+    assert review_rating(Decimal("4.0")) == Decimal(4)
+    assert review_rating(Decimal("4.50")) == Decimal("4.5")
+    for outside in ("1.0", "1.50", 4.5, True, False, "1e0", "01", "1.", None, [4]):
+        assert review_rating(outside) is None, outside
+    for bad_decimal in (Decimal("NaN"), Decimal("Infinity"), Decimal("4.25")):
+        assert review_rating(bad_decimal) is None, bad_decimal
 
 
 def test_the_sample_carries_one_half_step():

@@ -116,26 +116,27 @@ def rating_from_page(value: str) -> Decimal | None:
 # App Store feed in digits, which are members). A digit, or a digit and `.5`,
 # written so; `4.0`, `4.25`, `0.5` and `6` are outside it.
 REVIEW_RATINGS: frozenset[Decimal] = frozenset(Decimal(n) / 2 for n in range(2, 11))
-_REVIEW_RATING = re.compile(r"^(?:[1-4](?:\.5)?|5)$")
+# Each member's one spelling — the column's, trailing zeros dropped — derived
+# from the set, so the parse below is a lookup in the declaration and not a
+# second copy of it (round 4, code-reviewer #6).
+_REVIEW_RATING_SPELLINGS: dict[str, Decimal] = {
+    format(r, "f"): r for r in REVIEW_RATINGS
+}
 
 
 def review_rating(value: object) -> Decimal | None:
     """A review's rating as a parser or a fixture hands it — a string as
-    written, an integer, or a Decimal — as the column's value iff it is one of
-    `REVIEW_RATINGS`; None otherwise (the caller names item and field)."""
-    if isinstance(value, bool):
-        return None
+    written, an integer, or a Decimal — as the column's value iff its spelling
+    is a member's; None otherwise (the caller names item and field). A bool
+    spells `True`, a float is not accepted at all, and no text reaches
+    `Decimal()`: the lookup is the whole parse."""
     if isinstance(value, Decimal):
         text = format(value.normalize(), "f") if value.is_finite() else ""
     elif isinstance(value, (int, str)):
         text = str(value)
     else:
         return None
-    if not _REVIEW_RATING.fullmatch(text):
-        return None
-    rating = Decimal(text)
-    assert rating in REVIEW_RATINGS
-    return rating
+    return _REVIEW_RATING_SPELLINGS.get(text)
 
 
 class PageShapeError(ValueError):
