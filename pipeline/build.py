@@ -322,9 +322,10 @@ def load_snapshots(conn, rows: list[dict[str, object]], run_id: str) -> None:
     it was read from — a platform root for an anchor, the declared listing
     address for a hand-read row, the page address for a capture — and its day
     or instant. A row whose key is already in raw under OTHER figures is
-    refused with one line: that arises only from a corrected hand entry or a
-    re-frozen seed, and the fix is `make reset CONFIRM=yes` then `make
-    rebuild`, since the corpus is rebuilt from tracked inputs. Nothing is
+    refused with one line: that arises from a corrected hand entry, a
+    re-frozen seed or a parser whose fingerprint changed, and the fix is
+    `make reset CONFIRM=yes` then `make rebuild`, since the corpus is rebuilt
+    from tracked inputs. Nothing is
     tiebroken downstream: the key is unique in raw."""
     for r in rows:
         h = snapshot_hash(r)
@@ -343,8 +344,8 @@ def load_snapshots(conn, rows: list[dict[str, object]], run_id: str) -> None:
             raise PageShapeError(
                 f"{where}: a snapshot for ({r['source']}, {r['profile']}, "
                 f"{r['origin']}, {r['captured_at']}) is already in the corpus with "
-                "other figures — a corrected entry needs `make reset CONFIRM=yes` "
-                "then `make rebuild`"
+                "other figures — a corrected entry, a re-frozen seed or a changed "
+                "parse needs `make reset CONFIRM=yes` then `make rebuild`"
             )
         conn.execute(
             "insert into raw_platform_snapshots "

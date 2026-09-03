@@ -347,9 +347,10 @@ make rebuild && make idempotency-check ROWS=captured
   shows the unsolicited channel and states the sampling bias beside it.
   `channel_gap` (B1.3): one row per `(segment, channel, source, profile)`,
   the latest snapshot, with its tag — invited beside unsolicited for one
-  segment. `platform_stats` (B1.4): one row per `(segment, source, profile)`,
-  the latest snapshot carrying a non-null `one_star_share`, `response_rate`
-  or `response_delay_days`, with `review_count` and tag. `peer_ratings`
+  segment. `platform_stats` (B1.4): one row per `(segment, source, profile,
+  stat)` over the closed set `{review_count, one_star_share, response_rate,
+  response_delay_days}`, each the latest reading of that stat with its own
+  tag, address and day (A2). `peer_ratings`
   (B2.3): one row per `(segment, source, profile)` over the unsolicited
   channel, the latest snapshot, with its tag and date. All four are
   window-function selects over `stg_platform_snapshots` in the `stg_reviews`
@@ -380,8 +381,8 @@ make rebuild && make idempotency-check ROWS=captured
   from — the one place a brand-carrying address may appear, D1),
   `fetchable`, `terms` (the reason when not fetchable: the robots rule or
   the terms clause, with the date it was read), `declared_on`. Each parser
-  exposes `parse_page(body, page_url, captured_at, source) ->
-  Parsed(reviews, snapshots)` and names the body's file extension (`json` or
+  exposes `parse(body, page_url, captured_at, source) -> Parsed(reviews,
+  snapshots)` and names the body's file extension (`json` or
   `html`) and its sample directory (`fixtures/<parser-slug>/`). The cache
   root is bound once (`ingest/sources.py::CACHE_ROOT`, `data/cache/`); a
   source's cache directory is `CACHE_ROOT / platform / name`;
@@ -444,7 +445,9 @@ make rebuild && make idempotency-check ROWS=captured
   `reviewRating`'s `ratingValue`, an integer 1–5 checked against `bestRating`
   5; `review_date` = the review's own date as `YYYY-MM-DD`; `body` = the
   review text; `title` = the page's title-like field if the structure has one,
-  else empty; `external_id` = the review's stable identifier in the markup);
+  else empty; `external_id` = the content hash of (publication date,
+  experience date, rating, body) — the page marks no stable identifier,
+  decided at build, A2);
   the page's one `AggregateRating` (`ratingValue`, `ratingCount`) and its
   one-star share, response rate and response delay, if the structure carries
   them as data, yield the snapshot row; the `author` scope and every `Person`
@@ -470,8 +473,9 @@ make rebuild && make idempotency-check ROWS=captured
   `rating`, `review_count`, `one_star_share`, `response_rate`,
   `response_delay_days` (the last three empty when the page does not show
   them) and `read_from`, always the word `page` (the figure was read off the
-  declared address) — no address, no name, no free text. `make rebuild` parses it strictly (an undeclared or fetchable
-  source name, a bad number, a share outside 0–1, a date that is not one, a
+  declared address) — no address, no name, no free text. `make rebuild`
+  parses it strictly (an undeclared or fetchable source name, a bad number, a
+  share outside 0–1, a date that is not one, a
   wrong column set: one-line refusal naming the line and field); platform,
   address, profile, segment and channel come from the declaration; the row
   loads with `origin = manual`; a row entered twice loads once. No make
@@ -676,7 +680,7 @@ holds no address, no name, no free text (`read_from` is the word `page`).
 
 | Target | empty | `../x` | `"; ` | env-exported | `$(origin)` | Pinned by |
 |---|---|---|---|---|---|---|
-| `scrape` | `SOURCE` empty → every declared source (non-fetchable ones report one line each, the fetchable one fetches); `CONFIRM` empty → prompt on a tty, refuse non-interactively, no request | `SOURCE` refused — a declared name, never a path; the capture directory is derived from the declaration | one literal arg; not a declared name → refused | `unexport`ed; validated in Python; `CONFIRM=yes` from the environment → `$(origin)` = `environment` → refused, no request | `CONFIRM=yes` counts only from the command line | `tests/test_makefile.py::test_scrape_requires_command_line_confirm`, `::test_scrape_source_is_a_closed_set`, `::test_scrape_variables_reach_python_as_one_literal`; `tests/test_cli.py::test_cli_scrape_skips_a_source_declared_not_fetchable_and_exits_0`, `::test_cli_scrape_exits_2_only_on_a_refusal_met_during_the_run`, `::test_cli_scrape_naming_a_source_declared_not_fetchable_is_a_refusal` (round 1: a plain run skips such a source with one line; naming it, or a refusal met during the run, is exit 2) |
+| `scrape` | `SOURCE` empty → every declared source (non-fetchable ones report one line each; each fetchable one fetches — two today, on two hosts, at most 60 pages each); `CONFIRM` empty → prompt on a tty, refuse non-interactively, no request | `SOURCE` refused — a declared name, never a path; the capture directory is derived from the declaration | one literal arg; not a declared name → refused | `unexport`ed; validated in Python; `CONFIRM=yes` from the environment → `$(origin)` = `environment` → refused, no request | `CONFIRM=yes` counts only from the command line | `tests/test_makefile.py::test_scrape_requires_command_line_confirm`, `::test_scrape_source_is_a_closed_set`, `::test_scrape_variables_reach_python_as_one_literal`; `tests/test_cli.py::test_cli_scrape_skips_a_source_declared_not_fetchable_and_exits_0`, `::test_cli_scrape_exits_2_only_on_a_refusal_met_during_the_run`, `::test_cli_scrape_naming_a_source_declared_not_fetchable_is_a_refusal` (round 1: a plain run skips such a source with one line; naming it, or a refusal met during the run, is exit 2) |
 | `rebuild` | `ROWS` → `captured` (zero captures → the anchors and the manual file, with a one-line hint) | refused (closed set of four names) | one literal arg; refused | `unexport`ed; validated in Python | n/a | `tests/test_makefile.py::test_rebuild_variables_are_a_closed_set` (re-pinned to `ROWS`), `tests/test_cli.py::test_cli_refuses_bad_rows_with_exit_2` |
 | `idempotency-check` | `ROWS` → `synthetic` | refused | refused | `unexport`ed; validated in Python | n/a | `tests/test_makefile.py::test_idempotency_check_variables_are_a_closed_set` (re-pinned) |
 | `reset` | unchanged: prompt or refuse | n/a (no path taken) | n/a | `CONFIRM=yes` from the environment does not confirm | command line only | `tests/test_makefile.py::test_reset_requires_command_line_confirm`, `tests/test_cli.py::test_reset_removes_only_the_db_and_wal` (the file set re-pinned to the `ROWS` names) |

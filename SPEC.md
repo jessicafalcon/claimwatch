@@ -7,19 +7,19 @@ those parts and the exact charts inside them. Each panel below names two things:
 the kind of evidence it carries, and the `BACKING.md` row (`B<beat>.<n>`) that
 holds its query and its source. Nothing else is a chart in this study.
 
-**How to read a panel.** Every number in a panel wears exactly one evidence
-tag — *Measured* (we captured it), *Documented* (a sourced public report),
-*Modeled* (arithmetic we show), or *Pending* (an honest placeholder that shows
-no number); a panel that mixes kinds of point names each tag it carries, and
-every point is marked. Most rows are still Pending: the contracts were written
-before the data, so each panel names the tag it will wear once its data lands
-and shows a gray "not yet" state until then. The rating panels of Beat 1 and
-the peer context of Beat 2 show numbers today. Those numbers are mostly the
-public figures gathered when the study was scoped — we call them the *anchors*
-— tagged *Documented*. The figures we capture or read off a page ourselves
-land beside them, tagged *Measured*. Each point carries its own tag, so a
-chart can be read point by point. A panel never invents a number to fill
-itself.
+**How to read a panel.** Every number in a panel wears exactly one evidence tag
+— *Measured* (we captured it), *Documented* (a sourced public report) or
+*Modeled* (arithmetic we show). A panel with nothing to show yet is *Pending*:
+an honest placeholder, never a made-up number. A panel that mixes kinds of
+point names each tag it carries, and every point is marked. Most rows are still
+Pending: the contracts were written before the data, so each panel names the
+tag it will wear once its data lands and shows a gray "not yet" state until
+then. The rating panels of Beat 1 and the peer context of Beat 2 show numbers
+today. Those numbers are mostly the public figures gathered when the study was
+scoped — we call them the *anchors* — tagged *Documented*. The figures we
+capture or read off a page ourselves land beside them, tagged *Measured*. Each
+point carries its own tag, so a chart can be read point by point. A panel never
+invents a number to fill itself.
 
 **The classification grain (settled here, before any theme chart is frozen).** A
 review can be about more than one thing, so the classifier writes **one row per
@@ -44,10 +44,12 @@ they do not.
 *Under the hood:* ratings live in `platform_snapshots`: the anchors from
 PROJECT_BRIEF.md §6, the figures a person read off a page whose terms forbid a
 robot, and our own captures, each row marked with how it came to be. Repeated
-captures start in Phase 4. A figure the brief dates to a month or a season is
-placed on the 15th of that month; one it dates to a span of years is placed at
-mid-year of the span's first year ("2025–2026" is 2025-06-15); one it does not
-date is placed on the day of the figure it was gathered beside (the Google
+captures start in Phase 4. A figure the brief dates to a month is placed on
+the 15th of that month, and one it dates to a season on the 15th of that
+season's first month ("early 2025" is 2025-01-15); one it dates to a span of
+years is placed at mid-year of the span's first year ("2025–2026" is
+2025-06-15); one it does not date is placed on the day of the figure it was
+gathered beside (the Google
 Play figure beside the App Store's, 2024-09-15; the Opinion Assurances figures
 beside the June 2026 reading, 2026-06-15). The day is a placement, not a
 reading.

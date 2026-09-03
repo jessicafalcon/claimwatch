@@ -50,8 +50,10 @@ place and never deleted.
 - **Raw is append-only, idempotent on `(source, external_id, content_hash)`;
   staging keeps the latest capture.** A re-run of an unchanged review inserts
   nothing, an edited review appends a new row, so "run twice, counts unchanged"
-  holds; `run_id` is stamped in Python (never in SQL) and is in no natural key
-  and no mart. ([PLAN §4 decision 2](docs/PLAN.md); [Phase 1](#phase-1))
+  holds; `run_id` is stamped in Python (never in SQL) and is in no natural
+  key; every mart carries it as provenance, so a displayed point can be
+  traced to the run that wrote it. ([PLAN §4 decision 2](docs/PLAN.md);
+  [Phase 1](#phase-1))
 
 **Data**
 
@@ -100,10 +102,12 @@ place and never deleted.
     `data/snapshots/manual_snapshots.csv`, tagged Measured. The by-id address
     also answers a redirect to a slug address (Gotchas). ([Phase
     3a](#phase-3a))
-  - *Opinion Assurances profile pages (Phase 3a).* `robots.txt` allows the
-    profile and its path-based pages (`…-page<n>.html`) and disallows every
-    address with a query string; the site's conditions générales (V.3) forbid
-    automated extraction **without prior written authorization**, and V.1
+  - *Opinion Assurances profile pages (Phase 3a).* `robots.txt`
+    (https://www.opinion-assurances.fr/robots.txt) allows the profile and its
+    path-based pages (`…-page<n>.html`) and disallows every address with a
+    query string; the site's conditions générales, read 2026-09-02 on the
+    site's own terms page (its address is not recorded here), forbid in V.3
+    automated extraction **without prior written authorization**, and in V.1
     reproduction without written agreement. **Position as of 2026-09-02: the
     developer holds the site's written authorization** (requested and granted
     2026-09-02), recorded as the source's `terms`; the study publishes
@@ -581,9 +585,11 @@ renamed the rebuild input, closed five BACKLOG rows.
   not profile pages: a profile address spells the brand and may sit only in
   `ingest/sources.py` (D1), so a Documented point opens to its platform and to
   the brief's §6, not to a page — the trade D1 makes, stated in BACKING's note
-  on the rating rows. A figure the brief dates to a month or a season is
-  placed on the 15th of that month; one it dates to a span of years is placed
-  at mid-year of the span's first year ("2025–2026" is 2025-06-15); one it
+  on the rating rows. A figure the brief dates to a month is placed on the
+  15th of that month, and one it dates to a season on the 15th of that
+  season's first month ("early 2025" is 2025-01-15); one it dates to a span
+  of years is placed at mid-year of the span's first year ("2025–2026" is
+  2025-06-15); one it
   does not date is placed on the day of the figure it was gathered beside (the
   Google Play figure beside the App Store's, 2024-09-15; the Opinion
   Assurances figures beside the June 2026 reading, 2026-06-15). The day is a
