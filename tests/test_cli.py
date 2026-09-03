@@ -20,11 +20,14 @@ def _stamp_in_tmp(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "CONFIRM_STAMP", tmp_path / ".confirm")
 
 
+ORIGIN = "--goals-origin=default"  # what the recipe passes when make holds the list
+
+
 def armed(argv: list[str]) -> int:
     """`make confirm <target>` as the CLI sees it: the stamp of make process 1,
     with the invocation's goal list, then the target with the same id
     (A4 (d), A8 (d))."""
-    assert main(["confirm", "--make-pid=1", f"--goals=confirm {argv[0]}"]) == 0
+    assert main(["confirm", "--make-pid=1", ORIGIN, f"--goals=confirm {argv[0]}"]) == 0
     return main([*argv, "--make-pid=1"])
 
 
@@ -128,7 +131,7 @@ def test_cli_scrape_refuses_without_the_confirm_goal(capsys, monkeypatch):
     assert code == 2
     out = capsys.readouterr().out
     assert "run `make confirm scrape`" in out and "nothing fetched" in out
-    assert main(["confirm", "--make-pid=2", "--goals=confirm scrape"]) == 0
+    assert main(["confirm", "--make-pid=2", ORIGIN, "--goals=confirm scrape"]) == 0
     assert main(["scrape", "--make-pid=1"]) == 2
     assert not cli.CONFIRM_STAMP.exists()  # consumed by the refusal
 
@@ -140,13 +143,13 @@ def test_confirm_stamps_one_invocation_and_reset_consumes_it(capsys, isolated_pa
     import pipeline.cli as cli
     import pipeline.warehouse as warehouse
 
-    assert main(["confirm", "--make-pid=x", "--goals=confirm reset"]) == 2
+    assert main(["confirm", "--make-pid=x", ORIGIN, "--goals=confirm reset"]) == 2
     assert "not a process id" in capsys.readouterr().err
     corpus = warehouse.DEFAULT_DB
     corpus.write_text("x")
     assert main(["reset", "--make-pid=1"]) == 2 and corpus.exists()  # no stamp
-    goals = "--goals=confirm reset"
-    assert main(["confirm", "--make-pid=1", goals]) == 0 and cli.CONFIRM_STAMP.exists()
+    goals = [ORIGIN, "--goals=confirm reset"]
+    assert main(["confirm", "--make-pid=1", *goals]) == 0 and cli.CONFIRM_STAMP.exists()
     assert main(["reset", "--make-pid=2"]) == 2 and corpus.exists()  # another
     assert not cli.CONFIRM_STAMP.exists()  # consumed by the mismatch
     assert armed(["reset"]) == 0 and not corpus.exists()
@@ -165,18 +168,78 @@ def test_confirm_refuses_with_nothing_after_it_and_a_planted_stamp(capsys):
     import pipeline.cli as cli
 
     for goals in ("", "confirm", "reset confirm"):
-        assert main(["confirm", "--make-pid=1", f"--goals={goals}"]) == 2
+        assert main(["confirm", "--make-pid=1", ORIGIN, f"--goals={goals}"]) == 2
         assert "nothing follows" in capsys.readouterr().err
         assert not cli.CONFIRM_STAMP.exists()
     cli.CONFIRM_STAMP.write_text("planted\n", encoding="utf-8")
-    assert main(["confirm", "--make-pid=1", "--goals=confirm reset"]) == 2
+    assert main(["confirm", "--make-pid=1", ORIGIN, "--goals=confirm reset"]) == 2
     err = capsys.readouterr().err
     assert "already exists" in err and str(cli.CONFIRM_STAMP) in err
     assert cli.CONFIRM_STAMP.read_text(encoding="utf-8") == "planted\n"
     cli.CONFIRM_STAMP.unlink()
-    assert main(["confirm", "--make-pid=1", "--goals=confirm reset"]) == 0
+    assert main(["confirm", "--make-pid=1", ORIGIN, "--goals=confirm reset"]) == 0
     mode = stat.S_IMODE(os.stat(cli.CONFIRM_STAMP).st_mode)
     assert mode == 0o600, oct(mode)
+
+
+def test_confirm_arms_only_a_gated_goal_from_makes_own_list(
+    capsys, isolated_paths, tmp_path
+):
+    """A9 (a): the goal after `confirm` is a member of a closed set, so
+    `make confirm help` refuses and leaves no stamp — the typo A8 (d)'s
+    trailing-goal check left open; the goal list is trusted only with make's
+    own origin (`default`), so a MAKECMDGOALS definition from the
+    environment, MAKEFLAGS or the command line confirms nothing; a gated
+    target consumes the stamp before its own refusals; a stamp the process
+    cannot write refuses with one line (round 5, findings 1–5)."""
+    import os
+    import stat
+
+    import pipeline.cli as cli
+    import pipeline.warehouse as warehouse
+
+    for goal in ("help", "rebuild", "test", "probe"):
+        assert main(["confirm", "--make-pid=1", ORIGIN, f"--goals=confirm {goal}"]) == 2
+        err = capsys.readouterr().err
+        assert "arms `reset` or `scrape`" in err and f"`{goal}` follows" in err
+        assert not cli.CONFIRM_STAMP.exists()
+    for origin in ("environment", "command line", "file", ""):
+        code = main(
+            [
+                "confirm",
+                "--make-pid=1",
+                f"--goals-origin={origin}",
+                "--goals=confirm reset",
+            ]
+        )
+        assert code == 2
+        assert "did not come from make itself" in capsys.readouterr().err
+        assert not cli.CONFIRM_STAMP.exists()
+    for goal in ("reset", "scrape"):
+        assert main(["confirm", "--make-pid=1", ORIGIN, f"--goals=confirm {goal}"]) == 0
+        assert cli.CONFIRM_STAMP.exists()
+        cli.CONFIRM_STAMP.unlink()
+    # A gated target's own refusal consumes the stamp first: a refused TARGET
+    # after `confirm` leaves nothing armed.
+    corpus = warehouse.DEFAULT_DB
+    corpus.write_text("x")
+    assert main(["confirm", "--make-pid=1", ORIGIN, "--goals=confirm reset"]) == 0
+    assert main(["reset", "--target=snowflake", "--make-pid=1"]) == 2
+    assert "got 'snowflake'" in capsys.readouterr().err
+    assert not cli.CONFIRM_STAMP.exists() and corpus.exists()
+    # The stamp cannot be written: one line, exit 2, no traceback.
+    ro = tmp_path / "ro"
+    ro.mkdir()
+    ro.chmod(stat.S_IRUSR | stat.S_IXUSR)
+    try:
+        cli.CONFIRM_STAMP = ro / ".confirm"
+        if os.access(ro, os.W_OK):  # root ignores modes: nothing to prove here
+            pytest.skip("the directory is writable despite its mode")
+        assert main(["confirm", "--make-pid=1", ORIGIN, "--goals=confirm reset"]) == 2
+        err = capsys.readouterr().err
+        assert "cannot write the confirmation stamp" in err and "\n" not in err.strip()
+    finally:
+        ro.chmod(stat.S_IRWXU)
 
 
 def test_cli_scrape_refuses_a_bad_source_with_exit_2(capsys):

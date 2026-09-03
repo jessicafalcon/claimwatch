@@ -49,12 +49,18 @@ def resolve_choice(value: str, allowed: tuple[str, ...], default: str) -> str:
     return value
 
 
+# The goals `confirm` may arm — a closed set; `make confirm <anything else>`
+# refuses and leaves no stamp (A9 (a)).
+GATED = ("reset", "scrape")
+
+
 def confirmed(make_pid: str) -> bool:
     """A destructive or network action is confirmed only by the `confirm` goal
     of the SAME make invocation: the stamp `make confirm` wrote names this
     recipe's make process. The stamp is consumed either way, so a `confirm`
     left over from an earlier invocation confirms nothing later (a different
-    process id), and no environment can supply a goal."""
+    process id). A gated target calls this as its first act, before its own
+    refusals, so no refusal on a gated path leaves the stamp armed (A9 (a))."""
     try:
         stamped = CONFIRM_STAMP.read_text(encoding="utf-8").strip()
     except OSError:
@@ -68,29 +74,46 @@ def confirmed(make_pid: str) -> bool:
 
 def _do_confirm(args: argparse.Namespace) -> int:
     """`make confirm`: stamp this invocation's make process id for the `reset`
-    or `scrape` goal that follows it in the same command. A `confirm` that is
-    the last goal (or the only one) refuses, so no armed stamp outlives its
-    invocation; the stamp is created exclusively with owner-only permissions,
-    so a file already there — planted, or left by a killed run — makes this
-    recipe refuse naming it rather than overwrite it (A8 (d)). What the gate
-    holds against is a variable, an environment, `MAKEFLAGS` and a stale
-    invocation; a same-user process able to write `data/` while make runs is
-    outside it, and the Threat model says so."""
+    or `scrape` goal that follows it in the same command. The goal after
+    `confirm` must be one of `GATED`, so `make confirm help` and a trailing
+    `confirm` refuse and leave no stamp — no armed stamp outlives its
+    invocation; the goal list is trusted only when its origin is make's own
+    (`$(origin MAKECMDGOALS)` is `default`): a list from the environment,
+    `MAKEFLAGS` or the command line is refused (A9 (a)). The stamp is created
+    exclusively with owner-only permissions, so a file already there —
+    planted, or left by a killed run — makes this recipe refuse naming it
+    rather than overwrite it (A8 (d)); a create that fails for any other
+    reason refuses with one line too. What the gate does not hold against is
+    a same-user process able to write `data/` while make runs; the Threat
+    model says so."""
     if not args.make_pid.isdigit():
         raise Refused("refusing: --make-pid is not a process id")
-    goals = args.goals.split()
-    if not goals or goals[-1] == "confirm":
+    if args.goals_origin != "default":
         raise Refused(
-            "refusing: `confirm` arms the goal that follows it in the same command; "
-            "nothing follows (`make confirm reset`, `make confirm scrape`)"
+            "refusing: the goal list did not come from make itself (origin "
+            f"{args.goals_origin!r}, not 'default'); a MAKECMDGOALS definition "
+            "from the environment, MAKEFLAGS or the command line confirms nothing"
         )
-    CONFIRM_STAMP.parent.mkdir(parents=True, exist_ok=True)
+    goals = args.goals.split()
+    following = goals[goals.index("confirm") + 1 :] if "confirm" in goals else []
+    if not following or following[0] not in GATED:
+        after = f"`{following[0]}` follows" if following else "nothing follows"
+        raise Refused(
+            f"refusing: `confirm` arms {' or '.join(f'`{g}`' for g in GATED)} and "
+            f"nothing else; {after} (`make confirm reset`, `make confirm scrape`)"
+        )
     try:
+        CONFIRM_STAMP.parent.mkdir(parents=True, exist_ok=True)
         fd = os.open(CONFIRM_STAMP, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
     except FileExistsError as exc:
         raise Refused(
             f"refusing: a confirmation stamp already exists at {CONFIRM_STAMP}; it "
             "is not this invocation's — remove it and run the command again"
+        ) from exc
+    except OSError as exc:
+        raise Refused(
+            f"refusing: cannot write the confirmation stamp at {CONFIRM_STAMP}: "
+            f"{exc.strerror}"
         ) from exc
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
         fh.write(args.make_pid + "\n")
@@ -148,6 +171,7 @@ def _do_scrape(args: argparse.Namespace) -> int:
     Naming such a source with SOURCE= asks for it on purpose: that is a
     refusal, exit 2. The `confirm` goal gates it like `reset`, so an agent's
     non-interactive call refuses."""
+    armed = confirmed(args.make_pid)  # consumed first, before any refusal (A9)
     names = tuple(s.name for s in SOURCES)
     if args.source:
         wanted = resolve_choice(args.source, names, "")
@@ -159,7 +183,7 @@ def _do_scrape(args: argparse.Namespace) -> int:
                 print(f"scrape: {s.name}: skipped — declared not fetchable: {s.terms}")
     if not chosen:
         raise Refused("refusing: no fetchable source is declared in ingest/sources.py")
-    if not confirmed(args.make_pid):
+    if not armed:
         listed = ", ".join(s.name for s in chosen)
         hosts = ", ".join(sorted({s.host for s in chosen if s.fetchable})) or "no host"
         ok = _prompt(
@@ -207,8 +231,9 @@ def _do_idempotency(args: argparse.Namespace) -> int:
 def _do_reset(args: argparse.Namespace) -> int:
     # reset handles only the DuckDB file; TARGET=snowflake is refused with one
     # line here, not a traceback from reset() downstream.
+    armed = confirmed(args.make_pid)  # consumed first, before any refusal (A9)
     target = resolve_choice(args.target, ("duckdb",), "duckdb")
-    if not confirmed(args.make_pid):
+    if not armed:
         ok = _prompt(
             "Drop every DuckDB file this repo built (the corpus and one per "
             "rebuild input, past or present)? "
@@ -234,6 +259,7 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("confirm", add_help=False)
     p.add_argument("--make-pid", dest="make_pid", default="")
     p.add_argument("--goals", default="")  # make's own goal list, in order
+    p.add_argument("--goals-origin", dest="goals_origin", default="")  # $(origin)
     p = sub.add_parser("reset", add_help=False)
     p.add_argument("--target", default="")
     p.add_argument("--make-pid", dest="make_pid", default="")

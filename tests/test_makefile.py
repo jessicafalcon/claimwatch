@@ -184,11 +184,15 @@ def test_reset_and_scrape_take_the_make_pid_not_a_confirm_variable():
             assert "--confirm" not in out and "yes" not in out, (target, origin, out)
     out = _make_n("confirm", {}, {})
     assert "--make-pid=$PPID" in out and "--goals='confirm'" in out  # A8 (d)
+    assert "--goals-origin='default'" in out  # A9 (a): make's own list, by origin
 
 
 PROBE = (
     "include Makefile\n"
-    "probe:\n"
+    # `reset` re-defined as a probe (make warns "overriding commands" and uses
+    # this one): a gated goal that asks `confirmed` with its own make process
+    # id and deletes nothing — `confirm` arms `reset` or `scrape` alone (A9).
+    "reset:\n"
     '\t@uv run python -c "import sys; from pipeline.cli import confirmed; '
     "sys.exit(0 if confirmed('$$PPID') else 3)\"\n"
 )
@@ -217,29 +221,52 @@ def test_confirm_is_a_goal_of_the_same_invocation():
     cannot arrive through the environment, and the stamp names one process
     (round 3, security-reviewer #1)."""
     try:
-        assert _probe(["confirm", "probe"], {}) == 0
+        assert _probe(["confirm", "reset"], {}) == 0
         assert not CONFIRM_STAMP.exists()  # consumed
-        assert _probe(["probe"], {}) == 2
-        assert _probe(["probe", "confirm"], {}) == 2  # probe runs first: no stamp yet
-        assert _probe(["probe", "CONFIRM=yes"], {}) == 2
-        assert _probe(["probe"], {"CONFIRM": "yes"}) == 2
-        assert _probe(["probe"], {"MAKEFLAGS": "CONFIRM=yes"}) == 2
-        assert _probe(["probe"], {"MAKEFLAGS": "confirm"}) == 2
-        assert _probe(["probe"], {"MAKECMDGOALS": "confirm"}) == 2
+        assert _probe(["reset"], {}) == 2
+        assert _probe(["reset", "confirm"], {}) == 2  # reset runs first: no stamp yet
+        assert _probe(["reset", "CONFIRM=yes"], {}) == 2
+        assert _probe(["reset"], {"CONFIRM": "yes"}) == 2
+        assert _probe(["reset"], {"MAKEFLAGS": "CONFIRM=yes"}) == 2
+        assert _probe(["reset"], {"MAKEFLAGS": "confirm"}) == 2
+        assert _probe(["reset"], {"MAKECMDGOALS": "confirm"}) == 2
         # A8 (d): a confirm with nothing after it refuses and leaves no stamp,
         # so no armed stamp outlives its invocation.
         assert _probe(["confirm"], {}) == 2
         assert not CONFIRM_STAMP.exists()
-        assert _probe(["probe", "confirm"], {}) == 2  # confirm last: refused too
+        assert _probe(["reset", "confirm"], {}) == 2  # confirm last: refused too
         assert not CONFIRM_STAMP.exists()
         # A stale stamp (an earlier invocation's process id) confirms nothing
         # and is consumed; a planted stamp makes `confirm` itself refuse.
         CONFIRM_STAMP.write_text("99999\n", encoding="utf-8")
-        assert _probe(["probe"], {}) == 2  # another process: not this one
+        assert _probe(["reset"], {}) == 2  # another process: not this one
         assert not CONFIRM_STAMP.exists()  # and the stale stamp is gone
         CONFIRM_STAMP.write_text("99999\n", encoding="utf-8")
-        assert _probe(["confirm", "probe"], {}) == 2  # confirm refuses: file there
+        assert _probe(["confirm", "reset"], {}) == 2  # confirm refuses: file there
         assert CONFIRM_STAMP.read_text(encoding="utf-8") == "99999\n"  # untouched
+    finally:
+        CONFIRM_STAMP.unlink(missing_ok=True)
+
+
+def test_confirm_arms_a_gated_goal_or_nothing():
+    """A9 (a), against the installed make: `make confirm help` refuses and
+    leaves no stamp; a MAKECMDGOALS definition from the environment, from
+    MAKEFLAGS or from the command line has an origin that is not make's own
+    and confirms nothing, leaving no stamp; `make confirm reset` still arms
+    (round 5, code-reviewer #2, security-reviewer #1 #2, functionality-tester
+    #4 #5)."""
+    try:
+        assert _probe(["confirm", "help"], {}) == 2
+        assert not CONFIRM_STAMP.exists()
+        assert _probe(["confirm", "reset"], {"MAKECMDGOALS": "confirm reset"}) == 2
+        assert not CONFIRM_STAMP.exists()
+        assert _probe(["confirm", "reset", "MAKECMDGOALS=confirm reset"], {}) == 2
+        assert not CONFIRM_STAMP.exists()
+        env = {"MAKEFLAGS": "MAKECMDGOALS=confirm reset"}
+        assert _probe(["confirm", "reset"], env) == 2
+        assert not CONFIRM_STAMP.exists()
+        assert _probe(["confirm", "reset"], {}) == 0
+        assert not CONFIRM_STAMP.exists()  # consumed by the probe
     finally:
         CONFIRM_STAMP.unlink(missing_ok=True)
 
