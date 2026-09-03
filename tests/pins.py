@@ -81,7 +81,7 @@ ANCHOR_PROFILES = {
 # The marts on the anchors alone (`ROWS=synthetic` or `none`+anchors):
 RATING_TREND_ANCHOR_ROWS = 8  # every anchor with a rating, one per month
 CHANNEL_GAP_ANCHOR_ROWS = 6  # latest rating per segment × channel × platform × profile
-PLATFORM_STATS_ANCHOR_ROWS = 2  # the two anchors carrying a stat-row figure
+PLATFORM_STATS_ANCHOR_ROWS = 11  # one row per stat (A2): a count per key + 4 stats
 PEER_RATINGS_ANCHOR_ROWS = 4  # unsolicited: the studied insurer + three peers
 # The studied insurer's latest unsolicited point and its invited ones.
 CHANNEL_GAP_DIGITAL_FIRST = {
@@ -89,7 +89,12 @@ CHANNEL_GAP_DIGITAL_FIRST = {
     ("invited", "app-store"): ("4.900", 5000, "2024-09-15"),
     ("invited", "google-play"): ("4.500", 765, "2024-09-15"),
 }
-PLATFORM_STATS_OPINION_ASSURANCES = ("0.231", "0.820", "1.5", 534)
+PLATFORM_STATS_OPINION_ASSURANCES = {  # stat -> value, decimal(12, 3)
+    "review_count": "534.000",
+    "one_star_share": "0.231",
+    "response_rate": "0.820",
+    "response_delay_days": "1.500",
+}
 
 # fixtures/opinion-assurances/: a hand-written profile in the page's microdata
 # shape — three reviews on page 1, two on page 2 of which one repeats page 1's

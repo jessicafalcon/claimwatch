@@ -61,9 +61,10 @@ placed on the 15th of that month; the day is a placement, not a reading.
   anchors, *Measured* for a figure we captured or read off a page ourselves,
   each point marked.
 - **B1.4 — The stat row.** One-star share on independent platforms, review
-  counts, and the difference in how quickly companies answer reviews. Tag:
-  *Documented* for the anchors, *Measured* for a figure we captured or read
-  off a page ourselves, each point marked.
+  counts, and the difference in how quickly companies answer reviews. Each
+  stat is its own latest point, with its own tag and day. Tag: *Documented*
+  for the anchors, *Measured* for a figure we captured or read off a page
+  ourselves, each point marked.
 
 ## Beat 2 — The complaints have a shape
 

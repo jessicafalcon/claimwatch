@@ -82,20 +82,75 @@ def test_channel_gap_matches_pins(anchors_db):
     ]
 
 
+STATS = ("review_count", "one_star_share", "response_rate", "response_delay_days")
+
+
 def test_platform_stats_matches_pins(anchors_db):
+    """One row per (segment, source, profile, stat) — A2 — so each stat is its
+    own latest point; the profile's four stats read back as pinned."""
     rows = _query(
         anchors_db,
-        "select source, one_star_share, response_rate, response_delay_days, "
-        "review_count from platform_stats order by source",
+        "select source, profile, stat, value from platform_stats order by 1, 2, 3",
     )
     assert len(rows) == pins.PLATFORM_STATS_ANCHOR_ROWS
-    (oa,) = [r for r in rows if r[0] == "opinion-assurances"]
-    assert (
-        str(oa[1]),
-        str(oa[2]),
-        str(oa[3]),
-        oa[4],
-    ) == pins.PLATFORM_STATS_OPINION_ASSURANCES
+    assert {r[2] for r in rows} <= set(STATS)
+    oa = {
+        stat: str(value)
+        for source, profile, stat, value in rows
+        if (source, profile) == ("opinion-assurances", "fr-digital-first")
+    }
+    assert oa == pins.PLATFORM_STATS_OPINION_ASSURANCES
+
+
+def test_a_later_reading_of_one_stat_keeps_the_others(tmp_path):
+    """A2 (round 1, finding 21): a second hand entry that reads only the count
+    becomes the count's latest point; the three stats read the day before keep
+    their own point, tag and day — nothing is blanked."""
+    from pipeline.build import MANUAL_COLUMNS
+    from tests.test_snapshots import _write_csv
+
+    def row(day: str, **stats: str) -> dict[str, str]:
+        base = {
+            "source": "fr-digital-first-app-store-listing",
+            "captured_at": day,
+            "rating": "4.9",
+            "review_count": "13000",
+            "one_star_share": "",
+            "response_rate": "",
+            "response_delay_days": "",
+            "read_from": "page",
+        }
+        base.update(stats)
+        return base
+
+    manual = _write_csv(
+        tmp_path / "m.csv",
+        MANUAL_COLUMNS,
+        [
+            row(
+                "2026-09-01",
+                one_star_share="0.05",
+                response_rate="0.5",
+                response_delay_days="3",
+            ),
+            row("2026-09-02", review_count="13100"),
+        ],
+    )
+    db = tmp_path / "w.duckdb"
+    rebuild(
+        "duckdb", "captured", database=db, cache_dir=tmp_path / "no", manual_file=manual
+    )
+    rows = _query(
+        db,
+        "select stat, value, captured_at, tag from platform_stats "
+        "where source = 'app-store' and profile = 'fr-digital-first' order by stat",
+    )
+    assert rows == [
+        ("one_star_share", Decimal("0.050"), "2026-09-01", "Measured"),
+        ("response_delay_days", Decimal("3.000"), "2026-09-01", "Measured"),
+        ("response_rate", Decimal("0.500"), "2026-09-01", "Measured"),
+        ("review_count", Decimal("13100.000"), "2026-09-02", "Measured"),
+    ]
 
 
 def test_peer_ratings_matches_pins(anchors_db):
@@ -194,20 +249,20 @@ def test_a_hand_read_and_a_fetched_point_reach_the_marts_as_measured(tmp_path):
     ]
     stats = _query(
         db,
-        "select source, one_star_share, response_rate, response_delay_days, tag "
-        "from platform_stats order by source",
+        "select stat, value, tag, captured_at from platform_stats "
+        "where source = 'app-store' and profile = 'fr-digital-first' order by stat",
     )
     assert stats == [
-        ("app-store", Decimal("0.050"), Decimal("0.500"), Decimal("3.0"), "Measured"),
-        (
-            "opinion-assurances",
-            Decimal("0.231"),
-            Decimal("0.820"),
-            Decimal("1.5"),
-            "Documented",
-        ),
-        ("trustpilot", Decimal("0.180"), None, None, "Documented"),
+        ("one_star_share", Decimal("0.050"), "Measured", "2026-09-02"),
+        ("response_delay_days", Decimal("3.000"), "Measured", "2026-09-02"),
+        ("response_rate", Decimal("0.500"), "Measured", "2026-09-02"),
+        ("review_count", Decimal("13000.000"), "Measured", "2026-09-02"),
     ]
+    assert _query(
+        db,
+        "select distinct tag from platform_stats where source <> 'app-store' "
+        "and source <> 'google-play'",
+    ) == [("Documented",)]
     assert _query(db, "select distinct tag from peer_ratings") == [("Documented",)]
     tags = {t for m in MARTS for (t,) in _query(db, f"select distinct tag from {m}")}
     assert tags == {"Documented", "Measured"}
