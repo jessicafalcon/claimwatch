@@ -15,6 +15,7 @@ import pytest  # noqa: E402
 from ingest.parsed import PageShapeError  # noqa: E402
 from pipeline.build import (  # noqa: E402
     _columns,
+    _table_exists,
     build_derived,
     check_raw_declaration,
     content_hash,
@@ -323,6 +324,35 @@ def test_a_raw_file_with_two_statements_refuses_before_any_runs(tmp_path):
         check_raw_declaration(conn, commented)  # raw_z does not exist yet: passes
         conn.execute("create table raw_z (a integer)")
         check_raw_declaration(conn, commented)  # matches: the comments were ignored
+    finally:
+        conn.close()
+
+
+def test_a_declaration_the_engine_cannot_run_as_one_statement_refuses_with_one_line(
+    tmp_path,
+):
+    """A8 (a)'s one-statement rule strips `--` comments and splits on `;` as
+    text, before the engine parses; a `--` inside a literal is mangled and
+    the engine refuses the scratch. That refusal is this module's one line
+    naming the file, not a driver traceback, and nothing reaches the corpus
+    (round 5, security-reviewer #4, functionality-tester #7)."""
+    conn = connect("duckdb", database=":memory:")
+    try:
+        probe = tmp_path / "raw_probe.sql"
+        probe.write_text(
+            "create table if not exists raw_probe "
+            "(a integer, b varchar default 'q -- ');\n",
+            encoding="utf-8",
+        )
+        check_raw_declaration(conn, probe)  # not yet created: passes untouched
+        conn.execute("create table raw_probe (a integer)")
+        with pytest.raises(PageShapeError) as exc:
+            check_raw_declaration(conn, probe)
+        message = str(exc.value)
+        assert "raw_probe.sql: the engine refused the declaration" in message
+        assert "\n" not in message
+        assert conn.execute("select count(*) from raw_probe").fetchone() == (0,)
+        assert not _table_exists(conn, "declared_raw_probe")
     finally:
         conn.close()
 

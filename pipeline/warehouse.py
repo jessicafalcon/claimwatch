@@ -20,6 +20,9 @@ TARGETS = ("duckdb", "snowflake")
 # The working warehouse lives under data/ (gitignored; `.gitignore` covers
 # `*.duckdb`). Callers pass `database=":memory:"` or a temp path in tests.
 DEFAULT_DB = ROOT / "data" / "friction_ledger.duckdb"
+# The engine's own error, named here so no other module spells the driver's
+# to catch it (round 5, security-reviewer #4).
+DriverError = duckdb.Error
 
 
 def database_for(rows: str, root: str | Path | None = None) -> Path:

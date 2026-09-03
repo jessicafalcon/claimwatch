@@ -588,9 +588,19 @@ def check_raw_declaration(conn, path: Path) -> None:
             "and is not one this repo builds — remove it, then `make rebuild` "
             "(the corpus is not what is wrong)"
         )
-    conn.execute(
-        _CREATE_RAW.sub(f"create temporary table {scratch}", statements[0], count=1)
-    )
+    try:
+        conn.execute(
+            _CREATE_RAW.sub(f"create temporary table {scratch}", statements[0], count=1)
+        )
+    except warehouse.DriverError as exc:
+        # The one statement the file holds did not parse as one — a `--` or a
+        # `;` inside a literal, say — so the engine's refusal is relayed as
+        # this module's one line, never a traceback (round 5,
+        # security-reviewer #4, functionality-tester #7).
+        raise PageShapeError(
+            f"{where_file}: the engine refused the declaration as one statement: "
+            + " ".join(str(exc).split())
+        ) from exc
     try:
         declared = _columns(conn, scratch)
     finally:
