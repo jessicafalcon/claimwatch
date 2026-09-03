@@ -305,6 +305,87 @@ build); comparing the file's text against a stored copy (a byte change in a
 comment is not a schema change, and a schema change can hide in equal bytes
 across engines).
 
+**Proposed after review round 4 (2026-09-03) — A8: a raw table is compared
+with its whole declaration; the review loader loads a batch or nothing; the
+aggregate's declared scale is read like a review's; the confirm gate says
+what it holds against; the database file and the label set are derived from
+the input.** *Status: PROPOSED, awaiting approval; nothing in it is built.
+Round 4's plain fixes (findings 4, 8, 9, 10, 13, 14) are built in the commits
+before this one.* Restores invariant 3's premise (raw is what the files
+declare, A7), invariant 1's atomicity as it holds for snapshots (a refused
+batch leaves none of its rows in raw), invariant 6's "the declared shape is
+the site's" for the one review-site number the study displays, the Threat
+model's gate stated as what it is, and invariant 7 (each input builds its own
+database file) as a property of the input rather than of a caller.
+(a) *The comparison is the whole declaration* (round 4, findings 1, 6, 7,
+12): `check_raw_declaration` reads, for the existing table and for the
+scratch declaration alike, `(column_name, data_type, is_nullable)` ordered by
+`ordinal_position` from `information_schema.columns`, filtered to the schema
+the engine names (`warehouse.default_schema`; the temporary scratch table is
+listed under that schema on DuckDB, which the test asserts rather than
+assumes), and refuses on a nullability difference exactly as on a type — the
+case this phase itself opened when A4 (e) made `review_count` nullable, so a
+corpus built before it now dies in a driver `ConstraintException` instead of
+A7's one line. Before creating the scratch table it refuses if a table under
+the scratch name already exists, naming it as one this repo does not build —
+not pointing at `make confirm reset`, since a corpus is not what is wrong. A
+raw file is one statement: comments stripped, the file must be exactly one
+`create table if not exists` and only that statement is executed for the
+scratch, so nothing else in a raw file can ever run against the corpus during
+the check. Pinned by a database with `review_count integer not null` refused
+with A7's one line and nothing inserted; a declaration whose columns are the
+table's in another order refused naming the position; a stray
+`declared_raw_reviews` table refused naming itself; a two-statement raw file
+refused before any statement runs. Not taken: comparing the corpus's own
+catalog order without `order by` (unspecified on engines other than DuckDB);
+altering the column in place (rewrites history's values). (b) *The review
+loader loads a batch or nothing* (finding 2): `load_reviews` runs its batch in
+one transaction as `load_snapshots` does since A4 (a), so a refused rating in
+the fifth row leaves rows one to four uncommitted; DECISIONS' A6 entry, which
+already says "inserts nothing on a refusal", becomes true. Pinned by a
+five-row batch whose last rating is refused: zero rows in raw. (c) *The
+aggregate's declared scale is read* (finding 3): the Opinion Assurances
+parser reads the aggregate scope's `worstRating` and `bestRating` — the
+frozen sample already carries them, `0` and `5`, so no re-freeze — and refuses
+a page whose aggregate declares a scale other than the snapshot rating
+column's range (`MEASURES["rating"]`, 0 to 5), naming the bounds, the guard A6
+gives every review scope; a site that moves its aggregate to 0..10 refuses
+instead of storing 3.8 as a 0–5 rating tagged Measured. Pinned by `0..10`
+and a missing bound refused, `0.0..5.0` accepted as the same scale. (d) *The
+confirm gate says what it holds against* (findings 16, 17): A4 (d) delivered
+what it claimed — no variable, no environment and no `MAKEFLAGS` can arm
+`reset` or `scrape`, and a stale stamp refuses — and no more: the stamp is a
+file under `data/` whose content is the make process's id, so a same-user
+process able to write `data/` while make runs can arm either target, and a
+`make confirm` with nothing after it leaves a stamp that a later make process
+holding a recycled id would consume. Two hardenings that change no kind, and
+the claim written down: the stamp is created exclusively (`O_EXCL`, mode
+0600), so a file already there makes `confirm` itself refuse naming it rather
+than overwrite it; `confirm` as the last goal of its invocation refuses
+("`confirm` arms the goal that follows it; nothing follows"), read from the
+goal list make itself holds, so the common way to leave a stamp behind is
+closed; and the Threat model's `confirm`, `reset` and `scrape` rows and the
+DECISIONS entry state the residual in one sentence each. Pinned by a planted
+stamp making `confirm` refuse, `make confirm` alone refusing with no stamp
+left, and the six A4 (d) forms still refusing. Not taken: a nonce carried
+between the two recipes (make has no channel between two recipes but a file,
+which is the surface); the process's start time (`ps`, rejected in A4 (d));
+an age check (a clock in the CLI, rejected in A4 (d)); a longer claim. (e)
+*The file and the label set are derived from the input* (findings 5, 11):
+`rebuild` no longer takes a database file — it takes a root directory, and
+the file is always `database_for(rows, root)`, so a caller chooses where the
+files live and never which file an input lands in, and the literal `sample`
+can exist only in `friction_ledger.samples.duckdb` wherever the root is;
+`load_snapshots` takes `rows_input` as a required argument, passed by
+`rebuild` from its `rows`, a member of the closed `INPUTS` checked at entry —
+the mechanism's value is the input, never a signature's default. Pinned by
+`rebuild("duckdb", "samples", root=tmp)` writing exactly the samples file and
+no way to name another; `load_snapshots` without `rows_input` a `TypeError`.
+Cost: every test that passes `database=` passes `root=` instead. Not taken: a
+check that the file's name is the input's (a check on a spelling, not a
+derivation); a marker table naming the input inside each file (a row no
+source produced, counted by the idempotency check).
+
 ## Why
 
 Phase 2 built the collector and proved it on a frozen sample, but the one
