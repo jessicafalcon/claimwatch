@@ -37,8 +37,8 @@ ORIGINS = ("anchor", "manual", "fetch")  # how a snapshot row came to be
 PARSERS = ("app_store", "listing", "opinion_assurances")
 SAMPLE = "sample"  # the name and attribution of a frozen sample's declaration
 
-_SLUG = re.compile(r"^[a-z0-9-]+$")
-_DATE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
+_SLUG = re.compile(r"[a-z0-9-]+")  # matched whole (`fullmatch`, round 5)
+_DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 FEED_HOST = "itunes.apple.com"
 # The strings that spell the studied insurer (D1), one per form the
 # declarations below carry: the bare name (a profile path), the package id's
@@ -75,7 +75,7 @@ class Source:
     sample: bool = False
 
     def __post_init__(self) -> None:
-        if not _SLUG.match(self.name) or not _SLUG.match(self.platform):
+        if not _SLUG.fullmatch(self.name) or not _SLUG.fullmatch(self.platform):
             raise ValueError(f"source {self.name!r}: name and platform are slugs")
         if self.parser is not None and self.parser not in PARSERS:
             raise ValueError(
@@ -109,7 +109,7 @@ class Source:
         # The day is provenance: it is written as `captured_at` on every page
         # address the declaration puts in raw_source_pages, so it is required
         # and must be a real day — never empty, never 2026-02-30.
-        if not _DATE.match(self.declared_on):
+        if not _DATE.fullmatch(self.declared_on):
             raise ValueError(f"source {self.name!r}: declared_on is YYYY-MM-DD")
         try:
             date.fromisoformat(self.declared_on)

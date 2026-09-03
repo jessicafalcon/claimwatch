@@ -446,3 +446,46 @@ def test_a_hand_entered_declaration_needs_a_listing():
         with pytest.raises(ValueError, match="needs a listing address"):
             dataclasses.replace(store, name="twin", listing=empty)
     assert dataclasses.replace(store, name="twin", listing="https://h/x").listing
+
+
+def test_a_shape_guard_takes_the_whole_value_not_a_prefix_before_a_newline(
+    tmp_path,
+):
+    """Every declared shape is matched whole: under `re.match` an anchored
+    `$` accepts a trailing newline, so `x\\n` passed as the slug `x`, `4\\n`
+    as the digit string `4`, and round 4's `2026-09-02\\n` pin held only
+    because the stdlib parse behind the shape refused it (round 5,
+    code-reviewer #6). Each case here has no guard behind the shape, or a
+    refusal that names the shape rather than the parse."""
+    import json
+
+    from ingest import app_store
+    from ingest.captures import read_meta
+    from ingest.parsed import PageShapeError, count_in_range
+
+    with pytest.raises(ValueError, match="slugs"):
+        app_store_source(
+            name="x\n",
+            app_id=1,
+            country="fr",
+            listing="",
+            fetchable=True,
+            declared_on="2026-09-02",
+        )
+    assert count_in_range("512\n") is None
+    with pytest.raises(PageShapeError, match="is not a digit string"):
+        app_store._rating("4\n", "https://itunes.apple.com/x", "item")
+    src = by_name("fr-digital-first")
+    meta = tmp_path / "page-1.meta.json"
+    meta.write_text(
+        json.dumps(
+            {
+                "source_url": src.pages[0],
+                "captured_at": "2026-09-02T10:00:00\n",
+                "status": 200,
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(PageShapeError, match="is not YYYY-MM-DDTHH:MM:SS"):
+        read_meta(meta, src)

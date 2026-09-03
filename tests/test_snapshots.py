@@ -824,6 +824,7 @@ def test_manual_file_columns_are_exactly_the_declared_eight(tmp_path):
         ("source", "fr-digital-first", "has a parser"),  # a feed, not fetchable
         ("captured_at", "yesterday", "not YYYY-MM-DD"),
         ("captured_at", "2026-02-30", "not a real day"),
+        ("captured_at", "2026-09-02\n", "not YYYY-MM-DD"),  # whole value (round 5)
         ("rating", "5.5", "outside the range"),
         ("rating", "four", "not a number"),
         ("review_count", "-1", "not a non-negative integer"),
@@ -872,6 +873,7 @@ def test_manual_row_outside_the_declared_shape_is_refused(tmp_path, field, value
         ("captured_at", "2025-01"),
         ("source_url", "trustpilot.com"),
         ("profile", "Peer One"),
+        ("platform", "play\n"),  # the slug is the whole value (round 5)
         ("seeded_from", ""),
     ],
 )

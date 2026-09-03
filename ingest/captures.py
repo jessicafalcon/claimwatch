@@ -29,7 +29,7 @@ from ingest.parsed import PageShapeError, Parsed
 from ingest.sources import PARSERS, Source
 
 META_FIELDS = ("source_url", "captured_at", "status")
-_STAMP = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}$")
+_STAMP = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}")
 
 
 def parser_module(name: str) -> ModuleType:
@@ -41,7 +41,7 @@ def parser_module(name: str) -> ModuleType:
 
 
 def page_pattern(ext: str) -> re.Pattern[str]:
-    return re.compile(rf"^page-([0-9]+)\.{re.escape(ext)}$")
+    return re.compile(rf"page-([0-9]+)\.{re.escape(ext)}")
 
 
 def read_meta(path: Path, source: Source) -> dict[str, object]:
@@ -53,7 +53,7 @@ def read_meta(path: Path, source: Source) -> dict[str, object]:
     if not isinstance(meta, dict) or set(meta) != set(META_FIELDS):
         raise PageShapeError(f"{path}: meta must have exactly {META_FIELDS}")
     stamp = meta["captured_at"]
-    if not isinstance(stamp, str) or not _STAMP.match(stamp):
+    if not isinstance(stamp, str) or not _STAMP.fullmatch(stamp):
         raise PageShapeError(f"{path}: field 'captured_at' is not YYYY-MM-DDTHH:MM:SS")
     try:
         datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%S")
@@ -83,7 +83,7 @@ def capture_pages(capture_dir: Path, ext: str) -> list[Path]:
     rx = page_pattern(ext)
     pages = []
     for p in capture_dir.iterdir():
-        m = rx.match(p.name)
+        m = rx.fullmatch(p.name)
         if m:
             pages.append((int(m.group(1)), p))
     return [p for _, p in sorted(pages)]
@@ -94,7 +94,9 @@ def has_pages(root: Path, ext: str) -> bool:
     rule `read_captures` applies, so a refused page (`page-<n>.refused.<ext>`)
     counts for neither."""
     rx = page_pattern(ext)
-    return root.is_dir() and any(rx.match(p.name) for p in root.rglob(f"page-*.{ext}"))
+    return root.is_dir() and any(
+        rx.fullmatch(p.name) for p in root.rglob(f"page-*.{ext}")
+    )
 
 
 def read_captures(root: Path, source: Source) -> list[tuple[str, Parsed]]:
@@ -115,7 +117,11 @@ def read_captures(root: Path, source: Source) -> list[tuple[str, Parsed]]:
     mod = parser_module(source.parser)
     rx = page_pattern(mod.EXTENSION)
     dirs = sorted(
-        {p.parent for p in root.rglob(f"page-*.{mod.EXTENSION}") if rx.match(p.name)}
+        {
+            p.parent
+            for p in root.rglob(f"page-*.{mod.EXTENSION}")
+            if rx.fullmatch(p.name)
+        }
     )
     out: list[tuple[str, Parsed]] = []
     for d in dirs:

@@ -44,7 +44,7 @@ SAMPLE_PAGES = tuple(
     for n in (1, 2, 3)
 )
 RATING_MIN, RATING_MAX = 1, 5
-_DIGITS = re.compile(r"^[0-9]+$")
+_DIGITS = re.compile(r"[0-9]+")
 
 
 def _label(item: object, field: str, page_url: str, item_id: str | None) -> str:
@@ -63,7 +63,7 @@ def _label(item: object, field: str, page_url: str, item_id: str | None) -> str:
 
 
 def _rating(label: str, page_url: str, item_id: str) -> int:
-    if not _DIGITS.match(label):
+    if not _DIGITS.fullmatch(label):
         raise refuse(
             page_url, item_id, "im:rating", f"is not a digit string: {label!r}"
         )
@@ -98,7 +98,7 @@ def parse_item(
     declaration's, passed by the caller every time: a provenance column never
     comes from a default (round 2, code-reviewer #9)."""
     item_id = _label(item, "id", page_url, None)
-    if not _DIGITS.match(item_id):
+    if not _DIGITS.fullmatch(item_id):
         raise refuse(page_url, item_id, "id", "is not a digit string")
     return {
         "source": platform,

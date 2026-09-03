@@ -103,8 +103,11 @@ MANUAL_COLUMNS = (
     "response_delay_days",
     "read_from",
 )
-_SLUG = re.compile(r"^[a-z0-9-]+$")
-_DAY = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
+# A shape guard matches the whole value (`fullmatch`): an anchored `$` under
+# `match` accepts a trailing newline, so `x\n` would pass as the slug `x`
+# (round 5, code-reviewer #6).
+_SLUG = re.compile(r"[a-z0-9-]+")
+_DAY = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
 
 
 def content_hash(row: dict[str, str]) -> str:
@@ -186,7 +189,7 @@ def _count(value: str, *, where: str, line: int, field: str) -> int | None:
 
 
 def _day(value: str, *, where: str, line: int, field: str) -> str:
-    if not _DAY.match(value):
+    if not _DAY.fullmatch(value):
         raise _refuse_row(where, line, field, f"is not YYYY-MM-DD: {value!r}")
     try:
         date.fromisoformat(value)
@@ -228,7 +231,7 @@ def read_anchors(path: Path = ANCHORS) -> list[dict[str, object]]:
     out: list[dict[str, object]] = []
     for i, row in enumerate(_read_csv(path, ANCHOR_COLUMNS), 2):
         for field in ("platform", "profile"):
-            if not _SLUG.match(row[field]):
+            if not _SLUG.fullmatch(row[field]):
                 raise _refuse_row(where, i, field, f"is not a slug: {row[field]!r}")
         if row["segment"] not in SEGMENTS:
             raise _refuse_row(

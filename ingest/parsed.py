@@ -20,7 +20,7 @@ from decimal import ROUND_HALF_EVEN, Decimal, InvalidOperation
 # #2 #3, security-reviewer #1 #2).
 MAX_COUNT = 2**31 - 1
 _COUNT = re.compile(
-    r"^[0-9]{1,10}$"
+    r"[0-9]{1,10}"
 )  # ten digits cover MAX_COUNT; longer never reaches int()
 
 
@@ -30,7 +30,7 @@ def count_in_range(value: object) -> int | None:
     if isinstance(value, bool):
         return None
     if isinstance(value, str):
-        if not _COUNT.match(value):
+        if not _COUNT.fullmatch(value):
             return None
         number = int(value)
     elif isinstance(value, int):
