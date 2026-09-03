@@ -31,6 +31,9 @@
 # not a parallel run (`make -j` may start reset before confirm has stamped),
 # not a same-user process writing data/ while make runs — the spec's Threat
 # model states the three.
+# Goals run in order even under -j: `reset` must not start before `confirm`
+# has stamped (exit pass, security-reviewer #1; pinned by a -j2 probe).
+.NOTPARALLEL:
 unexport SPEC BASE TARGET ROWS SOURCE
 _Q = '$(subst ','\'',$(1))'
 

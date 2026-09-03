@@ -249,6 +249,19 @@ def test_confirm_is_a_goal_of_the_same_invocation():
         CONFIRM_STAMP.unlink(missing_ok=True)
 
 
+def test_a_parallel_run_still_stamps_before_the_gated_goal_runs():
+    """`.NOTPARALLEL:` — under `make -j2 confirm reset` make used to start
+    `reset` before `confirm` had stamped (7 of 12 runs left an armed stamp
+    behind and refused); with goals serialised every run is confirmed and
+    consumes its stamp (exit pass, security-reviewer #1, code-reviewer #1)."""
+    try:
+        for _ in range(8):
+            assert _probe(["-j2", "confirm", "reset"], {}) == 0
+            assert not CONFIRM_STAMP.exists()
+    finally:
+        CONFIRM_STAMP.unlink(missing_ok=True)
+
+
 def test_confirm_arms_a_gated_goal_or_nothing():
     """A9 (a), against the installed make: `make confirm help` refuses and
     leaves no stamp; a MAKECMDGOALS definition from the environment, from
