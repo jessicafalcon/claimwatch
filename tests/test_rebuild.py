@@ -14,6 +14,7 @@ import pytest  # noqa: E402
 
 from ingest.parsed import PageShapeError  # noqa: E402
 from pipeline.build import (  # noqa: E402
+    _columns,
     build_derived,
     check_raw_declaration,
     content_hash,
@@ -184,8 +185,8 @@ def test_a_raw_table_built_under_a_previous_declaration_refuses_the_rebuild():
         message = str(exc.value)
         assert "raw_reviews" in message and "'rating'" in message
         assert (
-            "INTEGER in the database" in message
-            and "DECIMAL(2,1) in the file" in message
+            "INTEGER not null in the database" in message
+            and "DECIMAL(2,1) not null in the file" in message
         )
         assert "`make confirm reset`" in message and "\n" not in message
         assert conn.execute("select count(*) from raw_reviews").fetchone() == (0,)
@@ -206,6 +207,120 @@ def test_a_raw_table_with_an_extra_column_refuses_the_rebuild():
             PageShapeError, match="column 'extra' is in the database only"
         ):
             create_raw(conn)
+    finally:
+        conn.close()
+
+
+def test_a_nullability_drift_refuses_with_one_line():
+    """A8 (a): the comparison is the whole declaration. A4 (e) made
+    `review_count` nullable; a corpus built before it passed A7's name-and-type
+    check and then died in a driver ConstraintException at the load. Now the
+    nullability difference refuses like a type, naming the column, both
+    sides and the fix, before anything is loaded."""
+    conn = connect("duckdb", database=":memory:")
+    try:
+        create_raw(conn)
+        conn.execute(
+            "alter table raw_platform_snapshots alter column review_count set not null"
+        )
+        with pytest.raises(PageShapeError) as exc:
+            create_raw(conn)
+        message = str(exc.value)
+        assert "'review_count' INTEGER not null in the database" in message
+        assert "'review_count' INTEGER nullable in the file" in message
+        assert "`make confirm reset`" in message and "\n" not in message
+    finally:
+        conn.close()
+
+
+def test_columns_in_another_order_refuse_naming_the_position():
+    """A8 (a): the comparison is by position — the file's order is the
+    table's — so a column moved to the end refuses at the first position
+    that differs, naming both columns."""
+    conn = connect("duckdb", database=":memory:")
+    try:
+        create_raw(conn)
+        conn.execute("alter table raw_reviews drop column body")
+        conn.execute("alter table raw_reviews add column body text")
+        with pytest.raises(PageShapeError) as exc:
+            create_raw(conn)
+        message = str(exc.value)
+        assert "column 9 is 'content_hash'" in message and "'body'" in message
+    finally:
+        conn.close()
+
+
+def test_a_stray_scratch_named_table_refuses_naming_itself():
+    """A8 (a): a table already sitting under the scratch name is not the
+    declaration and not the corpus; the check refuses naming it and does not
+    point at `make confirm reset`, and leaves it in place."""
+    conn = connect("duckdb", database=":memory:")
+    try:
+        create_raw(conn)
+        conn.execute("create table declared_raw_reviews (a integer)")
+        with pytest.raises(PageShapeError) as exc:
+            create_raw(conn)
+        message = str(exc.value)
+        assert (
+            "'declared_raw_reviews'" in message
+            and "not one this repo builds" in message
+        )
+        assert "make confirm reset" not in message
+        assert conn.execute("select count(*) from declared_raw_reviews").fetchone() == (
+            0,
+        )
+    finally:
+        conn.close()
+
+
+def test_a_raw_file_with_two_statements_refuses_before_any_runs(tmp_path):
+    """A8 (a): a raw file is exactly one `create table if not exists`; a
+    second statement would run against the corpus during the check, so the
+    file refuses first, and a header comment quoting the phrase is not a
+    statement."""
+    conn = connect("duckdb", database=":memory:")
+    try:
+        two = tmp_path / "raw_two.sql"
+        two.write_text(
+            "create table if not exists raw_x (a integer);\n"
+            "create table if not exists raw_y (b integer);\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(PageShapeError, match="holds 2 statements, not one"):
+            check_raw_declaration(conn, two)
+        assert conn.execute(
+            "select count(*) from information_schema.tables "
+            "where table_name in ('raw_x', 'raw_y')"
+        ).fetchone() == (0,)
+        other = tmp_path / "raw_other.sql"
+        other.write_text("insert into raw_reviews select 1;\n", encoding="utf-8")
+        with pytest.raises(PageShapeError, match="is not one `create table"):
+            check_raw_declaration(conn, other)
+        commented = tmp_path / "raw_commented.sql"
+        commented.write_text(
+            "-- create table if not exists nothing_here (x integer);\n"
+            "create table if not exists raw_z (\n"
+            "  a integer -- create table if not exists\n);\n",
+            encoding="utf-8",
+        )
+        check_raw_declaration(conn, commented)  # raw_z does not exist yet: passes
+        conn.execute("create table raw_z (a integer)")
+        check_raw_declaration(conn, commented)  # matches: the comments were ignored
+    finally:
+        conn.close()
+
+
+def test_the_scratch_declaration_is_listed_in_the_engines_default_schema():
+    """A8 (a) asserts, rather than assumes, that the engine lists a temporary
+    table under the schema it names as its default, which is where `_columns`
+    reads the scratch declaration from."""
+    conn = connect("duckdb", database=":memory:")
+    try:
+        conn.execute("create temporary table t_scratch (a integer, b text not null)")
+        assert _columns(conn, "t_scratch") == [
+            ("a", "INTEGER", "YES"),
+            ("b", "VARCHAR", "NO"),
+        ]
     finally:
         conn.close()
 

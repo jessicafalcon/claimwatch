@@ -506,17 +506,28 @@ def _sql_files(stage: str) -> list[Path]:
     return sorted((ROOT / "sql" / stage).glob("*.sql"))
 
 
-_CREATE_RAW = re.compile(r"create table if not exists ([a-z_]+)")
+_CREATE_RAW = re.compile(r"^create table if not exists ([a-z_]+)\b")
+_COMMENT = re.compile(r"--[^\n]*")
 
 
-def _columns(conn, table: str) -> list[tuple[str, str]]:
-    """(name, type) per column in order, in the engine's own vocabulary."""
+def _statements(sql: str) -> list[str]:
+    """The statements a SQL file holds, comments stripped, empty ones dropped —
+    so a phrase in a header comment is never mistaken for a statement (A8)."""
+    return [part.strip() for part in _COMMENT.sub("", sql).split(";") if part.strip()]
+
+
+def _columns(conn, table: str) -> list[tuple[str, str, str]]:
+    """(name, type, is_nullable) per column in position order, in the engine's
+    own vocabulary, read from the schema the engine names as its default
+    (`warehouse.default_schema`): a same-named table in another schema is not
+    this one (A8)."""
     return [
-        (name, kind)
-        for name, kind in conn.execute(
-            "select column_name, data_type from information_schema.columns "
-            "where table_name = ? order by ordinal_position",
-            [table],
+        (name, kind, nullable)
+        for name, kind, nullable in conn.execute(
+            "select column_name, data_type, is_nullable "
+            "from information_schema.columns "
+            "where table_schema = ? and table_name = ? order by ordinal_position",
+            [warehouse.default_schema(conn), table],
         ).fetchall()
     ]
 
@@ -524,44 +535,71 @@ def _columns(conn, table: str) -> list[tuple[str, str]]:
 def _table_exists(conn, table: str) -> bool:
     return (
         conn.execute(
-            "select count(*) from information_schema.tables where table_name = ?",
-            [table],
+            "select count(*) from information_schema.tables "
+            "where table_schema = ? and table_name = ?",
+            [warehouse.default_schema(conn), table],
         ).fetchone()[0]
         > 0
     )
 
 
+def _describe(column: tuple[str, str, str]) -> str:
+    name, kind, nullable = column
+    return f"{name!r} {kind} {'nullable' if nullable == 'YES' else 'not null'}"
+
+
 def check_raw_declaration(conn, path: Path) -> None:
-    """A raw table that already exists must be the one its file declares (A7).
-    `create table if not exists` keeps an older column silently and the
+    """A raw table that already exists must be the one its file declares (A7,
+    A8). `create table if not exists` keeps an older column silently and the
     engine casts into it on insert — 109 half-step ratings rounded on the
     first live run — so the declaration is created as a temporary table under
-    a scratch name, both column lists are read back from information_schema
-    in the engine's own words, and the first difference refuses the rebuild
-    naming table, column and both types. A table not yet created passes."""
-    sql = path.read_text(encoding="utf-8")
-    m = _CREATE_RAW.search(sql)
+    a scratch name, both column lists (name, type, nullability, by position)
+    are read back from information_schema in the engine's own words, and the
+    first difference refuses the rebuild naming position, column and both
+    sides. A table not yet created passes. The file is exactly one statement,
+    and only that statement is run for the scratch, so nothing else in a raw
+    file can reach the corpus during the check; a table already sitting under
+    the scratch name refuses, naming itself, since the corpus is not what is
+    wrong then."""
+    where_file = path.relative_to(ROOT) if path.is_relative_to(ROOT) else path
+    statements = _statements(path.read_text(encoding="utf-8"))
+    if len(statements) != 1:
+        raise PageShapeError(
+            f"{where_file}: holds {len(statements)} statements, not one "
+            "`create table if not exists`"
+        )
+    m = _CREATE_RAW.match(statements[0])
     if m is None:
-        raise PageShapeError(f"{path}: no `create table if not exists` statement")
+        raise PageShapeError(
+            f"{where_file}: is not one `create table if not exists` statement"
+        )
     table = m.group(1)
     if not _table_exists(conn, table):
         return
     scratch = f"declared_{table}"
-    conn.execute(_CREATE_RAW.sub(f"create temporary table {scratch}", sql, count=1))
+    if _table_exists(conn, scratch):
+        raise PageShapeError(
+            f"{where_file}: a table {scratch!r} already exists in the database "
+            "and is not one this repo builds — remove it, then `make rebuild` "
+            "(the corpus is not what is wrong)"
+        )
+    conn.execute(
+        _CREATE_RAW.sub(f"create temporary table {scratch}", statements[0], count=1)
+    )
     try:
         declared = _columns(conn, scratch)
     finally:
         conn.execute(f"drop table {scratch}")
     existing = _columns(conn, table)
-    where = f"{path.relative_to(ROOT)}: the corpus's table {table}"
+    where = f"{where_file}: the corpus's table {table}"
     tail = "a changed raw declaration needs `make confirm reset` then `make rebuild`"
-    for (have_name, have_type), (want_name, want_type) in zip(
-        existing, declared, strict=False
+    for position, (have, want) in enumerate(
+        zip(existing, declared, strict=False), start=1
     ):
-        if (have_name, have_type) != (want_name, want_type):
+        if have != want:
             raise PageShapeError(
-                f"{where}: column {have_name!r} is {have_type} in the database, "
-                f"{want_name!r} {want_type} in the file — {tail}"
+                f"{where}: column {position} is {_describe(have)} in the "
+                f"database, {_describe(want)} in the file — {tail}"
             )
     if len(existing) != len(declared):
         extra = existing[len(declared) :] or declared[len(existing) :]
