@@ -31,6 +31,10 @@ The declared shape, from the structure dump of 2026-09-02 (DECISIONS -> Phase
                                                  description; the first sample nested
                                                  it inside, and the guard keyed on that)
   [itemscope itemtype=".../AggregateRating"]   exactly one per page:
+                                                 <meta itemprop=worstRating content=0>
+                                                 <meta itemprop=bestRating content=5>
+                                                 the site's scale for the aggregate;
+                                                 another declared scale refuses (A8)
     <meta itemprop=ratingValue content=x.y>      0..5 -> snapshot rating
     <meta itemprop=ratingCount content=N>        -> snapshot review_count
 
@@ -58,6 +62,7 @@ from decimal import Decimal
 from html.parser import HTMLParser
 
 from ingest.parsed import (
+    MEASURES,
     REVIEW_RATINGS,
     Parsed,
     count_in_range,
@@ -86,6 +91,9 @@ _PERSON_TYPE = re.compile(r"^https?://schema\.org/person$", re.I)
 # through a bounded digit shape so no page text reaches `Decimal()` unchecked
 # (round 4, code-reviewer #10).
 REVIEW_SCALE = (min(REVIEW_RATINGS), max(REVIEW_RATINGS))
+# The scale the aggregate scope declares: the snapshot rating column's range
+# (`parsed.MEASURES["rating"]`, 0..5), the one guard for both scopes (A8 (c)).
+AGGREGATE_SCALE = (MEASURES["rating"].lo, MEASURES["rating"].hi)
 _BOUND = re.compile(r"[0-9]{1,3}(\.[0-9]{1,3})?")
 
 
@@ -160,6 +168,8 @@ class _Walker(HTMLParser):
             if self.aggregate_depth is not None and itemprop in (
                 "ratingValue",
                 "ratingCount",
+                "worstRating",
+                "bestRating",
             ):
                 if itemprop in self.aggregates[-1]:
                     self.aggregate_duplicates.append(itemprop)  # outside the shape
@@ -341,6 +351,22 @@ def _review_row(
 def _snapshot_row(
     aggregate: dict[str, str | None], page_url: str, captured_at: str, source: Source
 ) -> dict[str, object]:
+    declared = _declared_scale(
+        aggregate.get("worstRating"), aggregate.get("bestRating")
+    )
+    if declared != AGGREGATE_SCALE:
+        # The site declares the aggregate's scale as it declares each review's;
+        # the snapshot rating column admits 0..5 and nothing else, so an
+        # aggregate declared on another scale refuses instead of landing as a
+        # 0-5 rating tagged Measured (A8 (c)).
+        raise refuse(
+            page_url,
+            None,
+            "worstRating/bestRating",
+            f"declares the aggregate's scale {aggregate.get('worstRating')!r}.."
+            f"{aggregate.get('bestRating')!r}, not "
+            f"{AGGREGATE_SCALE[0]}..{AGGREGATE_SCALE[1]}",
+        )
     value = aggregate.get("ratingValue")
     rating = rating_from_page(value) if value is not None else None
     if rating is None:

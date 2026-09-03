@@ -511,6 +511,58 @@ def test_a_review_declaring_another_scale_refuses_the_page(mutate, declared):
         parse(html, PAGE_URL, CAPTURED, SRC)
 
 
+AGG_WORST = '<meta itemprop="worstRating" content="0">'
+AGG_BEST = '<meta itemprop="bestRating" content="5">'
+
+
+@pytest.mark.parametrize(
+    ("mutate", "declared"),
+    [
+        (
+            lambda s: s.replace(
+                AGG_BEST + '\n  <meta itemprop="ratingValue"',
+                AGG_BEST.replace('"5"', '"10"') + '\n  <meta itemprop="ratingValue"',
+                1,
+            ),
+            "'0'..'10'",
+        ),
+        (
+            lambda s: s.replace("  " + AGG_WORST + "\n", "", 1),
+            "None..'5'",
+        ),
+    ],
+)
+def test_an_aggregate_declaring_another_scale_refuses_the_page(mutate, declared):
+    """A8 (c): the aggregate is the one review-site number the study displays;
+    its declared scale is read like a review's, and a page declaring another
+    refuses naming the bounds instead of storing the figure as a 0-5 rating
+    tagged Measured (round 4, code-reviewer #2)."""
+    html = mutate(_page(1))
+    assert html != _page(1)
+    with pytest.raises(
+        PageShapeError,
+        match=(
+            "page: field 'worstRating/bestRating' declares the aggregate's scale "
+            f"{re.escape(declared)}, not 0..5"
+        ),
+    ):
+        parse(html, PAGE_URL, CAPTURED, SRC)
+
+
+def test_the_aggregates_scale_spelled_with_a_fraction_is_the_same_scale():
+    """A8 (c): a bound is a number — `0.0`..`5.0` is 0..5 and yields the same
+    snapshot row."""
+    html = _page(1).replace(
+        AGG_WORST + "\n  " + AGG_BEST,
+        AGG_WORST.replace('"0"', '"0.0"') + "\n  " + AGG_BEST.replace('"5"', '"5.0"'),
+        1,
+    )
+    assert html != _page(1)
+    assert parse(html, PAGE_URL, CAPTURED, SRC) == parse(
+        _page(1), PAGE_URL, CAPTURED, SRC
+    )
+
+
 AGGREGATE_OPEN = (
     '<div class="oa_scoring d-flex flex-column" itemprop="aggregateRating" '
     'itemscope itemtype="http://schema.org/AggregateRating">'
