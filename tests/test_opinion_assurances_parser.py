@@ -290,6 +290,68 @@ def test_a_nested_review_scope_refuses_the_page():
         parse(html, PAGE_URL, CAPTURED, SRC)
 
 
+def test_the_sample_carries_the_live_nesting_text_after_the_description():
+    """A5: the first live page refused because `h4.oa_text` FOLLOWS
+    `div.oa_description` while the first sample nested it inside. The sample
+    now carries the live nesting: the description's element holds its
+    sentence and nothing else."""
+    for n in (1, 2):
+        for m in re.finditer(
+            r'<div class="oa_description">(.*?)</div>', _page(n), flags=re.S
+        ):
+            assert "oa_text" not in m.group(1)
+            assert m.group(1).strip().startswith("Avis publié le")
+
+
+def test_a_body_nested_inside_the_description_is_still_the_review_text():
+    """A5: the guard's kind is "this element is the review's text", not "this
+    element is inside the description" — the first sample's nesting still
+    reads to the same rows."""
+    nested = re.sub(
+        r'(<div class="oa_description">\n\s+Avis publié le [^\n]+\n)(\s+</div>\n)'
+        r'(\s+<h4 class="oa_text[^\n]*\n[^\n]*\n\s+</h4>\n)',
+        lambda m: m.group(1) + m.group(3) + m.group(2),
+        _page(1),
+    )
+    assert nested != _page(1) and nested.count("oa_text") == _page(1).count("oa_text")
+    assert parse(nested, PAGE_URL, CAPTURED, SRC) == parse(
+        _page(1), PAGE_URL, CAPTURED, SRC
+    )
+
+
+def test_two_bodies_in_one_review_refuse_the_page():
+    """A5: the shape declares one `oa_text` per review; two refuse the page
+    naming the count, as two `ratingValue`s do."""
+    html = _second_review(
+        _page(1),
+        lambda s: s.replace(
+            '<div class="oa_commands',
+            '<h4 class="oa_text">EXEMPLE FICTIF. Second texte.</h4>'
+            '<div class="oa_commands',
+            1,
+        ),
+    )
+    with pytest.raises(
+        PageShapeError, match="review 2': field 'oa_text' appears 2 times"
+    ):
+        parse(html, PAGE_URL, CAPTURED, SRC)
+
+
+def test_a_body_inside_the_author_markup_is_neither_read_nor_counted():
+    """Author markup is never read: an `oa_text` inside it is layout, not a
+    second body."""
+    html = _second_review(
+        _page(1),
+        lambda s: s.replace(
+            "profil</a>",
+            'profil</a><h4 class="oa_text">reviewer-placeholder-9 wrote this</h4>',
+            1,
+        ),
+    )
+    rows = parse(html, PAGE_URL, CAPTURED, SRC).reviews
+    assert rows[1] == parse(_page(1), PAGE_URL, CAPTURED, SRC).reviews[1]
+
+
 AGGREGATE_OPEN = (
     '<div class="oa_scoring d-flex flex-column" itemprop="aggregateRating" '
     'itemscope itemtype="http://schema.org/AggregateRating">'

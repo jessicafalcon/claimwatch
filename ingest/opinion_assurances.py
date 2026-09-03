@@ -16,16 +16,22 @@ The declared shape, from the structure dump of 2026-09-02 (DECISIONS -> Phase
                                                  expérience le dd/mm/yyyy": the first
                                                  date -> review_date (YYYY-MM-DD),
                                                  the second is the experience date
-      h4.oa_text                                 the review text -> body (title = "")
+    h4.oa_text                                   the review text -> body (title = "");
+                                                 a child of the review scope, read
+                                                 wherever it sits in the scope outside
+                                                 the author markup, exactly one (A5:
+                                                 the live page has it FOLLOW the
+                                                 description; the first sample nested
+                                                 it inside, and the guard keyed on that)
   [itemscope itemtype=".../AggregateRating"]   exactly one per page:
     <meta itemprop=ratingValue content=x.y>      0..5 -> snapshot rating
     <meta itemprop=ratingCount content=N>        -> snapshot review_count
 
-A review missing its rating, its sentence or its body, a rating outside 1..5,
-a date that does not parse, or a page with two aggregates refuses the WHOLE
-page naming page, review (its position on the page) and field. A page with an
-aggregate and no review scope is the end of the list (an empty page); a page
-with neither is not a profile page and is refused.
+A review missing its rating, its sentence or its body, carrying two ratings or
+two bodies, a rating outside 1..5, a date that does not parse, or a page with
+two aggregates refuses the WHOLE page naming page, review (its position on the
+page) and field. A page with an aggregate and no review scope is the end of the
+list (an empty page); a page with neither is not a profile page and is refused.
 
 `external_id`: the page marks no stable review identifier (the only per-review
 link is the reviewer's member page, an author field), so the id is a content
@@ -72,6 +78,7 @@ class _Review:
         self.ratings_seen = 0  # more than one ratingValue is outside the shape
         self.sentence: list[str] = []
         self.body: list[str] = []
+        self.bodies_seen = 0  # more than one oa_text is outside the shape (A5)
         self.author_depth: int | None = None  # skipped while set
 
 
@@ -164,8 +171,15 @@ class _Walker(HTMLParser):
             self.rating_depth = depth
         elif "oa_description" in _classes(attrs) and self.desc_depth is None:
             self.desc_depth = depth
-        elif "oa_text" in _classes(attrs) and self.desc_depth is not None:
+        elif (
+            "oa_text" in _classes(attrs)
+            and review.author_depth is None
+            and self.body_depth is None
+        ):
+            # The review's text, wherever it sits in the scope: the live page
+            # has it follow the description, not sit inside it (A5).
             self.body_depth = depth
+            review.bodies_seen += 1
 
     def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         self.handle_starttag(tag, attrs)
@@ -246,6 +260,10 @@ def _review_row(
         raise refuse(page_url, item, "oa_description", "is not the declared sentence")
     published = _iso(m.group(1), page_url, item, "published")
     experienced = _iso(m.group(2), page_url, item, "experience")
+    if review.bodies_seen > 1:
+        raise refuse(
+            page_url, item, "oa_text", f"appears {review.bodies_seen} times, not once"
+        )
     body = " ".join(review.body)
     if not body:
         raise refuse(page_url, item, "oa_text", "is missing or empty")
