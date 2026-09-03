@@ -44,7 +44,7 @@ SAMPLE_PAGES = tuple(
     for n in (1, 2, 3)
 )
 RATING_MIN, RATING_MAX = 1, 5
-_DIGITS = re.compile(r"[0-9]+")
+_DIGITS = re.compile(r"\A[0-9]+\Z")
 
 
 def _label(item: object, field: str, page_url: str, item_id: str | None) -> str:

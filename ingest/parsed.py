@@ -20,7 +20,7 @@ from decimal import ROUND_HALF_EVEN, Decimal, InvalidOperation
 # #2 #3, security-reviewer #1 #2).
 MAX_COUNT = 2**31 - 1
 _COUNT = re.compile(
-    r"[0-9]{1,10}"
+    r"\A[0-9]{1,10}\Z"
 )  # ten digits cover MAX_COUNT; longer never reaches int()
 
 

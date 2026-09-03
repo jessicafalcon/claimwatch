@@ -37,8 +37,8 @@ ORIGINS = ("anchor", "manual", "fetch")  # how a snapshot row came to be
 PARSERS = ("app_store", "listing", "opinion_assurances")
 SAMPLE = "sample"  # the name and attribution of a frozen sample's declaration
 
-_SLUG = re.compile(r"[a-z0-9-]+")  # matched whole (`fullmatch`, round 5)
-_DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
+_SLUG = re.compile(r"\A[a-z0-9-]+\Z")  # matched whole (round 5, exit pass)
+_DATE = re.compile(r"\A[0-9]{4}-[0-9]{2}-[0-9]{2}\Z")
 FEED_HOST = "itunes.apple.com"
 # The strings that spell the studied insurer (D1), one per form the
 # declarations below carry: the bare name (a profile path), the package id's

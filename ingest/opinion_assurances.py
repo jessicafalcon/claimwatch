@@ -80,11 +80,13 @@ SAMPLE_DIR = ROOT / "fixtures" / "opinion-assurances"
 # fake, nameless profile (A4 (c)).
 SAMPLE_PAGES = profile_pages(f"https://{SAMPLE_HOST}/assureur-exemple-fictif.html", 3)
 _SENTENCE = re.compile(
-    r"^\S+ publié le (\d{2}/\d{2}/\d{4}) suite à une expérience le (\d{2}/\d{2}/\d{4})$"
+    r"\A\S+ publié le (\d{2}/\d{2}/\d{4}) "
+    r"suite à une expérience le (\d{2}/\d{2}/\d{4})\Z"
 )
-_REVIEW_TYPE = re.compile(r"^https?://schema\.org/review$", re.I)
-_AGGREGATE_TYPE = re.compile(r"^https?://schema\.org/aggregaterating$", re.I)
-_PERSON_TYPE = re.compile(r"^https?://schema\.org/person$", re.I)
+# Matched whole, like every shape (exit pass, code-reviewer #3).
+_REVIEW_TYPE = re.compile(r"\Ahttps?://schema\.org/review\Z", re.I)
+_AGGREGATE_TYPE = re.compile(r"\Ahttps?://schema\.org/aggregaterating\Z", re.I)
+_PERSON_TYPE = re.compile(r"\Ahttps?://schema\.org/person\Z", re.I)
 # The scale a review scope declares (`worstRating`, `bestRating`): the bounds
 # of `parsed.REVIEW_RATINGS`, which admits exactly the site's scale. A bound
 # is a number, compared as one — `5` and `5.0` declare the same scale — read
@@ -195,14 +197,14 @@ class _Walker(HTMLParser):
             return
         self.open.setdefault(tag, []).append(len(self.stack))
         self.stack.append((tag, attrs))
-        if scope and _REVIEW_TYPE.match(itemtype):
+        if scope and _REVIEW_TYPE.fullmatch(itemtype):
             if self.review_depth is not None:
                 self.nested_reviews += 1  # outside the shape: refused, never dropped
                 return
             self.review_depth = depth
             self.reviews.append(_Review())
             return
-        if scope and _AGGREGATE_TYPE.match(itemtype):
+        if scope and _AGGREGATE_TYPE.fullmatch(itemtype):
             # The profile's aggregate stands on its own: one inside a review
             # would be that review's numbers, one inside the aggregate would
             # merge its values into it. Both are outside the shape and refuse,
@@ -222,7 +224,7 @@ class _Walker(HTMLParser):
         # kind of the guard is "this element is about a person", not "this
         # element is the author scope" (round 1, functionality-tester F3).
         if review.author_depth is None and (
-            itemprop == "author" or _PERSON_TYPE.match(itemtype)
+            itemprop == "author" or _PERSON_TYPE.fullmatch(itemtype)
         ):
             review.author_depth = depth
         elif scope and itemprop == "reviewRating" and self.rating_depth is None:
@@ -331,7 +333,7 @@ def _review_row(
             "oa_description",
             f"holds {len(review.sentence)} texts, not one sentence",
         )
-    m = _SENTENCE.match(review.sentence[0])
+    m = _SENTENCE.fullmatch(review.sentence[0])
     if not m:
         raise refuse(page_url, item, "oa_description", "is not the declared sentence")
     published = _iso(m.group(1), page_url, item, "published")

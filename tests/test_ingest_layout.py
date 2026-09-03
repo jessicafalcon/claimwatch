@@ -505,3 +505,38 @@ def test_a_shape_guard_takes_the_whole_value_not_a_prefix_before_a_newline(
     )
     with pytest.raises(PageShapeError, match="is not YYYY-MM-DDTHH:MM:SS"):
         read_meta(meta, src)
+
+
+def test_every_shape_carries_its_own_anchors():
+    """The whole-value property lives in the shape, not only at the call:
+    under a bare `search`, a value with text around it is still refused by
+    every declared shape (exit pass, code-reviewer #8)."""
+    from ingest import app_store, captures, opinion_assurances, parsed, sources
+    from pipeline import build
+
+    shapes = (
+        build._SLUG,
+        build._DAY,
+        sources._SLUG,
+        sources._DATE,
+        captures._STAMP,
+        captures.page_pattern("xml"),
+        app_store._DIGITS,
+        parsed._COUNT,
+        opinion_assurances._REVIEW_TYPE,
+    )
+    good = (
+        "abc",
+        "2026-09-03",
+        "abc",
+        "2026-09-03",
+        "2026-09-03T10:00:00",
+        "page-1.xml",
+        "12",
+        "12",
+        "https://schema.org/review",
+    )
+    for shape, value in zip(shapes, good, strict=True):
+        assert shape.search(value)
+        assert not shape.search(f" {value}"), shape.pattern
+        assert not shape.search(f"{value}\n"), shape.pattern

@@ -29,7 +29,7 @@ from ingest.parsed import PageShapeError, Parsed
 from ingest.sources import PARSERS, Source
 
 META_FIELDS = ("source_url", "captured_at", "status")
-_STAMP = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}")
+_STAMP = re.compile(r"\A[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\Z")
 
 
 def parser_module(name: str) -> ModuleType:
@@ -41,7 +41,7 @@ def parser_module(name: str) -> ModuleType:
 
 
 def page_pattern(ext: str) -> re.Pattern[str]:
-    return re.compile(rf"page-([0-9]+)\.{re.escape(ext)}")
+    return re.compile(rf"\Apage-([0-9]+)\.{re.escape(ext)}\Z")
 
 
 def read_meta(path: Path, source: Source) -> dict[str, object]:
