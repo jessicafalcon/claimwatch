@@ -351,7 +351,7 @@ def _check_row(r: dict[str, object], run_id: str, rows_input: str) -> None:
 
 
 def load_snapshots(
-    conn, rows: list[dict[str, object]], run_id: str, rows_input: str = "captured"
+    conn, rows: list[dict[str, object]], run_id: str, rows_input: str
 ) -> None:
     """Append each snapshot not already present under its natural key + hash —
     the same guard shape as `load_reviews`. The key (A2) names what produced
@@ -366,7 +366,9 @@ def load_snapshots(
     from tracked inputs. Nothing is tiebroken downstream: the key is unique
     in raw. The batch is one transaction (A4 (a)): a refusal on any row
     leaves none of the batch in raw, so a refused rebuild never leaves the
-    corpus partly written."""
+    corpus partly written. `rows_input` — which closed set of labels applies —
+    is required and is the rebuild's input, a member of `INPUTS`, never a
+    signature's default (A8 (e))."""
     conn.execute("begin transaction")
     try:
         _load_snapshots(conn, rows, run_id, rows_input)
@@ -727,7 +729,7 @@ def rebuild(
     target: str = "duckdb",
     rows: str = "none",
     *,
-    database: str | Path | None = None,
+    root: str | Path | None = None,
     run_id: str | None = None,
     cache_dir: str | Path | None = None,
     manual_file: str | Path | None = None,
@@ -737,11 +739,13 @@ def rebuild(
     data/cache (zero captures -> the anchors and the file); `none` runs the
     pipeline end to end with zero rows; `synthetic` loads the review fixture
     and the anchors; `samples` loads the anchors and the frozen samples
-    through the real parsers. Every input goes through the same guards. With
-    no `database`, each input builds its own file (`warehouse.database_for`)."""
-    if database is None:
-        database = warehouse.database_for(rows)
-    conn = connect(target, database=database)
+    through the real parsers. Every input goes through the same guards. The
+    file is always `warehouse.database_for(rows, root)`: a caller names the
+    directory the files live in, never the file an input lands in, so the
+    literal `sample` can exist only in the samples file (A8 (e))."""
+    if rows not in INPUTS:
+        raise ValueError(f"rows input {rows!r} not in {INPUTS}")
+    conn = connect(target, database=warehouse.database_for(rows, root))
     try:
         create_raw(conn)
         if rows != "none":
@@ -779,11 +783,10 @@ def idempotency_check(
     prove `run_id` is not in the natural key) and compare per-table counts. Uses a
     throwaway file so it depends on no prior state and touches no working db."""
     with tempfile.TemporaryDirectory() as tmp:
-        db = Path(tmp) / "idempotency.duckdb"
         first = rebuild(
             target,
             rows,
-            database=db,
+            root=tmp,
             run_id="run-1",
             cache_dir=cache_dir,
             manual_file=manual_file,
@@ -791,7 +794,7 @@ def idempotency_check(
         second = rebuild(
             target,
             rows,
-            database=db,
+            root=tmp,
             run_id="run-2",
             cache_dir=cache_dir,
             manual_file=manual_file,

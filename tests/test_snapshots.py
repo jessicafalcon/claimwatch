@@ -27,7 +27,7 @@ from pipeline.build import (
     read_manual_snapshots,
     rebuild,
 )
-from pipeline.warehouse import connect
+from pipeline.warehouse import connect, database_for
 from tests import pins
 
 PLAY = by_name("fr-digital-first-google-play-listing")
@@ -72,8 +72,8 @@ def _play_capture(cache: Path, stamp: str) -> None:
 def test_anchors_seed_nine_documented_rows_with_provenance(tmp_path):
     """Nine since the re-freeze: the brief's Opinion Assurances anchor was
     missing from the Phase 1 file (round 1: the spec says nine everywhere)."""
-    db = tmp_path / "w.duckdb"
-    counts = rebuild("duckdb", "synthetic", database=db)
+    db = database_for("synthetic", tmp_path)
+    counts = rebuild("duckdb", "synthetic", root=tmp_path)
     assert counts["raw_platform_snapshots"] == pins.ANCHOR_ROWS
     assert counts["stg_platform_snapshots"] == pins.ANCHOR_ROWS
     rows = _query(
@@ -120,11 +120,11 @@ def test_anchors_seed_nine_documented_rows_with_provenance(tmp_path):
 def test_anchors_seed_identically_in_every_input_but_none(tmp_path):
     seen = {}
     for rows in ("captured", "synthetic", "samples", "none"):
-        db = tmp_path / f"{rows}.duckdb"
+        db = database_for(rows, tmp_path)
         rebuild(
             "duckdb",
             rows,
-            database=db,
+            root=tmp_path,
             cache_dir=tmp_path / "no",
             manual_file=tmp_path / "no.csv",
         )
@@ -158,9 +158,9 @@ def test_manual_and_fetched_rows_read_back_as_measured(tmp_path):
             }
         ],
     )
-    db = tmp_path / "w.duckdb"
+    db = database_for("captured", tmp_path)
     counts = rebuild(
-        "duckdb", "captured", database=db, cache_dir=cache, manual_file=manual
+        "duckdb", "captured", root=tmp_path, cache_dir=cache, manual_file=manual
     )
     assert counts["raw_platform_snapshots"] == pins.ANCHOR_ROWS + 2
     rows = _query(
@@ -221,11 +221,11 @@ def test_a_profile_capture_yields_one_snapshot_row_from_its_first_page(tmp_path)
     )
     assert moved != page2.read_text(encoding="utf-8")
     page2.write_text(moved, encoding="utf-8")
-    db = tmp_path / "w.duckdb"
+    db = database_for("captured", tmp_path)
     rebuild(
         "duckdb",
         "captured",
-        database=db,
+        root=tmp_path,
         cache_dir=tmp_path / "cache",
         manual_file=tmp_path / "none.csv",
     )
@@ -274,10 +274,13 @@ def test_a_corrected_figure_for_an_entered_day_refuses_the_load(
     functionality-tester F4) — is refused with one line naming its line and
     the fix, never tiebroken by hash order. The same figures again add
     nothing; a corrected figure on a NEW day is a new point."""
-    db = tmp_path / "w.duckdb"
     first = _manual(tmp_path, "m1.csv", [_store_row()])
     rebuild(
-        "duckdb", "captured", database=db, cache_dir=tmp_path / "no", manual_file=first
+        "duckdb",
+        "captured",
+        root=tmp_path,
+        cache_dir=tmp_path / "no",
+        manual_file=first,
     )
     changed = _manual(tmp_path, "m2.csv", [_store_row(**{field: corrected})])
     with pytest.raises(
@@ -286,13 +289,17 @@ def test_a_corrected_figure_for_an_entered_day_refuses_the_load(
         rebuild(
             "duckdb",
             "captured",
-            database=db,
+            root=tmp_path,
             cache_dir=tmp_path / "no",
             manual_file=changed,
         )
     assert "\n" not in str(exc.value)
     again = rebuild(
-        "duckdb", "captured", database=db, cache_dir=tmp_path / "no", manual_file=first
+        "duckdb",
+        "captured",
+        root=tmp_path,
+        cache_dir=tmp_path / "no",
+        manual_file=first,
     )
     assert again["raw_platform_snapshots"] == pins.ANCHOR_ROWS + 1
     new_day = _manual(
@@ -301,7 +308,7 @@ def test_a_corrected_figure_for_an_entered_day_refuses_the_load(
     later = rebuild(
         "duckdb",
         "captured",
-        database=db,
+        root=tmp_path,
         cache_dir=tmp_path / "no",
         manual_file=new_day,
     )
@@ -321,8 +328,8 @@ def test_a_corrected_attribution_for_an_entered_key_refuses_the_load(
     dropped by the not-exists guard (round 2, code-reviewer #4)."""
     from pipeline.build import build_derived, load_snapshots
 
-    db = tmp_path / "w.duckdb"
-    rebuild("duckdb", "synthetic", database=db)
+    db = database_for("synthetic", tmp_path)
+    rebuild("duckdb", "synthetic", root=tmp_path)
     conn = connect("duckdb", database=db)
     try:
         row = {
@@ -340,10 +347,10 @@ def test_a_corrected_attribution_for_an_entered_key_refuses_the_load(
             "captured_at": "2026-09-02",
             "seeded_from": "",
         }
-        load_snapshots(conn, [row], "first")
-        load_snapshots(conn, [dict(row)], "again")  # the same row: nothing
+        load_snapshots(conn, [row], "first", "captured")
+        load_snapshots(conn, [dict(row)], "again", "captured")  # the same row: nothing
         with pytest.raises(PageShapeError, match="another attribution"):
-            load_snapshots(conn, [{**row, field: corrected}], "corrected")
+            load_snapshots(conn, [{**row, field: corrected}], "corrected", "captured")
         build_derived(conn)
         stored = conn.execute(
             "select segment, channel, seeded_from from raw_platform_snapshots "
@@ -362,9 +369,12 @@ def test_a_respelled_figure_is_the_same_figure_not_a_correction(tmp_path):
     from pipeline.build import snapshot_hash
 
     first = _manual(tmp_path, "m1.csv", [_store_row(rating="4.9")])
-    db = tmp_path / "w.duckdb"
     rebuild(
-        "duckdb", "captured", database=db, cache_dir=tmp_path / "no", manual_file=first
+        "duckdb",
+        "captured",
+        root=tmp_path,
+        cache_dir=tmp_path / "no",
+        manual_file=first,
     )
     respelled = _manual(
         tmp_path, "m2.csv", [_store_row(rating="4.900", response_rate="")]
@@ -372,7 +382,7 @@ def test_a_respelled_figure_is_the_same_figure_not_a_correction(tmp_path):
     counts = rebuild(
         "duckdb",
         "captured",
-        database=db,
+        root=tmp_path,
         cache_dir=tmp_path / "no",
         manual_file=respelled,
     )
@@ -397,13 +407,12 @@ def test_a_respelled_figure_is_the_same_figure_not_a_correction(tmp_path):
 
 
 def test_two_entries_for_one_day_in_one_file_refuse_naming_the_second_line(tmp_path):
-    db = tmp_path / "w.duckdb"
     both = _manual(tmp_path, "m.csv", [_store_row(), _store_row(rating="4.8")])
     with pytest.raises(PageShapeError, match="line 3: a snapshot for"):
         rebuild(
             "duckdb",
             "captured",
-            database=db,
+            root=tmp_path,
             cache_dir=tmp_path / "no",
             manual_file=both,
         )
@@ -414,12 +423,12 @@ def test_a_hand_read_row_is_never_swallowed_by_an_anchor_with_its_numbers(tmp_pa
     profile, day and figures as an anchor is a row of its own — the key names
     how it came to be and where it was read — and, sharing the day, it stands
     in front of the anchor in the marts as the Measured point."""
-    db = tmp_path / "w.duckdb"
+    db = database_for("captured", tmp_path)
     same = _manual(
         tmp_path, "m.csv", [_store_row(captured_at="2024-09-15", review_count="5000")]
     )
     counts = rebuild(
-        "duckdb", "captured", database=db, cache_dir=tmp_path / "no", manual_file=same
+        "duckdb", "captured", root=tmp_path, cache_dir=tmp_path / "no", manual_file=same
     )
     assert counts["raw_platform_snapshots"] == pins.ANCHOR_ROWS + 1
     assert counts["stg_platform_snapshots"] == pins.ANCHOR_ROWS + 1
@@ -449,8 +458,8 @@ def test_the_snapshot_key_names_its_declaration(tmp_path):
     from pipeline.build import SNAPSHOT_KEY, load_snapshots
 
     assert SNAPSHOT_KEY == ("source", "profile", "origin", "source_url", "captured_at")
-    db = tmp_path / "w.duckdb"
-    rebuild("duckdb", "synthetic", database=db)
+    db = database_for("synthetic", tmp_path)
+    rebuild("duckdb", "synthetic", root=tmp_path)
     conn = connect("duckdb", database=db)
     try:
         (anchor,) = conn.execute(
@@ -473,7 +482,7 @@ def test_the_snapshot_key_names_its_declaration(tmp_path):
             "captured_at": anchor[7],  # and the very same day
             "seeded_from": "",
         }
-        load_snapshots(conn, [twin], "test")
+        load_snapshots(conn, [twin], "test", "captured")
         rows = conn.execute(
             "select origin from raw_platform_snapshots where source = 'app-store' "
             "and source_url = ? and captured_at = ? order by origin",
@@ -493,9 +502,11 @@ def test_the_snapshot_key_is_unique_in_raw(tmp_path):
     cache = tmp_path / "cache"
     _play_capture(cache, "2026-09-02T10:00:00")
     manual = _manual(tmp_path, "m.csv", [_store_row()])
-    db = tmp_path / "w.duckdb"
+    db = database_for("captured", tmp_path)
     for _ in range(2):
-        rebuild("duckdb", "captured", database=db, cache_dir=cache, manual_file=manual)
+        rebuild(
+            "duckdb", "captured", root=tmp_path, cache_dir=cache, manual_file=manual
+        )
     cols = ", ".join(SNAPSHOT_KEY)
     dupes = _query(
         db,
@@ -521,10 +532,9 @@ def test_reseeding_reentering_and_rebuilding_add_no_snapshot_row(tmp_path):
     # a second capture of the unchanged listing at a later time IS a new point
     # (captured_at is in the key); a second load of the same capture is not
     _play_capture(cache, "2026-09-09T10:00:00")
-    db = tmp_path / "w.duckdb"
     for _ in range(2):
         counts = rebuild(
-            "duckdb", "captured", database=db, cache_dir=cache, manual_file=manual
+            "duckdb", "captured", root=tmp_path, cache_dir=cache, manual_file=manual
         )
     assert counts["raw_platform_snapshots"] == expected + 1
 
@@ -603,8 +613,8 @@ def test_every_loaded_rows_fingerprint_is_its_stored_value(tmp_path, rows):
     ever reached the loader (round 3, finding 1)."""
     from pipeline.build import snapshot_hash
 
-    db = tmp_path / "w.duckdb"
-    rebuild("duckdb", rows, database=db)
+    db = database_for(rows, tmp_path)
+    rebuild("duckdb", rows, root=tmp_path)
     conn = connect("duckdb", database=db)
     try:
         cur = conn.execute("select * from raw_platform_snapshots")
@@ -648,11 +658,11 @@ def test_a_measure_beyond_its_columns_scale_or_range_refuses(tmp_path):
         _write_csv(tmp_path / "b.csv", MANUAL_COLUMNS, [_store_row(review_count="")])
     )
     assert blank["review_count"] is None  # an absent count, like the other measures
-    db = tmp_path / "w.duckdb"
+    db = database_for("captured", tmp_path)
     rebuild(
         "duckdb",
         "captured",
-        database=db,
+        root=tmp_path,
         cache_dir=tmp_path / "no",
         manual_file=tmp_path / "e.csv",
     )
@@ -699,20 +709,22 @@ def test_a_refused_batch_loads_nothing(tmp_path):
             "seeded_from": "",
         }
 
-    db = tmp_path / "w.duckdb"
-    rebuild("duckdb", "synthetic", database=db)
+    db = database_for("synthetic", tmp_path)
+    rebuild("duckdb", "synthetic", root=tmp_path)
     conn = connect("duckdb", database=db)
     try:
-        load_snapshots(conn, [point("https://a/", 1)], "first")
+        load_snapshots(conn, [point("https://a/", 1)], "first", "captured")
         with pytest.raises(PageShapeError, match="other figures"):
-            load_snapshots(conn, [point("https://b/", 2), point("https://a/", 3)], "x")
+            load_snapshots(
+                conn, [point("https://b/", 2), point("https://a/", 3)], "x", "captured"
+            )
         rows = conn.execute(
             "select source_url, review_count from raw_platform_snapshots "
             "where origin = 'manual' order by 1"
         ).fetchall()
         assert rows == [("https://a/", 1)]
         load_snapshots(
-            conn, [point("https://b/", 2)], "later"
+            conn, [point("https://b/", 2)], "later", "captured"
         )  # the loader still works
         assert (
             conn.execute(
@@ -768,12 +780,12 @@ def test_a_row_outside_a_closed_set_or_with_empty_provenance_refuses_the_load(
         run_id = value
     else:
         row[field] = value
-    db = tmp_path / "w.duckdb"
-    rebuild("duckdb", "synthetic", database=db)
+    db = database_for("synthetic", tmp_path)
+    rebuild("duckdb", "synthetic", root=tmp_path)
     conn = connect("duckdb", database=db)
     try:
         with pytest.raises(PageShapeError, match=why):
-            load_snapshots(conn, [row], run_id)
+            load_snapshots(conn, [row], run_id, "captured")
         assert (
             conn.execute(
                 "select count(*) from raw_platform_snapshots where origin <> 'anchor'"

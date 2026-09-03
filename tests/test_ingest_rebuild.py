@@ -18,7 +18,7 @@ from ingest.parsed import PageShapeError
 from ingest.sources import SOURCES, by_name, sample_source
 from pipeline.build import idempotency_check, rebuild
 from pipeline.metrics import reviews_per_month
-from pipeline.warehouse import connect
+from pipeline.warehouse import connect, database_for
 from tests import pins
 
 SAMPLE = Path(__file__).resolve().parent.parent / "fixtures" / "app-store"
@@ -57,14 +57,14 @@ def _query(db: Path, sql: str):
 
 
 def test_rebuild_from_sample_matches_pins(tmp_path):
-    counts = rebuild("duckdb", "samples", database=tmp_path / "w.duckdb")
+    counts = rebuild("duckdb", "samples", root=tmp_path)
     assert counts["raw_reviews"] == pins.SAMPLES_RAW_REVIEWS
     assert (
         counts["stg_reviews"]
         == pins.APP_STORE_SAMPLE_STG_ROWS + pins.OA_SAMPLE_STG_ROWS
     )
     rows = _query(
-        tmp_path / "w.duckdb",
+        database_for("samples", tmp_path),
         "select distinct source, run_id, captured_at from raw_reviews order by source",
     )
     assert rows == [
@@ -76,16 +76,16 @@ def test_rebuild_from_sample_matches_pins(tmp_path):
 def test_a_half_step_rating_is_stored_as_parsed(tmp_path):
     """A6: the sample's 4.5 lands in `raw_reviews.rating` (decimal(2, 1)) and
     reads back as the parsed value; a digit reads back as itself."""
-    rebuild("duckdb", "samples", database=tmp_path / "w.duckdb")
+    rebuild("duckdb", "samples", root=tmp_path)
     day, rating = pins.OA_SAMPLE_HALF_STEP
     rows = _query(
-        tmp_path / "w.duckdb",
+        database_for("samples", tmp_path),
         "select rating from stg_reviews where source = 'opinion-assurances' "
         f"and review_date = '{day}'",
     )
     assert rows == [(Decimal(rating),)]
     first = _query(
-        tmp_path / "w.duckdb",
+        database_for("samples", tmp_path),
         "select rating from stg_reviews where source = 'opinion-assurances' "
         f"and review_date = '{pins.OA_SAMPLE_FIRST_ROW['review_date']}'",
     )
@@ -105,11 +105,11 @@ def test_samples_load_every_frozen_sample_through_its_parser(tmp_path):
         ((capture_id, parsed),) = read_captures(mod.SAMPLE_DIR, sample_source(parser))
         assert capture_id == mod.SAMPLE_DIR.name
         assert parsed.reviews or parsed.snapshots, parser
-    counts = rebuild("duckdb", "samples", database=tmp_path / "w.duckdb")
+    counts = rebuild("duckdb", "samples", root=tmp_path)
     assert counts["raw_reviews"] == pins.SAMPLES_RAW_REVIEWS
     assert counts["raw_platform_snapshots"] == pins.SAMPLES_RAW_SNAPSHOTS
     months = _query(
-        tmp_path / "w.duckdb",
+        database_for("samples", tmp_path),
         "select source, substr(review_date, 1, 7), count(*) from stg_reviews "
         "group by 1, 2 order by 1, 2",
     )
@@ -157,8 +157,8 @@ def test_every_row_carries_its_declarations_attribution_not_the_modules():
 
 
 def test_reviews_per_month_matches_pins(tmp_path):
-    db = tmp_path / "w.duckdb"
-    rebuild("duckdb", "samples", database=db)
+    db = database_for("samples", tmp_path)
+    rebuild("duckdb", "samples", root=tmp_path)
     conn = connect("duckdb", database=db)
     try:
         assert tuple(reviews_per_month(conn)) == (
@@ -212,8 +212,8 @@ def test_second_capture_of_unchanged_pages_adds_no_rows(tmp_path):
     cache = tmp_path / "cache"
     _capture(cache, "2026-09-01T08-00-00", "2026-09-01T08:00:00")
     _capture(cache, "2026-09-08T08-00-00", "2026-09-08T08:00:00")
-    db = tmp_path / "w.duckdb"
-    counts = rebuild("duckdb", "captured", database=db, cache_dir=cache)
+    db = database_for("captured", tmp_path)
+    counts = rebuild("duckdb", "captured", root=tmp_path, cache_dir=cache)
     assert counts["raw_reviews"] == pins.APP_STORE_SAMPLE_RAW_ROWS
     assert counts["stg_reviews"] == pins.APP_STORE_SAMPLE_STG_ROWS
     assert _query(db, "select distinct captured_at from raw_reviews") == [
@@ -232,8 +232,8 @@ def test_edited_review_in_a_later_capture_appends_one_row(tmp_path):
         doc["feed"]["entry"][0]["im:rating"]["label"] = "5"
 
     _capture(cache, "2026-09-08T08-00-00", "2026-09-08T08:00:00", edit=edit)
-    db = tmp_path / "w.duckdb"
-    counts = rebuild("duckdb", "captured", database=db, cache_dir=cache)
+    db = database_for("captured", tmp_path)
+    counts = rebuild("duckdb", "captured", root=tmp_path, cache_dir=cache)
     assert counts["raw_reviews"] == pins.APP_STORE_SAMPLE_RAW_ROWS + 1
     assert counts["stg_reviews"] == pins.APP_STORE_SAMPLE_STG_ROWS
     ext = pins.APP_STORE_SAMPLE_FIRST_ROW["external_id"]
@@ -243,10 +243,10 @@ def test_edited_review_in_a_later_capture_appends_one_row(tmp_path):
 
 
 def test_reviews_per_month_is_stable_across_rebuilds(tmp_path):
-    db = tmp_path / "w.duckdb"
+    db = database_for("samples", tmp_path)
     seen = []
     for run_id in ("run-a", "run-b", "run-c"):
-        rebuild("duckdb", "samples", database=db, run_id=run_id)
+        rebuild("duckdb", "samples", root=tmp_path, run_id=run_id)
         conn = connect("duckdb", database=db)
         try:
             seen.append(reviews_per_month(conn))
@@ -277,8 +277,8 @@ def test_rebuild_from_captures_is_byte_stable_under_a_moving_clock(
     monkeypatch.setattr(captures, "datetime", NoClock)
     rows = []
     for name in ("a", "b"):
-        db = tmp_path / f"{name}.duckdb"
-        rebuild("duckdb", "samples", database=db)
+        db = database_for("samples", tmp_path / name)
+        rebuild("duckdb", "samples", root=tmp_path / name)
         rows.append(
             _query(db, "select * from raw_reviews order by external_id, content_hash")
         )
@@ -296,9 +296,9 @@ def test_refused_page_loads_nothing_from_the_capture(tmp_path):
     bad = copy.deepcopy(doc)
     del bad["feed"]["entry"][1]["im:rating"]
     page2.write_text(json.dumps(bad, ensure_ascii=False), encoding="utf-8")
-    db = tmp_path / "w.duckdb"
+    db = database_for("captured", tmp_path)
     with pytest.raises(PageShapeError, match="'im:rating' is missing") as exc:
-        rebuild("duckdb", "captured", database=db, cache_dir=cache)
+        rebuild("duckdb", "captured", root=tmp_path, cache_dir=cache)
     assert str(exc.value).startswith("capture ") and "2026-09-0" in str(exc.value)
     assert "\n" not in str(exc.value)
     assert _query(db, "select count(*) from raw_reviews") == [(0,)]
@@ -349,9 +349,9 @@ def test_meta_value_outside_the_declared_shape_refuses_the_capture(
     meta_path.write_text(json.dumps(meta))
     with pytest.raises(PageShapeError, match=f"field '{field}'"):
         read_captures(cache / FEED_DIR, FEED)
-    db = tmp_path / "w.duckdb"
+    db = database_for("captured", tmp_path)
     with pytest.raises(PageShapeError):
-        rebuild("duckdb", "captured", database=db, cache_dir=cache)
+        rebuild("duckdb", "captured", root=tmp_path, cache_dir=cache)
     assert _query(db, "select count(*) from raw_reviews") == [(0,)]
 
 
@@ -369,9 +369,7 @@ def test_meta_with_an_extra_key_is_refused(tmp_path):
 
 
 def test_zero_captures_is_zero_rows_not_an_error(tmp_path):
-    counts = rebuild(
-        "duckdb", "captured", database=tmp_path / "w.duckdb", cache_dir=tmp_path / "no"
-    )
+    counts = rebuild("duckdb", "captured", root=tmp_path, cache_dir=tmp_path / "no")
     assert counts["raw_reviews"] == 0 and counts["stg_reviews"] == 0
 
 
@@ -418,9 +416,7 @@ def test_a_capture_page_outside_the_declared_addresses_is_refused(tmp_path):
             read_captures(cache / FEED_DIR, FEED)
         assert url in str(exc.value) and FEED.name in str(exc.value)
         with pytest.raises(PageShapeError):
-            rebuild(
-                "duckdb", "captured", database=tmp_path / "w.duckdb", cache_dir=cache
-            )
+            rebuild("duckdb", "captured", root=tmp_path, cache_dir=cache)
 
 
 def test_sample_pages_are_the_frozen_meta_addresses():
@@ -449,8 +445,8 @@ def test_every_sample_review_joins_exactly_one_declared_page(tmp_path):
     where it was unguarded (round 3, code-reviewer #4)."""
     from ingest.sources import PARSERS
 
-    db = tmp_path / "w.duckdb"
-    counts = rebuild("duckdb", "samples", database=db)
+    db = database_for("samples", tmp_path)
+    counts = rebuild("duckdb", "samples", root=tmp_path)
     assert counts["raw_source_pages"] == sum(len(s.pages) for s in SOURCES) + sum(
         len(sample_source(p).pages) for p in PARSERS
     )
@@ -482,8 +478,8 @@ def test_every_captured_review_joins_exactly_one_declared_page(tmp_path):
         meta = json.loads(meta_path.read_text())
         meta["source_url"] = FEED.page_url(n)
         meta_path.write_text(json.dumps(meta))
-    db = tmp_path / "w.duckdb"
-    counts = rebuild("duckdb", "captured", database=db, cache_dir=cache)
+    db = database_for("captured", tmp_path)
+    counts = rebuild("duckdb", "captured", root=tmp_path, cache_dir=cache)
     assert counts["raw_reviews"] == pins.APP_STORE_SAMPLE_RAW_ROWS
     assert counts["raw_source_pages"] == sum(len(s.pages) for s in SOURCES)
     joined = _query(
@@ -513,7 +509,9 @@ def test_every_captured_review_joins_exactly_one_declared_page(tmp_path):
     days = _query(db, "select distinct captured_at from raw_source_pages")
     assert days and all(date.fromisoformat(d) for (d,) in days)
     # a second rebuild re-declares the same pages and adds nothing
-    again = rebuild("duckdb", "captured", database=db, cache_dir=cache, run_id="again")
+    again = rebuild(
+        "duckdb", "captured", root=tmp_path, cache_dir=cache, run_id="again"
+    )
     assert again["raw_source_pages"] == counts["raw_source_pages"]
 
 
@@ -526,8 +524,8 @@ def test_a_redeclared_attribution_refuses_the_rebuild(tmp_path):
 
     from pipeline.build import write_source_pages
 
-    db = tmp_path / "w.duckdb"
-    rebuild("duckdb", "synthetic", database=db)
+    db = database_for("synthetic", tmp_path)
+    rebuild("duckdb", "synthetic", root=tmp_path)
     conn = connect("duckdb", database=db)
     try:
         before = conn.execute("select count(*) from raw_source_pages").fetchone()[0]

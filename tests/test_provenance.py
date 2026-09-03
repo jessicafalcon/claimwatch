@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import pytest
 
+from pipeline.warehouse import database_for
+
 PROVENANCE = ("source", "source_url", "captured_at", "run_id")
 
 
@@ -38,8 +40,8 @@ def test_every_raw_table_has_four_provenance_columns(tmp_path, rows):
     from pipeline.build import rebuild
     from pipeline.warehouse import connect
 
-    db = tmp_path / "w.duckdb"
-    rebuild("duckdb", rows, database=db, run_id="test")
+    db = database_for(rows, tmp_path)
+    rebuild("duckdb", rows, root=tmp_path, run_id="test")
     conn = connect("duckdb", database=db)
     try:
         _check_tables(conn)

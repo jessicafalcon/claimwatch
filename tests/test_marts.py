@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from pipeline.build import rebuild
-from pipeline.warehouse import connect
+from pipeline.warehouse import connect, database_for
 from tests import pins
 
 MARTS = ("rating_trend", "channel_gap", "platform_stats", "peer_ratings")
@@ -26,9 +26,9 @@ def _query(db: Path, sql: str):
 
 @pytest.fixture(scope="module")
 def anchors_db(tmp_path_factory) -> Path:
-    db = tmp_path_factory.mktemp("marts") / "w.duckdb"
-    rebuild("duckdb", "synthetic", database=db)
-    return db
+    root = tmp_path_factory.mktemp("marts")
+    rebuild("duckdb", "synthetic", root=root)
+    return database_for("synthetic", root)
 
 
 def test_every_mart_row_carries_exactly_one_tag(anchors_db):
@@ -136,9 +136,13 @@ def test_a_later_reading_of_one_stat_keeps_the_others(tmp_path):
             row("2026-09-02", review_count="13100"),
         ],
     )
-    db = tmp_path / "w.duckdb"
+    db = database_for("captured", tmp_path)
     rebuild(
-        "duckdb", "captured", database=db, cache_dir=tmp_path / "no", manual_file=manual
+        "duckdb",
+        "captured",
+        root=tmp_path,
+        cache_dir=tmp_path / "no",
+        manual_file=manual,
     )
     rows = _query(
         db,
@@ -206,8 +210,8 @@ def test_a_hand_read_and_a_fetched_point_reach_the_marts_as_measured(tmp_path):
             }
         ],
     )
-    db = tmp_path / "w.duckdb"
-    rebuild("duckdb", "captured", database=db, cache_dir=cache, manual_file=manual)
+    db = database_for("captured", tmp_path)
+    rebuild("duckdb", "captured", root=tmp_path, cache_dir=cache, manual_file=manual)
     from ingest.sources import by_name
 
     store_url = by_name(store).listing
@@ -284,8 +288,8 @@ def test_a_same_day_measured_point_stands_in_front_of_an_anchor_in_every_mart(
     functionality-tester F2)."""
     from pipeline.build import build_derived, load_snapshots
 
-    db = tmp_path / "w.duckdb"
-    rebuild("duckdb", "synthetic", database=db)
+    db = database_for("synthetic", tmp_path)
+    rebuild("duckdb", "synthetic", root=tmp_path)
     conn = connect("duckdb", database=db)
     try:
         # the unsolicited studied-insurer anchor of 2026-06-15, re-read by hand
@@ -310,6 +314,7 @@ def test_a_same_day_measured_point_stands_in_front_of_an_anchor_in_every_mart(
                 }
             ],
             "test",
+            "captured",
         )
         build_derived(conn)
         where = "source = 'trustpilot' and profile = 'fr-digital-first'"
@@ -355,8 +360,8 @@ def test_the_latest_day_in_a_month_is_the_months_point_in_rating_trend(tmp_path)
     functionality-tester F4)."""
     from pipeline.build import build_derived, load_snapshots
 
-    db = tmp_path / "w.duckdb"
-    rebuild("duckdb", "synthetic", database=db)
+    db = database_for("synthetic", tmp_path)
+    rebuild("duckdb", "synthetic", root=tmp_path)
     conn = connect("duckdb", database=db)
     try:
         load_snapshots(
@@ -370,6 +375,7 @@ def test_the_latest_day_in_a_month_is_the_months_point_in_rating_trend(tmp_path)
                 ),
             ],
             "test",
+            "captured",
         )
         build_derived(conn)
         rows = conn.execute(
@@ -393,8 +399,8 @@ def test_a_same_day_capture_stands_in_front_of_a_hand_entry_in_every_mart(
     functionality-tester F5)."""
     from pipeline.build import build_derived, load_snapshots
 
-    db = tmp_path / "w.duckdb"
-    rebuild("duckdb", "synthetic", database=db)
+    db = database_for("synthetic", tmp_path)
+    rebuild("duckdb", "synthetic", root=tmp_path)
     conn = connect("duckdb", database=db)
     try:
         load_snapshots(
@@ -406,6 +412,7 @@ def test_a_same_day_capture_stands_in_front_of_a_hand_entry_in_every_mart(
                 _measured("fetch", "2026-06-15", "https://www.trustpilot.com/b", "3.7"),
             ],
             "test",
+            "captured",
         )
         build_derived(conn)
         where = "source = 'trustpilot' and profile = 'fr-digital-first'"
@@ -461,8 +468,8 @@ def test_marts_are_byte_stable_across_rebuilds(tmp_path, monkeypatch, rows):
         monkeypatch.setattr(module, name, _no_clock(getattr(module, name)))
     seen = []
     for name in ("a", "b"):
-        db = tmp_path / f"{name}.duckdb"
-        rebuild("duckdb", rows, database=db)
+        db = database_for(rows, tmp_path / name)
+        rebuild("duckdb", rows, root=tmp_path / name)
         seen.append(
             {m: sorted(map(str, _query(db, f"select * from {m}"))) for m in MARTS}
         )

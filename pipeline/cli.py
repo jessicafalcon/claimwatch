@@ -123,10 +123,9 @@ def _do_rebuild(args: argparse.Namespace) -> int:
             f"no captures under {shown} — nothing to load from the scraper; "
             "`make confirm scrape` fetches them (developer-run)"
         )
-    db = database_for(rows)  # one file per input; a sample never touches the corpus
-    for name, n in rebuild(target, rows, database=db).items():
+    for name, n in rebuild(target, rows).items():  # the file is the input's own
         print(f"{name:24} {n}")
-    conn = connect(target, database=db)
+    conn = connect(target, database=database_for(rows))
     try:
         months = reviews_per_month(conn)
     finally:

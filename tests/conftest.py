@@ -14,6 +14,8 @@ from collections.abc import Iterator
 
 import pytest
 
+from pipeline.warehouse import database_for
+
 
 def _blocked(*_args, **_kwargs):
     raise RuntimeError("network blocked: the test suite opens no socket")
@@ -51,8 +53,8 @@ def synthetic_conn(tmp_path):
     from pipeline.build import rebuild
     from pipeline.warehouse import connect
 
-    db = tmp_path / "warehouse.duckdb"
-    rebuild("duckdb", "synthetic", database=db, run_id="test")
+    db = database_for("synthetic", tmp_path)
+    rebuild("duckdb", "synthetic", root=tmp_path, run_id="test")
     conn = connect("duckdb", database=db)
     try:
         yield conn

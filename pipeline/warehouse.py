@@ -22,15 +22,19 @@ TARGETS = ("duckdb", "snowflake")
 DEFAULT_DB = ROOT / "data" / "friction_ledger.duckdb"
 
 
-def database_for(rows: str) -> Path:
+def database_for(rows: str, root: str | Path | None = None) -> Path:
     """One file per rebuild input (spec Phase 2, fix amendment A2; named by
     `ROWS` since Phase 3a): the real corpus (`captured`) is
     `friction_ledger.duckdb`; every other input builds
     `friction_ledger.<input>.duckdb` beside it, so a sample's rows can never
-    land in the real database and the counts a rebuild prints are its own."""
+    land in the real database and the counts a rebuild prints are its own.
+    `root` is the directory the files live in (data/ by default; a temp dir
+    in tests): a caller chooses where, never which file an input lands in
+    (A8 (e))."""
+    base = DEFAULT_DB if root is None else Path(root) / DEFAULT_DB.name
     if rows == "captured":
-        return DEFAULT_DB
-    return DEFAULT_DB.with_name(f"{DEFAULT_DB.stem}.{rows}{DEFAULT_DB.suffix}")
+        return base
+    return base.with_name(f"{base.stem}.{rows}{base.suffix}")
 
 
 def connect(target: str = "duckdb", *, database: str | Path | None = None):

@@ -23,7 +23,7 @@ from pipeline.build import (  # noqa: E402
     rebuild,
     table_counts,
 )
-from pipeline.warehouse import connect, default_schema  # noqa: E402
+from pipeline.warehouse import connect, database_for, default_schema  # noqa: E402
 
 _INSERT_RAW = (
     "insert into raw_reviews (source, external_id, source_url, captured_at, "
@@ -35,15 +35,13 @@ _INSERT_RAW = (
 def test_zero_row_rebuild(tmp_path):
     """`none`: every table exists and every count is zero — the anchors seed
     every other input, not this one."""
-    counts = rebuild("duckdb", "none", database=tmp_path / "none.duckdb")
+    counts = rebuild("duckdb", "none", root=tmp_path)
     assert set(counts) >= {"raw_reviews", "stg_reviews", "raw_platform_snapshots"}
     assert all(n == 0 for n in counts.values()), counts
 
 
 def test_synthetic_stage_counts_match_pins(tmp_path):
-    counts = rebuild(
-        "duckdb", "synthetic", database=tmp_path / "syn.duckdb", run_id="test"
-    )
+    counts = rebuild("duckdb", "synthetic", root=tmp_path, run_id="test")
     assert counts["raw_reviews"] == pins.RAW_REVIEWS_ROWS
     assert counts["stg_reviews"] == pins.STG_REVIEWS_ROWS
 
@@ -378,5 +376,40 @@ def test_table_counts_reads_the_default_schema_from_the_engine():
         counts = table_counts(conn)
         assert "stray" not in counts and counts["raw_reviews"] == 0
         assert default_schema(conn) == "main"  # DuckDB's answer, read, not spelled
+    finally:
+        conn.close()
+
+
+def test_the_database_file_is_derived_from_the_input_never_named(tmp_path):
+    """A8 (e): `rebuild` takes a root directory and the file is always
+    `database_for(rows, root)` — there is no way to name the file an input
+    lands in, so the literal `sample` exists only in the samples file wherever
+    the root is (round 4, code-reviewer #4)."""
+    import inspect
+
+    from pipeline.build import load_snapshots
+
+    assert "database" not in inspect.signature(rebuild).parameters
+    assert "root" in inspect.signature(rebuild).parameters
+    rebuild("duckdb", "samples", root=tmp_path)
+    assert sorted(p.name for p in tmp_path.iterdir()) == [
+        "friction_ledger.samples.duckdb"
+    ]
+    samples = tmp_path / "friction_ledger.samples.duckdb"
+    assert database_for("samples", tmp_path) == samples
+    assert database_for("captured", tmp_path) == tmp_path / "friction_ledger.duckdb"
+    with pytest.raises(ValueError, match="not in"):
+        rebuild("duckdb", "corpus", root=tmp_path)  # not an input: no file at all
+    assert sorted(p.name for p in tmp_path.iterdir()) == [
+        "friction_ledger.samples.duckdb"
+    ]
+    # the label set the loader applies is the input, never a signature's default
+    rows_input = inspect.signature(load_snapshots).parameters["rows_input"]
+    assert rows_input.default is inspect.Parameter.empty
+    conn = connect("duckdb", database=":memory:")
+    try:
+        create_raw(conn)
+        with pytest.raises(TypeError):
+            load_snapshots(conn, [], "t")  # rows_input is required
     finally:
         conn.close()
