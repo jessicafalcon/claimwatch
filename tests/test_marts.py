@@ -321,6 +321,62 @@ def test_a_same_day_measured_point_stands_in_front_of_an_anchor_in_every_mart(
         conn.close()
 
 
+def _measured(origin: str, day: str, url: str, rating: str) -> dict[str, object]:
+    """A Measured point on the studied insurer's unsolicited Trustpilot key —
+    the key the synthetic anchors carry for 2026-06-15."""
+    return {
+        "source": "trustpilot",
+        "profile": "fr-digital-first",
+        "segment": "digital-first",
+        "channel": "unsolicited",
+        "origin": origin,
+        "rating": Decimal(rating),
+        "review_count": 975,
+        "one_star_share": None,
+        "response_rate": None,
+        "response_delay_days": None,
+        "source_url": url,
+        "captured_at": day,
+        "seeded_from": "",
+    }
+
+
+def test_the_latest_day_in_a_month_is_the_months_point_in_rating_trend(tmp_path):
+    """B1.2's grain, "the latest snapshot in that month": of two readings of
+    one key in one month, the later day's rating and address reach the mart.
+    The earlier day's address sorts FIRST and both have the same precedence,
+    so only `captured_at desc` can pick the later one (round 3,
+    functionality-tester F4)."""
+    from pipeline.build import build_derived, load_snapshots
+
+    db = tmp_path / "w.duckdb"
+    rebuild("duckdb", "synthetic", database=db)
+    conn = connect("duckdb", database=db)
+    try:
+        load_snapshots(
+            conn,
+            [
+                _measured(
+                    "manual", "2026-06-10", "https://www.trustpilot.com/a", "3.1"
+                ),
+                _measured(
+                    "manual", "2026-06-20", "https://www.trustpilot.com/z", "3.7"
+                ),
+            ],
+            "test",
+        )
+        build_derived(conn)
+        rows = conn.execute(
+            "select rating, source_url, captured_at from rating_trend where source"
+            " = 'trustpilot' and profile = 'fr-digital-first' and month = '2026-06'"
+        ).fetchall()
+        assert rows == [
+            (Decimal("3.700"), "https://www.trustpilot.com/z", "2026-06-20")
+        ]
+    finally:
+        conn.close()
+
+
 def _no_clock(cls: type) -> type:
     """A date/datetime class whose `today()` and `now()` raise: reaching either
     on the data path is the failure. Parsing (`fromisoformat`, `strptime`)
