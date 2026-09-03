@@ -80,7 +80,7 @@ place and never deleted.
     and listing address) but marked not to fetch — `fetchable=False`, with
     this reason recorded as its `terms` — so the fetcher refuses it before
     any request, even if the host's file reads differently on a later day
-    (amendment A5); the fallback is the manual snapshot path above (Phase
+    (Phase 2's amendment A5); the fallback is the manual snapshot path above (Phase
     3a's `platform_snapshots`), never a different User-Agent or a
     "syndication feeds don't count" reading.
     ([Phase 2](#phase-2))
@@ -189,7 +189,8 @@ Each entry: the surprise, the official-docs check, what we did.
 
 - **Phase 2 — the live feed, checked by the first run (2026-09-02).** An agent
   runs no fetch, so the build session could not check the feed; the developer's
-  first `make scrape CONFIRM=yes` was the check. Result: the field names match
+  first live `make scrape` was the check (gated then by `CONFIRM=yes`; since
+  Phase 3a's A4 (d) by `make confirm scrape`). Result: the field names match
   the declared shape (8 pages, 316 items, every page parsed, no widening
   needed); the feed ended at page 8 with an empty page, which the fetcher
   treats as the end.

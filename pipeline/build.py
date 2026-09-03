@@ -118,7 +118,11 @@ def _canonical(value: object) -> str:
     """A measure's one spelling: an absent measure is the empty string, a
     decimal drops trailing zeros and never takes exponent form, so `4.9` and
     `4.90` — one figure, two spellings — hash alike and a re-spelling of a
-    tracked file is not a corrected figure (round 2, code-reviewer #12)."""
+    tracked file is not a corrected figure (round 2, code-reviewer #12). A
+    string is hashed as written: the text `1.0` and the text `1` are two
+    spellings here, and what makes a review rating one fingerprint is that
+    `load_reviews` admits it only as a member of `REVIEW_RATINGS`, so `1.0`
+    as text never reaches this hash (round 4, functionality-tester #7)."""
     if value is None:
         return ""
     if isinstance(value, Decimal):

@@ -229,7 +229,8 @@ def scrape(
         ) from exc
     (capture_dir / "robots.txt").write_bytes(robots.content)
     content_type = robots.headers.get("content-type", "")
-    (capture_dir / "robots.meta.json").write_text(  # why the run proceeded (A6)
+    # Why the run proceeded (Phase 2, A6).
+    (capture_dir / "robots.meta.json").write_text(
         json.dumps(
             {"status": robots.status_code, "content_type": content_type}, indent=2
         )
@@ -239,7 +240,7 @@ def scrape(
     if robots.status_code == 200:
         # The body alone decides whether this is a robots file; the content-type
         # is recorded, never trusted. An error page served with a 200 is a
-        # refusal, never permission (A6).
+        # refusal, never permission (Phase 2, A6).
         if not reads_as_robots(robots.text):
             raise FetchRefused(
                 f"refusing: robots.txt returned 200 but its body is not a robots file "

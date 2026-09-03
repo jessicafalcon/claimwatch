@@ -109,7 +109,9 @@ in the middle, and come out on the right as the numbers the study shows.
   host, parser, page addresses, cache directory, profile / segment / channel,
   and whether its site lets us fetch it — the one place a brand-carrying
   address may appear; the one binding of the cache root), `parsed.py` (what
-  every parser hands back and how it refuses), `captures.py` (reads captures
+  every parser hands back and how it refuses; the one place the snapshot
+  measures and the review ratings — half-steps 1 to 5 — are declared with
+  their bounds), `captures.py` (reads captures
   back for any parser; the meta checked against the source's declared host),
   the parsers — `app_store.py` (the review feed), `listing.py` (a store or
   platform page's rating block, one snapshot row), `opinion_assurances.py`
@@ -467,20 +469,9 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 **Phase 3a — Snapshots and the remaining polite sources**
 (`phase-3a-snapshots`, spec `specs/phase-3a-snapshots.md`, APPROVED 2026-09-02
-with amendment A1): being built; review rounds 1, 2 and 3 done, their fixes
-built, and amendments A2 (the snapshot key names its declaration and a same-key
-pair refuses; the stat row is one row per stat), A3 (a changed attribution
-refuses; the sample declaration is a property, not a name; a hand entry names a
-source with no parser), A4 (every measure's bound is its column's and a
-refused batch loads nothing; the loader checks its closed sets; a capture's
-address is a declared page; `make confirm <target>` replaces the CONFIRM
-variable; the ranged peer anchors are placements), A5 (the review text is a
-child of the review scope, not of the description), A6 (a review's rating
-is a half-step, 1 to 5, exactly the scale the site declares) and A7 (a
-rebuild refuses a raw table that is not its declaration) all approved and
-built. What a reader sees: the rating
-each platform shows is now a table of its own, seeded from the brief's public
-figures (Documented) and extended by the figures we capture or read off a page
+with amendment A1): being built. What a reader sees: the rating each platform
+shows is now a table of its own, seeded from the brief's public figures
+(Documented) and extended by the figures we capture or read off a page
 ourselves (Measured), with four Beat 1–2 charts built from it. How: every
 source is one declaration — which parser reads it, where its pages are,
 whether its site lets us fetch it — and `ROWS` names what a rebuild loads. Of
@@ -491,11 +482,27 @@ Phase 3a). The first live run (2026-09-03) captured Google Play's listing (one
 Measured row) and the profile's first page, which refused twice against a
 shape the hand-written sample had guessed — the text's nesting and the
 half-star ratings (DECISIONS → Gotchas); A5 and A6 corrected the shape and the
-page parses: 40 reviews and the aggregate. The full 14-page scrape then
-ran (14 pages, 534 reviews, aggregate 3.8 on 534) and the DONE command passes
-on it. Remaining: a scoped re-review of the A3–A7 commits, the exit audit. The DONE command is `make rebuild && make
-idempotency-check ROWS=captured`; Phase 1's line stays green (raw 40 / staging
-39); CI runs `ROWS=synthetic` and `ROWS=samples`. Phase 2 merged (PR #4).
+page parses: 40 reviews and the aggregate. The full 14-page scrape then ran:
+14 pages, 534 reviews, and the profile's aggregate (3.8 on 534 reviews,
+Measured); the DONE command passes on it. Amendments this phase: A2 (the
+snapshot key names its declaration and a same-key pair refuses; the stat row
+is one row per stat), A3 (a changed attribution refuses; the sample
+declaration is a property, not a name; a hand entry names a source with no
+parser), A4 (every measure's bound is its column's and a refused batch loads
+nothing; the loader checks its closed sets; a capture's address is a declared
+page; `make confirm <target>` replaces the CONFIRM variable; the ranged peer
+anchors are placements), A5 (the review text is a child of the review scope),
+A6 (a review's rating is a half-step, 1 to 5, exactly the scale the site
+declares) and A7 (a rebuild refuses a raw table that is not its declaration),
+all approved and built; review rounds 1–4 done, their plain fixes built; A8
+(the raw comparison is the whole declaration; the review loader loads a batch
+or nothing; the aggregate's declared scale is read; the confirm gate's claim
+is narrowed and written down; the database file and the label set are derived
+from the input) PROPOSED after round 4, awaiting approval. Remaining: A8's
+approval and build, a scoped re-review of it, the exit audit. The DONE command
+is `make rebuild && make idempotency-check ROWS=captured`; Phase 1's line
+stays green (raw 40 / staging 39); CI runs `ROWS=synthetic` and
+`ROWS=samples`. Phase 2 merged (PR #4).
 Next: the Phase 3a PR; then Phase 3b — Trustpilot.
 
 Open BACKLOG rows: **14**.

@@ -49,12 +49,11 @@ the 15th of that month, and one it dates to a season on the 15th of that
 season's first month ("early 2025" is 2025-01-15); one it dates to a span of
 years is placed at mid-year of the span's first year ("2025–2026" is
 2025-06-15); one it does not date is placed on the day of the figure it was
-gathered beside (the Google
-Play figure beside the App Store's, 2024-09-15; the Opinion Assurances figures
-beside the June 2026 reading, 2026-06-15). A figure the brief gives as a range
-is stored at the range's midpoint, rounded to the column ("~2.7–3.8" is
-3.250), and a figure it does not give at all is left empty. The day, and a
-midpoint, are placements, not readings.
+gathered beside (the Google Play figure beside the App Store's, 2024-09-15;
+the Opinion Assurances figures beside the June 2026 reading, 2026-06-15). A
+figure the brief gives as a range is stored at the range's midpoint, rounded
+to the column ("~2.7–3.8" is 3.250), and a figure it does not give at all is
+left empty. The day, and a midpoint, are placements, not readings.
 
 - **B1.1 — The hero case.** One documented refund put on hold pending extra
   documents — a roughly €340 emergency-room claim reported unresolved for
@@ -97,7 +96,9 @@ traction, and coverage-and-price frustration (PROJECT_BRIEF.md §5).
   (Pending until its mart lands — never faked).
 - **B2.3 — Peer context.** Public ratings across the market segment, so no one
   insurer is read in isolation. Tag: *Documented* for the anchors, *Measured*
-  for our own points (see *How to read a panel*).
+  for our own points (see *How to read a panel*). *Placed points, stated
+  beside the chart:* where the brief gives a range, the point is its midpoint,
+  not a reading, and a count the brief does not give is left blank.
 - **B2.4 — Classifier quality.** How often each theme label is right and how many
   true cases it catches, measured against the hand labels and shown next to the
   charts it feeds. Tag: *Measured* (Pending until the eval gate writes its mart).

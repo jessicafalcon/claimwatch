@@ -70,7 +70,8 @@ share theirs by design, and only a hand-entered row keys on it. (b) *A
 same-key pair is refused, not tiebroken* (finding 1): the loader refuses, with
 one line naming file, line and fix, a row whose key already sits in raw under
 another content hash — that arises only from a corrected hand entry or a
-re-frozen seed, and the fix is `make reset CONFIRM=yes` then `make rebuild`,
+re-frozen seed, and the fix is `make confirm reset` (A4 (d); `make reset
+CONFIRM=yes` when this was written) then `make rebuild`,
 since the corpus is rebuilt from tracked inputs; `stg_platform_snapshots` and
 the four marts drop `content_hash desc` from every `order by`, and a test
 asserts the key is unique in raw. (c) *The stat row is one row per stat*
@@ -102,8 +103,9 @@ invariant 4 (a captured review joins exactly one declared page). (a) *A
 changed attribution refuses* (round 2, findings 1 and 4): `raw_source_pages`'
 guard stays `(source, source_url)` + the attribution hash, but a declared page
 whose `profile`, `segment` or `channel` differs from the row already in raw
-REFUSES the rebuild with one line naming the address and the fix (`make reset
-CONFIRM=yes`, then `make rebuild`), so a re-declaration never appends a second
+REFUSES the rebuild with one line naming the address and the fix (`make
+confirm reset` — A4 (d); `CONFIRM=yes` when this was written — then `make
+rebuild`), so a re-declaration never appends a second
 row for one address and the review join stays one-to-one — pinned by a test
 that flips a source's segment in a copied tuple and by the join test extended
 to assert the count of `raw_source_pages` rows per address; `snapshot_hash`
@@ -138,7 +140,8 @@ by chance), invariant 3 (a row's attribution and address come from the
 declaration), invariant 4 (a captured review joins exactly one declared
 page) and the Threat model's one gate on the destructive and network targets.
 (a) *Every measure's bound is its column's* (round 3, finding 1, with 13):
-the five measures are declared once, beside the count, with the precision,
+the four decimal measures are declared once, beside the count (five figures
+in all), with the precision,
 scale and range of their columns — `rating`, `one_star_share` and
 `response_rate` `decimal(4,3)` in 0–5 and 0–1, `response_delay_days`
 `decimal(5,1)` in 0–9999.9 — and every reader derives its check from that
@@ -255,12 +258,17 @@ becomes a value of the closed set {1, 1.5, 2, … 4.5, 5}, declared once in
 `ingest/parsed.py` beside the snapshot measures, and `raw_reviews.rating`
 becomes `decimal(2,1) not null` (`stg_reviews` carries it); the Opinion
 Assurances parser accepts exactly that set by a strict parse — a digit, or a
-digit followed by `.5` — and refuses anything else naming the value; the App
+digit followed by `.5` — and refuses anything else naming the value, and
+reads each scope's declared `worstRating` and `bestRating`, refusing a page
+that declares another scale and naming the bounds, so the set admits exactly
+the scale the site declares; the App
 Store parser keeps its digit rule, since that feed gives digits, and the
 digit lands in the wider column unchanged; `content_hash` spells a decimal
 one way (trailing zeros dropped, as `snapshot_hash` already does), so a
 digit read as `1`, `1.0` or the integer 1 is one fingerprint and the
-synthetic corpus's hashes do not move. Nothing downstream reads a review's
+synthetic corpus's hashes do not move (for the text `1.0` the property is
+the loader's: it admits a rating only as a member of the set, so that text
+never reaches the hash — round 4, functionality-tester #7). Nothing downstream reads a review's
 rating yet: the Beat 1–2 marts read snapshots, and Phase 5's theme marts
 count rows. The sample is re-frozen with one half-step rating (page 1's
 second review, 5 → 4.5) so `ROWS=samples` carries one through the real
@@ -390,7 +398,7 @@ source produced, counted by the idempotency check).
 
 Phase 2 built the collector and proved it on a frozen sample, but the one
 source it declared asks crawlers not to read its review feed, so the warehouse
-still holds no real row. Phase 3a lands three things the study cannot start
+still holds no real row. Phase 3a lands four things the study cannot start
 without. First, the platform ratings over time — `platform_snapshots` — seeded
 from the verified figures in the brief and marked as such, then extended by our
 own captures: one automated, the rest read by hand where a site's terms say
@@ -436,8 +444,9 @@ Teaching rule).**
 ## The central constraint
 
 **Phase 1's review shape and Phase 2's load path, manners and run-twice
-property do not move: `raw_reviews` keeps its ten columns and `load_reviews`
-its guard; every new row of every new table carries the four provenance
+property do not move except as A6 amends them: `raw_reviews` keeps its ten
+columns (`rating` widened to `decimal(2,1)`) and `load_reviews` its guard, now
+a check of every rating against the declared half-steps; every new row of every new table carries the four provenance
 columns; the anchors seed the same nine rows in every rebuild input but
 `none`; a rebuild reads no clock and no network; the test suite opens no
 socket; every live fetch is run by the developer; no site whose robots file
@@ -700,8 +709,8 @@ make rebuild && make idempotency-check ROWS=captured
   query string, so the declared `page_url(n)` is the path form and page 1 is
   the profile itself. The parser: schema.org microdata, strictly — each
   `itemscope` of type `review` yields one review row (`rating` = its
-  `reviewRating`'s `ratingValue`, an integer 1–5 checked against `bestRating`
-  5; `review_date` = the review's own date as `YYYY-MM-DD`; `body` = the
+  `reviewRating`'s `ratingValue`, a half-step 1–5 (A6), checked against the
+  scope's declared `worstRating` 1 and `bestRating` 5; `review_date` = the review's own date as `YYYY-MM-DD`; `body` = the
   review text; `title` = the page's title-like field if the structure has one,
   else empty; `external_id` = the content hash of (publication date,
   experience date, rating, body) — the page marks no stable identifier,
@@ -825,7 +834,12 @@ New code:
   `rlike`, `glob`, the tilde operators). `ingest/parsed.py` — `Measure`,
   `MEASURES`, `rating_from_page`, `decode_json` (A4 (a), round 3);
   `pipeline/cli.py` — `confirm` and `CONFIRM_STAMP` (A4 (d));
-  `ingest/captures.py` — the declared-page check (A4 (c)).
+  `ingest/captures.py` — the declared-page check (A4 (c));
+  `ingest/parsed.py` — `REVIEW_RATINGS`, `review_rating` (A6);
+  `sql/raw/raw_reviews.sql` — `rating decimal(2,1)` (A6);
+  `ingest/opinion_assurances.py` — the body guard (A5), the declared-scale
+  check (A6); `pipeline/build.py` — `check_raw_declaration` (A7);
+  `pipeline/warehouse.py` — `default_schema` (round 4).
 - `sql/raw/raw_platform_snapshots.sql`, `sql/raw/raw_source_pages.sql`,
   `sql/staging/stg_platform_snapshots.sql`, `sql/marts/rating_trend.sql`,
   `sql/marts/channel_gap.sql`, `sql/marts/platform_stats.sql`,
@@ -854,7 +868,9 @@ New and extended tests:
   `tests/test_sql_portable.py`, `tests/test_makefile.py`, `tests/test_cli.py`,
   `tests/test_fixtures_frozen.py`, `tests/conftest.py` (`ROWS` scrubbed in
   place of `FIXTURE`), `tests/pins.py` (anchor rows per mart; the listing
-  sample's row) extended.
+  sample's row), `tests/test_rebuild.py` (A6's loader check, A7's declaration
+  check) extended; the A5–A7 pins sit in `tests/test_opinion_assurances_parser.py`
+  and `tests/test_rebuild.py`.
 
 Records (see Record updates): `DECISIONS.md`, `BACKLOG.md`, `CLAUDE.md`,
 `BACKING.md`, `SPEC.md`, `PROJECT_BRIEF.md`, `docs/PLAN.md`, this spec.
@@ -879,8 +895,10 @@ Freeze: fixtures/opinion-assurances/
       pointer on Phase 2's `FIXTURE` decision; the linear matcher; the
       `like` widening of the lint; Gotchas from the checks (the by-id App
       Store address redirects; the checks ran from the session, not by hand)
-      and from the first live run; the A2, A3 and A4 entries with their
-      rejected alternatives; the Gotcha on `$(origin)` and `MAKEFLAGS`
+      and from the first live run; the A2 through A7 entries with their
+      rejected alternatives; the Gotchas on `$(origin)` and `MAKEFLAGS`, on a
+      structure dump naming the fields and not their nesting, and on `create
+      table if not exists` keeping the old column
 - [ ] `BACKLOG.md` — five rows closed (struck + "DONE Phase 3a"): the
       wildcard bound, the `DEFAULT_CACHE` / `ALLOWED_HOSTS` binding, the
       `FIXTURE=cache` naming, the hardwired capture path, the permissive

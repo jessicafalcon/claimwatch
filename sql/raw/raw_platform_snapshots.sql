@@ -2,7 +2,8 @@
 -- at a moment, append-only (spec Phase 3a, pinned decision 1).
 -- Grain: one row per snapshot; natural key (source, profile, origin,
 --   source_url, captured_at) — what produced the row and when (A2) — plus
---   content_hash over the five measures. A re-seed of the anchors, a re-entry
+--   content_hash over the five figures and the attribution (segment,
+--   channel, seeded_from — A3 (a)). A re-seed of the anchors, a re-entry
 --   of a hand-read row or a re-capture of unchanged figures inserts nothing;
 --   a same-key row with other figures is refused by the loader, so the key
 --   is unique here.
