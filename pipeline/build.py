@@ -777,8 +777,8 @@ def rebuild(
         if rows == "captured":
             path = Path(manual_file) if manual_file is not None else MANUAL_SNAPSHOTS
             load_snapshots(conn, read_manual_snapshots(path), run_id or "manual", rows)
-        for source, root, prefix in captures_for(rows, cache_dir):
-            for capture_id, parsed in read_captures(root, source):
+        for source, capture_dir, prefix in captures_for(rows, cache_dir):
+            for capture_id, parsed in read_captures(capture_dir, source):
                 stamp = prefix if rows == "samples" else f"{prefix}/{capture_id}"
                 load_reviews(conn, parsed.reviews, run_id or stamp)
                 load_snapshots(conn, parsed.snapshots, run_id or stamp, rows)
