@@ -94,6 +94,43 @@ def test_samples_load_every_frozen_sample_through_its_parser(tmp_path):
     )
 
 
+def test_every_row_carries_its_declarations_attribution_not_the_modules():
+    """Invariant 3: a parser writes `source`, `profile`, `segment` and
+    `channel` from the declaration it is handed, never from its own
+    `SAMPLE_*` constants — each frozen sample is read under a twin
+    declaration whose every attribution value differs from the module's, and
+    every row carries the twin's (round 3, functionality-tester F3)."""
+    from ingest.captures import parser_module
+    from ingest.sources import PARSERS, SAMPLE, Source
+
+    for parser in PARSERS:
+        mod = parser_module(parser)
+        twin = Source(
+            name=SAMPLE,
+            platform="twin-platform",
+            host=mod.SAMPLE_HOST,
+            parser=parser,
+            pages=(),
+            profile="twin-profile",
+            segment="traditional",
+            channel="unsolicited",
+            listing="",
+            fetchable=False,
+            declared_on="2026-09-01",
+            terms="a frozen sample read under a twin declaration",
+        )
+        assert twin.platform != mod.SAMPLE_PLATFORM
+        ((_, parsed),) = read_captures(mod.SAMPLE_DIR, twin)
+        assert parsed.reviews or parsed.snapshots, parser
+        for row in parsed.reviews:
+            assert row["source"] == "twin-platform", parser
+        for row in parsed.snapshots:
+            assert row["source"] == "twin-platform", parser
+            assert row["profile"] == "twin-profile", parser
+            assert row["segment"] == "traditional", parser
+            assert row["channel"] == "unsolicited", parser
+
+
 def test_reviews_per_month_matches_pins(tmp_path):
     db = tmp_path / "w.duckdb"
     rebuild("duckdb", "samples", database=db)
