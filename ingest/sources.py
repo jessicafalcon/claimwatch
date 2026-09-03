@@ -39,11 +39,17 @@ SAMPLE = "sample"  # the name and attribution of a frozen sample's declaration
 _SLUG = re.compile(r"^[a-z0-9-]+$")
 _DATE = re.compile(r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
 FEED_HOST = "itunes.apple.com"
-# The strings that spell the studied insurer (D1): its name as it appears in
-# a profile path or a package id, and its store id. This file is the one place
-# they may appear; a test walks every tracked file for them, as words, and
-# fails on any other hit — the guard is mechanical, not a reading.
-BRAND_TOKENS = ("alan", "1277025964")
+# The strings that spell the studied insurer (D1), one per form the
+# declarations below carry: the bare name (a profile path), the package id's
+# segment (the name with a suffix, which a whole-word walk for the bare name
+# cannot match — round 2, security-reviewer #3) and the store id. This file
+# is the one place they may appear; a test walks every tracked file for them,
+# as words, and fails on any other hit — the guard is mechanical, not a
+# reading. A new source that spells the brand in a new form adds its form
+# here, in the same commit; a test pins that every form the declarations
+# carry is declared (the store id stands bare in the feed address and as
+# `id<store id>` in the listing address: two forms, two tokens).
+BRAND_TOKENS = ("alan", "alanmobile", "1277025964", "id1277025964")
 
 
 @dataclass(frozen=True)

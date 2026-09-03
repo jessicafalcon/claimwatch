@@ -251,6 +251,25 @@ def test_brand_carrying_strings_appear_only_in_the_declarations():
     assert hits == [], hits
 
 
+def test_every_brand_form_in_the_declarations_is_a_declared_token():
+    """Completeness of the guard (round 2, security-reviewer #3): every
+    address a declaration carries that spells the brand contains a declared
+    token as a whole word — the bare name, the package-id form, the store
+    id — so a form the walk cannot match cannot hide in an address."""
+    from ingest.sources import BRAND_TOKENS
+
+    def forms(text: str) -> set[str]:
+        return set(re.findall(r"[a-z0-9]+", text.lower()))
+
+    studied = [s for s in SOURCES if s.profile == "fr-digital-first"]
+    assert studied
+    for src in studied:
+        words = set().union(*(forms(u) for u in (src.listing, *src.pages)))
+        carrying = {w for w in words if any(t in w for t in BRAND_TOKENS)}
+        assert carrying, src.name  # each studied-insurer source spells the brand
+        assert carrying <= set(BRAND_TOKENS), (src.name, carrying - set(BRAND_TOKENS))
+
+
 def test_no_two_hand_entered_sources_share_a_platform_and_listing():
     """A2: a hand-read row's key carries its declaration's platform and listing
     address, so two hand-entered sources may not share them; the declared
