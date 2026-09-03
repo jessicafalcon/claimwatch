@@ -17,6 +17,7 @@ average it."""
 from __future__ import annotations
 
 import json
+import math
 import re
 from decimal import ROUND_HALF_EVEN, Decimal, InvalidOperation
 from html.parser import HTMLParser
@@ -79,9 +80,13 @@ def _objects(doc: object) -> list[dict[str, object]]:
 
 
 def _rating(value: object, page_url: str) -> Decimal:
+    # The shape is a finite number: a bounded digit string, or a JSON number
+    # that is not a bool and not NaN or an infinity — `json.loads` accepts
+    # those spellings, and a non-finite Decimal would raise at the range
+    # comparison, a traceback past the parser (round 3, security-reviewer #2).
     if isinstance(value, bool) or not (
         (isinstance(value, str) and _NUMBER.match(value))
-        or isinstance(value, int | float)
+        or (isinstance(value, int | float) and math.isfinite(value))
     ):
         raise refuse(page_url, None, "ratingValue", f"is not a number: {value!r}")
     try:

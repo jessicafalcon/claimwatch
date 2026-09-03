@@ -85,9 +85,28 @@ def test_two_aggregate_ratings_refuse_the_page():
 
 
 @pytest.mark.parametrize(
-    "value", ["5.1", "-0.5", "abc", "", True, None, [4], {"x": 1}, "4,5"]
+    "value",
+    [
+        "5.1",
+        "-0.5",
+        "abc",
+        "",
+        True,
+        None,
+        [4],
+        {"x": 1},
+        "4,5",
+        float("nan"),
+        float("inf"),
+        -float("inf"),
+        "NaN",
+        "Infinity",
+    ],
 )
 def test_rating_outside_the_shape_is_refused(value):
+    """A rating is a finite number; `json.loads` accepts `NaN` and `Infinity`
+    as numbers, and either is outside the shape and refuses in one line rather
+    than raising at the range check (round 3, security-reviewer #2)."""
     doc = _block()
     doc["aggregateRating"]["ratingValue"] = value
     with pytest.raises(PageShapeError, match="'ratingValue'"):
