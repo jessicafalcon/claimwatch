@@ -85,8 +85,7 @@ def _do_confirm(args: argparse.Namespace) -> int:
     rather than overwrite it (A8 (d)); a create that fails for any other
     reason refuses with one line too. What the gate does not hold against —
     an environment that chooses what make reads or runs (`MAKEFILES`, `PATH`),
-    a parallel run (`make -j` may start `reset` before this stamps), a
-    same-user process writing `data/` while make runs — the Threat model
+    a same-user process writing `data/` while make runs — the Threat model
     states."""
     if not args.make_pid.isdigit():
         raise Refused("refusing: --make-pid is not a process id")

@@ -1064,7 +1064,7 @@ holds no address, no name, no free text (`read_from` is the word `page`).
 | Target | empty | `../x` | `"; ` | env-exported | `$(origin)` | Pinned by |
 |---|---|---|---|---|---|---|
 | `scrape` | `SOURCE` empty → every declared source (non-fetchable ones report one line each; each fetchable one fetches — two today, on two hosts, at most 60 pages each); no `confirm` goal before it → prompt on a tty, refuse non-interactively, no request (residual as the `confirm` row states) | `SOURCE` refused — a declared name, never a path; the capture directory is derived from the declaration | one literal arg; not a declared name → refused | `unexport`ed; validated in Python; `CONFIRM=yes` from the environment, or through `MAKEFLAGS`, reaches no recipe → refused, no request | n/a — the gate is the `confirm` goal of the same invocation (A4 (d)), not a variable's origin | `tests/test_makefile.py::test_scrape_passes_source_unexpanded_and_its_make_pid`, `::test_confirm_is_a_goal_of_the_same_invocation`, `::test_scrape_source_is_a_closed_set`, `::test_scrape_variables_reach_python_as_one_literal`; `tests/test_cli.py::test_cli_scrape_refuses_without_the_confirm_goal`, `::test_cli_scrape_skips_a_source_declared_not_fetchable_and_exits_0`, `::test_cli_scrape_exits_2_only_on_a_refusal_met_during_the_run`, `::test_cli_scrape_naming_a_source_declared_not_fetchable_is_a_refusal` (round 1: a plain run skips such a source with one line; naming it, or a refusal met during the run, is exit 2) |
-| `confirm` | takes no variable; stamps its make process's id under `data/` (created exclusively, owner-only) for the `reset` or `scrape` that follows in the same invocation; it arms only when the goal after it is `reset` or `scrape`, refusing otherwise with no stamp left (A9); a stamp already there makes it refuse naming the file (A8 (d)) | n/a | n/a | `MAKEFLAGS='CONFIRM=yes'`, `MAKEFLAGS='confirm'`: no goal arrives, nothing confirmed; `MAKECMDGOALS=…` from the environment, `MAKEFLAGS` or the command line: the list's origin is not make's own (`$(origin MAKECMDGOALS)` is not `default`), refused, no stamp (A9). Residual, stated: The gate holds against a variable definition, an environment value, `MAKEFLAGS`, a stale invocation and a typo. It does not hold against an environment that chooses what make reads or runs (`MAKEFILES`, `PATH`), against a parallel run (`make -j` may start `reset` before `confirm` has stamped, so an armed stamp can outlive that invocation), or against a same-user process writing `data/` while make runs (A8 (d); the last two found by the exit pass, BACKLOG); a dangling symlink at the stamp path is never consumed and is removed by hand | n/a | `tests/test_makefile.py::test_confirm_arms_a_gated_goal_or_nothing`, `::test_confirm_is_a_goal_of_the_same_invocation` (both against the installed make), `::test_reset_and_scrape_take_the_make_pid_not_a_confirm_variable`; `tests/test_cli.py::test_confirm_arms_only_a_gated_goal_from_makes_own_list` (A9); `tests/test_cli.py::test_confirm_stamps_one_invocation_and_reset_consumes_it` |
+| `confirm` | takes no variable; stamps its make process's id under `data/` (created exclusively, owner-only) for the `reset` or `scrape` that follows in the same invocation; it arms only when the goal after it is `reset` or `scrape`, refusing otherwise with no stamp left (A9); a stamp already there makes it refuse naming the file (A8 (d)) | n/a | n/a | `MAKEFLAGS='CONFIRM=yes'`, `MAKEFLAGS='confirm'`: no goal arrives, nothing confirmed; `MAKECMDGOALS=…` from the environment, `MAKEFLAGS` or the command line: the list's origin is not make's own (`$(origin MAKECMDGOALS)` is not `default`), refused, no stamp (A9). Residual, stated: The gate holds against a variable definition, an environment value, `MAKEFLAGS`, a stale invocation and a typo. It does not hold against an environment that chooses what make reads or runs (`MAKEFILES`, `PATH`; found by the exit pass, BACKLOG) or against a same-user process writing `data/` while make runs (A8 (d)); goals run in order under `make -j` (`.NOTPARALLEL:`, pinned); a link to nowhere planted at the stamp path is consumed by the next gated run. The origin check is make's own answer at the recipe (`$(origin MAKECMDGOALS)`); the CLI takes the recipe's word for it, as it does for the goal list and the process id | n/a | `tests/test_makefile.py::test_confirm_arms_a_gated_goal_or_nothing`, `::test_confirm_is_a_goal_of_the_same_invocation` (both against the installed make), `::test_reset_and_scrape_take_the_make_pid_not_a_confirm_variable`; `tests/test_cli.py::test_confirm_arms_only_a_gated_goal_from_makes_own_list` (A9); `tests/test_cli.py::test_confirm_stamps_one_invocation_and_reset_consumes_it` |
 | `rebuild` | `ROWS` → `captured` (zero captures → the anchors and the manual file, with a one-line hint) | refused (closed set of four names) | one literal arg; refused | `unexport`ed; validated in Python | n/a | `tests/test_makefile.py::test_rebuild_variables_are_a_closed_set` (re-pinned to `ROWS`), `tests/test_cli.py::test_cli_refuses_bad_rows_with_exit_2` |
 | `idempotency-check` | `ROWS` → `synthetic` | refused | refused | `unexport`ed; validated in Python | n/a | `tests/test_makefile.py::test_idempotency_check_variables_are_a_closed_set` (re-pinned) |
 | `reset` | no `confirm` goal before it: prompt on a tty, refuse non-interactively, nothing deleted (residual as the `confirm` row states) | n/a (no path taken) | n/a | `CONFIRM=yes` from the environment or `MAKEFLAGS` reaches no recipe | n/a — `make confirm reset`, the goal of the same invocation (A4 (d)) | `tests/test_makefile.py::test_reset_and_scrape_take_the_make_pid_not_a_confirm_variable`, `::test_confirm_is_a_goal_of_the_same_invocation`; `tests/test_cli.py::test_confirm_stamps_one_invocation_and_reset_consumes_it`, `::test_reset_removes_only_the_db_and_wal` (the file set re-pinned to the `ROWS` names) |
@@ -1231,17 +1231,21 @@ goal), A5–A6 (the live page's nesting and half-star ratings, found by the
 first live run), A7–A8 (a raw table compared with its whole declaration;
 batches; the aggregate's scale; the gate's claim narrowed; the file derived
 from the input), A9 (the gate arms a gated goal or nothing from make's own
-list; the page writer's transaction; the `sample` label as the row's).
-Rounds 4 and 5 each reported correctness findings on the previous round's
-fixes, so the review cap applied: A9 was built once and one exit pass — the
-coherence audit over the repo, code and security review scoped to A9 —
-replaced a sixth round. That pass found no blocker: its record corrections
-landed in this commit, and its mechanism findings are BACKLOG rows with
-triggers, chiefly the gate's two open edges, both now stated as residuals
-(`make -j` can start `reset` before `confirm` stamps; an environment that
-chooses what make reads or runs, `MAKEFILES` or `PATH`, is outside the
-gate). BACKLOG: five rows closed, fourteen opened, one re-deferred; 23 open.
-Not here: Trustpilot (3b), theme charts (5b–7), the weekly capture commit
-(4), the App Store listing's block (unverified, hand-read). Still needing
-the developer: the Opinion Assurances terms page address and where the
-authorization is kept (DECISIONS → Phase 3a).
+list; the page writer's transaction; the `sample` label as the row's). Rounds
+4 and 5 each reported correctness findings on the previous round's fixes, so
+the review cap applied: A9 was built once and one exit pass — the coherence
+audit over the repo, code and security review scoped to A9 — replaced a sixth
+round. That pass found no blocker: its record corrections landed in this
+commit, and its mechanism findings were fixed as suggested in the commits that
+follow (goals serialised under `make -j` with a pin; the stamp consumed in any
+state; the relay over the whole scratch block; every shape anchored and the
+profile parser matching whole; the anchors reader refusing the sample profile)
+or stand as BACKLOG rows with triggers — an environment that chooses what make
+reads or runs (`MAKEFILES`, `PATH`) is outside the gate and stated so, the
+make-level probes write the working tree's stamp, the §6 response figures are
+not seeded, Phase 4's tracked path and a fetched peer's profile wait for their
+specs. BACKLOG: five rows closed, fourteen opened, one re-deferred, one of the
+fourteen closed at the exit; 22 open. Not here: Trustpilot (3b), theme charts
+(5b–7), the weekly capture commit (4), the App Store listing's block
+(unverified, hand-read). Still needing the developer: the Opinion Assurances
+terms page address and where the authorization is kept (DECISIONS → Phase 3a).

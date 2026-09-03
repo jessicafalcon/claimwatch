@@ -443,9 +443,10 @@ scraper, no model.
   stamp is created exclusively (A8 (d)); `confirm` arms `reset` or `scrape`
   alone and reads a goal list of make's own origin only (A9 (a)); what the
   gate does not hold against — an environment that chooses what make reads or
-  runs (`MAKEFILES`, `PATH`), a parallel run (`make -j`), a same-user process
-  writing `data/` while make runs — is written in the spec's Threat model
-  (exit pass, 2026-09-03). Mirrors the SPEC/BASE shape for the variables.
+  runs (`MAKEFILES`, `PATH`), a same-user process writing `data/` while make
+  runs — is written in the spec's Threat model; goals run in order under `-j`
+  (`.NOTPARALLEL:`, exit pass 2026-09-03). Mirrors the SPEC/BASE shape for the
+  variables.
 
 **Gotchas:** none — DuckDB's `create or replace`, `insert … where not exists`
 and `information_schema.tables` behaved as the official docs describe.
@@ -905,20 +906,23 @@ renamed the rebuild input, closed five BACKLOG rows.
   (`environment`), from `MAKEFLAGS` or from the command line (`command line`)
   overrides the list make built (probed against GNU Make 3.81); `reset` and
   `scrape` consume the stamp before their own refusals; a stamp create that
-  fails for any reason but "already there" refuses with one line. What the
-  gate still does not hold against, found by the exit pass and stated in the
-  Threat model: an environment that chooses what make reads or runs
-  (`MAKEFILES` with a `$(shell …)` planting the stamp, `PATH`), a parallel run
-  (`make -j2 confirm reset` can run `reset` before the stamp exists and leave
-  it armed), and a same-user process writing `data/` while make runs (A8 (d)).
-  (b) `write_source_pages` runs its batch in one transaction, as the two
-  loaders do. (c) `attribution_labels` takes the input and the row's profile:
-  the literal `sample` is admitted under `samples` on a row whose profile is
-  the sample declaration's, and a real declaration may not carry that profile.
-  Rejected: dropping the goal-list check and widening the residual (a leaked
-  stamp becomes the ordinary case); a Makefile-side `$(filter …)` (it runs on
-  the same overridable variable); a denylist of goals that may not follow
-  `confirm`; keying the label on the row's `source` (a sample row's source is
-  the real platform's name, as an anchor's is); dropping `rows_input` (the
-  input still decides where a sample declaration exists). Found by review
-  round 5 (2026-09-03); built in place of a sixth round, with one exit pass.
+  fails for any reason but "already there" refuses with one line. The exit
+  pass found two more edges: a parallel run (`make -j2 confirm reset` ran
+  `reset` before the stamp existed in 7 of 12 tries) is closed by
+  `.NOTPARALLEL:` with a `-j2` pin, and an environment that chooses what make
+  reads or runs (`MAKEFILES` with a `$(shell …)` planting the stamp, `PATH`)
+  is stated as a residual beside the same-user process (A8 (d)) — refusing
+  when `MAKEFILES` is set would only move that boundary one variable. A link
+  to nowhere planted at the stamp path is consumed by the next gated run
+  rather than wedging the gate. (b) `write_source_pages` runs its batch in one
+  transaction, as the two loaders do. (c) `attribution_labels` takes the input
+  and the row's profile: the literal `sample` is admitted under `samples` on a
+  row whose profile is the sample declaration's, and a real declaration may
+  not carry that profile. Rejected: dropping the goal-list check and widening
+  the residual (a leaked stamp becomes the ordinary case); a Makefile-side
+  `$(filter …)` (it runs on the same overridable variable); a denylist of
+  goals that may not follow `confirm`; keying the label on the row's `source`
+  (a sample row's source is the real platform's name, as an anchor's is);
+  dropping `rows_input` (the input still decides where a sample declaration
+  exists). Found by review round 5 (2026-09-03); built in place of a sixth
+  round, with one exit pass.

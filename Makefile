@@ -25,12 +25,12 @@
 # `scrape`, and only from a goal list whose origin is make's own
 # (`$(origin MAKECMDGOALS)` is `default` — a definition from the environment,
 # MAKEFLAGS or the command line is refused), so no ordinary command leaves an
-# armed stamp behind (A9 (a)). What the gate holds against is a variable
-# definition, an environment value, MAKEFLAGS, a stale invocation and a typo;
-# not an environment that chooses what make reads or runs (MAKEFILES, PATH),
-# not a parallel run (`make -j` may start reset before confirm has stamped),
-# not a same-user process writing data/ while make runs — the spec's Threat
-# model states the three.
+# armed stamp behind (A9 (a); goals run in order under -j, .NOTPARALLEL
+# below). What the gate holds against is a variable definition, an
+# environment value, MAKEFLAGS, a stale invocation and a typo; not an
+# environment that chooses what make reads or runs (MAKEFILES, PATH), not a
+# same-user process writing data/ while make runs — the spec's Threat model
+# states both.
 # Goals run in order even under -j: `reset` must not start before `confirm`
 # has stamped (exit pass, security-reviewer #1; pinned by a -j2 probe).
 .NOTPARALLEL:

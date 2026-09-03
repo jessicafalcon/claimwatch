@@ -191,10 +191,9 @@ in the middle, and come out on the right as the numbers the study shows.
   than overwrite it. The gate holds against a variable definition, an
   environment value, `MAKEFLAGS`, a stale invocation and a typo. It does not
   hold against an environment that chooses what make reads or runs
-  (`MAKEFILES`, `PATH`), against a parallel run (`make -j` may start `reset`
-  before `confirm` has stamped, so an armed stamp can outlive that
-  invocation), or against a same-user process writing `data/` while make runs
-  (the spec's Threat model says so).
+  (`MAKEFILES`, `PATH`), or against a same-user process writing `data/` while
+  make runs (the spec's Threat model says so); goals run in order even under
+  `make -j`.
 - `make reset [TARGET=duckdb]` — DESTRUCTIVE: drop every DuckDB file this repo
   built, the corpus and one per rebuild input; needs `make confirm reset` (no
   variable and no environment value counts).
@@ -524,13 +523,16 @@ only; the declared-page writer writes a batch or nothing; the `sample` label
 is the sample declaration's row's.
 
 The exit pass ran 2026-09-03 in place of a sixth round (the coherence audit
-over the repo, code and security review scoped to A9): no blocker; its record
-corrections are in, its mechanism findings are BACKLOG rows with triggers, the
-Delivered paragraph is appended. Remaining: the PR. The DONE command is `make
-rebuild && make idempotency-check ROWS=captured`; Phase 1's line stays green
-(raw 40 / staging 39); CI runs `ROWS=synthetic` and `ROWS=samples`. Phase 2
-merged (PR #4). Next: the Phase 3a PR; then Phase 3b — Trustpilot.
+over the repo, code and security review scoped to A9): no blocker; its
+findings are fixed as suggested (goals serialised under `-j`, the stamp
+consumed in any state, the relay over the whole scratch block, every shape
+anchored, the anchors reader's profile guard) or stand as three BACKLOG rows
+with triggers, and the Delivered paragraph is appended. The PR is open. The
+DONE command is `make rebuild && make idempotency-check ROWS=captured`; Phase
+1's line stays green (raw 40 / staging 39); CI runs `ROWS=synthetic` and
+`ROWS=samples`. Phase 2 merged (PR #4). Next: the Phase 3a PR; then Phase 3b —
+Trustpilot.
 
-Open BACKLOG rows: **23**.
+Open BACKLOG rows: **22**.
 
 (Update this section at the end of every working day.)

@@ -73,6 +73,10 @@ left empty. The day, and a midpoint, are placements, not readings.
   counts, and the difference in how quickly companies answer reviews. Each
   stat is its own latest point, with its own tag and day. Tag: *Documented*
   for the anchors, *Measured* for our own points (see *How to read a panel*).
+  *Stated beside the chart:* today the response rate and delay are measured
+  for one profile on one platform, so the comparison across platforms waits
+  for a second platform's measured figures; the brief's ranges for the studied
+  insurer are not placed (BACKLOG).
 
 ## Beat 2 — The complaints have a shape
 
