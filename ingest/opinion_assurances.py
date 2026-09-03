@@ -54,6 +54,7 @@ from __future__ import annotations
 import hashlib
 import re
 from datetime import date
+from decimal import Decimal
 from html.parser import HTMLParser
 
 from ingest.parsed import (
@@ -79,9 +80,27 @@ _SENTENCE = re.compile(
 _REVIEW_TYPE = re.compile(r"^https?://schema\.org/review$", re.I)
 _AGGREGATE_TYPE = re.compile(r"^https?://schema\.org/aggregaterating$", re.I)
 _PERSON_TYPE = re.compile(r"^https?://schema\.org/person$", re.I)
-# The scale a review scope declares (`worstRating`, `bestRating`), as text:
-# the bounds of `parsed.REVIEW_RATINGS`, which admits exactly the site's scale.
-REVIEW_SCALE = (str(min(REVIEW_RATINGS)), str(max(REVIEW_RATINGS)))
+# The scale a review scope declares (`worstRating`, `bestRating`): the bounds
+# of `parsed.REVIEW_RATINGS`, which admits exactly the site's scale. A bound
+# is a number, compared as one — `5` and `5.0` declare the same scale — read
+# through a bounded digit shape so no page text reaches `Decimal()` unchecked
+# (round 4, code-reviewer #10).
+REVIEW_SCALE = (min(REVIEW_RATINGS), max(REVIEW_RATINGS))
+_BOUND = re.compile(r"[0-9]{1,3}(\.[0-9]{1,3})?")
+
+
+def _declared_scale(
+    worst: str | None, best: str | None
+) -> tuple[Decimal, Decimal] | None:
+    """The scale a review scope declares, as numbers; None when a bound is
+    missing or is not a number in the shape."""
+    if worst is None or best is None:
+        return None
+    if not (_BOUND.fullmatch(worst) and _BOUND.fullmatch(best)):
+        return None
+    return (Decimal(worst), Decimal(best))
+
+
 _VOID = frozenset({"meta", "br", "img", "input", "hr", "link", "source", "wbr"})
 _SEP = "\x1f"
 
@@ -268,7 +287,7 @@ def _review_row(
             "ratingValue",
             f"appears {review.ratings_seen} times, not once",
         )
-    if (review.worst, review.best) != REVIEW_SCALE:
+    if _declared_scale(review.worst, review.best) != REVIEW_SCALE:
         # The site declares each review's scale; ours admits exactly it. A
         # page declaring another (a 0, a 10) refuses here, so a value the
         # site does not admit is never admitted by widening our set (A6).

@@ -442,7 +442,36 @@ def test_the_set_admits_exactly_the_scale_the_site_declares():
     best = set(re.findall(r'itemprop="bestRating" content="([^"]*)"', _page(1)))
     assert worst == {"1", "0"} and best == {"5"}  # reviews 1..5; the aggregate 0..5
     assert (min(REVIEW_RATINGS), max(REVIEW_RATINGS)) == (Decimal(1), Decimal(5))
-    assert REVIEW_SCALE == ("1", "5")
+    assert REVIEW_SCALE == (Decimal(1), Decimal(5))
+
+
+def test_the_same_scale_spelled_with_a_fraction_is_the_same_scale():
+    """A bound is a number: a page declaring `1.0`..`5.0` declares 1..5 and
+    parses to the same rows, where a text comparison refused all forty reviews
+    (round 4, code-reviewer #10)."""
+    html = _page(1).replace('worstRating" content="1"', 'worstRating" content="1.0"')
+    html = html.replace('bestRating" content="5"', 'bestRating" content="5.0"')
+    assert html != _page(1)
+    assert parse(html, PAGE_URL, CAPTURED, SRC) == parse(
+        _page(1), PAGE_URL, CAPTURED, SRC
+    )
+
+
+@pytest.mark.parametrize("bound", ["", "x", "5,0", "1e1", "0005", "5.0000", " 5"])
+def test_a_bound_outside_the_number_shape_refuses_the_page(bound):
+    """A bound that is not a number in the shape is not the scale — refused
+    naming what the page declared, never a Decimal() error past the parser."""
+    html = _second_review(
+        _page(1),
+        lambda s: s.replace(
+            'bestRating" content="5"', f'bestRating" content="{bound}"', 1
+        ),
+    )
+    with pytest.raises(
+        PageShapeError,
+        match="review 2': field 'worstRating/bestRating' declares the scale ",
+    ):
+        parse(html, PAGE_URL, CAPTURED, SRC)
 
 
 @pytest.mark.parametrize(
