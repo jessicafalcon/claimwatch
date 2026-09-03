@@ -92,6 +92,42 @@ later entry wins (a second order on the data path, and raw would carry a
 number no page produced); keeping `platform_stats`' grain and taking each
 column from its own latest row (three provenances in one row).
 
+**Proposed after review round 2 (2026-09-02) — A3: attribution joins the
+guards; the sample declaration is a property, not a name; a hand entry may
+name exactly the sources the uniqueness check covers.** *Status: PROPOSED,
+awaiting approval; nothing in it is built.* Restores invariant 1 (a row is
+keyed on what produced it, and a re-run changes no count by chance), invariant
+3 (attribution comes from the declaration, never from a caller's value) and
+invariant 4 (a captured review joins exactly one declared page). (a) *A
+changed attribution refuses* (round 2, findings 1 and 4): `raw_source_pages`'
+guard stays `(source, source_url)` + the attribution hash, but a declared page
+whose `profile`, `segment` or `channel` differs from the row already in raw
+REFUSES the rebuild with one line naming the address and the fix (`make reset
+CONFIRM=yes`, then `make rebuild`), so a re-declaration never appends a second
+row for one address and the review join stays one-to-one — pinned by a test
+that flips a source's segment in a copied tuple and by the join test extended
+to assert the count of `raw_source_pages` rows per address; `snapshot_hash`
+gains `segment`, `channel` and `seeded_from`, so a corrected attribution on an
+existing key is a same-key pair and refuses like a corrected figure, never
+dropped by `where not exists`. (b) *The sample declaration is a property*
+(findings 5 and 6): `Source` gains `sample: bool` (True only from
+`sample_source`, the frozen samples' declaration), the closed-set check on
+`segment` and `channel` keys on it rather than on `name == "sample"`, and
+invariant 1 reads "`segment` and `channel` are values from their closed sets,
+or the literal `sample` on a row a sample declaration wrote — a label that
+exists only in the samples database" with pinned decision 5 unchanged; a
+source named `sample` without the property refuses at declaration. (c) *A hand
+entry may name exactly the hand-entered sources* (finding 24):
+`read_manual_snapshots` accepts a source iff `parser is None` — the same set
+`hand_entries_are_unique` covers — so the App Store feed (a review source
+declared not fetchable) can no longer receive a hand-read row that collapses
+onto the listing's key; the error names the rule ("a hand entry names a source
+with no parser"). Not taken: widening the uniqueness check to every
+non-fetchable source (two declarations would then share one key by design);
+putting `origin` and the attribution into `raw_source_pages` (a page's
+attribution is one fact, not a series); a replace-on-change for either table
+(raw is append-only, and a replaced row would lose its provenance).
+
 ## Why
 
 Phase 2 built the collector and proved it on a frozen sample, but the one
