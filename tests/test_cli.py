@@ -206,6 +206,31 @@ def test_each_input_builds_its_own_database(capsys, isolated_paths):
     assert all(str(f) in out for f in files | {corpus})
 
 
+def test_reset_removes_every_database_this_repo_built_past_or_present(
+    capsys, isolated_paths
+):
+    """`reset` drops the corpus and every `<stem>.<input>.duckdb` beside it —
+    including files an earlier phase's input names left behind (`app-store`,
+    `empty`), which a list drawn from today's INPUTS would keep — and their
+    write-ahead logs; a neighbour that is not ours is untouched (round 1,
+    functionality-tester F5)."""
+    import pipeline.warehouse as warehouse
+
+    corpus = warehouse.DEFAULT_DB
+    ours = [corpus, corpus.with_name(corpus.name + ".wal")] + [
+        corpus.with_name(f"{corpus.stem}.{name}{corpus.suffix}")
+        for name in ("app-store", "empty", "synthetic", "samples")
+    ]
+    theirs = [corpus.with_name("other.duckdb"), corpus.with_name(f"{corpus.stem}.txt")]
+    for p in ours + theirs:
+        p.write_text("x")
+    assert main(["reset", "--confirm=yes", "--confirm-origin=command line"]) == 0
+    out = capsys.readouterr().out
+    assert not any(p.exists() for p in ours)
+    assert all(p.exists() for p in theirs)
+    assert all(str(p) in out for p in ours)
+
+
 def test_a_malformed_stored_page_is_a_one_line_refusal_from_rebuild(
     capsys, isolated_paths
 ):

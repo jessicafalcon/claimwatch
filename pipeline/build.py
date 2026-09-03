@@ -543,18 +543,30 @@ def idempotency_check(
     return first == second, first, second
 
 
+def built_databases() -> list[Path]:
+    """Every database file a rebuild of this repo can have written, whatever
+    its input was called when it ran: the corpus, and `<stem>.<input>.duckdb`
+    beside it for ANY input name — today's four and the names earlier phases
+    used (`app-store`, `empty`), which a list drawn from INPUTS would miss.
+    The shape is `warehouse.database_for`'s, read back as a pattern."""
+    base = warehouse.DEFAULT_DB
+    beside = (
+        sorted(base.parent.glob(f"{base.stem}.*{base.suffix}"))
+        if base.parent.is_dir()
+        else []
+    )
+    return [base] + [p for p in beside if p != base]
+
+
 def reset(target: str = "duckdb", *, database: str | Path | None = None) -> list[Path]:
     """Delete the DuckDB files (and their write-ahead logs): with no `database`,
-    every input's file — the real corpus and each fixture's own. The CLI gates
-    this on CONFIRM=yes from the command line; this function does the deletion
-    once confirmed. Returns the files removed."""
+    every file this repo built — the real corpus and one per rebuild input,
+    past or present (`built_databases`). The CLI gates this on CONFIRM=yes from
+    the command line; this function does the deletion once confirmed. Returns
+    the files removed."""
     if target != "duckdb":
         raise ValueError(f"reset only handles the DuckDB file, not {target!r}")
-    dbs = (
-        [warehouse.database_for(r) for r in INPUTS]
-        if database is None
-        else [Path(database)]
-    )
+    dbs = built_databases() if database is None else [Path(database)]
     removed: list[Path] = []
     for db in dbs:
         for p in (db, db.with_name(db.name + ".wal")):

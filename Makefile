@@ -47,7 +47,7 @@ rebuild: ## build the warehouse from raw [TARGET=duckdb] [ROWS=captured|none|syn
 idempotency-check: ## rebuild twice, diff per-table row counts (run-twice property) [ROWS=synthetic]
 	uv run python -m pipeline idempotency-check --target=$(call _Q,$(value TARGET)) --rows=$(call _Q,$(value ROWS))
 
-reset: ## DESTRUCTIVE drop every DuckDB file (the corpus and one per fixture) — needs CONFIRM=yes on the command line
+reset: ## DESTRUCTIVE drop every DuckDB file this repo built (the corpus and one per rebuild input, past or present) — needs CONFIRM=yes on the command line
 	uv run python -m pipeline reset --target=$(call _Q,$(value TARGET)) --confirm=$(call _Q,$(value CONFIRM)) --confirm-origin=$(call _Q,$(origin CONFIRM))
 
 scrape: ## NETWORK fetch the declared source(s) into data/cache [SOURCE=<name>] — needs CONFIRM=yes on the command line; developer-run
