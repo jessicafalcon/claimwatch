@@ -118,6 +118,7 @@ def test_every_row_carries_its_declarations_attribution_not_the_modules():
             fetchable=False,
             declared_on="2026-09-01",
             terms="a frozen sample read under a twin declaration",
+            sample=True,
         )
         assert twin.platform != mod.SAMPLE_PLATFORM
         ((_, parsed),) = read_captures(mod.SAMPLE_DIR, twin)

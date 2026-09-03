@@ -68,6 +68,10 @@ class Source:
     fetchable: bool  # the recorded terms position; False is refused before any request
     declared_on: str  # the real day (YYYY-MM-DD) the declaration was recorded
     terms: str = ""  # why, when not fetchable — a reason and a date, never a name
+    # The frozen samples' declaration, and only it (A3 (b)): a property, not a
+    # name, so the closed-set check on segment and channel keys on it — the
+    # literal `sample` exists only in the samples database.
+    sample: bool = False
 
     def __post_init__(self) -> None:
         if not _SLUG.match(self.name) or not _SLUG.match(self.platform):
@@ -84,7 +88,12 @@ class Source:
             raise ValueError(f"source {self.name!r}: fetchable=False needs terms")
         if self.fetchable and self.parser is None:
             raise ValueError(f"source {self.name!r}: a fetchable source needs a parser")
-        if self.name != SAMPLE and (
+        if self.name == SAMPLE and not self.sample:
+            raise ValueError(
+                f"source {self.name!r}: the name is the sample declaration's; "
+                "declare it with sample=True or choose another name"
+            )
+        if not self.sample and (
             self.segment not in SEGMENTS or self.channel not in CHANNELS
         ):
             raise ValueError(
@@ -181,6 +190,7 @@ def sample_source(parser: str) -> Source:
         fetchable=False,
         declared_on="2026-09-01",
         terms="a frozen sample, read from fixtures/, never fetched",
+        sample=True,
     )
 
 

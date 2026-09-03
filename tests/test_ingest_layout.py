@@ -286,6 +286,44 @@ def test_every_brand_form_in_the_declarations_is_a_declared_token():
         assert brand <= set(BRAND_TOKENS), (src.name, brand - set(BRAND_TOKENS))
 
 
+def test_the_sample_declaration_is_a_property_not_a_name():
+    """A3 (b): the closed-set check on `segment` and `channel` keys on the
+    `sample` property, which only `sample_source` sets — a declaration named
+    `sample` without it refuses, and a source of any other name carrying an
+    out-of-set label refuses whatever it is called (round 2, code-reviewer
+    #5, #6)."""
+    from ingest.sources import SAMPLE, sample_source
+
+    def declare(name: str, **over):
+        fields = dict(
+            name=name,
+            platform="google-play",
+            host="play.google.com",
+            parser="listing",
+            pages=(),
+            profile="p",
+            segment="NOT-A-SEGMENT",
+            channel="NOT-A-CHANNEL",
+            listing="",
+            fetchable=False,
+            declared_on="2026-09-01",
+            terms="a test declaration",
+        )
+        fields.update(over)
+        return Source(**fields)
+
+    for parser in PARSERS:
+        assert sample_source(parser).sample is True
+    with pytest.raises(ValueError, match="sample=True"):
+        declare(SAMPLE)  # the name alone earns nothing
+    with pytest.raises(ValueError, match="segment in"):
+        declare("not-a-sample")  # any other name: the closed sets
+    with pytest.raises(ValueError, match="segment in"):
+        declare("not-a-sample", segment="digital-first")  # channel still out
+    assert declare(SAMPLE, sample=True).segment == "NOT-A-SEGMENT"
+    assert declare("twin", sample=True).channel == "NOT-A-CHANNEL"
+
+
 def test_no_two_hand_entered_sources_share_a_platform_and_listing():
     """A2: a hand-read row's key carries its declaration's platform and listing
     address, so two hand-entered sources may not share them; the declared
