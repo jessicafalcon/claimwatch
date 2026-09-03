@@ -8,7 +8,13 @@ The declared shape, from the structure dump of 2026-09-02 (DECISIONS -> Phase
 3a, Gotchas). One page holds:
 
   [itemscope itemtype=".../review"]            one scope per review, in page order
-    [itemscope itemprop=reviewRating]            <meta itemprop=ratingValue content=N>
+    [itemscope itemprop=reviewRating]            <meta itemprop=worstRating content=1>
+                                                 <meta itemprop=bestRating content=5>
+                                                 the site's own scale for a review;
+                                                 any other declared scale refuses,
+                                                 so a value the site does not admit
+                                                 is never admitted here (A6)
+                                                 <meta itemprop=ratingValue content=N>
                                                  N a half-step 1..5, a digit or a
                                                  digit and `.5` (A6) -> rating
     [itemscope itemprop=author]                  NEVER READ (a Person: a pseudonym
@@ -51,6 +57,7 @@ from datetime import date
 from html.parser import HTMLParser
 
 from ingest.parsed import (
+    REVIEW_RATINGS,
     Parsed,
     count_in_range,
     rating_from_page,
@@ -72,6 +79,9 @@ _SENTENCE = re.compile(
 _REVIEW_TYPE = re.compile(r"^https?://schema\.org/review$", re.I)
 _AGGREGATE_TYPE = re.compile(r"^https?://schema\.org/aggregaterating$", re.I)
 _PERSON_TYPE = re.compile(r"^https?://schema\.org/person$", re.I)
+# The scale a review scope declares (`worstRating`, `bestRating`), as text:
+# the bounds of `parsed.REVIEW_RATINGS`, which admits exactly the site's scale.
+REVIEW_SCALE = (str(min(REVIEW_RATINGS)), str(max(REVIEW_RATINGS)))
 _VOID = frozenset({"meta", "br", "img", "input", "hr", "link", "source", "wbr"})
 _SEP = "\x1f"
 
@@ -84,6 +94,8 @@ class _Review:
     def __init__(self) -> None:
         self.rating: str | None = None
         self.ratings_seen = 0  # more than one ratingValue is outside the shape
+        self.worst: str | None = None  # the scale the review declares (A6)
+        self.best: str | None = None
         self.sentence: list[str] = []
         self.body: list[str] = []
         self.bodies_seen = 0  # more than one oa_text is outside the shape (A5)
@@ -137,10 +149,14 @@ class _Walker(HTMLParser):
                 self.current is not None
                 and self.current.author_depth is None
                 and self.rating_depth is not None
-                and itemprop == "ratingValue"
             ):
-                self.current.ratings_seen += 1
-                self.current.rating = attrs.get("content")
+                if itemprop == "ratingValue":
+                    self.current.ratings_seen += 1
+                    self.current.rating = attrs.get("content")
+                elif itemprop == "worstRating":
+                    self.current.worst = attrs.get("content")
+                elif itemprop == "bestRating":
+                    self.current.best = attrs.get("content")
         if tag in _VOID:
             return
         self.open.setdefault(tag, []).append(len(self.stack))
@@ -251,6 +267,17 @@ def _review_row(
             item,
             "ratingValue",
             f"appears {review.ratings_seen} times, not once",
+        )
+    if (review.worst, review.best) != REVIEW_SCALE:
+        # The site declares each review's scale; ours admits exactly it. A
+        # page declaring another (a 0, a 10) refuses here, so a value the
+        # site does not admit is never admitted by widening our set (A6).
+        raise refuse(
+            page_url,
+            item,
+            "worstRating/bestRating",
+            f"declares the scale {review.worst!r}..{review.best!r}, "
+            f"not {REVIEW_SCALE[0]}..{REVIEW_SCALE[1]}",
         )
     rating = review_rating(review.rating)
     if rating is None:

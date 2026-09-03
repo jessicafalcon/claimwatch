@@ -10,7 +10,7 @@ from decimal import Decimal
 
 import pytest
 
-from ingest.opinion_assurances import SAMPLE_DIR, parse
+from ingest.opinion_assurances import REVIEW_SCALE, SAMPLE_DIR, parse
 from ingest.parsed import REVIEW_RATINGS, PageShapeError
 from ingest.sources import sample_source
 from tests import pins
@@ -395,6 +395,54 @@ def test_the_sample_carries_one_half_step():
     day, rating = pins.OA_SAMPLE_HALF_STEP
     assert (rows[1]["review_date"], rows[1]["rating"]) == (day, Decimal(rating))
     assert [r["rating"] for r in rows].count(Decimal(rating)) == 1
+
+
+def test_the_set_admits_exactly_the_scale_the_site_declares():
+    """A6: the site declares each review's scale in its own markup; our closed
+    set's bounds are read back from the sample's declaration, so we admit a
+    value iff the site admits it."""
+    worst = set(re.findall(r'itemprop="worstRating" content="([^"]*)"', _page(1)))
+    best = set(re.findall(r'itemprop="bestRating" content="([^"]*)"', _page(1)))
+    assert worst == {"1", "0"} and best == {"5"}  # reviews 1..5; the aggregate 0..5
+    assert (min(REVIEW_RATINGS), max(REVIEW_RATINGS)) == (Decimal(1), Decimal(5))
+    assert REVIEW_SCALE == ("1", "5")
+
+
+@pytest.mark.parametrize(
+    ("mutate", "declared"),
+    [
+        (
+            lambda s: s.replace(
+                'worstRating" content="1"', 'worstRating" content="0"', 1
+            ),
+            "'0'..'5'",
+        ),
+        (
+            lambda s: s.replace(
+                'bestRating" content="5"', 'bestRating" content="10"', 1
+            ),
+            "'1'..'10'",
+        ),
+        (
+            lambda s: s.replace('<meta itemprop="worstRating" content="1">', "", 1),
+            "None..'5'",
+        ),
+    ],
+)
+def test_a_review_declaring_another_scale_refuses_the_page(mutate, declared):
+    """A6: a page whose review scale is not 1..5 — a site that starts admitting
+    0.5, say — refuses naming the declared bounds; the set is widened by hand,
+    with the page as evidence, never by the parse."""
+    html = _second_review(_page(1), mutate)
+    assert html != _page(1)
+    with pytest.raises(
+        PageShapeError,
+        match=(
+            "review 2': field 'worstRating/bestRating' declares the scale "
+            f"{re.escape(declared)}, not 1..5"
+        ),
+    ):
+        parse(html, PAGE_URL, CAPTURED, SRC)
 
 
 AGGREGATE_OPEN = (

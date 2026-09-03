@@ -810,8 +810,14 @@ renamed the rebuild input, closed five BACKLOG rows.
   corpus's hashes do not move; the App Store parser keeps its digit rule
   (its feed gives digits, members of the set). The sample is re-frozen with
   one half-step so `ROWS=samples` carries one through the real parser and
-  column. Nothing downstream reads a review's rating yet. Rejected: rounding
-  a half-step to a digit (an altered figure — a rating the reviewer did not
+  column. The set admits exactly the scale the site declares: each review
+  scope carries `worstRating` 1 and `bestRating` 5 (all 534 on the first
+  capture; the aggregate declares 0..5), the parser reads both and refuses a
+  page declaring another scale naming the bounds, so a value the site does
+  not admit (a 0.5, say) is admitted here only when the site admits it — by
+  widening the set by hand with that page as evidence, never by the parse.
+  Nothing downstream reads a review's rating yet. Rejected: rounding a
+  half-step to a digit (an altered figure — a rating the reviewer did not
   give); refusing the page (loses the phase's only review source over a
   value the site gives by design); a free `decimal` in 0–5 (wider than the
   site's shape; admits a malformed value).
