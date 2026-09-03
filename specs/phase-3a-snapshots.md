@@ -55,7 +55,7 @@ D5 (peer review profiles — no review source) and D6 (the page ceiling stays at
 
 **Proposed after review round 1 (2026-09-02) — A2: one snapshot row per
 declaration and day, no tiebreak; the stat row one row per stat; two sentences
-corrected.** *Status: PROPOSED, awaiting approval; nothing in it is built.*
+corrected.** *Status: APPROVED 2026-09-02; built in the commits that follow.*
 Restores invariant 1 (a snapshot row is one point, keyed on what produced it,
 and a rebuild changes no count by chance) and invariant 2 (a mart is the data,
 never a hash order). (a) *The key names its declaration* (round 1, findings 1
@@ -64,32 +64,33 @@ origin, source_url, captured_at)` — `source_url` is the platform root for an
 anchor, the declared listing address for a hand-read row and the page address
 for a capture — so a hand-read figure can never be swallowed by an anchor with
 the same numbers, and two declared sources sharing a platform and profile
-cannot collide on a day; a declaration test pins that no two sources share
-`(platform, listing)`. (b) *A same-key pair is refused, not tiebroken*
-(finding 1): the loader refuses, with one line naming file, line and fix, a
-row whose key already sits in raw under another content hash — that arises
-only from a corrected hand entry or a re-frozen seed, and the fix is `make
-reset CONFIRM=yes` then `make rebuild`, since the corpus is rebuilt from
-tracked inputs; `stg_platform_snapshots` and the four marts drop `content_hash
-desc` from every `order by`, and a test asserts the key is unique in raw. (c)
-*The stat row is one row per stat* (finding 21): `platform_stats`' grain
-becomes `(segment, source, profile, stat)`, `stat` from the closed set
-`{review_count, one_star_share, response_rate, response_delay_days}`, `value`
-the latest non-null reading of that stat with the tag, address and day of the
-row it came from — a fetch that reads one figure never blanks the other two;
-the pins and B1.4's panel text follow. (d) *Two sentences say what is true*
-(findings 12 and 14): Done-when 4 and pinned decision 4 read "a second `make
-scrape` of unchanged pages adds no raw review row; each capture adds one
-snapshot row per profile, since `captured_at` is in its key — that row is the
-point on the trend"; pinned decision 4's STOP-and-decide is recorded as
-decided — the page marks no identifier, `external_id` is the content hash of
-(publication date, experience date, rating, body), an edited review is a new
-review, the BACKLOG row carries the trigger; invariant 6 gains "and derives
-each review's identifier from its content, never from its author". Not taken:
-a load-sequence column so the later entry wins (a second order on the data
-path, and raw would carry a number no page produced); keeping
-`platform_stats`' grain and taking each column from its own latest row (three
-provenances in one row).
+cannot collide on a day; a declaration test pins that no two hand-entered
+sources share `(platform, listing)` — an app's feed and its store listing
+share theirs by design, and only a hand-entered row keys on it. (b) *A
+same-key pair is refused, not tiebroken* (finding 1): the loader refuses, with
+one line naming file, line and fix, a row whose key already sits in raw under
+another content hash — that arises only from a corrected hand entry or a
+re-frozen seed, and the fix is `make reset CONFIRM=yes` then `make rebuild`,
+since the corpus is rebuilt from tracked inputs; `stg_platform_snapshots` and
+the four marts drop `content_hash desc` from every `order by`, and a test
+asserts the key is unique in raw. (c) *The stat row is one row per stat*
+(finding 21): `platform_stats`' grain becomes `(segment, source, profile,
+stat)`, `stat` from the closed set `{review_count, one_star_share,
+response_rate, response_delay_days}`, `value` the latest non-null reading of
+that stat with the tag, address and day of the row it came from — a fetch that
+reads one figure never blanks the other two; the pins and B1.4's panel text
+follow. (d) *Two sentences say what is true* (findings 12 and 14): Done-when 4
+and pinned decision 4 read "a second `make scrape` of unchanged pages adds no
+raw review row; each capture adds one snapshot row per profile, since
+`captured_at` is in its key — that row is the point on the trend"; pinned
+decision 4's STOP-and-decide is recorded as decided — the page marks no
+identifier, `external_id` is the content hash of (publication date, experience
+date, rating, body), an edited review is a new review, the BACKLOG row carries
+the trigger; invariant 6 gains "and derives each review's identifier from its
+content, never from its author". Not taken: a load-sequence column so the
+later entry wins (a second order on the data path, and raw would carry a
+number no page produced); keeping `platform_stats`' grain and taking each
+column from its own latest row (three provenances in one row).
 
 ## Why
 
@@ -219,8 +220,10 @@ make rebuild && make idempotency-check ROWS=captured
    the entered row + one snapshot per fetched profile and listing, the four
    marts populated, reviews per month for the new source, and every count
    unchanged on the second rebuild; a second `make scrape` of unchanged pages
-   adds no raw row. The run is also the first live check of the rebuilt
-   robots gate on hosts that allow us. *Evidence: row 4.*
+   adds no raw review row and one snapshot row per profile, since
+   `captured_at` is in its key — that row is the point on the trend (A2). The
+   run is also the first live check of the rebuilt robots gate on hosts that
+   allow us. *Evidence: row 4.*
 5. **The rebuild input is named by what it is, and every frozen sample runs
    offline.** `ROWS` is the closed set `{captured, none, synthetic, samples}`
    (`captured` the default for `rebuild`, `synthetic` for
@@ -249,7 +252,7 @@ make rebuild && make idempotency-check ROWS=captured
 | 1 | `tests/test_snapshots.py::test_anchors_seed_nine_documented_rows_with_provenance`, `::test_manual_and_fetched_rows_read_back_as_measured`, `::test_reseeding_reentering_and_rebuilding_add_no_snapshot_row`, `::test_anchor_row_outside_the_declared_shape_is_refused` (a rating `6.0`, a count `-1`, a segment outside the closed set, a missing column), `::test_manual_row_outside_the_declared_shape_is_refused` (an undeclared source name, a fetchable source's name, a date that is not a date, a share above 1); `tests/test_provenance.py::test_every_raw_table_has_four_provenance_columns` (extended over every `raw_*` table) |
 | 2 | `tests/test_marts.py::test_rating_trend_matches_pins`, `::test_channel_gap_matches_pins`, `::test_platform_stats_matches_pins`, `::test_peer_ratings_matches_pins` (the anchors' rows, `tests/pins.py`), `::test_every_mart_row_carries_exactly_one_tag`; `make check-backing` prints `check-backing OK: 19 rows, 4 marts`; `tests/test_sql_portable.py::test_every_sql_file_is_portable_and_clock_free` over the new files |
 | 3 | `tests/test_ingest_layout.py::test_every_source_declares_parser_cache_host_and_attribution`, `::test_every_non_fetchable_source_states_its_reason` (extended: the reason names robots or a terms clause and a date), `::test_every_fetchable_sources_host_is_allowed`, `::test_no_module_branches_on_a_platform_name` (no comparison against a platform or source name outside `ingest/sources.py` and the parsers' own `SOURCE` constants), `::test_the_cache_root_is_bound_once`; `tests/test_ingest_rebuild.py::test_meta_is_validated_against_the_sources_declared_host`, `::test_every_captured_review_joins_exactly_one_declared_page` (on a capture the test writes under the feed source's shape); `tests/test_sql_portable.py::test_pattern_matching_is_refused_in_sql` (`like`, `similar to`, `regexp` planted) |
-| 4 | The DONE command's output on the developer's machine, pasted into the Delivered paragraph (counts per table, reviews per month for the new source, `idempotency-check OK`); `make scrape CONFIRM=yes` run twice, the second adding no raw row; functionality-tester reruns the DONE command on that cache and file; `tests/test_fetch_sources.py::test_a_listing_source_fetches_robots_then_one_page_and_archives_both`, `::test_a_review_page_source_stops_at_the_first_page_with_no_review`, `::test_a_non_fetchable_source_is_refused_before_any_request_whatever_robots_says` pin the same path on `httpx.MockTransport`; `tests/test_opinion_assurances_parser.py::test_well_formed_page_maps_to_reviews_and_one_snapshot` |
+| 4 | The DONE command's output on the developer's machine, pasted into the Delivered paragraph (counts per table, reviews per month for the new source, `idempotency-check OK`); `make scrape CONFIRM=yes` run twice, the second adding no raw review row and one snapshot row per profile (A2); functionality-tester reruns the DONE command on that cache and file; `tests/test_fetch_sources.py::test_a_listing_source_fetches_robots_then_one_page_and_archives_both`, `::test_a_review_page_source_stops_at_the_first_page_with_no_review`, `::test_a_non_fetchable_source_is_refused_before_any_request_whatever_robots_says` pin the same path on `httpx.MockTransport`; `tests/test_opinion_assurances_parser.py::test_well_formed_page_maps_to_reviews_and_one_snapshot` |
 | 5 | `tests/test_makefile.py::test_rebuild_variables_are_a_closed_set`, `::test_idempotency_check_variables_are_a_closed_set` (re-pinned to `ROWS` and the four names); `tests/test_cli.py::test_each_input_builds_its_own_database` (re-pinned); `tests/test_ingest_rebuild.py::test_samples_load_every_frozen_sample_through_its_parser` (pins per sample); `tests/test_fixtures_frozen.py::test_manifests_match` (extended to `fixtures/listings/` and `fixtures/opinion-assurances/`); `tests/test_listing_parser.py::test_sample_is_obviously_fake_and_nameless`, `tests/test_opinion_assurances_parser.py::test_sample_is_obviously_fake_and_nameless`; `tests/test_robots.py::test_the_frozen_app_store_robots_file_disallows_the_sample_feed`; `.github/workflows/ci.yml` runs `ROWS=samples` in place of `FIXTURE=app-store` |
 | 6 | `tests/test_robots.py::test_a_pathological_pattern_matches_in_linear_time`, `::test_pattern_matching_and_precedence` (the table, unchanged); `tests/test_listing_parser.py::test_only_the_aggregate_rating_is_read`, `::test_two_aggregate_ratings_refuse_the_page`, `::test_no_aggregate_rating_refuses_the_page`; `tests/test_opinion_assurances_parser.py::test_author_scope_is_never_read`, `::test_missing_required_field_refuses_the_page`, `::test_refusal_names_page_item_and_field`; `tests/test_snapshots.py::test_manual_file_columns_are_exactly_the_declared_eight`; `tests/test_app_store_parser.py::test_author_fields_are_never_read` (unchanged); security-reviewer confirms no name or address in `data/snapshots/manual_snapshots.csv` and no review text in any tracked file |
 
@@ -258,11 +261,11 @@ make rebuild && make idempotency-check ROWS=captured
 | Invariant ("for all …, … holds") | Falsified by (scenario test) |
 |---|---|
 | 1. For all snapshot rows, the four provenance columns are non-empty, `origin`, `profile`, `segment` and `channel` are values from their closed sets, and the row reads back `Documented` iff `origin = anchor` and `Measured` otherwise; a re-seed, a re-entry or a second rebuild changes no count. | `tests/test_snapshots.py::test_anchors_seed_nine_documented_rows_with_provenance`, `::test_manual_and_fetched_rows_read_back_as_measured`, `::test_reseeding_reentering_and_rebuilding_add_no_snapshot_row` — anchors, a manual row and a capture each loaded twice: nine plus one plus one, both times |
-| 2. For all rebuild inputs but `none`, the anchors seed the same nine rows and the four marts are byte-identical across two rebuilds under different wall-clock times; a Pending row's mart does not exist. | `tests/test_marts.py::test_marts_are_byte_stable_across_rebuilds` (clock patched to two instants), `::test_rating_trend_matches_pins` and siblings; `make check-backing` (orphans) |
+| 2. For all rebuild inputs but `none`, the anchors seed the same nine rows and the four marts are byte-identical across two rebuilds under different wall-clock times; a Pending row's mart does not exist. | `tests/test_marts.py::test_marts_are_byte_stable_across_rebuilds` (every clock the data path imports made to raise; every column compared, `run_id` included), `::test_rating_trend_matches_pins` and siblings; `make check-backing` (orphans) |
 | 3. For all declared sources, the parser, cache directory, host, page addresses, attribution and terms position are read from the declaration; a source declared not fetchable is never requested whatever its robots file says — a plain run skips it with one line, naming it refuses; no module outside `ingest/sources.py` and the parsers' own constants compares a platform or source name; a capture's meta is accepted iff its `source_url` host is the declaring source's host. | `tests/test_ingest_layout.py::test_no_module_branches_on_a_platform_name`, `::test_the_cache_root_is_bound_once`; `tests/test_fetch_sources.py::test_a_non_fetchable_source_is_refused_before_any_request_whatever_robots_says` — a permissive robots body and a non-fetchable source: only no request at all; `tests/test_ingest_rebuild.py::test_meta_is_validated_against_the_sources_declared_host` — a meta on another allowed host refuses; the allowlist shrunk in a test does not unload a declared source's capture |
 | 4. For all captured review rows, `(source, source_url)` joins exactly one `source_pages` row, and for all files under `sql/`, no `like`, `similar to` or regex function appears: attribution is exact-value or Python-written, never a pattern in SQL. | `tests/test_ingest_rebuild.py::test_every_captured_review_joins_exactly_one_declared_page` — a capture under a declared source joins; a page address outside the declaration is an unattributed row and the test fails; `tests/test_sql_portable.py::test_pattern_matching_is_refused_in_sql` |
 | 5. For all requests the fetcher makes to any host, the host's robots file was read first and allowed the path under both our group and `*`, the identifying User-Agent is set, the previous request to that host was ≥ 2 s earlier (more if asked), and there is no retry, proxy or rotation; matching a pattern takes time linear in its length times the path's. | `tests/test_app_store_fetch.py` (unchanged, now over a source parameter), `tests/test_fetch_sources.py::test_a_listing_source_fetches_robots_then_one_page_and_archives_both`, `::test_two_sources_on_two_hosts_keep_two_clocks`; `tests/test_robots.py::test_a_pathological_pattern_matches_in_linear_time` — thirty `*` against a 300-character non-matching path under 50 ms |
-| 6. For all parsers and hand-entered files, no author, pseudonym, name or brand-carrying address is read or stored: the listing parser accepts exactly one `AggregateRating` per page and reads nothing else from the block; the Opinion Assurances parser reads each `review` scope's rating, date, body and identifier and never its `author` scope, and refuses the whole page on a review outside the declared shape, naming page, item and field; the manual file has exactly the eight declared columns, none an address or free text; every frozen sample is fake, nameless and hashes to its MANIFEST. | `tests/test_listing_parser.py::test_only_the_aggregate_rating_is_read`, `::test_two_aggregate_ratings_refuse_the_page`, `::test_no_aggregate_rating_refuses_the_page`, `::test_refusal_names_page_and_field`; `tests/test_opinion_assurances_parser.py::test_author_scope_is_never_read`, `::test_missing_required_field_refuses_the_page`, `::test_refusal_names_page_item_and_field`; `tests/test_snapshots.py::test_manual_file_columns_are_exactly_the_declared_eight`; `tests/test_fixtures_frozen.py::test_manifests_match` |
+| 6. For all parsers and hand-entered files, no author, pseudonym, name or brand-carrying address is read or stored: the listing parser accepts exactly one `AggregateRating` per page and reads nothing else from the block; the Opinion Assurances parser reads each `review` scope's rating, date and body, derives its identifier from that content and never from its `author` scope, and refuses the whole page on a review outside the declared shape, naming page, item and field; the manual file has exactly the eight declared columns, none an address or free text; every frozen sample is fake, nameless and hashes to its MANIFEST. | `tests/test_listing_parser.py::test_only_the_aggregate_rating_is_read`, `::test_two_aggregate_ratings_refuse_the_page`, `::test_no_aggregate_rating_refuses_the_page`, `::test_refusal_names_page_and_field`; `tests/test_opinion_assurances_parser.py::test_author_scope_is_never_read`, `::test_missing_required_field_refuses_the_page`, `::test_refusal_names_page_item_and_field`; `tests/test_snapshots.py::test_manual_file_columns_are_exactly_the_declared_eight`; `tests/test_fixtures_frozen.py::test_manifests_match` |
 | 7. For all `ROWS` values, the set is closed and each input builds its own database file; under `samples`, every declared parser's frozen sample loads through that parser and matches its pins. | `tests/test_makefile.py::test_rebuild_variables_are_a_closed_set`, `tests/test_cli.py::test_each_input_builds_its_own_database`, `tests/test_ingest_rebuild.py::test_samples_load_every_frozen_sample_through_its_parser` — a parser with no sample directory is a test failure, not a skip |
 
 ## Pinned decisions (do not re-litigate)
@@ -415,11 +418,14 @@ make rebuild && make idempotency-check ROWS=captured
   than layout, are read off the redacted structure dump in the first hour
   and written into `ingest/opinion_assurances.py`'s header — the spec
   declares the fields, the build declares their addresses in the page;
-  **no stable identifier in the markup is a STOP-and-decide** (a content
-  hash as `external_id` would make an edited review a new review). Peers on
-  that platform may be declared the same way at the developer's choice within
-  the letter's scope (a traditional or digital-challenger segment, capped by
-  `MAX_PAGES`); each is a declaration, not a branch.
+  **no stable identifier in the markup was a STOP-and-decide**, decided at
+  build (A2): the page marks none, `external_id` is the content hash of
+  (publication date, experience date, rating, body), an edited review is a
+  new review, and the BACKLOG row carries the trigger for keying on the dates
+  and rating instead. Peers on that platform may be declared the same way at
+  the developer's choice within the letter's scope (a traditional or
+  digital-challenger segment, capped by `MAX_PAGES`); each is a declaration,
+  not a branch.
   The hand-entry path: `data/snapshots/manual_snapshots.csv`, tracked (the
   subtree `.gitignore` already reserves for public aggregates), hand-edited,
   exactly eight columns: `source` (a declared source name whose `fetchable`
