@@ -35,7 +35,7 @@ def _page(n: int = 1) -> dict:
 
 
 def _parse(doc: dict) -> list[dict]:
-    return parse_page(json.dumps(doc), PAGE_URL, CAPTURED)
+    return parse_page(json.dumps(doc), PAGE_URL, CAPTURED, SOURCE)
 
 
 def _mutated(mutate) -> dict:
@@ -160,9 +160,9 @@ def test_refusal_names_page_item_and_field():
 
 def test_non_json_and_missing_feed_are_refused():
     with pytest.raises(FeedShapeError, match="is not JSON"):
-        parse_page(b"<html>blocked</html>", PAGE_URL, CAPTURED)
+        parse_page(b"<html>blocked</html>", PAGE_URL, CAPTURED, SOURCE)
     with pytest.raises(FeedShapeError, match="'feed' is missing"):
-        parse_page(json.dumps({"rss": {}}), PAGE_URL, CAPTURED)
+        parse_page(json.dumps({"rss": {}}), PAGE_URL, CAPTURED, SOURCE)
     with pytest.raises(FeedShapeError, match="'entry' is dict, not a list"):
         doc = _page(1)
         doc["feed"]["entry"] = doc["feed"]["entry"][0]

@@ -90,9 +90,11 @@ def _review_date(label: str, page_url: str, item_id: str) -> str:
 
 
 def parse_item(
-    item: object, page_url: str, captured_at: str, platform: str = SOURCE
+    item: object, page_url: str, captured_at: str, platform: str
 ) -> dict[str, object]:
-    """One feed item -> one raw-shape row, or a refusal."""
+    """One feed item -> one raw-shape row, or a refusal. `platform` is the
+    declaration's, passed by the caller every time: a provenance column never
+    comes from a default (round 2, code-reviewer #9)."""
     item_id = _label(item, "id", page_url, None)
     if not _DIGITS.match(item_id):
         raise _refuse(page_url, item_id, "id", "is not a digit string")
@@ -113,7 +115,7 @@ def parse_item(
 
 
 def parse_page(
-    body: bytes | str, page_url: str, captured_at: str, platform: str = SOURCE
+    body: bytes | str, page_url: str, captured_at: str, platform: str
 ) -> list[dict[str, object]]:
     """A feed page -> raw-shape rows. Refuses the whole page on the first item
     that is not the declared shape; an absent `entry` is the end of the feed."""
