@@ -53,6 +53,44 @@ Documented and brief §6 is reworded; **D4** `FIXTURE` becomes `ROWS`. Dropped:
 D5 (peer review profiles — no review source) and D6 (the page ceiling stays at
 10 — no multi-page source is fetched).
 
+**Proposed after review round 1 (2026-09-02) — A2: one snapshot row per
+declaration and day, no tiebreak; the stat row one row per stat; two sentences
+corrected.** *Status: PROPOSED, awaiting approval; nothing in it is built.*
+Restores invariant 1 (a snapshot row is one point, keyed on what produced it,
+and a rebuild changes no count by chance) and invariant 2 (a mart is the data,
+never a hash order). (a) *The key names its declaration* (round 1, findings 1
+and 2): `raw_platform_snapshots`' natural key becomes `(source, profile,
+origin, source_url, captured_at)` — `source_url` is the platform root for an
+anchor, the declared listing address for a hand-read row and the page address
+for a capture — so a hand-read figure can never be swallowed by an anchor with
+the same numbers, and two declared sources sharing a platform and profile
+cannot collide on a day; a declaration test pins that no two sources share
+`(platform, listing)`. (b) *A same-key pair is refused, not tiebroken*
+(finding 1): the loader refuses, with one line naming file, line and fix, a
+row whose key already sits in raw under another content hash — that arises
+only from a corrected hand entry or a re-frozen seed, and the fix is `make
+reset CONFIRM=yes` then `make rebuild`, since the corpus is rebuilt from
+tracked inputs; `stg_platform_snapshots` and the four marts drop `content_hash
+desc` from every `order by`, and a test asserts the key is unique in raw. (c)
+*The stat row is one row per stat* (finding 21): `platform_stats`' grain
+becomes `(segment, source, profile, stat)`, `stat` from the closed set
+`{review_count, one_star_share, response_rate, response_delay_days}`, `value`
+the latest non-null reading of that stat with the tag, address and day of the
+row it came from — a fetch that reads one figure never blanks the other two;
+the pins and B1.4's panel text follow. (d) *Two sentences say what is true*
+(findings 12 and 14): Done-when 4 and pinned decision 4 read "a second `make
+scrape` of unchanged pages adds no raw review row; each capture adds one
+snapshot row per profile, since `captured_at` is in its key — that row is the
+point on the trend"; pinned decision 4's STOP-and-decide is recorded as
+decided — the page marks no identifier, `external_id` is the content hash of
+(publication date, experience date, rating, body), an edited review is a new
+review, the BACKLOG row carries the trigger; invariant 6 gains "and derives
+each review's identifier from its content, never from its author". Not taken:
+a load-sequence column so the later entry wins (a second order on the data
+path, and raw would carry a number no page produced); keeping
+`platform_stats`' grain and taking each column from its own latest row (three
+provenances in one row).
+
 ## Why
 
 Phase 2 built the collector and proved it on a frozen sample, but the one
