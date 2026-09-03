@@ -290,6 +290,48 @@ def test_a_nested_review_scope_refuses_the_page():
         parse(html, PAGE_URL, CAPTURED, SRC)
 
 
+AGGREGATE_OPEN = (
+    '<div class="oa_scoring d-flex flex-column" itemprop="aggregateRating" '
+    'itemscope itemtype="http://schema.org/AggregateRating">'
+)
+INNER_AGGREGATE = (
+    '<div itemscope itemtype="http://schema.org/AggregateRating" '
+    'itemprop="aggregateRating">'
+    '<meta itemprop="ratingCount" content="99999">'
+    '<meta itemprop="ratingValue" content="1"></div>'
+)
+
+
+def test_an_aggregate_nested_in_a_review_refuses_the_page():
+    """A page whose only aggregate sits inside one review's markup used to
+    yield that review's numbers as the profile-wide snapshot; it is outside
+    the declared shape and refuses (round 2, functionality-tester F1)."""
+    html = _page(1)
+    assert html.count(AGGREGATE_OPEN) == 1
+    head, tail = html.split(AGGREGATE_OPEN, 1)
+    block_end = tail.index("</div>") + len("</div>")
+    without = head + tail[block_end:]  # the page-level aggregate removed
+    with pytest.raises(PageShapeError, match="'aggregateRating' is missing"):
+        parse(without, PAGE_URL, CAPTURED, SRC)
+    nested = without.replace(
+        '<div class="oa_description">',
+        INNER_AGGREGATE + '<div class="oa_description">',
+        1,
+    )
+    with pytest.raises(
+        PageShapeError, match=r"'aggregateRating' 1 aggregate scope\(s\) nested"
+    ):
+        parse(nested, PAGE_URL, CAPTURED, SRC)
+
+
+def test_an_aggregate_nested_in_the_aggregate_refuses_the_page():
+    """An aggregate inside the aggregate used to merge its values into the
+    outer one without a word; it refuses too (round 2, code-reviewer #8)."""
+    html = _page(1).replace(AGGREGATE_OPEN, AGGREGATE_OPEN + INNER_AGGREGATE, 1)
+    with pytest.raises(PageShapeError, match=r"1 aggregate scope\(s\) nested"):
+        parse(html, PAGE_URL, CAPTURED, SRC)
+
+
 @pytest.mark.parametrize(
     "markup",
     [

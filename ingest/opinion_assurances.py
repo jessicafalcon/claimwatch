@@ -95,6 +95,7 @@ class _Walker(HTMLParser):
         self.aggregates: list[dict[str, str | None]] = []
         self.aggregate_duplicates: list[str] = []
         self.nested_reviews = 0  # a review scope inside a review scope
+        self.nested_aggregates = 0  # an aggregate inside a review or the aggregate
 
     @property
     def current(self) -> _Review | None:
@@ -135,7 +136,15 @@ class _Walker(HTMLParser):
             self.review_depth = depth
             self.reviews.append(_Review())
             return
-        if scope and _AGGREGATE_TYPE.match(itemtype) and self.aggregate_depth is None:
+        if scope and _AGGREGATE_TYPE.match(itemtype):
+            # The profile's aggregate stands on its own: one inside a review
+            # would be that review's numbers, one inside the aggregate would
+            # merge its values into it. Both are outside the shape and refuse,
+            # never dropped or merged (round 2, code-reviewer #8,
+            # functionality-tester F1; the class of round 1's finding 7).
+            if self.aggregate_depth is not None or self.review_depth is not None:
+                self.nested_aggregates += 1
+                return
             self.aggregate_depth = depth
             self.aggregates.append({})
             return
@@ -299,6 +308,23 @@ def parse(body: bytes | str, page_url: str, captured_at: str, source: Source) ->
     w = _Walker()
     w.feed(text)
     w.close()
+    # Structure first: a scope inside a scope names the cause; the counts
+    # and duplicates it would produce are its symptoms.
+    if w.nested_reviews:
+        raise refuse(
+            page_url,
+            None,
+            "review",
+            f"{w.nested_reviews} review scope(s) nested in a review",
+        )
+    if w.nested_aggregates:
+        raise refuse(
+            page_url,
+            None,
+            "aggregateRating",
+            f"{w.nested_aggregates} aggregate scope(s) nested in a review or in "
+            "the aggregate",
+        )
     if len(w.aggregates) > 1:
         raise refuse(
             page_url,
@@ -313,13 +339,6 @@ def parse(body: bytes | str, page_url: str, captured_at: str, source: Source) ->
     if w.aggregate_duplicates:
         raise refuse(
             page_url, None, w.aggregate_duplicates[0], "appears twice in the aggregate"
-        )
-    if w.nested_reviews:
-        raise refuse(
-            page_url,
-            None,
-            "review",
-            f"{w.nested_reviews} review scope(s) nested in a review",
         )
     if not w.reviews:
         return Parsed()  # the end of the list
