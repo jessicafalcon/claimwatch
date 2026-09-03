@@ -13,7 +13,7 @@ file:line):
   spec's DONE command and paste its real result. The DONE command is the only
   definition of done; "tests pass" alone does not substitute. Exception: if
   the DONE command fetches from a live platform, calls the paid model API,
-  touches Snowflake, or prompts for `CONFIRM`, report that it needs explicit
+  touches Snowflake, or needs the `confirm` goal, report that it needs explicit
   user go-ahead instead of running it.
 - **(c) Deterministic first** — name any decision this commit adds that a
   model makes outside `classify/llm.py`; any `now()` / `current_date` /

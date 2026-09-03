@@ -308,7 +308,7 @@ def test_a_nested_review_scope_refuses_the_page():
     )
     html = 'itemtype="https://schema.org/review"'.join(scopes)
     with pytest.raises(
-        PageShapeError, match="field 'review' 1 review scope\(s\) nested"
+        PageShapeError, match=r"field 'review' 1 review scope\(s\) nested"
     ):
         parse(html, PAGE_URL, CAPTURED, SRC)
 

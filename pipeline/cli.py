@@ -76,16 +76,18 @@ def _do_confirm(args: argparse.Namespace) -> int:
     """`make confirm`: stamp this invocation's make process id for the `reset`
     or `scrape` goal that follows it in the same command. The goal after
     `confirm` must be one of `GATED`, so `make confirm help` and a trailing
-    `confirm` refuse and leave no stamp — no armed stamp outlives its
-    invocation; the goal list is trusted only when its origin is make's own
+    `confirm` refuse and leave no stamp — no ordinary command leaves an armed
+    stamp behind; the goal list is trusted only when its origin is make's own
     (`$(origin MAKECMDGOALS)` is `default`): a list from the environment,
     `MAKEFLAGS` or the command line is refused (A9 (a)). The stamp is created
     exclusively with owner-only permissions, so a file already there —
     planted, or left by a killed run — makes this recipe refuse naming it
     rather than overwrite it (A8 (d)); a create that fails for any other
-    reason refuses with one line too. What the gate does not hold against is
-    a same-user process able to write `data/` while make runs; the Threat
-    model says so."""
+    reason refuses with one line too. What the gate does not hold against —
+    an environment that chooses what make reads or runs (`MAKEFILES`, `PATH`),
+    a parallel run (`make -j` may start `reset` before this stamps), a
+    same-user process writing `data/` while make runs — the Threat model
+    states."""
     if not args.make_pid.isdigit():
         raise Refused("refusing: --make-pid is not a process id")
     if args.goals_origin != "default":

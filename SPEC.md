@@ -98,7 +98,9 @@ traction, and coverage-and-price frustration (PROJECT_BRIEF.md §5).
   insurer is read in isolation. Tag: *Documented* for the anchors, *Measured*
   for our own points (see *How to read a panel*). *Placed points, stated
   beside the chart:* where the brief gives a range, the point is its midpoint,
-  not a reading, and a count the brief does not give is left blank.
+  not a reading, and a count the brief does not give is left blank. A profile
+  rated on two platforms is two points, each labelled by its platform, never
+  one averaged point.
 - **B2.4 — Classifier quality.** How often each theme label is right and how many
   true cases it catches, measured against the hand labels and shown next to the
   charts it feeds. Tag: *Measured* (Pending until the eval gate writes its mart).

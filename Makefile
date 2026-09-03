@@ -19,15 +19,18 @@
 # `make confirm reset`. The `confirm` recipe stamps its make process's id
 # (`$$PPID`, the recipe shell's parent); `reset`/`scrape` pass their own and
 # Python confirms only when the two are one process, consuming the stamp
-# (spec Phase 3a, A4 (d); pinned by tests/test_makefile.py). What that holds
-# against is a variable, an environment, MAKEFLAGS and a stale invocation —
-# not a same-user process writing data/ while make runs, which could plant
-# the stamp: the stamp is created exclusively, so a planted file makes
-# `confirm` itself refuse (A8 (d)); `confirm` arms only when the goal after
-# it is `reset` or `scrape`, and only from a goal list whose origin is make's
-# own (`$(origin MAKECMDGOALS)` is `default` — a definition from the
-# environment, MAKEFLAGS or the command line is refused), so no armed stamp
-# outlives its invocation (A9 (a)).
+# (spec Phase 3a, A4 (d); pinned by tests/test_makefile.py). The stamp is
+# created exclusively, so a planted file makes `confirm` itself refuse
+# (A8 (d)); `confirm` arms only when the goal after it is `reset` or
+# `scrape`, and only from a goal list whose origin is make's own
+# (`$(origin MAKECMDGOALS)` is `default` — a definition from the environment,
+# MAKEFLAGS or the command line is refused), so no ordinary command leaves an
+# armed stamp behind (A9 (a)). What the gate holds against is a variable
+# definition, an environment value, MAKEFLAGS, a stale invocation and a typo;
+# not an environment that chooses what make reads or runs (MAKEFILES, PATH),
+# not a parallel run (`make -j` may start reset before confirm has stamped),
+# not a same-user process writing data/ while make runs — the spec's Threat
+# model states the three.
 unexport SPEC BASE TARGET ROWS SOURCE
 _Q = '$(subst ','\'',$(1))'
 

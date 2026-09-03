@@ -50,6 +50,7 @@ and `fixtures/anchors/` are frozen at first write and read-only thereafter.
 
 ```
 make rebuild FIXTURE=synthetic && make idempotency-check
+# as run then; FIXTURE became ROWS in Phase 3a: make rebuild ROWS=synthetic && make idempotency-check
 ```
 
 - `make rebuild FIXTURE=synthetic` — builds the DuckDB warehouse from raw:

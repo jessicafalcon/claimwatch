@@ -199,9 +199,10 @@ PROBE = (
 
 
 def _probe(goals: list[str], env: dict[str, str]) -> int:
-    """Run the real Makefile plus a `probe` goal that asks `confirmed` with
-    its own make process id: 0 when the invocation was confirmed, otherwise
-    make's 2 (the recipe exits 3 and make reports a failed goal as 2)."""
+    """Run the real Makefile plus a `reset` goal redefined as a probe that
+    asks `confirmed` with its own make process id: 0 when the invocation was
+    confirmed, otherwise make's 2 (the recipe exits 3 and make reports a
+    failed goal as 2)."""
     res = subprocess.run(
         ["make", "-s", "-f", "-", *goals],
         cwd=ROOT,

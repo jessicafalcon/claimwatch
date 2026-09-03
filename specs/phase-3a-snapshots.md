@@ -5,7 +5,7 @@ Phase 3 (scraper fleet + snapshots), split by `docs/PLAN.md` §5 into 3a (this
 phase: `platform_snapshots` seeded from the §6 anchors, the polite sources) and
 3b (Trustpilot, its own session). Depends on `phase-2-scraper` merged (PR #4).
 
-**Status: APPROVED 2026-09-02 — in progress.** No new dependencies: the two
+**Status: APPROVED 2026-09-02 — DELIVERED 2026-09-03, the PR pending the developer's push.** No new dependencies: the two
 parsers here are stdlib `json` over a page's machine-readable block and stdlib
 `html.parser` over a page's schema.org microdata; `pyyaml` stays pre-approved
 and unused; anything else is a STOP-and-ask. No pandas on any pipeline path.
@@ -401,9 +401,9 @@ declared-page writer writes a batch or nothing; the `sample` label is the
 sample declaration's row's.** *Status: APPROVED 2026-09-03 on the developer's
 word ("lets follow your recommendation"); built in the commits that follow,
 then one exit pass in place of a sixth round.* Restores the Threat model's
-`confirm` row as stated (no armed stamp outlives its invocation; the
-environment supplies no goal), invariant 1's atomicity for the third raw
-writer as A8 (b) gave it to the second, and invariant 1's "the literal
+`confirm` row as stated (no ordinary command leaves an armed stamp behind; a
+variable definition supplies no goal), invariant 1's atomicity for the third
+raw writer as A8 (b) gave it to the second, and invariant 1's "the literal
 `sample` on a row a sample declaration wrote" as a property of the row rather
 than of the input. (a) *The gate's goal is a member of a closed set, and the
 list it is read from is make's own* (round 5, findings 1, 2, 3, 4, 5):
@@ -550,65 +550,62 @@ make rebuild && make idempotency-check ROWS=captured
 ## Done-when
 
 1. **`platform_snapshots` lands, seeded from the anchors and marked as such.**
-   `raw_platform_snapshots` (append-only, natural key `(source, profile,
-   origin, source_url, captured_at)` + content hash of the measures, A2) and
-   `stg_platform_snapshots` exist; the nine anchor rows load from the
-   re-frozen `fixtures/anchors/` with `origin = anchor` and read back as
-   `Documented`; a hand-entered row (`origin = manual`) and a captured row
-   (`origin = fetch`) read back as `Measured`; every row carries `source`,
-   `source_url`, `captured_at`, `run_id`, `profile`, `segment`, `channel`; a
-   re-seed, a re-entry and a second rebuild add no row. *Evidence: row 1.*
-2. **Four marts land and four BACKING rows flip Pending → Documented.**
-   `sql/marts/rating_trend.sql` (B1.2), `channel_gap.sql` (B1.3),
-   `platform_stats.sql` (B1.4), `peer_ratings.sql` (B2.3) build from
-   `stg_platform_snapshots`, each row carrying its point's tag; BACKING flips
-   those rows with sources of the declared shape; SPEC.md's four panels say
-   what they now show; `make check-backing` prints 19 rows, 4 marts, 0
-   orphans. *Evidence: row 2.*
-3. **Every source declares its parser, cache root, host, profile, segment,
-   channel and terms position; nothing branches on a name.**
-   `ingest/sources.py` holds the closed tuple — the Phase 2 feed source, the
-   Google Play listing (fetchable), the Opinion Assurances profiles
-   (fetchable under the written authorization, A1), the App Store listing
-   (declared, not fetchable, its terms clause as the reason, hand-entered
-   snapshots only); `pipeline/build.py` loads every
-   fetchable source's captures through the declared parser and fills a
-   hand-entered row's platform, address, segment and channel from the
-   declaration; the cache root is bound once; a capture's meta is validated
-   against its source's declared host; a review row's segment comes from
-   `source_pages` (one row per declared page address, written in Python at
-   rebuild) joined on exact `source_url`; the SQL lint refuses `like`,
-   `similar to` and `regexp` alike. *Evidence: row 3.*
-4. **The first real rows: reviews from Opinion Assurances, snapshots from
-   two fetches and one hand entry (A1).** After the developer's `make confirm
-   scrape` and the entry in `data/snapshots/manual_snapshots.csv`, the
-   DONE command prints `raw_reviews` > 0 from the Opinion Assurances profile
-   through the unchanged `load_reviews` guard, `raw_platform_snapshots` = 9 +
-   the entered row + one snapshot per fetched profile and listing, the four
-   marts populated, reviews per month for the new source, and every count
-   unchanged on the second rebuild; a second `make scrape` of unchanged pages
-   adds no raw review row and one snapshot row per profile, since
-   `captured_at` is in its key — that row is the point on the trend (A2). The
-   run is also the first live check of the rebuilt robots gate on hosts that
-   allow us. *Evidence: row 4.*
-5. **The rebuild input is named by what it is, and every frozen sample runs
-   offline.** `ROWS` is the closed set `{captured, none, synthetic, samples}`
-   (`captured` the default for `rebuild`, `synthetic` for
-   `idempotency-check`); `samples` reads every frozen sample under
-   `fixtures/<parser>/` through its real parser, in CI; the new samples
-   `fixtures/listings/` and `fixtures/opinion-assurances/` (A1) are
-   hand-written, fake and nameless with a MANIFEST;
-   `fixtures/app-store/robots.txt` is re-frozen to the real rule and a test
-   reads it through `ingest/robots.py`. *Evidence: row 5.*
-6. **The matcher is linear, and no parser or file reads a name.** A robots
-   pattern with thirty wildcards against a long non-matching path answers in
-   milliseconds and the matching table stands; the listing parser reads the
-   page's `AggregateRating` and nothing else (no `author`, `name`, `url` or
-   review item); the Opinion Assurances parser never reads the `author`
-   scope or any `Person` (A1); the manual file carries no address and no name (a source
-   name, a date, five numbers and the word `page`); the health-details BACKLOG row is
-   re-deferred with a trigger that names what it is about — review text in a
-   tracked file — which this phase does not reach. *Evidence: row 6.*
+`raw_platform_snapshots` (append-only, natural key `(source, profile, origin,
+source_url, captured_at)` + content hash of the measures, A2) and
+`stg_platform_snapshots` exist; the nine anchor rows load from the re-frozen
+`fixtures/anchors/` with `origin = anchor` and read back as `Documented`; a
+hand-entered row (`origin = manual`) and a captured row (`origin = fetch`)
+read back as `Measured`; every row carries `source`, `source_url`,
+`captured_at`, `run_id`, `profile`, `segment`, `channel`; a re-seed, a
+re-entry and a second rebuild add no row. *Evidence: row 1.* 2. **Four marts
+land and four BACKING rows flip Pending → Documented.**
+`sql/marts/rating_trend.sql` (B1.2), `channel_gap.sql` (B1.3),
+`platform_stats.sql` (B1.4), `peer_ratings.sql` (B2.3) build from
+`stg_platform_snapshots`, each row carrying its point's tag; BACKING flips
+those rows with sources of the declared shape; SPEC.md's four panels say what
+they now show; `make check-backing` prints 19 rows, 4 marts, 0 orphans.
+*Evidence: row 2.* 3. **Every source declares its parser, cache root, host,
+profile, segment, channel and terms position; nothing branches on a name.**
+`ingest/sources.py` holds the closed tuple — the Phase 2 feed source, the
+Google Play listing (fetchable), the Opinion Assurances profiles (fetchable
+under the written authorization, A1), the App Store listing (declared, not
+fetchable, its terms clause as the reason, hand-entered snapshots only);
+`pipeline/build.py` loads every source's captures through the declared parser
+— every source with a parser, fetchable or not, so a source whose terms turn
+to no keeps the pages it archived while permitted and fills a hand-entered
+row's platform, address, segment and channel from the declaration; the cache
+root is bound once; a capture's meta is validated against its source's
+declared host; a review row's segment comes from `source_pages` (one row per
+declared page address, written in Python at rebuild) joined on exact
+`source_url`; the SQL lint refuses `like`, `similar to` and `regexp` alike.
+*Evidence: row 3.* 4. **The first real rows: reviews from Opinion Assurances,
+snapshots from two fetches and one hand entry (A1).** After the developer's
+`make confirm scrape` and the entry in `data/snapshots/manual_snapshots.csv`,
+the DONE command prints `raw_reviews` > 0 from the Opinion Assurances profile
+through the unchanged `load_reviews` guard, `raw_platform_snapshots` = 9 + the
+entered row + one snapshot per fetched profile and listing, the four marts
+populated, reviews per month for the new source, and every count unchanged on
+the second rebuild; a second `make scrape` of unchanged pages adds no raw
+review row and one snapshot row per profile, since `captured_at` is in its key
+— that row is the point on the trend (A2). The run is also the first live
+check of the rebuilt robots gate on hosts that allow us. *Evidence: row 4.* 5.
+**The rebuild input is named by what it is, and every frozen sample runs
+offline.** `ROWS` is the closed set `{captured, none, synthetic, samples}`
+(`captured` the default for `rebuild`, `synthetic` for `idempotency-check`);
+`samples` reads every frozen sample under `fixtures/<parser>/` through its
+real parser, in CI; the new samples `fixtures/listings/` and
+`fixtures/opinion-assurances/` (A1) are hand-written, fake and nameless with a
+MANIFEST; `fixtures/app-store/robots.txt` is re-frozen to the real rule and a
+test reads it through `ingest/robots.py`. *Evidence: row 5.* 6. **The matcher
+is linear, and no parser or file reads a name.** A robots pattern with thirty
+wildcards against a long non-matching path answers in milliseconds and the
+matching table stands; the listing parser reads the page's `AggregateRating`
+and nothing else (no `author`, `name`, `url` or review item); the Opinion
+Assurances parser never reads the `author` scope or any `Person` (A1); the
+manual file carries no address and no name (a source name, a date, five
+numbers and the word `page`); the health-details BACKLOG row is re-deferred
+with a trigger that names what it is about — review text in a tracked file —
+which this phase does not reach. *Evidence: row 6.*
 
 (6 items. Each is a contract, not a narrative.)
 
@@ -964,7 +961,7 @@ Freeze: fixtures/opinion-assurances/
 
 ## Record updates (REQUIRED)
 
-- [ ] `DECISIONS.md` — Phase 3a entry: the snapshot shape, the anchors
+- [x] `DECISIONS.md` — Phase 3a entry: the snapshot shape, the anchors
       re-freeze (D2) and tag (D3); the four marts and the Documented flip; the
       source declaration and parser dispatch; under "Scrape politely", the
       position of each source as checked on 2026-09-02 (Google Play listing
@@ -980,7 +977,7 @@ Freeze: fixtures/opinion-assurances/
       alternatives; the Gotchas on `$(origin)` and `MAKEFLAGS`, on a structure
       dump naming the fields and not their nesting, and on `create table if
       not exists` keeping the old column
-- [ ] `BACKLOG.md` — five rows closed (struck + "DONE Phase 3a"): the wildcard
+- [x] `BACKLOG.md` — five rows closed (struck + "DONE Phase 3a"): the wildcard
       bound, the `DEFAULT_CACHE` / `ALLOWED_HOSTS` binding, the
       `FIXTURE=cache` naming, the hardwired capture path, the permissive
       frozen `robots.txt`; the health-details row re-deferred with the trigger
@@ -998,28 +995,31 @@ Freeze: fixtures/opinion-assurances/
       offline (Phase 10's demonstration); `make review-gate` without `SPEC=`
       is red on a phase branch and its two summary lines count different
       things (the next change to `scripts/review_gate.py`, or Phase 3b's first
-      gate run)
-- [ ] `CLAUDE.md` — Current status; Commands (`ROWS`; `scrape`'s hosts; the
+      gate run); and at the exit pass seven more, each with its trigger in
+      BACKLOG: the confirm gate's open edges, the make-level probes' stamp,
+      round 5's fix classes at their sites only, the §6 response figures,
+      Phase 4's tracked path, a fetched peer's profile, CLAUDE.md's growth
+- [x] `CLAUDE.md` — Current status; Commands (`ROWS`; `scrape`'s hosts; the
       manual file); Repo map (`ingest/captures.py`, `listing.py`, the four
       marts, `fixtures/listings/`, `data/snapshots/manual_snapshots.csv`,
       `sql/marts/` no longer empty); Workflow rules (the `confirm` goal
       replaces `CONFIRM=yes`); Git workflow (CI runs `ROWS=synthetic` and
       `ROWS=samples`); Commands (`confirm`; `rebuild`'s declaration check and
       one-file rule); BACKLOG count
-- [ ] `BACKING.md` — B1.2, B1.3, B1.4, B2.3 Pending → Documented with sources
+- [x] `BACKING.md` — B1.2, B1.3, B1.4, B2.3 Pending → Documented with sources
       of the declared shape
-- [ ] `SPEC.md` — the four panels' tag sentences and the header's "Today
+- [x] `SPEC.md` — the four panels' tag sentences and the header's "Today
       every row is Pending" (a tag change, not a chart change — flagged here,
       approved with the spec)
-- [ ] `PROJECT_BRIEF.md` — §6: anchors "appear in the study with Documented
+- [x] `PROJECT_BRIEF.md` — §6: anchors "appear in the study with Documented
       tags, marked as seeded" (D3); §9 Phase 3 unchanged in meaning
-- [ ] `docs/PLAN.md` — §5 row 3a: the DONE command and the sources as built
-- [ ] `specs/TEMPLATE.md` — Threat model: goal gating (`make confirm
+- [x] `docs/PLAN.md` — §5 row 3a: the DONE command and the sources as built
+- [x] `specs/TEMPLATE.md` — Threat model: goal gating (`make confirm
       <target>`) replaces `$(origin)` gating as the settled shape (A4 (d))
-- [ ] `.claude/agents/security-reviewer.md` — the destructive-target
+- [x] `.claude/agents/security-reviewer.md` — the destructive-target
       checklist item names the `confirm` goal (A4 (d))
-- [ ] README — none (Phase 9)
-- [ ] `specs/phase-3a-snapshots.md` — this spec; the "Delivered" paragraph at
+- [x] README — none (Phase 9)
+- [x] `specs/phase-3a-snapshots.md` — this spec; the "Delivered" paragraph at
       exit
 
 ## Threat model (REQUIRED when the phase adds a `make` target that takes a variable, deletes anything, calls a paid API, or touches the network)
@@ -1064,7 +1064,7 @@ holds no address, no name, no free text (`read_from` is the word `page`).
 | Target | empty | `../x` | `"; ` | env-exported | `$(origin)` | Pinned by |
 |---|---|---|---|---|---|---|
 | `scrape` | `SOURCE` empty → every declared source (non-fetchable ones report one line each; each fetchable one fetches — two today, on two hosts, at most 60 pages each); no `confirm` goal before it → prompt on a tty, refuse non-interactively, no request (residual as the `confirm` row states) | `SOURCE` refused — a declared name, never a path; the capture directory is derived from the declaration | one literal arg; not a declared name → refused | `unexport`ed; validated in Python; `CONFIRM=yes` from the environment, or through `MAKEFLAGS`, reaches no recipe → refused, no request | n/a — the gate is the `confirm` goal of the same invocation (A4 (d)), not a variable's origin | `tests/test_makefile.py::test_scrape_passes_source_unexpanded_and_its_make_pid`, `::test_confirm_is_a_goal_of_the_same_invocation`, `::test_scrape_source_is_a_closed_set`, `::test_scrape_variables_reach_python_as_one_literal`; `tests/test_cli.py::test_cli_scrape_refuses_without_the_confirm_goal`, `::test_cli_scrape_skips_a_source_declared_not_fetchable_and_exits_0`, `::test_cli_scrape_exits_2_only_on_a_refusal_met_during_the_run`, `::test_cli_scrape_naming_a_source_declared_not_fetchable_is_a_refusal` (round 1: a plain run skips such a source with one line; naming it, or a refusal met during the run, is exit 2) |
-| `confirm` | takes no variable; stamps its make process's id under `data/` (created exclusively, owner-only) for the `reset` or `scrape` that follows in the same invocation; it arms only when the goal after it is `reset` or `scrape`, refusing otherwise with no stamp left (A9); a stamp already there makes it refuse naming the file (A8 (d)) | n/a | n/a | `MAKEFLAGS='CONFIRM=yes'`, `MAKEFLAGS='confirm'`: no goal arrives, nothing confirmed; `MAKECMDGOALS=…` from the environment, `MAKEFLAGS` or the command line: the list's origin is not make's own (`$(origin MAKECMDGOALS)` is not `default`), refused, no stamp (A9). Residual, stated: the gate holds against a variable, an environment, `MAKEFLAGS` and a stale invocation, not against a same-user process that writes `data/` while make runs (A8 (d)) | n/a | `tests/test_makefile.py::test_confirm_arms_a_gated_goal_or_nothing`, `::test_confirm_is_a_goal_of_the_same_invocation` (both against the installed make), `::test_reset_and_scrape_take_the_make_pid_not_a_confirm_variable`; `tests/test_cli.py::test_confirm_arms_only_a_gated_goal_from_makes_own_list` (A9); `tests/test_cli.py::test_confirm_stamps_one_invocation_and_reset_consumes_it` |
+| `confirm` | takes no variable; stamps its make process's id under `data/` (created exclusively, owner-only) for the `reset` or `scrape` that follows in the same invocation; it arms only when the goal after it is `reset` or `scrape`, refusing otherwise with no stamp left (A9); a stamp already there makes it refuse naming the file (A8 (d)) | n/a | n/a | `MAKEFLAGS='CONFIRM=yes'`, `MAKEFLAGS='confirm'`: no goal arrives, nothing confirmed; `MAKECMDGOALS=…` from the environment, `MAKEFLAGS` or the command line: the list's origin is not make's own (`$(origin MAKECMDGOALS)` is not `default`), refused, no stamp (A9). Residual, stated: The gate holds against a variable definition, an environment value, `MAKEFLAGS`, a stale invocation and a typo. It does not hold against an environment that chooses what make reads or runs (`MAKEFILES`, `PATH`), against a parallel run (`make -j` may start `reset` before `confirm` has stamped, so an armed stamp can outlive that invocation), or against a same-user process writing `data/` while make runs (A8 (d); the last two found by the exit pass, BACKLOG); a dangling symlink at the stamp path is never consumed and is removed by hand | n/a | `tests/test_makefile.py::test_confirm_arms_a_gated_goal_or_nothing`, `::test_confirm_is_a_goal_of_the_same_invocation` (both against the installed make), `::test_reset_and_scrape_take_the_make_pid_not_a_confirm_variable`; `tests/test_cli.py::test_confirm_arms_only_a_gated_goal_from_makes_own_list` (A9); `tests/test_cli.py::test_confirm_stamps_one_invocation_and_reset_consumes_it` |
 | `rebuild` | `ROWS` → `captured` (zero captures → the anchors and the manual file, with a one-line hint) | refused (closed set of four names) | one literal arg; refused | `unexport`ed; validated in Python | n/a | `tests/test_makefile.py::test_rebuild_variables_are_a_closed_set` (re-pinned to `ROWS`), `tests/test_cli.py::test_cli_refuses_bad_rows_with_exit_2` |
 | `idempotency-check` | `ROWS` → `synthetic` | refused | refused | `unexport`ed; validated in Python | n/a | `tests/test_makefile.py::test_idempotency_check_variables_are_a_closed_set` (re-pinned) |
 | `reset` | no `confirm` goal before it: prompt on a tty, refuse non-interactively, nothing deleted (residual as the `confirm` row states) | n/a (no path taken) | n/a | `CONFIRM=yes` from the environment or `MAKEFLAGS` reaches no recipe | n/a — `make confirm reset`, the goal of the same invocation (A4 (d)) | `tests/test_makefile.py::test_reset_and_scrape_take_the_make_pid_not_a_confirm_variable`, `::test_confirm_is_a_goal_of_the_same_invocation`; `tests/test_cli.py::test_confirm_stamps_one_invocation_and_reset_consumes_it`, `::test_reset_removes_only_the_db_and_wal` (the file set re-pinned to the `ROWS` names) |
@@ -1181,3 +1181,67 @@ host, a new parser of a page written by strangers, a tracked file under
 - The health-details rule for excerpts — BACKLOG row re-deferred; the tracked
   file this phase adds carries numbers only.
 - Classification, the cost model, the study — Phases 5–9.
+
+## Delivered (2026-09-03, pre-PR)
+
+As specified, under amendments A1–A9: the rating each platform shows is a
+table of its own. `platform_snapshots` (raw → staging) is keyed on `(source,
+profile, origin, source_url, captured_at)` with a fingerprint over the five
+figures and the attribution, seeded from the brief's §6 figures
+(`fixtures/anchors/`, nine rows, Documented) and extended by what we capture
+or read off a page (Measured): the hand-entry file
+`data/snapshots/manual_snapshots.csv` (one App Store reading) and every
+capture under `data/cache/`. The four Beat 1–2 marts (`rating_trend`,
+`channel_gap`, `platform_stats`, `peer_ratings`) build from it, and B1.2,
+B1.3, B1.4 and B2.3 flipped Pending → Documented (`check-backing`: 19 rows,
+4 marts, 0 orphans); a row stays Documented until measured points make the
+series. Every source is one declaration in `ingest/sources.py` — parser,
+host, page addresses, cache directory, profile / segment / channel, whether
+its site lets us fetch it — and every module dispatches on it;
+`raw_source_pages` joins each captured review to its declaration by exact
+address. Two parsers landed beside the feed's: `ingest/listing.py` (a store
+page's one `AggregateRating`, one snapshot row) and
+`ingest/opinion_assurances.py` (a profile page's schema.org microdata: review
+rows with a content-hash `external_id`, the author scope never read,
+half-step ratings and the aggregate each checked against the scale the page
+declares, one snapshot row). Terms positions as built: Google Play's listing
+fetched; Apple's listing hand-read under its site terms; Opinion Assurances
+fetched under the site's written authorization; the App Store feed declared
+and not fetched. `ROWS` names the rebuild input from a closed set, each
+input in its own file derived from the input; the robots matcher is linear;
+`make confirm <target>` gates `reset` and `scrape` as a goal of the same
+invocation. Fixtures frozen with `Freeze:` lines: the anchors (twice), the
+App Store robots file, `fixtures/listings/`, `fixtures/opinion-assurances/`
+(twice).
+
+**Real rows.** The first live run (2026-09-03) captured the Play listing and
+the profile's 14 pages; `make rebuild && make idempotency-check
+ROWS=captured` prints raw_reviews 534, raw_platform_snapshots 13 (9 anchors,
+1 hand entry, 3 fetched), raw_source_pages 25, stg_reviews 534,
+stg_platform_snapshots 13, channel_gap 7, peer_ratings 5, platform_stats 9,
+rating_trend 11, and `idempotency-check OK`, every count unchanged. A second
+scrape of unchanged pages adds no raw review row and one snapshot row per
+profile (`captured_at` is in the key). Phase 1's line stays raw 40 / staging
+39, now with 9 snapshots; CI runs `ROWS=synthetic` and `ROWS=samples`; `make
+review-gate SPEC=specs/phase-3a-snapshots.md` prints 7/7; 559 tests.
+
+**Reviews and the cap.** Five rounds and nine amendments: A1 (the profile's
+authorization), A2–A4 (the key, the attribution, the bounds, the `confirm`
+goal), A5–A6 (the live page's nesting and half-star ratings, found by the
+first live run), A7–A8 (a raw table compared with its whole declaration;
+batches; the aggregate's scale; the gate's claim narrowed; the file derived
+from the input), A9 (the gate arms a gated goal or nothing from make's own
+list; the page writer's transaction; the `sample` label as the row's).
+Rounds 4 and 5 each reported correctness findings on the previous round's
+fixes, so the review cap applied: A9 was built once and one exit pass — the
+coherence audit over the repo, code and security review scoped to A9 —
+replaced a sixth round. That pass found no blocker: its record corrections
+landed in this commit, and its mechanism findings are BACKLOG rows with
+triggers, chiefly the gate's two open edges, both now stated as residuals
+(`make -j` can start `reset` before `confirm` stamps; an environment that
+chooses what make reads or runs, `MAKEFILES` or `PATH`, is outside the
+gate). BACKLOG: five rows closed, fourteen opened, one re-deferred; 23 open.
+Not here: Trustpilot (3b), theme charts (5b–7), the weekly capture commit
+(4), the App Store listing's block (unverified, hand-read). Still needing
+the developer: the Opinion Assurances terms page address and where the
+authorization is kept (DECISIONS → Phase 3a).

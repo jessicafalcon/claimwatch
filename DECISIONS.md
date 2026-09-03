@@ -124,10 +124,13 @@ place and never deleted.
   ([Phase 3a](#phase-3a))
 - **A scraped page is parsed strictly to a declared shape; the page is the
   unit of refusal.** A feed item missing or mis-typing a required field, a
-  rating outside 1–5 or a non-ISO timestamp refuses the whole page, naming
-  page, item and field; nothing partial is loaded and nothing is defaulted.
-  Widening the shape is a tested change in `ingest/app_store.py`, never a
-  `.get(…, default)`. ([PLAN §2](docs/PLAN.md) Boundary row; [Phase 2](#phase-2))
+  rating outside the scale the shape declares, or a non-ISO timestamp refuses
+  the whole page, naming page, item and field; nothing partial is loaded and
+  nothing is defaulted. Widening a shape is a tested change in the parser that
+  declares it — `ingest/app_store.py`, and since Phase 3a `ingest/listing.py`
+  and `ingest/opinion_assurances.py` (the review half-steps and the
+  aggregate's 0..5, A6/A8) — never a `.get(…, default)`. ([PLAN
+  §2](docs/PLAN.md) Boundary row; [Phase 2](#phase-2))
 
 **Process**
 
@@ -417,10 +420,11 @@ scraper, no model.
   `theme_share_by_segment` (B2.5).
 - **The warehouse seam and idempotent raw** — promoted to "Decisions still in
   force" above (Warehouse).
-- **`run_id` is stamped in Python, not SQL; in FIXTURE mode it is the fixture
-  name.** So `sql/` stays clock-free, a changing `run_id` never duplicates a row
-  or moves a number, and the synthetic rebuild is byte-stable, not merely
-  count-stable. Rejected: `run_id` from `now()` in SQL.
+- **`run_id` is stamped in Python, not SQL; for a fixture input (`FIXTURE`
+  then, `ROWS` since Phase 3a) it is the input's name.** So `sql/` stays
+  clock-free, a changing `run_id` never duplicates a row or moves a number,
+  and the synthetic rebuild is byte-stable, not merely count-stable. Rejected:
+  `run_id` from `now()` in SQL.
 - **The fixture is read in Python (stdlib csv) and inserted with a portable
   guard** — DuckDB's `read_csv` is dialect-bound, so the load lives in the
   driver, not in a `sql/` file (no pandas). `insert … select … where not exists`
@@ -438,9 +442,10 @@ scraper, no model.
   and `reset` runs only in that process (A4 (d), [Phase 3a](#phase-3a)). The
   stamp is created exclusively (A8 (d)); `confirm` arms `reset` or `scrape`
   alone and reads a goal list of make's own origin only (A9 (a)); what the
-  gate does not hold against — a same-user process writing `data/` while make
-  runs — is written in the spec's Threat model. Mirrors the SPEC/BASE shape
-  for the variables.
+  gate does not hold against — an environment that chooses what make reads or
+  runs (`MAKEFILES`, `PATH`), a parallel run (`make -j`), a same-user process
+  writing `data/` while make runs — is written in the spec's Threat model
+  (exit pass, 2026-09-03). Mirrors the SPEC/BASE shape for the variables.
 
 **Gotchas:** none — DuckDB's `create or replace`, `insert … where not exists`
 and `information_schema.tables` behaved as the official docs describe.
@@ -486,11 +491,12 @@ mart, no model.
   rows. Rejected: one overwritten cache per source (loses the history the
   proof needs).
 - **`rebuild` reads captures by default; `FIXTURE` names the rebuild input:
-  `{cache, empty, synthetic, app-store}`.** `cache` is the real run (a clone
-  runs `make rebuild` and gets data once it has scraped), `app-store` runs the
-  frozen sample through the real parser (CI does, offline). `run_id` is the
-  capture id in cache mode, the fixture name otherwise — no clock. Rejected: a
-  second variable; keeping `empty` as the default.
+  `{cache, empty, synthetic, app-store}`.** *Superseded by Phase 3a's `ROWS`
+  entry: `{captured, none, synthetic, samples}`.* `cache` is the real run (a
+  clone runs `make rebuild` and gets data once it has scraped), `app-store`
+  runs the frozen sample through the real parser (CI does, offline). `run_id`
+  is the capture id in cache mode, the fixture name otherwise — no clock.
+  Rejected: a second variable; keeping `empty` as the default.
 - **Reviews per month is a query, not a mart** (`pipeline/metrics.py`, printed
   by `rebuild`, pinned by a test). No SPEC.md panel shows it, so a
   `sql/marts/` file would be an orphan under BACKING.md's rule; it surfaces in
@@ -900,16 +906,19 @@ renamed the rebuild input, closed five BACKLOG rows.
   overrides the list make built (probed against GNU Make 3.81); `reset` and
   `scrape` consume the stamp before their own refusals; a stamp create that
   fails for any reason but "already there" refuses with one line. What the
-  gate still does not hold against is a same-user process writing `data/`
-  while make runs (A8 (d)). (b) `write_source_pages` runs its batch in one
-  transaction, as the two loaders do. (c) `attribution_labels` takes the input
-  and the row's profile: the literal `sample` is admitted under `samples` on a
-  row whose profile is the sample declaration's, and a real declaration may
-  not carry that profile. Rejected: dropping the goal-list check and widening
-  the residual (a leaked stamp becomes the ordinary case); a Makefile-side
-  `$(filter …)` (it runs on the same overridable variable); a denylist of
-  goals that may not follow `confirm`; keying the label on the row's `source`
-  (a sample row's source is the real platform's name, as an anchor's is);
-  dropping `rows_input` (the input still decides where a sample declaration
-  exists). Found by review round 5 (2026-09-03); built in place of a sixth
-  round, with one exit pass.
+  gate still does not hold against, found by the exit pass and stated in the
+  Threat model: an environment that chooses what make reads or runs
+  (`MAKEFILES` with a `$(shell …)` planting the stamp, `PATH`), a parallel run
+  (`make -j2 confirm reset` can run `reset` before the stamp exists and leave
+  it armed), and a same-user process writing `data/` while make runs (A8 (d)).
+  (b) `write_source_pages` runs its batch in one transaction, as the two
+  loaders do. (c) `attribution_labels` takes the input and the row's profile:
+  the literal `sample` is admitted under `samples` on a row whose profile is
+  the sample declaration's, and a real declaration may not carry that profile.
+  Rejected: dropping the goal-list check and widening the residual (a leaked
+  stamp becomes the ordinary case); a Makefile-side `$(filter …)` (it runs on
+  the same overridable variable); a denylist of goals that may not follow
+  `confirm`; keying the label on the row's `source` (a sample row's source is
+  the real platform's name, as an anchor's is); dropping `rows_input` (the
+  input still decides where a sample declaration exists). Found by review
+  round 5 (2026-09-03); built in place of a sixth round, with one exit pass.
