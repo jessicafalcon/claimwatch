@@ -418,6 +418,28 @@ def test_reseeding_reentering_and_rebuilding_add_no_snapshot_row(tmp_path):
     assert counts["raw_platform_snapshots"] == expected + 1
 
 
+def test_the_only_tracked_files_under_data_are_hand_read_snapshot_csvs():
+    """`data/` is gitignored but `data/snapshots/` is re-included whole, and
+    Phase 4's weekly commit will `git add` it: every tracked path under
+    `data/` must be a `data/snapshots/*.csv` that parses under the declared
+    eight columns — never a capture, a corpus extract or a file carrying
+    reviewer text (round 2, security-reviewer #5)."""
+    import subprocess
+
+    root = Path(__file__).resolve().parents[1]
+    tracked = subprocess.run(
+        ["git", "ls-files", "-z", "data"], cwd=root, capture_output=True, check=True
+    ).stdout.decode("utf-8", errors="replace")
+    paths = [p for p in tracked.split("\0") if p]
+    assert paths, "the hand-read file is tracked"
+    for rel in paths:
+        parts = Path(rel).parts
+        assert parts[:2] == ("data", "snapshots") and len(parts) == 3, rel
+        assert rel.endswith(".csv"), rel
+        rows = read_manual_snapshots(root / rel)  # the declared shape, or a refusal
+        assert all(r["origin"] == "manual" for r in rows), rel
+
+
 def test_the_tracked_manual_file_loads_and_names_no_address():
     rows = read_manual_snapshots()
     assert rows and all(r["origin"] == "manual" for r in rows)
