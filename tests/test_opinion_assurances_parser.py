@@ -337,6 +337,26 @@ def test_two_bodies_in_one_review_refuse_the_page():
         parse(html, PAGE_URL, CAPTURED, SRC)
 
 
+def test_two_bodies_one_nested_in_the_other_refuse_the_page():
+    """A5's "exactly one `oa_text`" counts elements, not openings: a body
+    nested inside the body is a second one and refuses like a sibling, never
+    two texts merged into one row (round 4, code-reviewer #7,
+    functionality-tester #2)."""
+    html = _second_review(
+        _page(1),
+        lambda s: s.replace(
+            '<h4 class="oa_text my-xl-4 my-3">',
+            '<h4 class="oa_text my-xl-4 my-3"><span class="oa_text">INNER.</span>',
+            1,
+        ),
+    )
+    assert html != _page(1)
+    with pytest.raises(
+        PageShapeError, match="review 2': field 'oa_text' appears 2 times"
+    ):
+        parse(html, PAGE_URL, CAPTURED, SRC)
+
+
 def test_a_body_inside_the_author_markup_is_neither_read_nor_counted():
     """Author markup is never read: an `oa_text` inside it is layout, not a
     second body."""

@@ -195,15 +195,15 @@ class _Walker(HTMLParser):
             self.rating_depth = depth
         elif "oa_description" in _classes(attrs) and self.desc_depth is None:
             self.desc_depth = depth
-        elif (
-            "oa_text" in _classes(attrs)
-            and review.author_depth is None
-            and self.body_depth is None
-        ):
+        elif "oa_text" in _classes(attrs) and review.author_depth is None:
             # The review's text, wherever it sits in the scope: the live page
-            # has it follow the description, not sit inside it (A5).
-            self.body_depth = depth
+            # has it follow the description, not sit inside it (A5). Every
+            # `oa_text` in the scope is counted, one nested in another
+            # included — "exactly one body" is a count of elements, not of
+            # openings (round 4, code-reviewer #7, functionality-tester #2).
             review.bodies_seen += 1
+            if self.body_depth is None:
+                self.body_depth = depth
 
     def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         self.handle_starttag(tag, attrs)
