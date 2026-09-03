@@ -209,6 +209,42 @@ Freeze (A4 (e)): `fixtures/anchors/platform_snapshots_seed.csv`
 and its `MANIFEST.sha256` — the three peer rows' `rating` and `review_count`
 as stated above; every other cell unchanged.
 
+**Amendment A5 (2026-09-03, first live run) — the review text is a child of
+the review scope, not of the description.** The first `make confirm scrape`
+fetched the profile's first page and the parser refused it: `review 1`,
+`oa_text` "missing or empty". The text is on the page; it sits where the
+declared shape did not look. On the live page `div.oa_description` closes
+after its dated sentence, and `h4.oa_text` follows it as a *sibling* inside
+the review's content block (as does `div.oa_commands`); the parser's header,
+the hand-written sample and the parser's condition (`oa_text` opens the body
+only while the description is open) all nested it inside the description.
+The structure dump of 2026-09-02 (DECISIONS → Gotchas) recorded the fields
+and never their nesting; the nesting was the sample's guess. Every other part
+of the shape held on the live page: 40 review scopes, one `ratingValue` each
+as a `meta content`, the author scope, the dated sentence as the
+description's own text, one aggregate. What changes: the declared shape names
+`h4.oa_text` as a child of the review scope, read wherever it sits inside the
+scope outside the author markup — the kind of the guard becomes "this
+element is the review's text", not "this element is inside the description";
+a review scope with two `oa_text` elements refuses the page naming the
+count, as two `ratingValue`s do; the description's own text is read as
+before. `fixtures/opinion-assurances/` is re-frozen with the three pages in
+the live nesting (the text and the commands block siblings of the
+description), still fake and nameless; `MANIFEST.sha256` follows. Restores
+the invariant the parser's docstring already states — a review missing its
+body refuses the page — which now fails only when the body is missing.
+Pinned by the sample (the live nesting), a page with the body nested inside
+the description (accepted: inside the scope), and a review with two bodies
+(refused). Not taken: accepting the body at either place with the nested one
+preferred (a preference is a second shape); reading the first `oa_text`
+after the description by document order (a position, not a scope); a
+denylist of layout wrappers to skip (a fix for the case).
+
+Freeze (A5): `fixtures/opinion-assurances/page-1.html`, `page-2.html`,
+`page-3.html` and `MANIFEST.sha256` — `h4.oa_text` and `div.oa_commands`
+moved out of `div.oa_description` to follow it; every text, date, rating and
+meta file unchanged.
+
 ## Why
 
 Phase 2 built the collector and proved it on a frozen sample, but the one
