@@ -608,7 +608,13 @@ renamed the rebuild input, closed five BACKLOG rows.
   compares a platform name (a test greps for it). Reviews get their segment
   from `raw_source_pages` — one row per declared page address, written in
   Python at every rebuild — joined on exact `source_url`; `pipeline/sql_lint.py`
-  refuses `like` and `similar to` beside `regexp`. Rejected: a `segment`
+  refuses `like` and `similar to` beside `regexp`. The lint is a denylist by
+  design (Phase 1) and is widened only with a record here: review round 2
+  added `ilike` and `rlike`, the pattern keywords both engines accept that the
+  first set missed; round 3 added DuckDB's `glob` keyword and its tilde
+  operators (`~~` is `like`, `~` a regex match, `!~~` and `~~*` their
+  variants), caught by the one character all of them carry, which no portable
+  statement uses. Rejected: a `segment`
   column on `raw_reviews` (Phase 1's shape); a pattern over the address in
   SQL; deriving the allowlist from the declarations (a circular import; the
   allowlist is a fetch-time knob).

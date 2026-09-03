@@ -32,6 +32,10 @@ NONPORTABLE = (
     "unpivot",
     "list_value",
     "group by all",
+    # DuckDB spells its pattern operators with a tilde (`~~` is `like`, `~` a
+    # regex match, with `!` and `*` variants): the one character every one of
+    # them carries, and one no portable statement uses (round 3).
+    "~",
 )
 # A clock on the data path is a bug: the number would change between runs.
 CLOCK = (
@@ -44,16 +48,19 @@ CLOCK = (
 )
 
 
-# Pattern matching by keyword: the closed set of keywords both engines accept
-# for a pattern, each matched as a whole word, so `like(`, `like` before a
-# newline or a tab, and `LIKE` are caught alike and `unlike_count` is not
-# (round 1, code-reviewer on the spaced needle; round 2: `ilike` and `rlike`,
-# which both engines accept and the first set missed). The keyword, not the
-# regex, is what a hit reports — it is what a reader must remove.
+# Pattern matching by keyword, each matched as a whole word, so `like(`,
+# `like` before a newline or a tab, and `LIKE` are caught alike and
+# `unlike_count` is not (round 1, code-reviewer on the spaced needle). The set
+# is every pattern keyword either engine documents — a denylist by design
+# (Phase 1), widened only with a record: round 2 added `ilike` and `rlike`,
+# round 3 `glob` and the tilde operators above (DECISIONS → Phase 3a). The
+# keyword, not the regex, is what a hit reports — it is what a reader must
+# remove.
 PATTERN_WORDS = (
     ("like", r"\blike\b"),
     ("ilike", r"\bilike\b"),
     ("rlike", r"\brlike\b"),
+    ("glob", r"\bglob\b"),
     ("similar to", r"\bsimilar\s+to\b"),
 )
 

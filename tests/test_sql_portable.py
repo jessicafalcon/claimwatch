@@ -63,3 +63,12 @@ def test_pattern_matching_is_refused_in_sql():
     assert find_nonportable("where url rlike 'a.*'") == ["rlike"]
     assert find_nonportable("where url similar to 'a'") == ["similar to"]
     assert find_nonportable("where url like 'a%'") == ["like"]  # the word, not a regex
+    # DuckDB's own spellings (round 3): the `glob` keyword and every tilde
+    # operator — `~~` is like, `~` a regex match, `!~~` and `~~*` their
+    # variants — one character covers the whole family
+    assert find_nonportable("where url glob 'a*'") == ["glob"]
+    assert find_nonportable("where url ~~ 'a%'") == ["~"]
+    assert find_nonportable("where url ~ 'a.*'") == ["~"]
+    assert find_nonportable("where url !~~ 'a%'") == ["~"]
+    assert find_nonportable("where url ~~* 'a%'") == ["~"]
+    assert find_nonportable("-- ~ in a comment is prose\nselect 1") == []
