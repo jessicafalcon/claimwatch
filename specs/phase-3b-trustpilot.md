@@ -8,14 +8,50 @@ refusal, the manual snapshot path; no evasion") and the Phase 3a Gotcha
 permitted real page, names replaced, before the parser is written"). Depends
 on Phase 3a merged (PR #5, 2026-09-03).
 
-**Status: APPROVED 2026-09-03 — in progress.** No new dependencies:
-`httpx` (fetch) and `pyyaml` are the Phase 2 allowlist; the parser uses the
-stdlib `json` decoder already in `ingest/parsed.py`. Trustpilot marks its
-data as JSON-LD, so no HTML-microdata code is added beyond what exists.
+**Status: APPROVED 2026-09-03 — in progress.** No new dependencies. (A1: the
+robots check found Trustpilot not fetchable, so no parser is built at all — the
+phase is a source declaration, one hand-read row, and records. The
+JSON-LD/`httpx` notes below are pre-A1 and stand only as the plan for a future
+authorization.)
 
 Four sections marked REQUIRED are mandatory. The status line moves `PROPOSED`
 → `APPROVED <date> — in progress` → `APPROVED <date> — DELIVERED <date>, PR
 open` when the Delivered paragraph is appended.
+
+## Amendment A1 — the terms check found Trustpilot not fetchable (2026-09-03)
+
+The developer's robots check (Phase 0a default #2) settled pinned decision 3's
+fork. `fr.trustpilot.com/robots.txt` (and `www.trustpilot.com`'s) ends with
+`User-agent: *` / `Disallow: /`, and our crawler's User-Agent matches none of
+the named groups, so under RFC 9309 the catch-all group governs and every path
+is disallowed. There is no page we may fetch, so none we may freeze — so the
+hand-read branch is taken, mirroring the App Store listing:
+
+- Done-when **1** (the JSON-LD parser) and **4** (the frozen sample) are
+  **dropped**; `ingest/trustpilot.py` and `fixtures/trustpilot/` are not built,
+  and the `Freeze:` line is removed.
+- Trustpilot is declared as a not-fetchable source (`platform=trustpilot`,
+  `parser=None`, `fetchable=False`, `host=fr.trustpilot.com`), its `terms`
+  naming fr's robots rule with the date read; refused before any request,
+  whatever the file says on a later day.
+- Its rating and review count are read by hand off the profile page (robots
+  governs a crawler, not a person reading) and loaded as one **Measured** row
+  in `data/snapshots/manual_snapshots.csv`, on profile `fr-digital-first` — the
+  same series as the Documented Trustpilot anchors already seeded.
+- The DONE command becomes `make rebuild && make idempotency-check
+  ROWS=captured` (the hand-read row loads under `captured`, as the App Store
+  listing's does), not `ROWS=samples` (no sample exists).
+- Done-when **6** (the no-`SPEC` gate fix) is kept only if `make review-gate`
+  without `SPEC=` is red on this branch; with no fixture change it may be
+  green, and is then re-deferred with its existing trigger.
+
+The parser and sample are re-deferred (BACKLOG): their trigger is a future
+written authorization from Trustpilot, as Opinion Assurances granted. The
+surviving done-when are **2** (declared source), **3** (a hand-read row reuses
+its anchor's profile), and **5** (no-key run green, idempotent), renumbered
+1–3 below, plus the two hand-read specifics A1 adds (the source is
+not-fetchable and refused before any request; one Measured row loads beside
+the anchor).
 
 ## Why
 
@@ -37,6 +73,12 @@ guessed nesting is a shape the tests cannot see) is why the sample is frozen
 from one permitted real page, names replaced, **before** the parser is
 written.
 
+*(A1, 2026-09-03: the robots check found no page we may fetch, so neither the
+parser nor the sample is built this phase — the two paragraphs above are the
+pre-A1 plan, kept as the design for a future authorization. What 3b delivers
+is the hand-read path: a not-fetchable source declaration and one Measured
+row beside the anchors. See the A1 section above.)*
+
 ## The central constraint
 
 **The anchors do not move, and no Trustpilot address reaches any file but
@@ -47,116 +89,110 @@ profile, never replacing it and never forking it into a second series. The
 Trustpilot profile address spells the brand (D1): it lives in the source
 declaration and nowhere else — no prose, comment, commit, test name or
 fixture repeats it. The no-key run stays green and the pipeline stays
-idempotent throughout (Trustpilot adds review rows and one snapshot row, both
-append-only on a content hash).
+idempotent throughout (under A1 Trustpilot adds one hand-read snapshot row,
+append-only on its content hash).
 
-## DONE command
+## DONE command (A1)
 
 ```
-make rebuild ROWS=samples && make idempotency-check ROWS=samples
+make rebuild && make idempotency-check ROWS=captured
 ```
 
-- `make rebuild ROWS=samples` runs every frozen sample — now including
-  `fixtures/trustpilot/` — through its real parser and loads it into the
-  samples database: proves the Trustpilot parser turns its frozen page into
-  review rows and one aggregate snapshot row (the count CI reproduces).
-- `make idempotency-check ROWS=samples` rebuilds twice and diffs per-table row
-  counts: proves the Trustpilot rows are append-only on their content hash — a
-  second load of the same sample inserts nothing. Offline, DuckDB, no key, no
-  fetch, exactly what CI runs.
+- `make rebuild` (default `ROWS=captured`) loads the anchors, the hand-read
+  rows in `data/snapshots/manual_snapshots.csv` — now including the Trustpilot
+  row — and any capture under `data/cache/`: proves the Measured Trustpilot
+  row loads beside its Documented anchor on the same profile.
+- `make idempotency-check ROWS=captured` rebuilds twice and diffs per-table row
+  counts: proves the hand-read row is append-only on its content hash — a
+  second load inserts nothing. Offline, DuckDB, no key, no fetch.
+
+(A1 replaced the pre-amendment `ROWS=samples` DONE: no sample fixture is built,
+because no Trustpilot page may be fetched or frozen.)
 
 ## Done-when
 
-1. **The Trustpilot parser reads a profile page.** `ingest/trustpilot.py`
-   turns one Trustpilot profile page (JSON-LD) into review rows — each rating
-   a member of `REVIEW_RATINGS` (Trustpilot rates in whole stars 1–5, which
-   are members) — and exactly one aggregate snapshot row (rating 0–5, review
-   count); a page outside the declared JSON-LD shape raises `PageShapeError`
-   naming page, item and field, and the whole page loads nothing. *Evidence:
-   rows 1, 5.*
-2. **Trustpilot is one declared source with its recorded terms position.**
-   `trustpilot` is in `PARSERS`; a `Source` for the studied insurer's
-   Trustpilot profile is in `SOURCES`, `unsolicited` channel, its `fetchable`
-   and `terms` set from the developer's checked robots.txt + terms position
-   (recorded beside it and in DECISIONS → Phase 3b). A source not recorded
-   fetchable is refused before any request; its profile address is the only
-   new brand-carrying string, added to `BRAND_TOKENS` if it is a new form.
+1. ~~**The Trustpilot parser reads a profile page.**~~ **DROPPED by A1** —
+   Trustpilot is not fetchable, so there is no page to parse. Replaced by A1's
+   hand-read row (done-when 2 below). *(re-deferred to a future authorization,
+   BACKLOG.)*
+2. **Trustpilot is one declared not-fetchable source (A1).** A `Source` for the
+   studied insurer's Trustpilot profile is in `SOURCES`: `platform=trustpilot`,
+   `parser=None`, `fetchable=False`, `host=fr.trustpilot.com`, `unsolicited`
+   channel, its `terms` naming fr's robots rule (`User-agent: *` → `Disallow:
+   /`, read 2026-09-03) — recorded beside it and in DECISIONS → Phase 3b. It is
+   refused before any request; its profile address is the only new
+   brand-carrying string, added to `BRAND_TOKENS` if it is a new form.
    *Evidence: rows 2, 3.*
-3. **A fetched Trustpilot row joins its anchor's series, not a new one.** The
-   Trustpilot source's `profile` equals the anchor seed's Trustpilot profile
-   for the studied insurer (`fr-digital-first`), pinned by a test that the
-   declaration and the seed agree — so a measured point and its Documented
-   anchor are one series in `rating_trend` / `peer_ratings`. The same rule
-   binds any future Trustpilot peer. *Evidence: row 4.* (Closes BACKLOG "A
+3. **One Measured Trustpilot row loads beside its anchor, on the same series
+   (A1).** A row in `data/snapshots/manual_snapshots.csv` for the Trustpilot
+   source carries its rating and review count read by hand (tagged Measured);
+   the source's `profile` equals the anchor seed's Trustpilot profile for the
+   studied insurer (`fr-digital-first`), pinned by a test that the declaration
+   and the seed agree — so the Measured point and its Documented anchor are one
+   series in `rating_trend` / `peer_ratings`, never two. The same rule binds
+   any future Trustpilot peer. *Evidence: rows 3, 4.* (Closes BACKLOG "A
    fetched peer may not join its anchor's series".)
-4. **A frozen Trustpilot sample runs through the real parser under
-   `ROWS=samples`.** `fixtures/trustpilot/` holds a real profile page with the
-   insurer's name replaced (a fake, nameless profile), its meta files and a
-   `MANIFEST.sha256`; it is read-only after this phase and its rows land in
-   the samples database, joining `raw_source_pages` like any capture's.
-   *Evidence: rows 4, 5.*
+4. ~~**A frozen Trustpilot sample runs through the real parser.**~~ **DROPPED
+   by A1** — no page may be fetched, so none may be frozen. No
+   `fixtures/trustpilot/`, no `Freeze:` line.
 5. **The no-key run stays green and the rebuild stays idempotent.** With the
    API key unset the pipeline runs end to end; a second rebuild on the same
    input leaves every table's row count unchanged. *Evidence: row 5.*
-6. **`make review-gate` without `SPEC=` is green on a phase branch, and its
-   two summary lines count the same thing.** The no-`SPEC` form reads the
-   branch's spec (or skips the freeze check) so a new or re-frozen fixture
-   does not fail it, and the FAIL line counts the same quantity the OK line
-   does. *Evidence: row 6.* (Closes BACKLOG "`make review-gate` without
-   `SPEC=` is red on a phase branch".)
+6. **`make review-gate` without `SPEC=` is green on this branch, and its two
+   summary lines count the same thing (A1: kept only if red).** With no fixture
+   change the no-`SPEC` gate may already be green; if it is red, the no-`SPEC`
+   form reads the branch's spec (or skips the freeze check) and the FAIL line
+   counts the same quantity the OK line does. If green, re-deferred with its
+   existing BACKLOG trigger. *Evidence: row 6.*
 
-(6 items — at the cap.)
+(A1: done-when 1 and 4 dropped; the surviving contract is 2, 3, 5, and 6 if
+red.)
 
 ## Evidence (REQUIRED)
 
 | Done-when | Proof (test id / `make` target / output line) |
 |---|---|
-| 1 | `tests/test_trustpilot_parser.py::test_parses_reviews_and_aggregate`, `::test_off_shape_page_refuses_naming_field`, `::test_review_rating_outside_the_half_steps_refuses` |
-| 2 | `tests/test_fetch_sources.py::test_trustpilot_source_declared`, `tests/test_makefile.py::test_scrape_refuses_a_source_not_fetchable` (if not fetchable), `tests/test_ingest_layout.py::test_brand_carrying_strings_appear_only_in_the_declarations` |
-| 3 | `tests/test_snapshots.py::test_fetched_trustpilot_profile_matches_its_anchor_seed` |
-| 4 | `tests/test_fixtures_frozen.py::test_trustpilot_sample_manifest`, `make rebuild ROWS=samples` prints the Trustpilot review + snapshot counts |
-| 5 | `tests/test_rebuild.py::test_no_key_run_is_green` (existing, extended), `make idempotency-check ROWS=samples` prints "row counts unchanged" |
-| 6 | `tests/test_review_gate.py::test_no_spec_gate_green_with_a_frozen_fixture` and `::test_both_summary_lines_count_the_same`; `make review-gate` prints an OK line on this branch |
+| 1 | DROPPED by A1 (no parser). |
+| 2 | `tests/test_fetch_sources.py::test_trustpilot_source_declared_not_fetchable`, `tests/test_makefile.py::test_scrape_refuses_a_source_not_fetchable` (Trustpilot named), `tests/test_ingest_layout.py::test_brand_carrying_strings_appear_only_in_the_declarations` |
+| 3 | `tests/test_snapshots.py::test_trustpilot_hand_read_row_matches_its_anchor_seed`, `make rebuild` prints the Trustpilot Measured snapshot loaded |
+| 4 | DROPPED by A1 (no sample). |
+| 5 | `tests/test_rebuild.py::test_no_key_run_is_green` (existing), `make idempotency-check ROWS=captured` prints "row counts unchanged" |
+| 6 | If red: `tests/test_review_gate.py::test_no_spec_gate_green_on_a_phase_branch`; else `make review-gate` (no SPEC) prints an OK line on this branch |
 
 ## Invariants (REQUIRED)
 
+(A1: the JSON-LD-parse and frozen-sample invariants are dropped with done-when
+1 and 4. The surviving invariants:)
+
 | Invariant ("for all …, … holds") | Falsified by (scenario test) |
 |---|---|
-| For all Trustpilot profile pages the parser reads, every review row's rating is a member of `REVIEW_RATINGS` and the aggregate rating is in [0, 5]; a page outside the declared JSON-LD shape loads nothing from it. | `tests/test_trustpilot_parser.py::test_off_shape_page_refuses_naming_field` — a page with a rating of `6`, a missing aggregate, or malformed JSON-LD loads zero rows and names the field. |
-| For all declared sources, no request is made to a source not recorded fetchable; a fetchable source names a parser. | `tests/test_makefile.py::test_scrape_refuses_a_source_not_fetchable` — `make scrape SOURCE=<trustpilot>` on a not-fetchable declaration exits 2 before any fetch. |
-| For all fetched snapshot rows, the row's profile equals the anchor seed's profile for that platform and profile, so one profile is one series. | `tests/test_snapshots.py::test_fetched_trustpilot_profile_matches_its_anchor_seed` — a declaration whose profile is not the seed's is caught. |
-| For all frozen samples, the bytes match `MANIFEST.sha256` and a rebuild reads them read-only; a second rebuild changes no row count. | `tests/test_fixtures_frozen.py::test_trustpilot_sample_manifest` (a mutated byte fails) and `tests/test_idempotency.py` (a second load inserts nothing). |
+| For all declared sources, no request is made to a source not recorded fetchable. | `tests/test_makefile.py::test_scrape_refuses_a_source_not_fetchable` — `make scrape SOURCE=<trustpilot>` on the not-fetchable declaration exits 2 before any fetch. |
+| For all snapshot rows, the row's profile equals the anchor seed's profile for that platform and profile, so one profile is one series. | `tests/test_snapshots.py::test_trustpilot_hand_read_row_matches_its_anchor_seed` — a declaration whose profile is not the seed's is caught. |
+| For all hand-read rows, a second rebuild on the same input changes no row count. | `tests/test_idempotency.py` — a second load of `manual_snapshots.csv` inserts nothing (append-only on the content hash). |
 | For all Trustpilot addresses in the tree, the string appears only in `ingest/sources.py`. | `tests/test_ingest_layout.py::test_brand_carrying_strings_appear_only_in_the_declarations` — a brand token in any other tracked file fails. |
 
 ## Pinned decisions (do not re-litigate)
 
-- **The parser reads JSON-LD, not layout.** Trustpilot marks its aggregate
-  (`aggregateRating`: `ratingValue`, `reviewCount`) and each review
-  (`reviewRating.ratingValue`, an integer 1–5) as JSON-LD in a
-  `<script type="application/ld+json">` block, decoded by
-  `parsed.decode_json`; everything else on the page is layout and is never
-  read. Rejected: parsing the visible HTML — brittle and a second shape.
-  Satisfies invariant 1.
-- **The sample is frozen from one permitted real page, names replaced,
-  before the parser.** A hand-guessed JSON-LD shape is a shape the tests
-  cannot see (the 3a Gotcha). The developer fetches one profile page once
-  under Trustpilot's own terms, replaces the insurer's name with a nameless
-  placeholder, and freezes it; the parser is written against it. Satisfies
-  invariant 4.
-- **The terms position is the developer's recorded check, and a refusal takes
-  the hand-read path.** Following Phase 0a default #2: the developer checks
-  Trustpilot's robots.txt and terms; if they permit an identifying, rate-
-  limited fetch the source is `fetchable=True` with a `parser`; if they
-  forbid it the source is `fetchable=False` with `terms` and its figures are
-  hand-read into `data/snapshots/manual_snapshots.csv` (Measured), as the App
-  Store listing is. Either way the position is recorded beside the source and
-  in DECISIONS → Phase 3b, and a not-fetchable source is refused before any
-  request. Satisfies invariant 2.
-- **A measured Trustpilot point reuses its anchor's profile.** The
+- ~~**The parser reads JSON-LD, not layout.**~~ **SUPERSEDED by A1** — no page
+  may be fetched, so no parser is written. (The JSON-LD shape stands as a note
+  for a future authorization; not built now.)
+- ~~**The sample is frozen from one permitted real page.**~~ **SUPERSEDED by
+  A1** — no permitted page exists, so none is frozen.
+- **The terms position is the developer's recorded check, and the refusal
+  takes the hand-read path (settled by A1).** Following Phase 0a default #2:
+  the developer's check found `fr.trustpilot.com/robots.txt` ends with
+  `User-agent: *` / `Disallow: /` and our User-Agent matches no named group
+  (RFC 9309: the catch-all group governs), so the source is `fetchable=False`
+  with `terms` naming that rule and the date, and its figures are hand-read
+  into `data/snapshots/manual_snapshots.csv` (Measured), as the App Store
+  listing is. The position is recorded beside the source and in DECISIONS →
+  Phase 3b; the not-fetchable source is refused before any request. Satisfies
+  the surviving no-request invariant.
+- **A Measured Trustpilot point reuses its anchor's profile.** The
   declaration's `profile` is `fr-digital-first`, exactly the seed's Trustpilot
   profile, so `rating_trend` / `peer_ratings` keyed on `(source, profile)`
-  read one series, not two. Rejected: a new profile name for the fetched
-  point. Satisfies invariant 3.
+  read one series, not two. Rejected: a new profile name for the hand-read
+  point. Satisfies the one-series invariant.
 - **The response-rate and response-delay figures stay Documented, or wait.**
   Trustpilot's "replied to X% of negative reviews" and "typically replies in
   N" are layout text, not JSON-LD (as Opinion Assurances' were — BACKLOG),
@@ -165,108 +201,111 @@ make rebuild ROWS=samples && make idempotency-check ROWS=samples
   figures — and BACKLOG "The §6 response figures are not seeded" is re-
   deferred with a Phase 9 trigger, not seeded from layout. Satisfies the
   central constraint (no invented number).
-- **The no-`SPEC` gate reads the branch's spec or skips the freeze check.**
-  The freeze check needs a `Freeze:` line, which lives in a spec; the no-
-  `SPEC` gate has none to read, so it must resolve the branch's spec or skip
-  that one check, and both summary lines must count the same quantity. This
-  is a `scripts/review_gate.py` change, in scope because 3b's `Freeze:` line
-  is what exposes it. Satisfies done-when 6.
+- **The no-`SPEC` gate is fixed only if red on this branch (A1).** The freeze
+  check needs a `Freeze:` line, which lives in a spec; the no-`SPEC` gate has
+  none to read. Under A1 this branch adds no fixture, so the gate may already
+  be green — checked during implementation. If red, `scripts/review_gate.py`
+  resolves the branch's spec or skips that one check and both summary lines
+  count the same quantity; if green, re-deferred with its BACKLOG trigger.
+  Satisfies done-when 6.
 
-## Scope (files)
+## Scope (files) — A1
 
-- `ingest/trustpilot.py` — the new parser (JSON-LD → reviews + one snapshot),
-  exposing `parse()`, `EXTENSION`, `SAMPLE_PLATFORM`, `SAMPLE_HOST`,
-  `SAMPLE_DIR`, `SAMPLE_PAGES` (the contract in `ingest/parsed.py` and the
-  `PARSERS`/`sample_source` closed set in `ingest/sources.py`).
-- `ingest/sources.py` — `trustpilot` added to `PARSERS`; the Trustpilot
-  `Source` in `SOURCES`; its brand form in `BRAND_TOKENS` if new.
-- `ingest/captures.py` — `parser_module` gains `trustpilot` in its closed-set
-  lookup (if it enumerates modules).
-- `fixtures/trustpilot/` — the frozen sample: real page (names replaced), meta
-  files, `MANIFEST.sha256`.
-- `scripts/review_gate.py` — the no-`SPEC` freeze-check fix (done-when 6).
-- `data/snapshots/manual_snapshots.csv` — only if the terms check makes
-  Trustpilot not fetchable (the hand-read path).
-- `tests/test_trustpilot_parser.py` (new), `tests/test_fetch_sources.py`,
-  `tests/test_snapshots.py`, `tests/test_fixtures_frozen.py`,
-  `tests/test_ingest_layout.py`, `tests/test_makefile.py`,
-  `tests/test_review_gate.py` (new), `tests/pins.py` — the pinned counts.
+A1 dropped `ingest/trustpilot.py`, `fixtures/trustpilot/`, and the parser/
+sample tests. The phase touches:
+
+- `ingest/sources.py` — the Trustpilot `Source` in `SOURCES`
+  (`platform=trustpilot`, `parser=None`, `fetchable=False`,
+  `host=fr.trustpilot.com`, the profile `listing` address, `terms`); its brand
+  form in `BRAND_TOKENS` if the profile domain is a new form.
+- `data/snapshots/manual_snapshots.csv` — one hand-read Measured Trustpilot
+  row (rating + count).
+- `scripts/review_gate.py` — the no-`SPEC` gate fix, only if the gate is red on
+  this branch (done-when 6).
+- `tests/test_fetch_sources.py`, `tests/test_snapshots.py`,
+  `tests/test_ingest_layout.py`, `tests/test_makefile.py`, `tests/pins.py` —
+  the declaration, the hand-read row, the brand walk, the not-fetchable
+  refusal, the pinned counts. `tests/test_review_gate.py` (new) only if the
+  gate fix lands.
 - Records: `DECISIONS.md`, `BACKLOG.md`, `CLAUDE.md`, `SPEC.md`, `README.md`,
   this spec.
 
-Freeze: fixtures/trustpilot/
+Freeze: none
 
 ## Record updates (REQUIRED)
 
-- [ ] `DECISIONS.md` — Phase 3b entry: the Trustpilot terms/robots position as
-  checked (fetchable or hand-read), the JSON-LD shape from the structure dump,
-  the re-defer of the §6 response figures; the D1 brand-token note if a new
-  form.
-- [ ] `BACKLOG.md` — closed: "A fetched peer may not join its anchor's series",
-  "`make review-gate` without `SPEC=` is red". Re-deferred with new triggers:
-  "The §6 response figures are not seeded" (→ Phase 9), "Round 5's fix classes
-  were applied at their finding sites only" (apply each class in the new
-  parser). Opened if any: a Trustpilot re-fetch / edit-id row like Opinion
-  Assurances'. Open-row count updated.
-- [ ] `CLAUDE.md` — Current status; Repo map (`ingest/trustpilot.py`, the
-  Trustpilot source, `fixtures/trustpilot/`); `PARSERS`; BACKLOG count; the
+- [ ] `DECISIONS.md` — Phase 3b entry: the Trustpilot robots position as
+  checked (`fr.trustpilot.com` `User-agent: *` → `Disallow: /`, our UA in no
+  named group, 2026-09-03 → not fetchable → hand-read), amendment A1, the
+  re-defer of the §6 response figures and of the parser/sample; the D1
+  brand-token note if the profile domain is a new form.
+- [ ] `BACKLOG.md` — closed: "A fetched peer may not join its anchor's series"
+  (the hand-read row reuses its anchor's profile, pinned). Re-deferred:
+  "`make review-gate` without `SPEC=` is red" (A1: fixed only if red this
+  branch, else its trigger stands), "The §6 response figures are not seeded"
+  (→ Phase 9), "Round 5's fix classes were applied at their finding sites
+  only" (no new parser built — trigger stands). Opened: the Trustpilot parser
+  + sample, re-deferred to a future written authorization from Trustpilot.
+  Open-row count updated.
+- [ ] `CLAUDE.md` — Current status; Repo map (the Trustpilot hand-read source
+  in `ingest/sources.py`, the `manual_snapshots.csv` note); BACKLOG count; the
   line-count row (the audit reports growth against the ~400 cap).
 - [ ] `BACKING.md` — none (B1.2, B1.3, B1.4, B2.3 already name
-  `https://www.trustpilot.com/`; the row tag stays Documented until measured
-  points make the series).
-- [ ] `SPEC.md` — none unless the terms check changes a panel (a design
-  change: STOP first). Beat 1's "under the hood" already names Trustpilot.
-- [ ] `README.md` — the Trustpilot source in the sources list; `make scrape`
-  gains a green Trustpilot path only if fetchable.
+  `https://www.trustpilot.com/` and `data/snapshots/manual_snapshots.csv`; the
+  row tag stays Documented until measured points make the series).
+- [ ] `SPEC.md` — none (no panel changes). Beat 1's "under the hood" already
+  names Trustpilot and the hand-read path.
+- [ ] `README.md` — the Trustpilot source in the sources list (hand-read, not
+  fetchable — no `make scrape` path).
 - [ ] this spec — the "Delivered" paragraph appended at exit.
 
 ## Threat model (REQUIRED when the phase adds a `make` target that takes a variable, deletes anything, calls a paid API, or touches the network)
 
 None — no new `make` target takes a variable, deletes, calls a paid API, or
-touches the network. `make scrape` (network, Phase 2/3a) gains one fetchable
-source but no new variable or code path: it fetches Trustpilot's declared page
-addresses under the same gate (`make confirm scrape`, Phase 3a A4/A9),
-robots.txt first, ≥ 2 s apart per host, identifying User-Agent, no proxy, no
-retry, ≤ 60 pages — and is developer-run, never by an agent. A source not
-recorded fetchable is refused (exit 2) before any request, whatever its robots
-file says on a later day. If the developer's terms check makes Trustpilot not
-fetchable, no fetch path exists at all and the figures are hand-read. The
-security-reviewer checks the fetch conduct of the new source and the JSON-LD
-parser's refusal on a hostile page.
+touches the network, and A1 adds no network code. Trustpilot is declared
+`fetchable=False` (fr's robots `User-agent: *` → `Disallow: /`), so `make
+scrape` has no Trustpilot path at all: a source not recorded fetchable is
+refused (exit 2) before any request, whatever its robots file says on a later
+day. The one new input is a hand-read row in `manual_snapshots.csv` (numbers a
+person read; no address, no name). The security-reviewer checks that the
+not-fetchable declaration is refused before any request and that no brand
+string reaches any file but `ingest/sources.py`.
 
 ## Review & stack risk
 
-- **code-reviewer** (triggered — `ingest/**`, `scripts/`, `tests/`): the
-  parser is a closed-shape JSON-LD parse (round 5's fix class at every site —
-  `\A…\Z`, a strict decode, no `.get(default)` that invents a value); the
-  measured point reuses its anchor's profile; no clock, no pattern in SQL.
-- **security-reviewer** (mandatory — `ingest/**` incl. a network source, and
-  `scripts/review_gate.py`): scrape conduct (rate limit, robots, no evasion),
-  no brand string outside `sources.py`, no personal data in the frozen sample
-  (names replaced), the parser refuses a hostile page without a traceback.
-- **functionality-tester** (triggered): the DONE command, the parser against
-  `fixtures/trustpilot/`, idempotency, the no-key run, a hand-mutation of the
-  frozen sample.
+- **code-reviewer** (triggered — `ingest/sources.py`, `scripts/` if the gate
+  fix lands, `tests/`): the declaration's not-fetchable refusal, the hand-read
+  row's profile reuse, the brand walk, no clock, no pattern in SQL.
+- **security-reviewer** (mandatory — `ingest/**`, and `scripts/review_gate.py`
+  if it changes): the not-fetchable source refused before any request, no
+  brand string outside `sources.py`, no personal data in the hand-read row
+  (numbers only, no name, no address).
+- **functionality-tester** (triggered): the DONE command
+  (`make rebuild && make idempotency-check ROWS=captured`), the hand-read row
+  loading beside its anchor, idempotency, the no-key run.
 - **study-editor** (triggered — SPEC/README/CLAUDE/DECISIONS prose): no
   editorial sentence about one insurer, Trustpilot named only as a sourced
   data point, the response-figures wording honest.
 - **coherence-auditor** at exit (mandatory): the stale sentences it must find
-  gone — the two closed BACKLOG rows struck, the Trustpilot source reflected
-  in the Repo map, no "Phase 3b next" left dangling; the anchors ↔ seed ↔
-  declaration profile agreement.
-- Stack risk: verify Trustpilot's real JSON-LD shape from the frozen page in
-  the first hour (the `@type`, the `aggregateRating` keys, whether reviews are
-  one array or paginated as separate JSON-LD blocks); a guessed key is the 3a
-  Gotcha again. STOP and report before any workaround; findings → DECISIONS →
-  Gotchas.
+  gone — the closed BACKLOG row struck, the Trustpilot hand-read source
+  reflected in the Repo map, no "Phase 3b next" left dangling; the anchors ↔
+  seed ↔ declaration profile agreement.
+- Stack risk: minimal under A1 — no parsing, no network code. The one care is
+  that the hand-read row's `(source, profile, platform)` matches the anchor
+  seed exactly so the Measured point and the Documented anchor read as one
+  series; a mismatch is caught by the profile-agreement test.
 
 ## Out of scope (deferred, recorded)
 
-- **Trustpilot peers as fetched sources.** 3b fetches the studied insurer's
-  profile only; peer profiles stay Documented anchors. If a peer is fetched
-  later, done-when 3's profile-reuse rule binds it (BACKLOG).
-- **Response rate and delay as measured figures.** Layout text, not JSON-LD;
-  re-deferred to Phase 9's B1.4 panel (BACKLOG).
+- **The Trustpilot JSON-LD parser and a frozen sample (A1).** Not built —
+  Trustpilot forbids our crawler on every path, so no page may be fetched or
+  frozen. Re-deferred to a future written authorization from Trustpilot (as
+  Opinion Assurances granted); recorded in BACKLOG.
+- **Trustpilot peers as measured sources.** Peer profiles stay Documented
+  anchors; if one is ever hand-read or fetched, done-when 3's profile-reuse
+  rule binds it (BACKLOG).
+- **Response rate and delay as measured figures.** Layout text, and Trustpilot
+  is not fetched anyway; re-deferred to Phase 9's B1.4 panel (BACKLOG).
 - **A weekly Trustpilot re-fetch and the edit-id question.** Phase 4's
   workflow, with the Opinion Assurances re-fetch/edit-id rows (BACKLOG).
 - **The App Store listing's JSON-LD block.** Unverified; its trigger is a
