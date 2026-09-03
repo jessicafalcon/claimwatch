@@ -85,32 +85,36 @@ def test_two_aggregate_ratings_refuse_the_page():
 
 
 @pytest.mark.parametrize(
-    "value",
+    ("value", "why"),
     [
-        "5.1",
-        "5.0006",  # rounds to 5.001, past the column's range
-        "-0.5",
-        "abc",
-        "",
-        True,
-        None,
-        [4],
-        {"x": 1},
-        "4,5",
-        float("nan"),
-        float("inf"),
-        -float("inf"),
-        "NaN",
-        "Infinity",
+        ("5.1", "is not a number in 0..5"),
+        ("5.0006", "is not a number in 0..5"),  # rounds to 5.001, past the range
+        ("-0.5", "is not a number in 0..5"),
+        ("abc", "is not a number in 0..5"),
+        ("", "is not a number in 0..5"),
+        ("4,5", "is not a number in 0..5"),
+        ("NaN", "is not a number in 0..5"),  # a string: the digit shape refuses it
+        ("Infinity", "is not a number in 0..5"),
+        (True, "is not a number: "),
+        (None, "is not a number: "),
+        ([4], "is not a number: "),
+        ({"x": 1}, "is not a number: "),
+        (float("nan"), "is not a number: "),  # a JSON number: the finite check
+        (float("inf"), "is not a number: "),
+        (-float("inf"), "is not a number: "),
     ],
 )
-def test_rating_outside_the_shape_is_refused(value):
+def test_rating_outside_the_shape_is_refused(value, why):
     """A rating is a finite number; `json.loads` accepts `NaN` and `Infinity`
     as numbers, and either is outside the shape and refuses in one line rather
-    than raising at the range check (round 3, security-reviewer #2)."""
+    than raising at the range check (round 3, security-reviewer #2). The
+    refusal names which check refused — the finite-number check for a
+    non-finite JSON number, the digit shape for text — so removing the finite
+    check fails the suite instead of falling through to the range message
+    (round 4, functionality-tester #5)."""
     doc = _block()
     doc["aggregateRating"]["ratingValue"] = value
-    with pytest.raises(PageShapeError, match="'ratingValue'"):
+    with pytest.raises(PageShapeError, match=f"'ratingValue' {re.escape(why)}"):
         parse(_with_block(doc), PAGE_URL, CAPTURED, SRC)
 
 
