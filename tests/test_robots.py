@@ -213,17 +213,39 @@ def test_a_pathological_pattern_matches_in_linear_time():
     """Phase 3a, pinned decision 6: thirty wildcards against a long path that
     does not match answer in milliseconds (the regex form took seconds at
     seven stars), and the verdicts of the matching table are unchanged."""
-    import time
+    import subprocess
+    import sys
+    from pathlib import Path
 
     from ingest.robots import _matches
 
-    pattern = "/" + "a*" * 30 + "b"
-    path = "/" + "a" * 300
-    t0 = time.perf_counter()
-    assert _matches(pattern, path) is False
-    assert _matches(pattern + "$", path) is False
-    assert _matches("/" + "a*" * 30, path) is True
-    assert time.perf_counter() - t0 < 0.05
+    # A backtracking matcher would sit on this input for minutes, and a regex
+    # engine holds the interpreter lock for the whole match, so no in-process
+    # deadline can interrupt it. The pin must FAIL, not hang CI: the three
+    # calls run in a child process that is killed at 2 s (round 1,
+    # functionality-tester on the restored-regex mutation).
+    child = (
+        "import time; from ingest.robots import _matches\n"
+        "pattern = '/' + 'a*' * 30 + 'b'; path = '/' + 'a' * 300\n"
+        "t0 = time.perf_counter()\n"
+        "v = (_matches(pattern, path), _matches(pattern + '$', path),"
+        " _matches('/' + 'a*' * 30, path))\n"
+        "print(v, time.perf_counter() - t0)"
+    )
+    try:
+        res = subprocess.run(
+            [sys.executable, "-c", child],
+            cwd=Path(__file__).resolve().parents[1],
+            capture_output=True,
+            text=True,
+            timeout=2.0,
+        )
+    except subprocess.TimeoutExpired:
+        pytest.fail("the matcher did not answer within 2 s: not linear")
+    assert res.returncode == 0, res.stderr
+    verdicts, elapsed = res.stdout.rsplit(" ", 1)
+    assert verdicts == "(False, False, True)"
+    assert float(elapsed) < 0.05
     # the four forms of the table, on their own
     assert _matches("/fr/rss/", "/fr/rss/x") is True  # prefix
     assert _matches("/fr/rss/$", "/fr/rss/x") is False  # anchored: exact only
