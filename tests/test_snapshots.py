@@ -373,6 +373,49 @@ def test_a_hand_read_row_is_never_swallowed_by_an_anchor_with_its_numbers(tmp_pa
     assert gap == [("Measured", store.listing, "2024-09-15")]
 
 
+def test_the_snapshot_key_names_its_declaration(tmp_path):
+    """A2 (a), pinned literally: the key is these five names, and two rows
+    that differ in `origin` alone — an anchor and a hand entry sharing
+    platform, profile, day AND address — are two rows (round 2,
+    functionality-tester F3)."""
+    from pipeline.build import SNAPSHOT_KEY, load_snapshots
+
+    assert SNAPSHOT_KEY == ("source", "profile", "origin", "source_url", "captured_at")
+    db = tmp_path / "w.duckdb"
+    rebuild("duckdb", "synthetic", database=db)
+    conn = connect("duckdb", database=db)
+    try:
+        (anchor,) = conn.execute(
+            "select source, profile, segment, channel, rating, review_count, "
+            "source_url, captured_at from raw_platform_snapshots "
+            "where source = 'app-store' and origin = 'anchor'"
+        ).fetchall()
+        twin = {
+            "source": anchor[0],
+            "profile": anchor[1],
+            "segment": anchor[2],
+            "channel": anchor[3],
+            "origin": "manual",
+            "rating": anchor[4],
+            "review_count": anchor[5],
+            "one_star_share": None,
+            "response_rate": None,
+            "response_delay_days": None,
+            "source_url": anchor[6],  # the very same address
+            "captured_at": anchor[7],  # and the very same day
+            "seeded_from": "",
+        }
+        load_snapshots(conn, [twin], "test")
+        rows = conn.execute(
+            "select origin from raw_platform_snapshots where source = 'app-store' "
+            "and source_url = ? and captured_at = ? order by origin",
+            [anchor[6], anchor[7]],
+        ).fetchall()
+        assert rows == [("anchor",), ("manual",)]
+    finally:
+        conn.close()
+
+
 def test_the_snapshot_key_is_unique_in_raw(tmp_path):
     """A2: with anchors, a capture and a hand entry loaded twice, no two raw
     rows share (source, profile, origin, source_url, captured_at) — staging
