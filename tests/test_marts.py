@@ -115,25 +115,48 @@ def test_peer_ratings_matches_pins(anchors_db):
     )  # the unsolicited anchors with a rating
 
 
-def test_marts_are_byte_stable_across_rebuilds(tmp_path, monkeypatch):
-    import ingest.captures as captures
-    import pipeline.build as build
+def _no_clock(cls: type) -> type:
+    """A date/datetime class whose `today()` and `now()` raise: reaching either
+    on the data path is the failure. Parsing (`fromisoformat`, `strptime`)
+    still works, which is all the data path may do with a date."""
 
-    class NoClock(build.date):
+    class NoClock(cls):  # type: ignore[misc,valid-type]
         @classmethod
         def today(cls):  # pragma: no cover - reaching here is the failure
             raise AssertionError("a clock was read on the data path")
 
-    monkeypatch.setattr(build, "date", NoClock)
+        @classmethod
+        def now(cls, tz=None):  # pragma: no cover - reaching here is the failure
+            raise AssertionError("a clock was read on the data path")
+
+    return NoClock
+
+
+@pytest.mark.parametrize("rows", ["synthetic", "samples"])
+def test_marts_are_byte_stable_across_rebuilds(tmp_path, monkeypatch, rows):
+    """Two rebuilds of one input, with every clock the data path imports made
+    to raise, produce marts equal in EVERY column, `run_id` included: for a
+    fixture input `run_id` is the input's name, so a rebuild is byte-stable,
+    not merely count-stable. `samples` runs every parser, so the parsers'
+    date imports are covered too (round 1, code-reviewer #7)."""
+    import ingest.app_store as app_store
+    import ingest.captures as captures
+    import ingest.opinion_assurances as opinion_assurances
+    import pipeline.build as build
+
+    for module, name in (
+        (build, "date"),
+        (captures, "datetime"),
+        (app_store, "datetime"),
+        (opinion_assurances, "date"),
+    ):
+        monkeypatch.setattr(module, name, _no_clock(getattr(module, name)))
     seen = []
     for name in ("a", "b"):
         db = tmp_path / f"{name}.duckdb"
-        rebuild("duckdb", "synthetic", database=db, run_id=name)
+        rebuild("duckdb", rows, database=db)
         seen.append(
-            {
-                m: sorted(map(str, _query(db, f"select * exclude (run_id) from {m}")))
-                for m in MARTS
-            }
+            {m: sorted(map(str, _query(db, f"select * from {m}"))) for m in MARTS}
         )
     assert seen[0] == seen[1]
-    assert captures  # the reader stays clock-free too (its datetime is only a parser)
+    assert all(seen[0][m] for m in MARTS)  # each mart holds rows to compare
