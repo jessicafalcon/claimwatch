@@ -394,6 +394,66 @@ check that the file's name is the input's (a check on a spelling, not a
 derivation); a marker table naming the input inside each file (a row no
 source produced, counted by the idempotency check).
 
+**Proposed after review round 5 (2026-09-03) — A9: the confirm gate arms a
+gated goal or nothing and reads a goal list of make's own origin only; the
+declared-page writer writes a batch or nothing; the `sample` label is the
+sample declaration's row's.** *Status: PROPOSED, awaiting approval.* Restores
+the Threat model's `confirm` row as stated (no armed stamp outlives its
+invocation; the environment supplies no goal), invariant 1's atomicity for
+the third raw writer as A8 (b) gave it to the second, and invariant 1's "the
+literal `sample` on a row a sample declaration wrote" as a property of the
+row rather than of the input. (a) *The gate's goal is a member of a closed
+set, and the list it is read from is make's own* (round 5, findings 1, 2, 3,
+4, 5): `confirm` arms only when the goal that follows it in the invocation
+is one of `GATED = ("reset", "scrape")` — `make confirm help`, `make confirm
+rebuild` and a trailing `confirm` refuse with one line and leave no stamp,
+so the ordinary typo A8 (d) left open is closed by the set, not by a
+position check; the recipe passes `$(origin MAKECMDGOALS)` beside the list
+and `confirm` refuses a list whose origin is not `default` — make's own goal
+list is the one definition with that origin, and one from the environment
+(`environment`), from `MAKEFLAGS` or from the command line (`command line`)
+is refused, so the Threat model's "no goal arrives from the environment"
+becomes a check rather than a claim (probed against the installed make:
+`default`, `environment`, `command line`, `command line`); every gated
+target consumes the stamp as its first act, before its own refusals
+(`_do_scrape`'s "no fetchable source", `_do_reset`'s `TARGET`), so no
+refusal on a gated path leaves the stamp armed; a stamp create that fails
+for any reason but "already there" (a read-only `data/`, say) refuses with
+one line naming the path, never a traceback. The stuck gate after a leaked
+stamp (finding 2) closes for every leak an ordinary command can make; the
+stamp a killed run leaves still makes the next `confirm` refuse naming the
+file, which is A8 (d)'s design. Pinned against the installed make by `make
+confirm help` and `make confirm` refusing with no stamp left, `make confirm
+reset` and `make confirm scrape` arming, `MAKECMDGOALS='confirm reset'` in
+the environment, on the command line and through `MAKEFLAGS` refusing with
+no stamp, a `TARGET=snowflake` reset after `confirm` leaving no stamp, and
+the six A4 (d) forms still refusing; the Threat model's `confirm` row, the
+DECISIONS entry, CLAUDE.md's `make confirm` entry, the Makefile's header and
+`pipeline/cli.py`'s docstrings say the same one thing. Not taken: dropping
+the goal-list check and widening the residual (a leaked stamp is then the
+ordinary case, not the residual); a Makefile-side `$(filter …)` (it runs on
+the same overridable variable); a list of goals that may not follow
+`confirm` (a denylist). (b) *The declared-page writer writes a batch or
+nothing* (finding 6): `write_source_pages` runs its batch in one transaction
+as `load_reviews` and `load_snapshots` do, so a re-declaration refused on
+the third source leaves the first two sources' pages uncommitted and A8
+(b)'s "a refused rebuild never leaves raw partly written" holds for all
+three raw writers. Pinned by three declarations whose third re-declares an
+attribution: zero page rows in raw. (c) *The `sample` label is the sample
+declaration's row's* (finding 11): the loader admits the literal `sample` on
+a row whose `source` is the sample declaration's name (`SAMPLE`, the one
+declaration with `sample=True`) and only under the `samples` input — the
+input names the file such declarations exist in, the row's declaration
+names the row — so an anchor or a hand-entered row carrying `segment=sample`
+under `ROWS=samples` refuses; `attribution_labels` takes the input and the
+row's source, and pinned decision 5's "iff the input is `samples`" (A4 (b),
+A8 (e)) reads "iff the input is `samples` and the row is the sample
+declaration's". Pinned by an anchor row with `segment=sample` refused under
+`samples`, a sample-declared row loading, and the label refused under
+`captured` as before. Not taken: dropping `rows_input` (the input still
+decides where a sample declaration exists); looking the declaration object
+up per row (the row carries its declaration's name, which is the fact).
+
 ## Why
 
 Phase 2 built the collector and proved it on a frozen sample, but the one
