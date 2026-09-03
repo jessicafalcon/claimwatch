@@ -247,17 +247,30 @@ def _store_row(**over: str) -> dict[str, str]:
     return row
 
 
-def test_a_corrected_figure_for_an_entered_day_refuses_the_load(tmp_path):
+@pytest.mark.parametrize(
+    ("field", "corrected"),
+    [
+        ("rating", "4.8"),
+        ("review_count", "13001"),
+        ("one_star_share", "0.1"),
+        ("response_rate", "0.5"),
+        ("response_delay_days", "2"),
+    ],
+)
+def test_a_corrected_figure_for_an_entered_day_refuses_the_load(
+    tmp_path, field, corrected
+):
     """A2 (round 1, finding 1): a hand-read row whose key is already in the
-    corpus under other figures is refused with one line naming its line and
-    the fix — never tiebroken by hash order. The same figures again add
+    corpus under other figures — any of the five measures (round 2,
+    functionality-tester F4) — is refused with one line naming its line and
+    the fix, never tiebroken by hash order. The same figures again add
     nothing; a corrected figure on a NEW day is a new point."""
     db = tmp_path / "w.duckdb"
     first = _manual(tmp_path, "m1.csv", [_store_row()])
     rebuild(
         "duckdb", "captured", database=db, cache_dir=tmp_path / "no", manual_file=first
     )
-    corrected = _manual(tmp_path, "m2.csv", [_store_row(rating="4.8")])
+    changed = _manual(tmp_path, "m2.csv", [_store_row(**{field: corrected})])
     with pytest.raises(
         PageShapeError, match=r"line 2: a snapshot for .*make reset"
     ) as exc:
@@ -266,7 +279,7 @@ def test_a_corrected_figure_for_an_entered_day_refuses_the_load(tmp_path):
             "captured",
             database=db,
             cache_dir=tmp_path / "no",
-            manual_file=corrected,
+            manual_file=changed,
         )
     assert "\n" not in str(exc.value)
     again = rebuild(
@@ -274,7 +287,7 @@ def test_a_corrected_figure_for_an_entered_day_refuses_the_load(tmp_path):
     )
     assert again["raw_platform_snapshots"] == pins.ANCHOR_ROWS + 1
     new_day = _manual(
-        tmp_path, "m3.csv", [_store_row(rating="4.8", captured_at="2026-09-03")]
+        tmp_path, "m3.csv", [_store_row(**{field: corrected}, captured_at="2026-09-03")]
     )
     later = rebuild(
         "duckdb",
