@@ -93,16 +93,12 @@ def test_rebuild_from_the_sample_prints_the_metric(isolated_paths, capsys):
 
 
 def test_rebuild_from_captures_under_the_cache(isolated_paths, capsys):
-    import shutil
-    from pathlib import Path
 
     from tests import pins
+    from tests.test_ingest_rebuild import _capture
 
-    sample = Path(__file__).resolve().parent.parent / "fixtures" / "app-store"
-    feed = by_name("fr-digital-first")  # a capture lives under platform/name
-    shutil.copytree(
-        sample, isolated_paths / feed.platform / feed.name / "2026-09-01T08-00-00"
-    )
+    # a capture lives under platform/name, at the feed's declared addresses
+    _capture(isolated_paths, "2026-09-01T08-00-00", "2026-09-01T08:00:00")
     assert main(["rebuild"]) == 0
     out = capsys.readouterr().out
     assert "no captures" not in out
@@ -252,13 +248,10 @@ def test_a_malformed_stored_page_is_a_one_line_refusal_from_rebuild(
     """Fix amendment A3: a hand-corrupted page-1.json under the cache makes
     `rebuild` and `idempotency-check` print one line naming the page and the
     field, exit 2, no traceback."""
-    import shutil
-    from pathlib import Path
 
-    sample = Path(__file__).resolve().parent.parent / "fixtures" / "app-store"
-    feed = by_name("fr-digital-first")
-    d = isolated_paths / feed.platform / feed.name / "2026-09-01T08-00-00"
-    shutil.copytree(sample, d)
+    from tests.test_ingest_rebuild import _capture
+
+    d = _capture(isolated_paths, "2026-09-01T08-00-00", "2026-09-01T08:00:00")
     (d / "page-1.json").write_text('{"feed": {"entry": [{"id": "no label"}]}}')
     for argv in (["rebuild"], ["idempotency-check", "--rows=captured"]):
         assert main(argv) == 2

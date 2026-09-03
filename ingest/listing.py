@@ -34,6 +34,10 @@ EXTENSION = "html"
 SAMPLE_PLATFORM = "google-play"  # the frozen sample is written in that store's shape
 SAMPLE_HOST = "play.google.com"
 SAMPLE_DIR = ROOT / "fixtures" / "listings"
+# The frozen sample's page address, as its meta carries it (A4 (c)).
+SAMPLE_PAGES = (
+    f"https://{SAMPLE_HOST}/store/apps/details?id=example.fictional.app&hl=fr&gl=FR",
+)
 # A rating, as a JSON number or a digit string, and a count alike must fit
 # their columns: `parsed.rating_from_page` (a bounded digit run — at most two
 # digits before the point and thirty-two after, a store prints fifteen — so

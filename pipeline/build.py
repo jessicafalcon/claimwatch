@@ -608,7 +608,12 @@ def rebuild(
     try:
         create_raw(conn)
         if rows != "none":
-            write_source_pages(conn, run_id or "declared")
+            # every declaration the input loads, the samples' under `samples`,
+            # so every captured row joins exactly one page (A4 (c))
+            declared = SOURCES + (
+                tuple(sample_source(p) for p in PARSERS) if rows == "samples" else ()
+            )
+            write_source_pages(conn, run_id or "declared", declared)
             load_snapshots(conn, read_anchors(), run_id or "anchors", rows)
         if rows == "synthetic":
             load_reviews(conn, read_fixture("synthetic"), run_id or "synthetic")

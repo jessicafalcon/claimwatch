@@ -43,12 +43,15 @@ from datetime import date
 from html.parser import HTMLParser
 
 from ingest.parsed import Parsed, count_in_range, rating_from_page, refuse
-from ingest.sources import ROOT, Source
+from ingest.sources import ROOT, Source, profile_pages
 
 EXTENSION = "html"
 SAMPLE_PLATFORM = "opinion-assurances"
 SAMPLE_HOST = "www.opinion-assurances.fr"
 SAMPLE_DIR = ROOT / "fixtures" / "opinion-assurances"
+# The frozen sample's three page addresses, as its meta files carry them: a
+# fake, nameless profile (A4 (c)).
+SAMPLE_PAGES = profile_pages(f"https://{SAMPLE_HOST}/assureur-exemple-fictif.html", 3)
 _SENTENCE = re.compile(
     r"^\S+ publié le (\d{2}/\d{2}/\d{4}) suite à une expérience le (\d{2}/\d{2}/\d{4})$"
 )

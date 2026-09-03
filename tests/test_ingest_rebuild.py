@@ -34,6 +34,10 @@ def _capture(root: Path, capture_id: str, captured_at: str, edit=None) -> Path:
     for meta in d.glob("page-*.meta.json"):
         m = json.loads(meta.read_text())
         m["captured_at"] = captured_at
+        # the sample's own addresses (id=0) become the feed's declared ones:
+        # a capture page is accepted at a declared address only (A4 (c))
+        n = int(meta.name.split("-")[1].split(".")[0])
+        m["source_url"] = FEED.page_url(n)
         meta.write_text(json.dumps(m))
     if edit is not None:
         page = d / "page-1.json"
@@ -110,7 +114,7 @@ def test_every_row_carries_its_declarations_attribution_not_the_modules():
             platform="twin-platform",
             host=mod.SAMPLE_HOST,
             parser=parser,
-            pages=(),
+            pages=mod.SAMPLE_PAGES,
             profile="twin-profile",
             segment="traditional",
             channel="unsolicited",
@@ -153,14 +157,14 @@ def test_pages_beyond_nine_are_read_in_numeric_order(tmp_path):
     for n in range(1, 11):
         (d / f"page-{n}.json").write_bytes(page)
         meta = {
-            "source_url": f"https://itunes.apple.com/fr/rss/x/page={n}/json",
+            "source_url": FEED.page_url(n),  # a declared address (A4 (c))
             "captured_at": pins.APP_STORE_SAMPLE_CAPTURED_AT,
             "status": 200,
         }
         (d / f"page-{n}.meta.json").write_text(json.dumps(meta))
     expected = [f"page-{n}.json" for n in range(1, 11)]
     assert [p.name for p in capture_pages(d, "json")] == expected
-    ((_, parsed),) = read_captures(d, SAMPLE_SRC)
+    ((_, parsed),) = read_captures(d, FEED)
     rows = parsed.reviews
     seen = [int(r["source_url"].rsplit("page=", 1)[1].split("/")[0]) for r in rows]
     assert seen == sorted(seen) and seen[-1] == 10
@@ -372,6 +376,78 @@ def test_meta_is_validated_against_the_sources_declared_host(tmp_path, monkeypat
     monkeypatch.setattr(politeness, "ALLOWED_HOSTS", ())
     ((_, parsed),) = read_captures(cache / FEED_DIR, FEED)
     assert len(parsed.reviews) == sum(pins.APP_STORE_SAMPLE_ITEMS_ON_PAGES)
+
+
+def test_a_capture_page_outside_the_declared_addresses_is_refused(tmp_path):
+    """A4 (c): a meta on the declared host but at an address the declaration
+    does not list — page 11 of a ten-page feed, a query-string variant — is
+    refused naming the address, so no captured row can exist without its
+    `raw_source_pages` row (round 3, code-reviewer #4)."""
+    cache = tmp_path / "cache"
+    d = _capture(cache, "2026-09-01T08-00-00", "2026-09-01T08:00:00")
+    meta_path = d / "page-1.meta.json"
+    meta = json.loads(meta_path.read_text())
+    for url in (
+        FEED.page_url(10).replace("page=10", "page=11"),
+        FEED.page_url(1) + "?x=1",
+        FEED.page_url(1).upper(),
+    ):
+        meta["source_url"] = url
+        meta_path.write_text(json.dumps(meta))
+        with pytest.raises(PageShapeError, match="not a declared page address") as exc:
+            read_captures(cache / FEED_DIR, FEED)
+        assert url in str(exc.value) and FEED.name in str(exc.value)
+        with pytest.raises(PageShapeError):
+            rebuild(
+                "duckdb", "captured", database=tmp_path / "w.duckdb", cache_dir=cache
+            )
+
+
+def test_sample_pages_are_the_frozen_meta_addresses():
+    """A4 (c): each parser's `SAMPLE_PAGES` is exactly the addresses its frozen
+    meta files carry, in page order, and the sample declaration's pages."""
+    from ingest.captures import capture_pages, parser_module
+    from ingest.sources import PARSERS
+
+    for parser in PARSERS:
+        mod = parser_module(parser)
+        stored = tuple(
+            json.loads(
+                p.with_name(
+                    p.name[: -len(mod.EXTENSION) - 1] + ".meta.json"
+                ).read_text()
+            )["source_url"]
+            for p in capture_pages(mod.SAMPLE_DIR, mod.EXTENSION)
+        )
+        assert stored == mod.SAMPLE_PAGES == sample_source(parser).pages, parser
+        assert all(u.startswith(f"https://{mod.SAMPLE_HOST}/") for u in stored)
+
+
+def test_every_sample_review_joins_exactly_one_declared_page(tmp_path):
+    """A4 (c): under `samples`, which CI runs, every review row joins exactly
+    one `raw_source_pages` row — the zero-join half of invariant 4, pinned
+    where it was unguarded (round 3, code-reviewer #4)."""
+    from ingest.sources import PARSERS
+
+    db = tmp_path / "w.duckdb"
+    counts = rebuild("duckdb", "samples", database=db)
+    assert counts["raw_source_pages"] == sum(len(s.pages) for s in SOURCES) + sum(
+        len(sample_source(p).pages) for p in PARSERS
+    )
+    joined = _query(
+        db,
+        "select r.source, r.external_id, count(p.source_url) from stg_reviews r "
+        "left join raw_source_pages p "
+        "on r.source = p.source and r.source_url = p.source_url "
+        "group by r.source, r.external_id",
+    )
+    assert len(joined) == pins.SAMPLES_RAW_REVIEWS
+    assert all(n == 1 for _, _, n in joined), joined
+    assert _query(
+        db,
+        "select distinct profile from raw_source_pages where run_id "
+        "= 'declared' and source_url in (select source_url from stg_reviews)",
+    ) == [("sample",)]
 
 
 def test_every_captured_review_joins_exactly_one_declared_page(tmp_path):

@@ -37,6 +37,12 @@ EXTENSION = "json"
 SAMPLE_PLATFORM = SOURCE
 SAMPLE_HOST = "itunes.apple.com"
 SAMPLE_DIR = ROOT / "fixtures" / "app-store"
+# The frozen sample's page addresses, as its meta files carry them (an app id
+# of 0: no real app); the sample declaration's pages (A4 (c)).
+SAMPLE_PAGES = tuple(
+    f"https://{SAMPLE_HOST}/fr/rss/customerreviews/id=0/sortBy=mostRecent/page={n}/json"
+    for n in (1, 2, 3)
+)
 RATING_MIN, RATING_MAX = 1, 5
 _DIGITS = re.compile(r"^[0-9]+$")
 

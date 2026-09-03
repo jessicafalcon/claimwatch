@@ -32,7 +32,8 @@ SEGMENTS = ("digital-first", "traditional", "digital-challenger")
 CHANNELS = ("invited", "unsolicited")
 ORIGINS = ("anchor", "manual", "fetch")  # how a snapshot row came to be
 # The parsers, by module name under `ingest/` — a closed set; each module
-# exposes parse(), EXTENSION, SAMPLE_PLATFORM, SAMPLE_HOST, SAMPLE_DIR.
+# exposes parse(), EXTENSION, SAMPLE_PLATFORM, SAMPLE_HOST, SAMPLE_DIR and
+# SAMPLE_PAGES (the frozen meta files' addresses, A4 (c)).
 PARSERS = ("app_store", "listing", "opinion_assurances")
 SAMPLE = "sample"  # the name and attribution of a frozen sample's declaration
 
@@ -179,7 +180,9 @@ def profile_pages(profile_url: str, pages: int) -> tuple[str, ...]:
 def sample_source(parser: str) -> Source:
     """The declaration a frozen sample is read under (`ROWS=samples`): its
     profile, segment and channel are the literal `sample` — labels that exist
-    only in the samples database — and it is never fetched."""
+    only in the samples database — its pages are the frozen meta files'
+    addresses, so its rows join `raw_source_pages` like any capture's (A4
+    (c)), and it is never fetched."""
     from ingest.captures import parser_module  # the closed-set lookup
 
     mod = parser_module(parser)
@@ -188,7 +191,7 @@ def sample_source(parser: str) -> Source:
         platform=mod.SAMPLE_PLATFORM,
         host=mod.SAMPLE_HOST,
         parser=parser,
-        pages=(),
+        pages=mod.SAMPLE_PAGES,
         profile=SAMPLE,
         segment=SAMPLE,
         channel=SAMPLE,

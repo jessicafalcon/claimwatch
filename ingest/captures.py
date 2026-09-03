@@ -5,12 +5,15 @@ A capture is one run's saved copy of a source's pages exactly as they arrived:
 `captured_at`, `status`), plus the robots file the run obeyed. A rebuild reads
 no clock and asks the site nothing: everything comes from these files.
 
-The meta is parsed strictly (fix amendment A4): exactly the three fields,
-`captured_at` a real `YYYY-MM-DDTHH:MM:SS` instant (staging's dedup sort key),
-`source_url` an https address on the declaring source's own host — the host
-the declaration names, not the fetch-time allowlist, so shrinking the
-allowlist never unloads a legitimately captured row — and `status` the integer
-200. Anything else refuses the capture with the file and field named."""
+The meta is parsed strictly (Phase 2's amendment A4): exactly the three
+fields, `captured_at` a real `YYYY-MM-DDTHH:MM:SS` instant (staging's dedup
+sort key), `source_url` an https address on the declaring source's own host
+— the host the declaration names, not the fetch-time allowlist, so shrinking
+the allowlist never unloads a legitimately captured row — and one of the
+declaration's page addresses, exactly (Phase 3a's A4 (c)), so every captured
+row joins its `raw_source_pages` row by construction; and `status` the
+integer 200. Anything else refuses the capture with the file and field
+named."""
 
 from __future__ import annotations
 
@@ -41,7 +44,8 @@ def page_pattern(ext: str) -> re.Pattern[str]:
     return re.compile(rf"^page-([0-9]+)\.{re.escape(ext)}$")
 
 
-def read_meta(path: Path, host: str) -> dict[str, object]:
+def read_meta(path: Path, source: Source) -> dict[str, object]:
+    host = source.host
     try:
         meta = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
@@ -62,6 +66,11 @@ def read_meta(path: Path, host: str) -> dict[str, object]:
     if parts is None or parts.scheme != "https" or parts.hostname != host:
         raise PageShapeError(
             f"{path}: field 'source_url' is not an https address on {host!r}"
+        )
+    if url not in source.pages:
+        raise PageShapeError(
+            f"{path}: field 'source_url' is not a declared page address of "
+            f"{source.name!r}: {url}"
         )
     status = meta["status"]
     if type(status) is not int or status != 200:
@@ -115,7 +124,7 @@ def read_captures(root: Path, source: Source) -> list[tuple[str, Parsed]]:
             try:
                 meta = read_meta(
                     page.with_name(page.name[: -len(mod.EXTENSION) - 1] + ".meta.json"),
-                    source.host,
+                    source,
                 )
                 one = mod.parse(
                     page.read_bytes(),
