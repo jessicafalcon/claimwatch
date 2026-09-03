@@ -215,3 +215,16 @@ def test_a_block_nested_past_the_stack_declares_nothing_not_a_traceback():
     html = _html().replace(_BLOCK.search(_html()).group(2), "[" * 100_000)
     with pytest.raises(PageShapeError, match="'aggregateRating' is missing"):
         parse(html, PAGE_URL, CAPTURED, SRC)
+
+
+def test_a_count_under_both_names_refuses_the_page():
+    """`ratingCount` and `reviewCount` are two spellings of one figure; a page
+    carrying both is outside the shape and refuses, even when they agree —
+    two foreign values are never resolved by preference (round 3,
+    code-reviewer #6)."""
+    doc = _block()
+    agg = doc["aggregateRating"]
+    for other in (agg["ratingCount"], 7):
+        agg["reviewCount"] = other
+        with pytest.raises(PageShapeError, match="both appear"):
+            parse(_with_block(doc), PAGE_URL, CAPTURED, SRC)

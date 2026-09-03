@@ -105,6 +105,13 @@ def _count(aggregate: dict[str, object], page_url: str) -> int:
         raise refuse(
             page_url, None, "ratingCount", "is missing (and so is reviewCount)"
         )
+    if len(present) > 1:
+        # Two foreign values for one figure are never resolved by preference;
+        # like a second ratingValue, they are the page outside its shape
+        # (round 3, code-reviewer #6).
+        raise refuse(
+            page_url, None, "ratingCount", "and reviewCount both appear: one count"
+        )
     field_name = present[0]
     value = aggregate[field_name]
     count = count_in_range(value)
