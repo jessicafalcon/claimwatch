@@ -19,7 +19,12 @@
 # `make confirm reset`. The `confirm` recipe stamps its make process's id
 # (`$$PPID`, the recipe shell's parent); `reset`/`scrape` pass their own and
 # Python confirms only when the two are one process, consuming the stamp
-# (spec Phase 3a, A4 (d); pinned by tests/test_makefile.py).
+# (spec Phase 3a, A4 (d); pinned by tests/test_makefile.py). What that holds
+# against is a variable, an environment, MAKEFLAGS and a stale invocation —
+# not a same-user process writing data/ while make runs, which could plant
+# the stamp: the stamp is created exclusively, so a planted file makes
+# `confirm` itself refuse, and a `confirm` with no goal after it refuses so
+# no stamp is left behind (A8 (d)).
 unexport SPEC BASE TARGET ROWS SOURCE
 _Q = '$(subst ','\'',$(1))'
 
@@ -52,7 +57,7 @@ idempotency-check: ## rebuild twice, diff per-table row counts (run-twice proper
 	uv run python -m pipeline idempotency-check --target=$(call _Q,$(value TARGET)) --rows=$(call _Q,$(value ROWS))
 
 confirm: ## arm reset or scrape for THIS invocation only: `make confirm reset`, `make confirm scrape`
-	@uv run python -m pipeline confirm --make-pid=$$PPID
+	@uv run python -m pipeline confirm --make-pid=$$PPID --goals=$(call _Q,$(MAKECMDGOALS))
 
 reset: ## DESTRUCTIVE drop every DuckDB file this repo built (the corpus and one per rebuild input, past or present) — needs `make confirm reset`
 	uv run python -m pipeline reset --target=$(call _Q,$(value TARGET)) --make-pid=$$PPID

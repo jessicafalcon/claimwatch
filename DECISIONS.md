@@ -436,6 +436,9 @@ scraper, no model.
   was shown to report `command line` (GNU Make 3.81 and 4.x alike); a goal
   cannot arrive that way, so `make confirm reset` stamps the make process's
   id and `reset` runs only in that process (A4 (d), [Phase 3a](#phase-3a)).
+  The stamp is created exclusively and a trailing `confirm` refuses; what the
+  gate does not hold against — a same-user process writing `data/` while
+  make runs — is written in the spec's Threat model (A8 (d)).
   Mirrors the SPEC/BASE shape for the variables.
 
 **Gotchas:** none — DuckDB's `create or replace`, `insert … where not exists`
@@ -787,7 +790,9 @@ renamed the rebuild input, closed five BACKLOG rows.
   on the loader (a caller's value); deriving the sample pages from the meta
   files (a declaration read from data); reading make's own argv through `ps`
   (a process tree the recipe does not own); a stamp age check (a clock in
-  the CLI; the process id and the consumed stamp suffice); a zero count for
+  the CLI; the process id and the consumed stamp hold against a variable, an
+  environment, `MAKEFLAGS` and a stale invocation — the residual, a same-user
+  process writing `data/` while make runs, is stated in A8 (d)); a zero count for
   a peer the brief does not count (a number no source gave); dropping the
   two peers (two Documented ratings the brief does state).
 - **A5 (first live run, approved and built 2026-09-03): the review text is a

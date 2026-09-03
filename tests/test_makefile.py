@@ -182,7 +182,8 @@ def test_reset_and_scrape_take_the_make_pid_not_a_confirm_variable():
             )
             assert "--make-pid=$PPID" in out, (target, origin, out)
             assert "--confirm" not in out and "yes" not in out, (target, origin, out)
-    assert "--make-pid=$PPID" in _make_n("confirm", {}, {})
+    out = _make_n("confirm", {}, {})
+    assert "--make-pid=$PPID" in out and "--goals='confirm'" in out  # A8 (d)
 
 
 PROBE = (
@@ -225,10 +226,20 @@ def test_confirm_is_a_goal_of_the_same_invocation():
         assert _probe(["probe"], {"MAKEFLAGS": "CONFIRM=yes"}) == 2
         assert _probe(["probe"], {"MAKEFLAGS": "confirm"}) == 2
         assert _probe(["probe"], {"MAKECMDGOALS": "confirm"}) == 2
-        assert _probe(["confirm"], {}) == 0  # a confirm with nothing after it
-        assert CONFIRM_STAMP.exists()
-        assert _probe(["probe"], {}) == 2  # another invocation: another process
+        # A8 (d): a confirm with nothing after it refuses and leaves no stamp,
+        # so no armed stamp outlives its invocation.
+        assert _probe(["confirm"], {}) == 2
+        assert not CONFIRM_STAMP.exists()
+        assert _probe(["probe", "confirm"], {}) == 2  # confirm last: refused too
+        assert not CONFIRM_STAMP.exists()
+        # A stale stamp (an earlier invocation's process id) confirms nothing
+        # and is consumed; a planted stamp makes `confirm` itself refuse.
+        CONFIRM_STAMP.write_text("99999\n", encoding="utf-8")
+        assert _probe(["probe"], {}) == 2  # another process: not this one
         assert not CONFIRM_STAMP.exists()  # and the stale stamp is gone
+        CONFIRM_STAMP.write_text("99999\n", encoding="utf-8")
+        assert _probe(["confirm", "probe"], {}) == 2  # confirm refuses: file there
+        assert CONFIRM_STAMP.read_text(encoding="utf-8") == "99999\n"  # untouched
     finally:
         CONFIRM_STAMP.unlink(missing_ok=True)
 

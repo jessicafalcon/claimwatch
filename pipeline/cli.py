@@ -16,6 +16,7 @@ loads `httpx`."""
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 from ingest import sources
@@ -67,11 +68,32 @@ def confirmed(make_pid: str) -> bool:
 
 def _do_confirm(args: argparse.Namespace) -> int:
     """`make confirm`: stamp this invocation's make process id for the `reset`
-    or `scrape` goal that follows it in the same command."""
+    or `scrape` goal that follows it in the same command. A `confirm` that is
+    the last goal (or the only one) refuses, so no armed stamp outlives its
+    invocation; the stamp is created exclusively with owner-only permissions,
+    so a file already there — planted, or left by a killed run — makes this
+    recipe refuse naming it rather than overwrite it (A8 (d)). What the gate
+    holds against is a variable, an environment, `MAKEFLAGS` and a stale
+    invocation; a same-user process able to write `data/` while make runs is
+    outside it, and the Threat model says so."""
     if not args.make_pid.isdigit():
         raise Refused("refusing: --make-pid is not a process id")
+    goals = args.goals.split()
+    if not goals or goals[-1] == "confirm":
+        raise Refused(
+            "refusing: `confirm` arms the goal that follows it in the same command; "
+            "nothing follows (`make confirm reset`, `make confirm scrape`)"
+        )
     CONFIRM_STAMP.parent.mkdir(parents=True, exist_ok=True)
-    CONFIRM_STAMP.write_text(args.make_pid + "\n", encoding="utf-8")
+    try:
+        fd = os.open(CONFIRM_STAMP, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError as exc:
+        raise Refused(
+            f"refusing: a confirmation stamp already exists at {CONFIRM_STAMP}; it "
+            "is not this invocation's — remove it and run the command again"
+        ) from exc
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(args.make_pid + "\n")
     print(
         "confirm: armed for this make invocation — `reset` or `scrape` must follow "
         "in the same command (`make confirm reset`, `make confirm scrape`)"
@@ -212,6 +234,7 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--rows", default="")
     p = sub.add_parser("confirm", add_help=False)
     p.add_argument("--make-pid", dest="make_pid", default="")
+    p.add_argument("--goals", default="")  # make's own goal list, in order
     p = sub.add_parser("reset", add_help=False)
     p.add_argument("--target", default="")
     p.add_argument("--make-pid", dest="make_pid", default="")
