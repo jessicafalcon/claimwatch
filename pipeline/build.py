@@ -33,11 +33,11 @@ import hashlib
 import re
 import tempfile
 from datetime import date
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from pathlib import Path
 
 from ingest.captures import parser_module, read_captures
-from ingest.parsed import PageShapeError, count_in_range
+from ingest.parsed import MEASURES, PageShapeError, count_in_range
 from ingest.sources import (
     CHANNELS,
     PARSERS,
@@ -136,20 +136,30 @@ def _refuse_row(where: str, line: int, field: str, why: str) -> PageShapeError:
     return PageShapeError(f"{where}: line {line}: field {field!r} {why}")
 
 
-def _decimal(
-    value: str, *, where: str, line: int, field: str, lo: Decimal, hi: Decimal | None
-) -> Decimal | None:
-    """An optional decimal inside [lo, hi] (hi None = unbounded); empty -> None."""
+def _decimal(value: str, *, where: str, line: int, field: str) -> Decimal | None:
+    """An optional measure, exactly as written, inside its column's digit
+    shape and range (`parsed.MEASURES`, A4 (a)); empty -> None. A figure with
+    more decimals than the column's scale is outside the shape and refuses
+    here, never rounded by the engine at the load."""
     if value == "":
         return None
-    if not re.fullmatch(r"[0-9]{1,6}(\.[0-9]{1,6})?", value):  # bounded, digits only
-        raise _refuse_row(where, line, field, f"is not a number: {value!r}")
-    try:
-        number = Decimal(value)
-    except InvalidOperation as exc:
-        raise _refuse_row(where, line, field, f"is not a number: {value!r}") from exc
-    if not number.is_finite() or number < lo or (hi is not None and number > hi):
-        raise _refuse_row(where, line, field, f"is outside the range: {value!r}")
+    measure = MEASURES[field]
+    number = measure.exact(value)
+    if number is None:
+        raise _refuse_row(
+            where,
+            line,
+            field,
+            f"is not a number the column holds (decimal({measure.precision}, "
+            f"{measure.scale}), digits only): {value!r}",
+        )
+    if not measure.in_range(number):
+        raise _refuse_row(
+            where,
+            line,
+            field,
+            f"is outside the range {measure.lo}..{measure.hi}: {value!r}",
+        )
     return number
 
 
@@ -176,44 +186,15 @@ def _day(value: str, *, where: str, line: int, field: str) -> str:
 
 
 def _measures(row: dict[str, str], *, where: str, line: int) -> dict[str, object]:
-    one = Decimal(1)
-    return {
-        "rating": _decimal(
-            row["rating"],
-            where=where,
-            line=line,
-            field="rating",
-            lo=Decimal(0),
-            hi=Decimal(5),
-        ),
+    out: dict[str, object] = {
+        "rating": _decimal(row["rating"], where=where, line=line, field="rating"),
         "review_count": _count(
             row["review_count"], where=where, line=line, field="review_count"
         ),
-        "one_star_share": _decimal(
-            row["one_star_share"],
-            where=where,
-            line=line,
-            field="one_star_share",
-            lo=Decimal(0),
-            hi=one,
-        ),
-        "response_rate": _decimal(
-            row["response_rate"],
-            where=where,
-            line=line,
-            field="response_rate",
-            lo=Decimal(0),
-            hi=one,
-        ),
-        "response_delay_days": _decimal(
-            row["response_delay_days"],
-            where=where,
-            line=line,
-            field="response_delay_days",
-            lo=Decimal(0),
-            hi=None,
-        ),
     }
+    for field in ("one_star_share", "response_rate", "response_delay_days"):
+        out[field] = _decimal(row[field], where=where, line=line, field=field)
+    return out
 
 
 def _read_csv(path: Path, columns: tuple[str, ...]) -> list[dict[str, str]]:
@@ -335,8 +316,20 @@ def load_snapshots(conn, rows: list[dict[str, object]], run_id: str) -> None:
     hand entry, a re-frozen seed or a parser whose fingerprint changed, and
     the fix is
     `make reset CONFIRM=yes` then `make rebuild`, since the corpus is rebuilt
-    from tracked inputs. Nothing is
-    tiebroken downstream: the key is unique in raw."""
+    from tracked inputs. Nothing is tiebroken downstream: the key is unique
+    in raw. The batch is one transaction (A4 (a)): a refusal on any row
+    leaves none of the batch in raw, so a refused rebuild never leaves the
+    corpus partly written."""
+    conn.execute("begin transaction")
+    try:
+        _load_snapshots(conn, rows, run_id)
+    except BaseException:
+        conn.execute("rollback")
+        raise
+    conn.execute("commit")
+
+
+def _load_snapshots(conn, rows: list[dict[str, object]], run_id: str) -> None:
     for r in rows:
         h = snapshot_hash(r)
         key = [r[c] for c in SNAPSHOT_KEY]

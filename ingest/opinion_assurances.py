@@ -40,10 +40,9 @@ from __future__ import annotations
 import hashlib
 import re
 from datetime import date
-from decimal import ROUND_HALF_EVEN, Decimal, InvalidOperation
 from html.parser import HTMLParser
 
-from ingest.parsed import Parsed, count_in_range, refuse
+from ingest.parsed import Parsed, count_in_range, rating_from_page, refuse
 from ingest.sources import ROOT, Source
 
 EXTENSION = "html"
@@ -58,7 +57,6 @@ _AGGREGATE_TYPE = re.compile(r"^https?://schema\.org/aggregaterating$", re.I)
 _PERSON_TYPE = re.compile(r"^https?://schema\.org/person$", re.I)
 _VOID = frozenset({"meta", "br", "img", "input", "hr", "link", "source", "wbr"})
 _SEP = "\x1f"
-_PLACES = Decimal("0.001")
 
 
 def _classes(attrs: dict[str, str | None]) -> set[str]:
@@ -265,16 +263,11 @@ def _snapshot_row(
     aggregate: dict[str, str | None], page_url: str, captured_at: str, source: Source
 ) -> dict[str, object]:
     value = aggregate.get("ratingValue")
-    if value is None or not re.fullmatch(r"[0-9]{1,2}(\.[0-9]{1,32})?", value):
-        raise refuse(page_url, None, "ratingValue", f"is not a number: {value!r}")
-    try:
-        rating = Decimal(value).quantize(_PLACES, rounding=ROUND_HALF_EVEN)
-    except InvalidOperation as exc:
+    rating = rating_from_page(value) if value is not None else None
+    if rating is None:
         raise refuse(
-            page_url, None, "ratingValue", f"is not a number: {value!r}"
-        ) from exc
-    if not Decimal(0) <= rating <= Decimal(5):
-        raise refuse(page_url, None, "ratingValue", f"is outside 0..5: {value!r}")
+            page_url, None, "ratingValue", f"is not a number in 0..5: {value!r}"
+        )
     count = count_in_range(aggregate.get("ratingCount"))
     if count is None:
         raise refuse(

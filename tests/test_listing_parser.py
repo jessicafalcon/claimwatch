@@ -88,6 +88,7 @@ def test_two_aggregate_ratings_refuse_the_page():
     "value",
     [
         "5.1",
+        "5.0006",  # rounds to 5.001, past the column's range
         "-0.5",
         "abc",
         "",
@@ -163,6 +164,7 @@ def test_rating_is_rounded_half_even_to_three_places():
         ("4.1235", "4.124"),
         ("4.1225", "4.122"),
         (5, "5.000"),
+        ("4.9996", "5.000"),  # rounds to the column's edge: inside
     ]
     for value, kept in cases:
         doc["aggregateRating"]["ratingValue"] = value

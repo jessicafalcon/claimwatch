@@ -586,6 +586,131 @@ def test_a_hand_entry_names_a_source_with_no_parser(tmp_path):
     assert accepted, "at least one hand-entered source is declared"
 
 
+@pytest.mark.parametrize("rows", ["synthetic", "samples"])
+def test_every_loaded_rows_fingerprint_is_its_stored_value(tmp_path, rows):
+    """A4 (a): the fingerprint is computed from what the column stores — a
+    row read back from raw, re-fingerprinted, matches its own `content_hash`
+    for every row of every input, so nothing the engine would have rescaled
+    ever reached the loader (round 3, finding 1)."""
+    from pipeline.build import snapshot_hash
+
+    db = tmp_path / "w.duckdb"
+    rebuild("duckdb", rows, database=db)
+    conn = connect("duckdb", database=db)
+    try:
+        cur = conn.execute("select * from raw_platform_snapshots")
+        names = [d[0] for d in cur.description]
+        stored = [dict(zip(names, r, strict=True)) for r in cur.fetchall()]
+    finally:
+        conn.close()
+    assert stored
+    for row in stored:
+        assert snapshot_hash(row) == row["content_hash"], row
+
+
+def test_a_measure_beyond_its_columns_scale_or_range_refuses(tmp_path):
+    """A4 (a): every measure's bound is its column's, declared once — the
+    edge of each column loads exactly as written, one digit past it refuses
+    at the parse naming line and field, never a driver exception at the load
+    (round 3, security-reviewer #4 #5, functionality-tester F1 F2)."""
+    from ingest.parsed import MEASURES
+
+    assert set(MEASURES) == {
+        "rating",
+        "one_star_share",
+        "response_rate",
+        "response_delay_days",
+    }
+    assert str(MEASURES["response_delay_days"].hi) == "9999.9"
+    edge = _store_row(
+        rating="4.123",
+        one_star_share="0.999",
+        response_rate="1",
+        response_delay_days="9999.9",
+    )
+    (row,) = read_manual_snapshots(
+        _write_csv(tmp_path / "e.csv", MANUAL_COLUMNS, [edge])
+    )
+    assert (row["rating"], row["response_delay_days"]) == (
+        Decimal("4.123"),
+        Decimal("9999.9"),
+    )
+    db = tmp_path / "w.duckdb"
+    rebuild(
+        "duckdb",
+        "captured",
+        database=db,
+        cache_dir=tmp_path / "no",
+        manual_file=tmp_path / "e.csv",
+    )
+    assert _query(
+        db,
+        "select rating, one_star_share, response_rate, response_delay_days from "
+        "raw_platform_snapshots where origin = 'manual'",
+    ) == [(Decimal("4.123"), Decimal("0.999"), Decimal("1.000"), Decimal("9999.9"))]
+    for field, past in (
+        ("rating", "4.1234"),
+        ("one_star_share", "0.9999"),
+        ("response_delay_days", "10000"),
+        ("response_delay_days", "9999.99"),
+    ):
+        path = _write_csv(
+            tmp_path / "p.csv", MANUAL_COLUMNS, [_store_row(**{field: past})]
+        )
+        with pytest.raises(PageShapeError, match=f"line 2: field '{field}'") as exc:
+            read_manual_snapshots(path)
+        assert "\n" not in str(exc.value)
+
+
+def test_a_refused_batch_loads_nothing(tmp_path):
+    """A4 (a): the loader's batch is one transaction — a batch whose second
+    row is a same-key pair leaves its first row out of raw too, so a refused
+    rebuild never leaves the corpus partly written (round 3,
+    functionality-tester F6)."""
+    from pipeline.build import load_snapshots
+
+    def point(url: str, count: int) -> dict[str, object]:
+        return {
+            "source": "app-store",
+            "profile": "fr-digital-first",
+            "segment": "digital-first",
+            "channel": "invited",
+            "origin": "manual",
+            "rating": Decimal("4.9"),
+            "review_count": count,
+            "one_star_share": None,
+            "response_rate": None,
+            "response_delay_days": None,
+            "source_url": url,
+            "captured_at": "2026-09-02",
+            "seeded_from": "",
+        }
+
+    db = tmp_path / "w.duckdb"
+    rebuild("duckdb", "synthetic", database=db)
+    conn = connect("duckdb", database=db)
+    try:
+        load_snapshots(conn, [point("https://a/", 1)], "first")
+        with pytest.raises(PageShapeError, match="other figures"):
+            load_snapshots(conn, [point("https://b/", 2), point("https://a/", 3)], "x")
+        rows = conn.execute(
+            "select source_url, review_count from raw_platform_snapshots "
+            "where origin = 'manual' order by 1"
+        ).fetchall()
+        assert rows == [("https://a/", 1)]
+        load_snapshots(
+            conn, [point("https://b/", 2)], "later"
+        )  # the loader still works
+        assert (
+            conn.execute(
+                "select count(*) from raw_platform_snapshots where origin = 'manual'"
+            ).fetchone()[0]
+            == 2
+        )
+    finally:
+        conn.close()
+
+
 def test_manual_file_columns_are_exactly_the_declared_eight(tmp_path):
     assert len(MANUAL_COLUMNS) == 8
     bad = _write_csv(tmp_path / "m.csv", MANUAL_COLUMNS + ("note",), [])
@@ -613,7 +738,12 @@ def test_manual_file_columns_are_exactly_the_declared_eight(tmp_path):
         ("review_count", "2147483648", "not a non-negative integer"),  # column ceiling
         ("rating", "4." + "9" * 5000, "not a number"),
         ("one_star_share", "1.5", "outside the range"),
-        ("response_rate", "82", "outside the range"),
+        ("response_rate", "82", "not a number the column holds"),  # two digits
+        ("response_rate", "1.5", "outside the range"),
+        ("rating", "4.1234", "not a number the column holds"),  # past the scale
+        ("response_delay_days", "10000", "not a number the column holds"),
+        ("response_delay_days", "12.34", "not a number the column holds"),
+        ("one_star_share", "0.9999", "not a number the column holds"),
         (
             "response_delay_days",
             "-1",

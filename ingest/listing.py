@@ -17,24 +17,29 @@ average it."""
 from __future__ import annotations
 
 import math
-import re
-from decimal import ROUND_HALF_EVEN, Decimal, InvalidOperation
+from decimal import Decimal
 from html.parser import HTMLParser
 
-from ingest.parsed import PageShapeError, Parsed, count_in_range, decode_json, refuse
+from ingest.parsed import (
+    PageShapeError,
+    Parsed,
+    count_in_range,
+    decode_json,
+    rating_from_page,
+    refuse,
+)
 from ingest.sources import ROOT, Source
 
 EXTENSION = "html"
 SAMPLE_PLATFORM = "google-play"  # the frozen sample is written in that store's shape
 SAMPLE_HOST = "play.google.com"
 SAMPLE_DIR = ROOT / "fixtures" / "listings"
-# Bounded runs: a rating has at most two digits before the point and at most
-# thirty-two after (a store prints fifteen). A longer string is outside the
-# shape and refuses; it never reaches Decimal(), whose own limits would
-# surface as a traceback (round 1, security-reviewer #2). A count, as a JSON
-# number or a digit string, must fit the column: `parsed.count_in_range`.
-_NUMBER = re.compile(r"^[0-9]{1,2}(\.[0-9]{1,32})?$")
-_PLACES = Decimal("0.001")
+# A rating, as a JSON number or a digit string, and a count alike must fit
+# their columns: `parsed.rating_from_page` (a bounded digit run — at most two
+# digits before the point and thirty-two after, a store prints fifteen — so
+# nothing long reaches Decimal(); round 1, security-reviewer #2) and
+# `parsed.count_in_range`, both derived from the one declaration of the
+# columns (A4 (a)).
 
 
 class _Blocks(HTMLParser):
@@ -84,18 +89,15 @@ def _rating(value: object, page_url: str) -> Decimal:
     # those spellings, and a non-finite Decimal would raise at the range
     # comparison, a traceback past the parser (round 3, security-reviewer #2).
     if isinstance(value, bool) or not (
-        (isinstance(value, str) and _NUMBER.match(value))
+        isinstance(value, str)
         or (isinstance(value, int | float) and math.isfinite(value))
     ):
         raise refuse(page_url, None, "ratingValue", f"is not a number: {value!r}")
-    try:
-        rating = Decimal(str(value)).quantize(_PLACES, rounding=ROUND_HALF_EVEN)
-    except InvalidOperation as exc:
+    rating = rating_from_page(str(value))
+    if rating is None:
         raise refuse(
-            page_url, None, "ratingValue", f"is not a number: {value!r}"
-        ) from exc
-    if not Decimal(0) <= rating <= Decimal(5):
-        raise refuse(page_url, None, "ratingValue", f"is outside 0..5: {value!r}")
+            page_url, None, "ratingValue", f"is not a number in 0..5: {value!r}"
+        )
     return rating
 
 

@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
+from decimal import ROUND_HALF_EVEN, Decimal, InvalidOperation
 
 # `raw_platform_snapshots.review_count` is an `integer` column (32-bit signed):
 # the shape every count must fit, whatever brought it — a store page's JSON
@@ -37,6 +38,76 @@ def count_in_range(value: object) -> int | None:
     else:
         return None
     return number if 0 <= number <= MAX_COUNT else None
+
+
+@dataclass(frozen=True)
+class Measure:
+    """One snapshot measure as its column holds it — `decimal(precision,
+    scale)` inside [lo, hi] — and the two ways a value may reach it: a hand
+    entry EXACTLY as written (more decimals than the scale is outside the
+    shape: a person's reading is never rounded for them) or a page's figure
+    ROUNDED half-even to the scale. Either way nothing reaches the loader
+    that the column would rescale, so the fingerprint is the stored value
+    (spec Phase 3a, A4 (a))."""
+
+    precision: int
+    scale: int
+    lo: Decimal
+    hi: Decimal
+
+    @property
+    def places(self) -> Decimal:
+        return Decimal(1).scaleb(-self.scale)
+
+    @property
+    def pattern(self) -> str:
+        """The digit shape the column holds: at most precision - scale digits
+        before the point and scale after — bounded, so nothing long reaches
+        Decimal()."""
+        return rf"[0-9]{{1,{self.precision - self.scale}}}(\.[0-9]{{1,{self.scale}}})?"
+
+    def exact(self, text: str) -> Decimal | None:
+        """A hand-read figure, as written; None when its digit shape is not
+        the column's (the caller then names the field)."""
+        if not re.fullmatch(self.pattern, text):
+            return None
+        return Decimal(text)
+
+    def rounded(self, value: Decimal) -> Decimal:
+        """A page's figure, rounded half-even to the column's scale."""
+        return value.quantize(self.places, rounding=ROUND_HALF_EVEN)
+
+    def in_range(self, value: Decimal) -> bool:
+        return value.is_finite() and self.lo <= value <= self.hi
+
+
+def _ceiling(precision: int, scale: int) -> Decimal:
+    return Decimal(10) ** (precision - scale) - Decimal(1).scaleb(-scale)
+
+
+# `raw_platform_snapshots`' four decimal measures, declared once with their
+# columns' precision, scale and range; every reader — a hand entry, a store
+# page's JSON-LD, a profile page's microdata — derives its check from here,
+# the way `count_in_range` does for the count (A4 (a)).
+MEASURES: dict[str, Measure] = {
+    "rating": Measure(4, 3, Decimal(0), Decimal(5)),
+    "one_star_share": Measure(4, 3, Decimal(0), Decimal(1)),
+    "response_rate": Measure(4, 3, Decimal(0), Decimal(1)),
+    "response_delay_days": Measure(5, 1, Decimal(0), _ceiling(5, 1)),
+}
+
+
+def rating_from_page(value: str) -> Decimal | None:
+    """A page's rating text -> the column's value: a bounded digit run,
+    rounded to the column's scale, inside its range; None otherwise (the
+    parser names page and field)."""
+    if not re.fullmatch(r"[0-9]{1,2}(\.[0-9]{1,32})?", value):
+        return None
+    try:
+        rating = MEASURES["rating"].rounded(Decimal(value))
+    except InvalidOperation:
+        return None
+    return rating if MEASURES["rating"].in_range(rating) else None
 
 
 class PageShapeError(ValueError):
