@@ -398,62 +398,64 @@ idempotency check).
 **Proposed after review round 5 (2026-09-03) — A9: the confirm gate arms a
 gated goal or nothing and reads a goal list of make's own origin only; the
 declared-page writer writes a batch or nothing; the `sample` label is the
-sample declaration's row's.** *Status: PROPOSED, awaiting approval.* Restores
-the Threat model's `confirm` row as stated (no armed stamp outlives its
-invocation; the environment supplies no goal), invariant 1's atomicity for
-the third raw writer as A8 (b) gave it to the second, and invariant 1's "the
-literal `sample` on a row a sample declaration wrote" as a property of the
-row rather than of the input. (a) *The gate's goal is a member of a closed
-set, and the list it is read from is make's own* (round 5, findings 1, 2, 3,
-4, 5): `confirm` arms only when the goal that follows it in the invocation
-is one of `GATED = ("reset", "scrape")` — `make confirm help`, `make confirm
-rebuild` and a trailing `confirm` refuse with one line and leave no stamp,
-so the ordinary typo A8 (d) left open is closed by the set, not by a
-position check; the recipe passes `$(origin MAKECMDGOALS)` beside the list
-and `confirm` refuses a list whose origin is not `default` — make's own goal
-list is the one definition with that origin, and one from the environment
-(`environment`), from `MAKEFLAGS` or from the command line (`command line`)
-is refused, so the Threat model's "no goal arrives from the environment"
-becomes a check rather than a claim (probed against the installed make:
-`default`, `environment`, `command line`, `command line`); every gated
-target consumes the stamp as its first act, before its own refusals
-(`_do_scrape`'s "no fetchable source", `_do_reset`'s `TARGET`), so no
-refusal on a gated path leaves the stamp armed; a stamp create that fails
-for any reason but "already there" (a read-only `data/`, say) refuses with
-one line naming the path, never a traceback. The stuck gate after a leaked
-stamp (finding 2) closes for every leak an ordinary command can make; the
-stamp a killed run leaves still makes the next `confirm` refuse naming the
-file, which is A8 (d)'s design. Pinned against the installed make by `make
-confirm help` and `make confirm` refusing with no stamp left, `make confirm
-reset` and `make confirm scrape` arming, `MAKECMDGOALS='confirm reset'` in
-the environment, on the command line and through `MAKEFLAGS` refusing with
-no stamp, a `TARGET=snowflake` reset after `confirm` leaving no stamp, and
-the six A4 (d) forms still refusing; the Threat model's `confirm` row, the
-DECISIONS entry, CLAUDE.md's `make confirm` entry, the Makefile's header and
-`pipeline/cli.py`'s docstrings say the same one thing. Not taken: dropping
-the goal-list check and widening the residual (a leaked stamp is then the
-ordinary case, not the residual); a Makefile-side `$(filter …)` (it runs on
-the same overridable variable); a list of goals that may not follow
+sample declaration's row's.** *Status: APPROVED 2026-09-03 on the developer's
+word ("lets follow your recommendation"); built in the commits that follow,
+then one exit pass in place of a sixth round.* Restores the Threat model's
+`confirm` row as stated (no armed stamp outlives its invocation; the
+environment supplies no goal), invariant 1's atomicity for the third raw
+writer as A8 (b) gave it to the second, and invariant 1's "the literal
+`sample` on a row a sample declaration wrote" as a property of the row rather
+than of the input. (a) *The gate's goal is a member of a closed set, and the
+list it is read from is make's own* (round 5, findings 1, 2, 3, 4, 5):
+`confirm` arms only when the goal that follows it in the invocation is one of
+`GATED = ("reset", "scrape")` — `make confirm help`, `make confirm rebuild`
+and a trailing `confirm` refuse with one line and leave no stamp, so the
+ordinary typo A8 (d) left open is closed by the set, not by a position check;
+the recipe passes `$(origin MAKECMDGOALS)` beside the list and `confirm`
+refuses a list whose origin is not `default` — make's own goal list is the one
+definition with that origin, and one from the environment (`environment`),
+from `MAKEFLAGS` or from the command line (`command line`) is refused, so the
+Threat model's "no goal arrives from the environment" becomes a check rather
+than a claim (probed against the installed make: `default`, `environment`,
+`command line`, `command line`); every gated target consumes the stamp as its
+first act, before its own refusals (`_do_scrape`'s "no fetchable source",
+`_do_reset`'s `TARGET`), so no refusal on a gated path leaves the stamp armed;
+a stamp create that fails for any reason but "already there" (a read-only
+`data/`, say) refuses with one line naming the path, never a traceback. The
+stuck gate after a leaked stamp (finding 2) closes for every leak an ordinary
+command can make; the stamp a killed run leaves still makes the next `confirm`
+refuse naming the file, which is A8 (d)'s design. Pinned against the installed
+make by `make confirm help` and `make confirm` refusing with no stamp left,
+`make confirm reset` and `make confirm scrape` arming, `MAKECMDGOALS='confirm
+reset'` in the environment, on the command line and through `MAKEFLAGS`
+refusing with no stamp, a `TARGET=snowflake` reset after `confirm` leaving no
+stamp, and the six A4 (d) forms still refusing; the Threat model's `confirm`
+row, the DECISIONS entry, CLAUDE.md's `make confirm` entry, the Makefile's
+header and `pipeline/cli.py`'s docstrings say the same one thing. Not taken:
+dropping the goal-list check and widening the residual (a leaked stamp is then
+the ordinary case, not the residual); a Makefile-side `$(filter …)` (it runs
+on the same overridable variable); a list of goals that may not follow
 `confirm` (a denylist). (b) *The declared-page writer writes a batch or
 nothing* (finding 6): `write_source_pages` runs its batch in one transaction
-as `load_reviews` and `load_snapshots` do, so a re-declaration refused on
-the third source leaves the first two sources' pages uncommitted and A8
-(b)'s "a refused rebuild never leaves raw partly written" holds for all
-three raw writers. Pinned by three declarations whose third re-declares an
-attribution: zero page rows in raw. (c) *The `sample` label is the sample
-declaration's row's* (finding 11): the loader admits the literal `sample` on
-a row whose `source` is the sample declaration's name (`SAMPLE`, the one
-declaration with `sample=True`) and only under the `samples` input — the
-input names the file such declarations exist in, the row's declaration
-names the row — so an anchor or a hand-entered row carrying `segment=sample`
-under `ROWS=samples` refuses; `attribution_labels` takes the input and the
-row's source, and pinned decision 5's "iff the input is `samples`" (A4 (b),
-A8 (e)) reads "iff the input is `samples` and the row is the sample
-declaration's". Pinned by an anchor row with `segment=sample` refused under
-`samples`, a sample-declared row loading, and the label refused under
-`captured` as before. Not taken: dropping `rows_input` (the input still
-decides where a sample declaration exists); looking the declaration object
-up per row (the row carries its declaration's name, which is the fact).
+as `load_reviews` and `load_snapshots` do, so a re-declaration refused on the
+third source leaves the first two sources' pages uncommitted and A8 (b)'s "a
+refused rebuild never leaves raw partly written" holds for all three raw
+writers. Pinned by three declarations whose third re-declares an attribution:
+zero page rows in raw. (c) *The `sample` label is the sample declaration's
+row's* (finding 11): the loader admits the literal `sample` on a row whose
+`profile` is the sample declaration's (`SAMPLE`, the one profile only a
+`sample=True` declaration may carry — a real declaration naming it refuses at
+its declaration) and only under the `samples` input — the input names the file
+such declarations exist in, the row's declaration names the row — so an anchor
+or a hand-entered row carrying `segment=sample` under `ROWS=samples` refuses;
+`attribution_labels` takes the input and the row's profile, and pinned
+decision 5's "iff the input is `samples`" (A4 (b), A8 (e)) reads "iff the
+input is `samples` and the row is the sample declaration's". Pinned by an
+anchor row with `segment=sample` refused under `samples`, a sample-declared
+row loading, and the label refused under `captured` as before. Not taken:
+dropping `rows_input` (the input still decides where a sample declaration
+exists); looking the declaration object up per row (the row carries its
+declaration's profile, which is the fact).
 
 ## Why
 
@@ -625,7 +627,7 @@ make rebuild && make idempotency-check ROWS=captured
 
 | Invariant ("for all …, … holds") | Falsified by (scenario test) |
 |---|---|
-| 1. For all snapshot rows, the four provenance columns and `profile` are non-empty, `origin` is a value from its closed set, `segment` and `channel` are values from their closed sets or the literal `sample` on a row a sample declaration wrote — a label that exists only in the samples database (A3) — the loader refusing any other value, and the row reads back `Documented` iff `origin = anchor` and `Measured` otherwise; every measure is bounded by its column's precision, scale and range at the parse, so the fingerprint is the stored value; a re-seed, a re-entry or a second rebuild changes no count; the key `(source, profile, origin, source_url, captured_at)` is unique in raw, a row whose key is already there under other figures or another attribution refuses the load rather than being tiebroken (A2, A3), and a refused batch leaves none of its rows in raw (A4) — a review batch as a snapshot batch (A8). | `tests/test_snapshots.py::test_anchors_seed_nine_documented_rows_with_provenance`, `::test_manual_and_fetched_rows_read_back_as_measured`, `::test_reseeding_reentering_and_rebuilding_add_no_snapshot_row` — anchors, a manual row and a capture each loaded twice: nine plus one plus one, both times; `::test_a_corrected_figure_for_an_entered_day_refuses_the_load`, `::test_a_corrected_attribution_for_an_entered_key_refuses_the_load` (A3), `::test_two_entries_for_one_day_in_one_file_refuse_naming_the_second_line`, `::test_a_hand_read_row_is_never_swallowed_by_an_anchor_with_its_numbers`, `::test_the_snapshot_key_is_unique_in_raw`; `::test_a_row_outside_a_closed_set_or_with_empty_provenance_refuses_the_load`, `::test_every_loaded_rows_fingerprint_is_its_stored_value`, `::test_a_measure_beyond_its_columns_scale_or_range_refuses`, `::test_a_refused_batch_loads_nothing` (A4); `tests/test_rebuild.py::test_a_refused_review_batch_loads_nothing` (A8); `tests/test_provenance.py::test_every_raw_table_has_four_provenance_columns` over `synthetic` and `samples`; `tests/test_ingest_layout.py::test_no_two_hand_entered_sources_share_a_platform_and_listing` (A2), `::test_the_sample_declaration_is_a_property_not_a_name` (A3), `::test_a_hand_entered_declaration_needs_a_listing` (A4) |
+| 1. For all snapshot rows, the four provenance columns and `profile` are non-empty, `origin` is a value from its closed set, `segment` and `channel` are values from their closed sets or the literal `sample` on a row a sample declaration wrote — a label that exists only in the samples database (A3) — the loader refusing any other value, and the row reads back `Documented` iff `origin = anchor` and `Measured` otherwise; every measure is bounded by its column's precision, scale and range at the parse, so the fingerprint is the stored value; a re-seed, a re-entry or a second rebuild changes no count; the key `(source, profile, origin, source_url, captured_at)` is unique in raw, a row whose key is already there under other figures or another attribution refuses the load rather than being tiebroken (A2, A3), and a refused batch leaves none of its rows in raw (A4) — a review batch as a snapshot batch (A8), and a declared-page batch as both (A9); the literal `sample` is admitted on a row whose `profile` is the sample declaration's, under `samples` alone (A9). | `tests/test_snapshots.py::test_anchors_seed_nine_documented_rows_with_provenance`, `::test_manual_and_fetched_rows_read_back_as_measured`, `::test_reseeding_reentering_and_rebuilding_add_no_snapshot_row` — anchors, a manual row and a capture each loaded twice: nine plus one plus one, both times; `::test_a_corrected_figure_for_an_entered_day_refuses_the_load`, `::test_a_corrected_attribution_for_an_entered_key_refuses_the_load` (A3), `::test_two_entries_for_one_day_in_one_file_refuse_naming_the_second_line`, `::test_a_hand_read_row_is_never_swallowed_by_an_anchor_with_its_numbers`, `::test_the_snapshot_key_is_unique_in_raw`; `::test_a_row_outside_a_closed_set_or_with_empty_provenance_refuses_the_load`, `::test_every_loaded_rows_fingerprint_is_its_stored_value`, `::test_a_measure_beyond_its_columns_scale_or_range_refuses`, `::test_a_refused_batch_loads_nothing` (A4); `tests/test_rebuild.py::test_a_refused_review_batch_loads_nothing` (A8); `tests/test_ingest_rebuild.py::test_a_refused_page_batch_writes_nothing`, `tests/test_snapshots.py::test_the_sample_label_is_the_sample_declarations_rows` (A9); `tests/test_provenance.py::test_every_raw_table_has_four_provenance_columns` over `synthetic` and `samples`; `tests/test_ingest_layout.py::test_no_two_hand_entered_sources_share_a_platform_and_listing` (A2), `::test_the_sample_declaration_is_a_property_not_a_name` (A3), `::test_a_hand_entered_declaration_needs_a_listing` (A4) |
 | 2. For all rebuild inputs but `none`, the anchors seed the same nine rows and the four marts are byte-identical across two rebuilds under different wall-clock times; a Pending row's mart does not exist. | `tests/test_marts.py::test_marts_are_byte_stable_across_rebuilds` (every clock the data path imports made to raise; every column compared, `run_id` included), `::test_rating_trend_matches_pins` and siblings; `make check-backing` (orphans) |
 | 3. For all declared sources, the parser, cache directory, host, page addresses, attribution and terms position are read from the declaration; a source declared not fetchable is never requested whatever its robots file says — a plain run skips it with one line, naming it refuses; no module outside `ingest/sources.py` and the parsers' own constants compares a platform or source name; a capture's meta is accepted iff its `source_url` is one of the declaring source's page addresses, exactly (A4); a hand entry names a source with no parser — the set the uniqueness check covers (A3); a raw table already in the file is its `sql/raw/` declaration — name, type and nullability, by position, read from the engine's catalog in the schema the engine names — or the rebuild refuses before loading, and a raw file is exactly one `create table if not exists` statement (A7, A8). | `tests/test_ingest_layout.py::test_no_module_branches_on_a_platform_name`, `::test_the_cache_root_is_bound_once`; `tests/test_fetch_sources.py::test_a_non_fetchable_source_is_refused_before_any_request_whatever_robots_says` — a permissive robots body and a non-fetchable source: only no request at all; `tests/test_ingest_rebuild.py::test_meta_is_validated_against_the_sources_declared_host` — a meta on another allowed host refuses; the allowlist shrunk in a test does not unload a declared source's capture; `::test_a_capture_page_outside_the_declared_addresses_is_refused`, `::test_sample_pages_are_the_frozen_meta_addresses` (A4); `tests/test_snapshots.py::test_a_hand_entry_names_a_source_with_no_parser` (A3); `tests/test_rebuild.py::test_a_raw_table_built_under_a_previous_declaration_refuses_the_rebuild` (A7), `::test_a_nullability_drift_refuses_with_one_line`, `::test_columns_in_another_order_refuse_naming_the_position`, `::test_a_stray_scratch_named_table_refuses_naming_itself`, `::test_a_raw_file_with_two_statements_refuses_before_any_runs`, `::test_the_scratch_declaration_is_listed_in_the_engines_default_schema` (A8) |
 | 4. For all captured review rows, `(source, source_url)` joins exactly one `source_pages` row — a re-declaration that changes a page's attribution refuses the rebuild rather than appending a second row (A3), and the frozen samples join under `samples` (A4) — and for all files under `sql/`, no `like`, `similar to` or regex function appears: attribution is exact-value or Python-written, never a pattern in SQL. | `tests/test_ingest_rebuild.py::test_every_captured_review_joins_exactly_one_declared_page` — a capture under a declared source joins, one `raw_source_pages` row per address; a page address outside the declaration is an unattributed row and the test fails; `::test_a_redeclared_attribution_refuses_the_rebuild` (A3); `::test_every_sample_review_joins_exactly_one_declared_page` (A4); `tests/test_sql_portable.py::test_pattern_matching_is_refused_in_sql` |
@@ -1055,7 +1057,7 @@ holds no address, no name, no free text (`read_from` is the word `page`).
 | Target | empty | `../x` | `"; ` | env-exported | `$(origin)` | Pinned by |
 |---|---|---|---|---|---|---|
 | `scrape` | `SOURCE` empty → every declared source (non-fetchable ones report one line each; each fetchable one fetches — two today, on two hosts, at most 60 pages each); no `confirm` goal before it → prompt on a tty, refuse non-interactively, no request (residual as the `confirm` row states) | `SOURCE` refused — a declared name, never a path; the capture directory is derived from the declaration | one literal arg; not a declared name → refused | `unexport`ed; validated in Python; `CONFIRM=yes` from the environment, or through `MAKEFLAGS`, reaches no recipe → refused, no request | n/a — the gate is the `confirm` goal of the same invocation (A4 (d)), not a variable's origin | `tests/test_makefile.py::test_scrape_passes_source_unexpanded_and_its_make_pid`, `::test_confirm_is_a_goal_of_the_same_invocation`, `::test_scrape_source_is_a_closed_set`, `::test_scrape_variables_reach_python_as_one_literal`; `tests/test_cli.py::test_cli_scrape_refuses_without_the_confirm_goal`, `::test_cli_scrape_skips_a_source_declared_not_fetchable_and_exits_0`, `::test_cli_scrape_exits_2_only_on_a_refusal_met_during_the_run`, `::test_cli_scrape_naming_a_source_declared_not_fetchable_is_a_refusal` (round 1: a plain run skips such a source with one line; naming it, or a refusal met during the run, is exit 2) |
-| `confirm` | takes no variable; stamps its make process's id under `data/` (created exclusively, owner-only) for the `reset` or `scrape` that follows in the same invocation; as the last goal it refuses and leaves no stamp; a stamp already there makes it refuse naming the file (A8 (d)) | n/a | n/a | `MAKEFLAGS='CONFIRM=yes'`, `MAKEFLAGS='confirm'`, `MAKECMDGOALS=confirm` in the environment: no goal arrives, nothing confirmed. Residual, stated: the gate holds against a variable, an environment, `MAKEFLAGS` and a stale invocation, not against a same-user process that writes `data/` while make runs (A8 (d)) | n/a | `tests/test_makefile.py::test_confirm_is_a_goal_of_the_same_invocation` (against the installed make), `::test_reset_and_scrape_take_the_make_pid_not_a_confirm_variable`; `tests/test_cli.py::test_confirm_stamps_one_invocation_and_reset_consumes_it` |
+| `confirm` | takes no variable; stamps its make process's id under `data/` (created exclusively, owner-only) for the `reset` or `scrape` that follows in the same invocation; it arms only when the goal after it is `reset` or `scrape`, refusing otherwise with no stamp left (A9); a stamp already there makes it refuse naming the file (A8 (d)) | n/a | n/a | `MAKEFLAGS='CONFIRM=yes'`, `MAKEFLAGS='confirm'`: no goal arrives, nothing confirmed; `MAKECMDGOALS=…` from the environment, `MAKEFLAGS` or the command line: the list's origin is not make's own (`$(origin MAKECMDGOALS)` is not `default`), refused, no stamp (A9). Residual, stated: the gate holds against a variable, an environment, `MAKEFLAGS` and a stale invocation, not against a same-user process that writes `data/` while make runs (A8 (d)) | n/a | `tests/test_makefile.py::test_confirm_arms_a_gated_goal_or_nothing`, `::test_confirm_is_a_goal_of_the_same_invocation` (both against the installed make), `::test_reset_and_scrape_take_the_make_pid_not_a_confirm_variable`; `tests/test_cli.py::test_confirm_arms_only_a_gated_goal_from_makes_own_list` (A9); `tests/test_cli.py::test_confirm_stamps_one_invocation_and_reset_consumes_it` |
 | `rebuild` | `ROWS` → `captured` (zero captures → the anchors and the manual file, with a one-line hint) | refused (closed set of four names) | one literal arg; refused | `unexport`ed; validated in Python | n/a | `tests/test_makefile.py::test_rebuild_variables_are_a_closed_set` (re-pinned to `ROWS`), `tests/test_cli.py::test_cli_refuses_bad_rows_with_exit_2` |
 | `idempotency-check` | `ROWS` → `synthetic` | refused | refused | `unexport`ed; validated in Python | n/a | `tests/test_makefile.py::test_idempotency_check_variables_are_a_closed_set` (re-pinned) |
 | `reset` | no `confirm` goal before it: prompt on a tty, refuse non-interactively, nothing deleted (residual as the `confirm` row states) | n/a (no path taken) | n/a | `CONFIRM=yes` from the environment or `MAKEFLAGS` reaches no recipe | n/a — `make confirm reset`, the goal of the same invocation (A4 (d)) | `tests/test_makefile.py::test_reset_and_scrape_take_the_make_pid_not_a_confirm_variable`, `::test_confirm_is_a_goal_of_the_same_invocation`; `tests/test_cli.py::test_confirm_stamps_one_invocation_and_reset_consumes_it`, `::test_reset_removes_only_the_db_and_wal` (the file set re-pinned to the `ROWS` names) |
