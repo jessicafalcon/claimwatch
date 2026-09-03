@@ -854,3 +854,35 @@ renamed the rebuild input, closed five BACKLOG rows.
   values); a CLAUDE.md note alone (a silent failure; a note stops no build);
   comparing the file's text with a stored copy (a comment edit is not a
   schema change; a schema change can hide in equal bytes across engines).
+- **A8 (after review round 4, approved and built 2026-09-03): a raw table
+  is compared with its whole declaration; the review loader loads a batch
+  or nothing; the aggregate's declared scale is read like a review's; the
+  confirm gate says what it holds against; the database file and the label
+  set are derived from the input.** (a) `check_raw_declaration` reads name,
+  type and nullability by position, for the table and the scratch
+  declaration alike, from the schema the engine names
+  (`warehouse.default_schema`); a nullability drift refuses like a type —
+  the case A4 (e)'s nullable `review_count` opened, a driver
+  `ConstraintException` out of `make rebuild` on a corpus built before it; a
+  table already sitting under the scratch name refuses naming itself, not
+  the corpus; a raw file is exactly one `create table if not exists`
+  statement, comments stripped, and only that statement runs for the
+  scratch. (b) `load_reviews` runs its batch in one transaction, as
+  `load_snapshots` has since A4 (a). (c) The Opinion Assurances parser reads
+  the aggregate scope's `worstRating` and `bestRating` and refuses another
+  scale than the rating column's 0..5, the guard A6 gives each review scope;
+  the frozen sample already carried 0 and 5. (d) The confirm stamp is
+  created exclusively, owner-only, so a planted file makes `confirm` refuse
+  naming it; a `confirm` that is the last goal refuses and leaves no stamp;
+  the Threat model states the residual — a same-user process writing
+  `data/` while make runs — because the stamp is a file and make has no
+  channel between two recipes but a file. (e) `rebuild` takes a root
+  directory and the file is always `database_for(rows, root)`;
+  `load_snapshots` takes its input as a required argument. Rejected:
+  comparing without `order by ordinal_position` (unspecified order on other
+  engines); altering a column in place (rewrites history); a nonce between
+  the recipes (the channel is the same file); the process start time via
+  `ps` and an age check (both rejected in A4 (d)); a check that the file's
+  name is the input's (a spelling, not a derivation); a marker table naming
+  the input inside each file (a row no source produced, counted by the
+  idempotency check). Found by review round 4 (2026-09-03).

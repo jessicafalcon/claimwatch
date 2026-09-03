@@ -839,7 +839,12 @@ New code:
   `sql/raw/raw_reviews.sql` — `rating decimal(2,1)` (A6);
   `ingest/opinion_assurances.py` — the body guard (A5), the declared-scale
   check (A6); `pipeline/build.py` — `check_raw_declaration` (A7);
-  `pipeline/warehouse.py` — `default_schema` (round 4).
+  `pipeline/warehouse.py` — `default_schema` (round 4), `database_for(rows,
+  root)` (A8 (e)); `pipeline/build.py` — `check_raw_declaration` reads name,
+  type and nullability from the default schema and refuses a multi-statement
+  file (A8 (a)), `load_reviews` in one transaction (A8 (b)), `rebuild(root=)`
+  (A8 (e)); `ingest/opinion_assurances.py` — `AGGREGATE_SCALE` (A8 (c));
+  `pipeline/cli.py` — the exclusive stamp and `--goals` (A8 (d)).
 - `sql/raw/raw_platform_snapshots.sql`, `sql/raw/raw_source_pages.sql`,
   `sql/staging/stg_platform_snapshots.sql`, `sql/marts/rating_trend.sql`,
   `sql/marts/channel_gap.sql`, `sql/marts/platform_stats.sql`,
@@ -895,7 +900,7 @@ Freeze: fixtures/opinion-assurances/
       pointer on Phase 2's `FIXTURE` decision; the linear matcher; the
       `like` widening of the lint; Gotchas from the checks (the by-id App
       Store address redirects; the checks ran from the session, not by hand)
-      and from the first live run; the A2 through A7 entries with their
+      and from the first live run; the A2 through A8 entries with their
       rejected alternatives; the Gotchas on `$(origin)` and `MAKEFLAGS`, on a
       structure dump naming the fields and not their nesting, and on `create
       table if not exists` keeping the old column

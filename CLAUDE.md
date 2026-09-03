@@ -152,12 +152,14 @@ in the middle, and come out on the right as the numbers the study shows.
   (with no capture it says so); `none` runs it end to end with zero rows;
   `synthetic` loads the review fixture and the anchors; `samples` runs every
   frozen sample through its real parser (CI does). A raw table already in
-  the file must be the one its `sql/raw/` file declares, column for column
-  through the engine's own catalog; otherwise the rebuild refuses naming the
-  column and both types, since `create table if not exists` would keep the
-  old column and the engine would cast into it silently (`make confirm
-  reset` first). The Phase 3a DONE command
-  is `make rebuild && make idempotency-check ROWS=captured`.
+  the file must be the one its `sql/raw/` file declares — name, type and
+  nullability, column by column in the file's order, read from the engine's
+  own catalog; otherwise the rebuild refuses naming the column and both
+  sides, since `create table if not exists` would keep the old column and
+  the engine would cast into it silently (`make confirm reset` first). A raw
+  file is exactly one statement. The file a rebuild writes is always the
+  input's own, `friction_ledger[.<input>].duckdb` under `data/`. The Phase
+  3a DONE command is `make rebuild && make idempotency-check ROWS=captured`.
 - `make idempotency-check [TARGET=] [ROWS=synthetic]` — rebuild twice, diff
   per-table row counts (the run-twice property as a command); same `ROWS`
   values as `rebuild`, but this one defaults to `synthetic`; pass
@@ -179,7 +181,12 @@ in the middle, and come out on the right as the numbers the study shows.
   the SAME invocation and nothing else: `make confirm reset`, `make confirm
   scrape`. The recipe stamps its make process's id; the gated target passes
   its own and runs only when the two are one process; the stamp is consumed
-  either way, so an earlier `confirm` confirms nothing later.
+  either way, so an earlier `confirm` confirms nothing later. The stamp is
+  created exclusively, so a file already there makes `confirm` refuse; a
+  `confirm` with no goal after it refuses and leaves none. The gate holds
+  against a variable, an environment, `MAKEFLAGS` and a stale invocation, not
+  against a same-user process writing `data/` while make runs (the spec's
+  Threat model says so).
 - `make reset [TARGET=duckdb]` — DESTRUCTIVE: drop every DuckDB file this repo
   built, the corpus and one per rebuild input; needs `make confirm reset` (no
   variable and no environment value counts).
@@ -498,8 +505,8 @@ all approved and built; review rounds 1–4 done, their plain fixes built; A8
 (the raw comparison is the whole declaration; the review loader loads a batch
 or nothing; the aggregate's declared scale is read; the confirm gate's claim
 is narrowed and written down; the database file and the label set are derived
-from the input) PROPOSED after round 4, awaiting approval. Remaining: A8's
-approval and build, a scoped re-review of it, the exit audit. The DONE command
+from the input) approved and built after round 4. Remaining: a scoped
+re-review of A8, the exit audit. The DONE command
 is `make rebuild && make idempotency-check ROWS=captured`; Phase 1's line
 stays green (raw 40 / staging 39); CI runs `ROWS=synthetic` and
 `ROWS=samples`. Phase 2 merged (PR #4).
