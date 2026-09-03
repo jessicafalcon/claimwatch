@@ -115,6 +115,104 @@ def test_peer_ratings_matches_pins(anchors_db):
     )  # the unsolicited anchors with a rating
 
 
+def test_a_hand_read_and_a_fetched_point_reach_the_marts_as_measured(tmp_path):
+    """Done-when 2 on a Measured row, not only on the anchors: a fetched
+    listing (google-play, invited) and a hand-read stat row (app-store,
+    invited), both dated after every anchor, become the latest point of their
+    key in rating_trend, channel_gap and platform_stats, tagged Measured, with
+    their own address and day; the anchors stay Documented beside them; the
+    unsolicited-only peer_ratings mart is untouched by either (round 1,
+    code-reviewer #8, functionality-tester Done-when 2)."""
+    from pipeline.build import MANUAL_COLUMNS
+    from tests.test_snapshots import PLAY, _play_capture, _write_csv
+
+    store = "fr-digital-first-app-store-listing"
+    cache = tmp_path / "cache"
+    _play_capture(cache, "2026-09-02T10:00:00")
+    manual = _write_csv(
+        tmp_path / "manual.csv",
+        MANUAL_COLUMNS,
+        [
+            {
+                "source": store,
+                "captured_at": "2026-09-02",
+                "rating": "4.9",
+                "review_count": "13000",
+                "one_star_share": "0.05",
+                "response_rate": "0.5",
+                "response_delay_days": "3",
+                "read_from": "page",
+            }
+        ],
+    )
+    db = tmp_path / "w.duckdb"
+    rebuild("duckdb", "captured", database=db, cache_dir=cache, manual_file=manual)
+    from ingest.sources import by_name
+
+    store_url = by_name(store).listing
+    trend = _query(
+        db,
+        "select source, month, rating, tag, source_url, captured_at from rating_trend "
+        "where channel = 'invited' and profile = 'fr-digital-first' "
+        "order by source, month",
+    )
+    assert trend == [
+        (
+            "app-store",
+            "2024-09",
+            Decimal("4.900"),
+            "Documented",
+            "https://apps.apple.com/",
+            "2024-09-15",
+        ),
+        ("app-store", "2026-09", Decimal("4.900"), "Measured", store_url, "2026-09-02"),
+        (
+            "google-play",
+            "2024-09",
+            Decimal("4.500"),
+            "Documented",
+            "https://play.google.com/",
+            "2024-09-15",
+        ),
+        (
+            "google-play",
+            "2026-09",
+            Decimal("4.123"),
+            "Measured",
+            PLAY.page_url(1),
+            "2026-09-02T10:00:00",
+        ),
+    ]
+    gap = _query(
+        db,
+        "select source, rating, review_count, tag, captured_at from channel_gap "
+        "where channel = 'invited' and profile = 'fr-digital-first' order by source",
+    )
+    assert gap == [
+        ("app-store", Decimal("4.900"), 13000, "Measured", "2026-09-02"),
+        ("google-play", Decimal("4.123"), 1234, "Measured", "2026-09-02T10:00:00"),
+    ]
+    stats = _query(
+        db,
+        "select source, one_star_share, response_rate, response_delay_days, tag "
+        "from platform_stats order by source",
+    )
+    assert stats == [
+        ("app-store", Decimal("0.050"), Decimal("0.500"), Decimal("3.0"), "Measured"),
+        (
+            "opinion-assurances",
+            Decimal("0.231"),
+            Decimal("0.820"),
+            Decimal("1.5"),
+            "Documented",
+        ),
+        ("trustpilot", Decimal("0.180"), None, None, "Documented"),
+    ]
+    assert _query(db, "select distinct tag from peer_ratings") == [("Documented",)]
+    tags = {t for m in MARTS for (t,) in _query(db, f"select distinct tag from {m}")}
+    assert tags == {"Documented", "Measured"}
+
+
 def _no_clock(cls: type) -> type:
     """A date/datetime class whose `today()` and `now()` raise: reaching either
     on the data path is the failure. Parsing (`fromisoformat`, `strptime`)
