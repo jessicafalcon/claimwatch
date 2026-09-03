@@ -64,12 +64,12 @@ def confirmed(make_pid: str) -> bool:
     try:
         stamped = CONFIRM_STAMP.read_text(encoding="utf-8").strip()
     except OSError:
-        return False
+        stamped = None  # absent, unreadable, or a link to nowhere
     try:
-        CONFIRM_STAMP.unlink()
+        CONFIRM_STAMP.unlink()  # consumed whatever its state (exit pass)
     except OSError:
         pass
-    return bool(make_pid) and make_pid.isdigit() and stamped == make_pid
+    return stamped is not None and make_pid.isdigit() and stamped == make_pid
 
 
 def _do_confirm(args: argparse.Namespace) -> int:

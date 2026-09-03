@@ -221,9 +221,13 @@ def test_confirm_is_a_goal_of_the_same_invocation():
     and a stamp left by an earlier invocation each confirm nothing — a goal
     cannot arrive through the environment, and the stamp names one process
     (round 3, security-reviewer #1)."""
+    from pipeline.warehouse import DEFAULT_DB
+
+    existed = DEFAULT_DB.exists()  # the probe's `reset` deletes nothing (A9)
     try:
         assert _probe(["confirm", "reset"], {}) == 0
         assert not CONFIRM_STAMP.exists()  # consumed
+        assert DEFAULT_DB.exists() == existed  # the override took: no delete
         assert _probe(["reset"], {}) == 2
         assert _probe(["reset", "confirm"], {}) == 2  # reset runs first: no stamp yet
         assert _probe(["reset", "CONFIRM=yes"], {}) == 2

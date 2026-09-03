@@ -492,3 +492,22 @@ def test_cli_scrape_naming_a_source_declared_not_fetchable_is_a_refusal(
     assert code == 2
     assert err.count("\n") == 1 and "'no' is declared not fetchable" in err
     assert server.urls() == []
+    assert not cli.CONFIRM_STAMP.exists()  # consumed before the refusal (A9 (a))
+
+
+def test_a_dangling_symlink_at_the_stamp_is_consumed_by_the_next_gated_run(capsys):
+    """A link to nowhere at the stamp path makes `confirm` refuse (exclusive
+    create) and used to be never consumed, wedging the gate until removed by
+    hand; a gated run now consumes the stamp whatever its state, confirming
+    nothing, so the next `confirm` works (exit pass, security-reviewer #4)."""
+    import os
+
+    import pipeline.cli as cli
+
+    os.symlink(cli.CONFIRM_STAMP.parent / "nowhere", cli.CONFIRM_STAMP)
+    assert main(["confirm", "--make-pid=1", ORIGIN, "--goals=confirm reset"]) == 2
+    assert "already exists" in capsys.readouterr().err
+    assert main(["reset", "--make-pid=1"]) == 2  # confirms nothing
+    assert not os.path.lexists(cli.CONFIRM_STAMP)  # and the link is gone
+    assert main(["confirm", "--make-pid=1", ORIGIN, "--goals=confirm reset"]) == 0
+    cli.CONFIRM_STAMP.unlink()
