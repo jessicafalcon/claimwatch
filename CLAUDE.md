@@ -151,15 +151,16 @@ in the middle, and come out on the right as the numbers the study shows.
   `data/snapshots/manual_snapshots.csv` and every capture under `data/cache/`
   (with no capture it says so); `none` runs it end to end with zero rows;
   `synthetic` loads the review fixture and the anchors; `samples` runs every
-  frozen sample through its real parser (CI does). A raw table already in
-  the file must be the one its `sql/raw/` file declares — name, type and
+  frozen sample through its real parser (CI does). A raw table already in the
+  file must be the one its `sql/raw/` file declares — name, type and
   nullability, column by column in the file's order, read from the engine's
-  own catalog; otherwise the rebuild refuses naming the column and both
-  sides, since `create table if not exists` would keep the old column and
-  the engine would cast into it silently (`make confirm reset` first). A raw
-  file is exactly one statement. The file a rebuild writes is always the
-  input's own, `friction_ledger[.<input>].duckdb` under `data/`. The Phase
-  3a DONE command is `make rebuild && make idempotency-check ROWS=captured`.
+  own catalog; otherwise the rebuild refuses naming the column and both sides,
+  since `create table if not exists` would keep the old column and the engine
+  would cast into it silently (`make confirm reset` first). Each `sql/raw/`
+  file holds exactly one table definition, so nothing else in the file can run
+  while that check happens. The file a rebuild writes is always the input's
+  own, `friction_ledger[.<input>].duckdb` under `data/`. The Phase 3a DONE
+  command is `make rebuild && make idempotency-check ROWS=captured`.
 - `make idempotency-check [TARGET=] [ROWS=synthetic]` — rebuild twice, diff
   per-table row counts (the run-twice property as a command); same `ROWS`
   values as `rebuild`, but this one defaults to `synthetic`; pass
@@ -182,11 +183,11 @@ in the middle, and come out on the right as the numbers the study shows.
   scrape`. The recipe stamps its make process's id; the gated target passes
   its own and runs only when the two are one process; the stamp is consumed
   either way, so an earlier `confirm` confirms nothing later. The stamp is
-  created exclusively, so a file already there makes `confirm` refuse; a
-  `confirm` with no goal after it refuses and leaves none. The gate holds
-  against a variable, an environment, `MAKEFLAGS` and a stale invocation, not
-  against a same-user process writing `data/` while make runs (the spec's
-  Threat model says so).
+  written only when none is there, so a file already sitting in `data/` makes
+  `confirm` refuse rather than overwrite it; a `confirm` with no goal after it
+  refuses and leaves none. The gate holds against a variable, an environment,
+  `MAKEFLAGS` and a stale invocation, not against a same-user process writing
+  `data/` while make runs (the spec's Threat model says so).
 - `make reset [TARGET=duckdb]` — DESTRUCTIVE: drop every DuckDB file this repo
   built, the corpus and one per rebuild input; needs `make confirm reset` (no
   variable and no environment value counts).
@@ -491,27 +492,36 @@ shape the hand-written sample had guessed — the text's nesting and the
 half-star ratings (DECISIONS → Gotchas); A5 and A6 corrected the shape and the
 page parses: 40 reviews and the aggregate. The full 14-page scrape then ran:
 14 pages, 534 reviews, and the profile's aggregate (3.8 on 534 reviews,
-Measured); the DONE command passes on it. Amendments this phase: A2 (the
-snapshot key names its declaration and a same-key pair refuses; the stat row
-is one row per stat), A3 (a changed attribution refuses; the sample
-declaration is a property, not a name; a hand entry names a source with no
-parser), A4 (every measure's bound is its column's and a refused batch loads
-nothing; the loader checks its closed sets; a capture's address is a declared
-page; `make confirm <target>` replaces the CONFIRM variable; the ranged peer
-anchors are placements), A5 (the review text is a child of the review scope),
-A6 (a review's rating is a half-step, 1 to 5, exactly the scale the site
-declares) and A7 (a rebuild refuses a raw table that is not its declaration),
-all approved and built; review rounds 1–4 done, their plain fixes built; A8
-(the raw comparison is the whole declaration; the review loader loads a batch
-or nothing; the aggregate's declared scale is read; the confirm gate's claim
-is narrowed and written down; the database file and the label set are derived
-from the input) approved and built after round 4. Remaining: a scoped
-re-review of A8, the exit audit. The DONE command
-is `make rebuild && make idempotency-check ROWS=captured`; Phase 1's line
-stays green (raw 40 / staging 39); CI runs `ROWS=synthetic` and
-`ROWS=samples`. Phase 2 merged (PR #4).
-Next: the Phase 3a PR; then Phase 3b — Trustpilot.
+Measured); the DONE command passes on it.
 
-Open BACKLOG rows: **14**.
+Amendments this phase, each approved and built: A2 (the snapshot key names its
+declaration and a same-key pair refuses; the stat row is one row per stat), A3
+(a changed attribution refuses; the sample declaration is a property, not a
+name; a hand entry names a source with no parser), A4 (every measure's bound
+is its column's and a refused batch loads nothing; the loader checks its
+closed sets; a capture's address is a declared page; `make confirm <target>`
+replaces the CONFIRM variable; the ranged peer anchors are placements), A5
+(the review text is a child of the review scope), A6 (a review's rating is a
+half-step, 1 to 5, exactly the scale the site declares) and A7 (a rebuild
+refuses a raw table that is not its declaration). A8, approved and built after
+round 4: the raw comparison is the whole declaration; the review loader loads
+a batch or nothing; the aggregate's declared scale is read; the confirm gate's
+claim is narrowed and written down; the database file and the label set are
+derived from the input. Review rounds 1–5 done and their plain fixes built
+(round 5's six: a column's position is the catalog's ordinal, the schema
+filters are pinned, a declaration the engine cannot run refuses with one line,
+a doubled bound refuses, every shape guard matches the whole value, one name
+for the capture directory). A9 is proposed after round 5 and awaits approval:
+the confirm gate arms a gated goal or nothing and reads a goal list of make's
+own origin only; the declared-page writer writes a batch or nothing; the
+`sample` label is the sample declaration's row's.
+
+Remaining: A9's approval and build, its scoped re-review, the exit audit. The
+DONE command is `make rebuild && make idempotency-check ROWS=captured`; Phase
+1's line stays green (raw 40 / staging 39); CI runs `ROWS=synthetic` and
+`ROWS=samples`. Phase 2 merged (PR #4). Next: the Phase 3a PR; then Phase 3b —
+Trustpilot.
+
+Open BACKLOG rows: **16**.
 
 (Update this section at the end of every working day.)

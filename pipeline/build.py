@@ -61,19 +61,20 @@ _SEP = "\x1f"  # unit separator — cannot appear in the CSV content fields
 # The content fields whose hash is the fingerprint (provenance is excluded, so a
 # re-capture of the same review at a new time is NOT a new row).
 _CONTENT = ("rating", "review_date", "title", "body")
-# A snapshot's five measures (spec Phase 3a, pinned decision 1) and, with
-# them, its fingerprint: the measures plus the attribution the key does not
+# A snapshot's five figures — the four measures and the review count (spec
+# Phase 3a, pinned decision 1; `parsed.MEASURES` declares the four) — and,
+# with them, its fingerprint: the figures plus the attribution the key does not
 # carry — segment, channel, seeded_from — so a corrected attribution on an
 # existing key is a same-key pair and refuses like a corrected figure, never
 # silently dropped by the `where not exists` guard (A3 (a)).
-_MEASURES = (
+_FIGURES = (
     "rating",
     "review_count",
     "one_star_share",
     "response_rate",
     "response_delay_days",
 )
-_FINGERPRINT = _MEASURES + ("segment", "channel", "seeded_from")
+_FINGERPRINT = _FIGURES + ("segment", "channel", "seeded_from")
 ANCHORS = ROOT / "fixtures" / "anchors" / "platform_snapshots_seed.csv"
 ANCHOR_COLUMNS = (
     "platform",
@@ -134,9 +135,10 @@ def _canonical(value: object) -> str:
 
 
 def snapshot_hash(row: dict[str, object]) -> str:
-    """sha256 of the five measures and the three attribution values outside
-    the key, in a fixed order and one spelling each, so a row is its numbers
-    and its attribution and nothing else."""
+    """sha256 of the five snapshot figures (the four measures and the review
+    count) and the three attribution values outside the key, in a fixed order
+    and one spelling each, so a row is its numbers and its attribution and
+    nothing else."""
     payload = _SEP.join(_canonical(row.get(c, "")) for c in _FINGERPRINT)
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 

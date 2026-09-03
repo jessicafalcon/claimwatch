@@ -251,35 +251,35 @@ meta file unchanged.
 **Amendment A6 (2026-09-03, first live run) — a review's rating is a
 half-step, 1 to 5.** With A5 built the same live page refused at its sixth
 review: `ratingValue` `'1.5'` "is not a digit 1..5". The site rates a review
-in half stars (page 1: sixteen 1s, one 1.5, five 4s, four 4.5s, fourteen
-5s), and the declared shape, the parser and the reviews table (`rating
-integer not null`) all allowed a digit only. What changes: the review rating
-becomes a value of the closed set {1, 1.5, 2, … 4.5, 5}, declared once in
+in half stars (page 1: sixteen 1s, one 1.5, five 4s, four 4.5s, fourteen 5s),
+and the declared shape, the parser and the reviews table (`rating integer not
+null`) all allowed a digit only. What changes: the review rating becomes a
+value of the closed set {1, 1.5, 2, … 4.5, 5}, declared once in
 `ingest/parsed.py` beside the snapshot measures, and `raw_reviews.rating`
 becomes `decimal(2,1) not null` (`stg_reviews` carries it); the Opinion
 Assurances parser accepts exactly that set by a strict parse — a digit, or a
-digit followed by `.5` — and refuses anything else naming the value, and
-reads each scope's declared `worstRating` and `bestRating`, refusing a page
-that declares another scale and naming the bounds, so the set admits exactly
-the scale the site declares; the App
-Store parser keeps its digit rule, since that feed gives digits, and the
-digit lands in the wider column unchanged; `content_hash` spells a decimal
-one way (trailing zeros dropped, as `snapshot_hash` already does), so a
-digit read as `1`, `1.0` or the integer 1 is one fingerprint and the
-synthetic corpus's hashes do not move (for the text `1.0` the property is
-the loader's: it admits a rating only as a member of the set, so that text
-never reaches the hash — round 4, functionality-tester #7). Nothing downstream reads a review's
-rating yet: the Beat 1–2 marts read snapshots, and Phase 5's theme marts
-count rows. The sample is re-frozen with one half-step rating (page 1's
-second review, 5 → 4.5) so `ROWS=samples` carries one through the real
-parser and the real column. Restores invariant 6's property that a page in
-the declared shape loads: the shape now is the site's. Pinned by the sample,
-each half-step accepted, and `4.0`, `4.25`, `0.5` and `6` refused naming the
-value; the loaded row read back equals the parsed value. Not taken: rounding
-a half-step to a digit (an altered figure — the study would show a rating
-the reviewer did not give); refusing the page (loses the phase's only review
-source over a value the site gives by design); a free `decimal` in 0–5 (wider
-than the site's shape; it admits a malformed value).
+digit followed by `.5` — and refuses anything else naming the value, and reads
+each scope's declared `worstRating` and `bestRating`, refusing a page that
+declares another scale and naming the bounds, so the set admits exactly the
+scale the site declares; the App Store parser keeps its digit rule, since that
+feed gives digits, and the digit lands in the wider column unchanged;
+`content_hash` spells a decimal one way (trailing zeros dropped, as
+`snapshot_hash` already does), so a digit read as `1`, `1.0` or the integer 1
+is one fingerprint and the synthetic corpus's hashes do not move (for the text
+`1.0` the property is the loader's: it admits a rating only as a member of the
+set, so that text never reaches the hash — round 4, functionality-tester #7).
+Nothing downstream reads a review's rating yet: the Beat 1–2 marts read
+snapshots, and Phase 5's theme marts count rows. The sample is re-frozen with
+one half-step rating (page 1's second review, 5 → 4.5) so `ROWS=samples`
+carries one through the real parser and the real column. Restores invariant
+6's property that a page in the declared shape loads: the shape now is the
+site's. Pinned by the sample, each half-step accepted, and `4.0`, `4.25`,
+`0.5` and `6` refused naming the value; the loaded row read back equals the
+parsed value. Not taken: rounding a half-step to a digit (an altered figure —
+the study would show a rating the reviewer did not give); refusing the page
+(loses the phase's only review source over a value the site gives by design);
+a free `decimal` in 0–5 (wider than the site's shape; it admits a malformed
+value).
 
 Freeze (A6): `fixtures/opinion-assurances/page-1.html` and `MANIFEST.sha256`
 — the second review's `ratingValue` `5` → `4.5`; every other byte unchanged.
@@ -315,84 +315,85 @@ across engines).
 
 **Proposed after review round 4 (2026-09-03) — A8: a raw table is compared
 with its whole declaration; the review loader loads a batch or nothing; the
-aggregate's declared scale is read like a review's; the confirm gate says
-what it holds against; the database file and the label set are derived from
-the input.** *Status: APPROVED 2026-09-03 on the developer's word ("approved
-as suggested"); built in the commits that follow.* Round 4's plain fixes (findings 4, 8, 9, 10, 13, 14) are built in the commits
-before this one.* Restores invariant 3's premise (raw is what the files
-declare, A7), invariant 1's atomicity as it holds for snapshots (a refused
-batch leaves none of its rows in raw), invariant 6's "the declared shape is
-the site's" for the one review-site number the study displays, the Threat
-model's gate stated as what it is, and invariant 7 (each input builds its own
-database file) as a property of the input rather than of a caller.
-(a) *The comparison is the whole declaration* (round 4, findings 1, 6, 7,
-12): `check_raw_declaration` reads, for the existing table and for the
-scratch declaration alike, `(column_name, data_type, is_nullable)` ordered by
-`ordinal_position` from `information_schema.columns`, filtered to the schema
-the engine names (`warehouse.default_schema`; the temporary scratch table is
-listed under that schema on DuckDB, which the test asserts rather than
-assumes), and refuses on a nullability difference exactly as on a type — the
-case this phase itself opened when A4 (e) made `review_count` nullable, so a
-corpus built before it now dies in a driver `ConstraintException` instead of
-A7's one line. Before creating the scratch table it refuses if a table under
-the scratch name already exists, naming it as one this repo does not build —
-not pointing at `make confirm reset`, since a corpus is not what is wrong. A
-raw file is one statement: comments stripped, the file must be exactly one
-`create table if not exists` and only that statement is executed for the
-scratch, so nothing else in a raw file can ever run against the corpus during
-the check. Pinned by a database with `review_count integer not null` refused
-with A7's one line and nothing inserted; a declaration whose columns are the
-table's in another order refused naming the position; a stray
-`declared_raw_reviews` table refused naming itself; a two-statement raw file
-refused before any statement runs. Not taken: comparing the corpus's own
-catalog order without `order by` (unspecified on engines other than DuckDB);
-altering the column in place (rewrites history's values). (b) *The review
-loader loads a batch or nothing* (finding 2): `load_reviews` runs its batch in
-one transaction as `load_snapshots` does since A4 (a), so a refused rating in
-the fifth row leaves rows one to four uncommitted; DECISIONS' A6 entry, which
-already says "inserts nothing on a refusal", becomes true. Pinned by a
-five-row batch whose last rating is refused: zero rows in raw. (c) *The
-aggregate's declared scale is read* (finding 3): the Opinion Assurances
-parser reads the aggregate scope's `worstRating` and `bestRating` — the
-frozen sample already carries them, `0` and `5`, so no re-freeze — and refuses
-a page whose aggregate declares a scale other than the snapshot rating
-column's range (`MEASURES["rating"]`, 0 to 5), naming the bounds, the guard A6
-gives every review scope; a site that moves its aggregate to 0..10 refuses
-instead of storing 3.8 as a 0–5 rating tagged Measured. Pinned by `0..10`
-and a missing bound refused, `0.0..5.0` accepted as the same scale. (d) *The
-confirm gate says what it holds against* (findings 16, 17): A4 (d) delivered
-what it claimed — no variable, no environment and no `MAKEFLAGS` can arm
-`reset` or `scrape`, and a stale stamp refuses — and no more: the stamp is a
-file under `data/` whose content is the make process's id, so a same-user
-process able to write `data/` while make runs can arm either target, and a
-`make confirm` with nothing after it leaves a stamp that a later make process
-holding a recycled id would consume. Two hardenings that change no kind, and
-the claim written down: the stamp is created exclusively (`O_EXCL`, mode
-0600), so a file already there makes `confirm` itself refuse naming it rather
-than overwrite it; `confirm` as the last goal of its invocation refuses
-("`confirm` arms the goal that follows it; nothing follows"), read from the
-goal list make itself holds, so the common way to leave a stamp behind is
-closed; and the Threat model's `confirm`, `reset` and `scrape` rows and the
-DECISIONS entry state the residual in one sentence each. Pinned by a planted
-stamp making `confirm` refuse, `make confirm` alone refusing with no stamp
-left, and the six A4 (d) forms still refusing. Not taken: a nonce carried
-between the two recipes (make has no channel between two recipes but a file,
-which is the surface); the process's start time (`ps`, rejected in A4 (d));
-an age check (a clock in the CLI, rejected in A4 (d)); a longer claim. (e)
-*The file and the label set are derived from the input* (findings 5, 11):
-`rebuild` no longer takes a database file — it takes a root directory, and
-the file is always `database_for(rows, root)`, so a caller chooses where the
-files live and never which file an input lands in, and the literal `sample`
-can exist only in `friction_ledger.samples.duckdb` wherever the root is;
-`load_snapshots` takes `rows_input` as a required argument, passed by
-`rebuild` from its `rows`, a member of the closed `INPUTS` checked at entry —
-the mechanism's value is the input, never a signature's default. Pinned by
-`rebuild("duckdb", "samples", root=tmp)` writing exactly the samples file and
-no way to name another; `load_snapshots` without `rows_input` a `TypeError`.
-Cost: every test that passes `database=` passes `root=` instead. Not taken: a
-check that the file's name is the input's (a check on a spelling, not a
-derivation); a marker table naming the input inside each file (a row no
-source produced, counted by the idempotency check).
+aggregate's declared scale is read like a review's; the confirm gate says what
+it holds against; the database file and the label set are derived from the
+input.** *Status: APPROVED 2026-09-03 on the developer's word ("approved as
+suggested"); built in the commits that follow; round 4's plain fixes (findings
+4, 8, 9, 10, 13, 14) are built in the commits before this one.* Restores
+invariant 3's premise (raw is what the files declare, A7), invariant 1's
+atomicity as it holds for snapshots (a refused batch leaves none of its rows
+in raw), invariant 6's "the declared shape is the site's" for the one
+review-site number the study displays, the Threat model's gate stated as what
+it is, and invariant 7 (each input builds its own database file) as a property
+of the input rather than of a caller. (a) *The comparison is the whole
+declaration* (round 4, findings 1, 6, 7, 12): `check_raw_declaration` reads,
+for the existing table and for the scratch declaration alike, `(column_name,
+data_type, is_nullable)` ordered by `ordinal_position` from
+`information_schema.columns`, filtered to the schema the engine names
+(`warehouse.default_schema`; the temporary scratch table is listed under that
+schema on DuckDB, which the test asserts rather than assumes), and refuses on
+a nullability difference exactly as on a type — the case this phase itself
+opened when A4 (e) made `review_count` nullable, so a corpus built before it
+would otherwise die in a driver `ConstraintException` instead of getting A7's
+one line. Before creating the scratch table it refuses if a table under the
+scratch name already exists, naming it as one this repo does not build — not
+pointing at `make confirm reset`, since a corpus is not what is wrong. A raw
+file is one statement: comments stripped, the file must be exactly one `create
+table if not exists` and only that statement is executed for the scratch, so
+nothing else in a raw file can ever run against the corpus during the check.
+Pinned by a database with `review_count integer not null` refused with A7's
+one line and nothing inserted; a declaration whose columns are the table's in
+another order refused naming the position; a stray `declared_raw_reviews`
+table refused naming itself; a two-statement raw file refused before any
+statement runs. Not taken: comparing the corpus's own catalog order without
+`order by` (unspecified on engines other than DuckDB); altering the column in
+place (rewrites history's values). (b) *The review loader loads a batch or
+nothing* (finding 2): `load_reviews` runs its batch in one transaction as
+`load_snapshots` does since A4 (a), so a refused rating in the fifth row
+leaves rows one to four uncommitted; DECISIONS' A6 entry, which already says
+"inserts nothing on a refusal", becomes true. Pinned by a five-row batch whose
+last rating is refused: zero rows in raw. (c) *The aggregate's declared scale
+is read* (finding 3): the Opinion Assurances parser reads the aggregate
+scope's `worstRating` and `bestRating` — the frozen sample already carries
+them, `0` and `5`, so no re-freeze — and refuses a page whose aggregate
+declares a scale other than the snapshot rating column's range
+(`MEASURES["rating"]`, 0 to 5), naming the bounds, the guard A6 gives every
+review scope; a site that moves its aggregate to 0..10 refuses instead of
+storing 3.8 as a 0–5 rating tagged Measured. Pinned by `0..10` and a missing
+bound refused, `0.0..5.0` accepted as the same scale. (d) *The confirm gate
+says what it holds against* (findings 16, 17): A4 (d) delivered what it
+claimed — no variable, no environment and no `MAKEFLAGS` can arm `reset` or
+`scrape`, and a stale stamp refuses — and no more: the stamp is a file under
+`data/` whose content is the make process's id, so a same-user process able to
+write `data/` while make runs can arm either target, and a `make confirm` with
+nothing after it leaves a stamp that a later make process holding a recycled
+id would consume. Two hardenings that change no kind, and the claim written
+down: the stamp is created exclusively (`O_EXCL`, mode 0600), so a file
+already there makes `confirm` itself refuse naming it rather than overwrite
+it; `confirm` as the last goal of its invocation refuses ("`confirm` arms the
+goal that follows it; nothing follows"), read from the goal list make itself
+holds, so the common way to leave a stamp behind is closed; and the Threat
+model's `confirm`, `reset` and `scrape` rows and the DECISIONS entry state the
+residual in one sentence each. Pinned by a planted stamp making `confirm`
+refuse, `make confirm` alone refusing with no stamp left, and the six A4 (d)
+forms still refusing. Not taken: a nonce carried between the two recipes (make
+has no channel between two recipes but a file, which is the surface); the
+process's start time (`ps`, rejected in A4 (d)); an age check (a clock in the
+CLI, rejected in A4 (d)); a longer claim. (e) *The file and the label set are
+derived from the input* (findings 5, 11): `rebuild` no longer takes a database
+file — it takes a root directory, and the file is always `database_for(rows,
+root)`, so a caller chooses where the files live and never which file an input
+lands in, and the literal `sample` can exist only in
+`friction_ledger.samples.duckdb` wherever the root is; `load_snapshots` takes
+`rows_input` as a required argument, passed by `rebuild` from its `rows`, a
+member of the closed `INPUTS` checked at entry — the mechanism's value is the
+input, never a signature's default. Pinned by `rebuild("duckdb", "samples",
+root=tmp)` writing exactly the samples file and no way to name another;
+`load_snapshots` without `rows_input` a `TypeError`. Cost: every test that
+passes `database=` passes `root=` instead. Not taken: a check that the file's
+name is the input's (a check on a spelling, not a derivation); a marker table
+naming the input inside each file (a row no source produced, counted by the
+idempotency check).
 
 **Proposed after review round 5 (2026-09-03) — A9: the confirm gate arms a
 gated goal or nothing and reads a goal list of make's own origin only; the
@@ -506,14 +507,15 @@ Teaching rule).**
 **Phase 1's review shape and Phase 2's load path, manners and run-twice
 property do not move except as A6 amends them: `raw_reviews` keeps its ten
 columns (`rating` widened to `decimal(2,1)`) and `load_reviews` its guard, now
-a check of every rating against the declared half-steps; every new row of every new table carries the four provenance
-columns; the anchors seed the same nine rows in every rebuild input but
-`none`; a rebuild reads no clock and no network; the test suite opens no
-socket; every live fetch is run by the developer; no site whose robots file
-or terms refuse us is fetched, by any means.** Segment attribution joins on
-`source_url` by exact value or on a column written in Python, never a pattern
-in SQL. No parser reads a reviewer's name. `check-backing` stays clean: four
-marts land, four rows flip, zero orphans.
+a check of every rating against the declared half-steps; every new row of
+every new table carries the four provenance columns; the anchors seed the same
+nine rows in every rebuild input but `none`; a rebuild reads no clock and no
+network; the test suite opens no socket; every live fetch is run by the
+developer; no site whose robots file or terms refuse us is fetched, by any
+means.** Segment attribution joins on `source_url` by exact value or on a
+column written in Python, never a pattern in SQL. No parser reads a reviewer's
+name. `check-backing` stays clean: four marts land, four rows flip, zero
+orphans.
 
 ## DONE command
 
@@ -737,27 +739,25 @@ make rebuild && make idempotency-check ROWS=captured
   `source_pages` for the phase that charts it (Phase 2 promised the table
   here, and the join property is only cheap to pin now).
 - **The sources, with their positions as checked on 2026-09-02, and the
-  hand-entry path.** Four declared sources for the studied insurer:
-  (a) the App Store review feed (Phase 2's): `fetchable=False`, robots
-  disallows `/*/rss/*` for every crawler — unchanged.
-  (b) the Google Play listing: `parser=listing`, host `play.google.com`,
-  `pages=1`, the details address by package id with `hl=fr&gl=FR`,
-  `fetchable=True`. Checked: the catch-all group disallows `/_`,
-  `/store/getreviews` and `/store/xhr` and does not disallow
-  `/store/apps/details` (our matcher: allowed); Google's terms forbid
+  hand-entry path.** Four declared sources for the studied insurer: (a) the
+  App Store review feed (Phase 2's): `fetchable=False`, robots disallows
+  `/*/rss/*` for every crawler — unchanged. (b) the Google Play listing:
+  `parser=listing`, host `play.google.com`, `pages=1`, the details address by
+  package id with `hl=fr&gl=FR`, `fetchable=True`. Checked: the catch-all
+  group disallows `/_`, `/store/getreviews` and `/store/xhr` and does not
+  disallow `/store/apps/details` (our matcher: allowed); Google's terms forbid
   automated access only where it breaches robots.txt; the page answers 200
   without a redirect, about 1.3 MB, and carries one JSON-LD block of type
   `SoftwareApplication` whose `aggregateRating` holds `ratingValue` and
   `ratingCount` as digit strings. Reviews on this platform load through the
   disallowed `/_` call and are not fetched, ever — recorded as the platform's
-  review position. The package id spells the brand: D1.
-  (c) the App Store listing: `parser=None`, host `apps.apple.com`,
-  `fetchable=False`, `terms` = Apple's website terms of use, "Your Use of the
-  Site": no robot, spider, page-scrape or automated means to access or copy
-  the site (read 2026-09-02); robots allows `/fr/app/…`, so the terms alone
-  decide; the by-id address also answers 301 to a slug address. Snapshots
-  hand-entered.
-  (d) the Opinion Assurances profile (A1): `parser=opinion_assurances`, host
+  review position. The package id spells the brand: D1. (c) the App Store
+  listing: `parser=None`, host `apps.apple.com`, `fetchable=False`, `terms` =
+  Apple's website terms of use, "Your Use of the Site": no robot, spider,
+  page-scrape or automated means to access or copy the site (read 2026-09-02);
+  robots allows `/fr/app/…`, so the terms alone decide; the by-id address also
+  answers 301 to a slug address. Snapshots hand-entered. (d) the Opinion
+  Assurances profile (A1): `parser=opinion_assurances`, host
   `www.opinion-assurances.fr`, `pages=14` for the studied insurer (the
   profile's own page count on 2026-09-02; a later page past the last is an
   empty page and the end), `fetchable=True`, `terms` = the site's written
@@ -770,52 +770,49 @@ make rebuild && make idempotency-check ROWS=captured
   the profile itself. The parser: schema.org microdata, strictly — each
   `itemscope` of type `review` yields one review row (`rating` = its
   `reviewRating`'s `ratingValue`, a half-step 1–5 (A6), checked against the
-  scope's declared `worstRating` 1 and `bestRating` 5; `review_date` = the review's own date as `YYYY-MM-DD`; `body` = the
-  review text; `title` = the page's title-like field if the structure has one,
-  else empty; `external_id` = the content hash of (publication date,
-  experience date, rating, body) — the page marks no stable identifier,
-  decided at build, A2);
-  the page's one `AggregateRating` (`ratingValue`, `ratingCount`) and its
-  one-star share, response rate and response delay, if the structure carries
-  them as data, yield the snapshot row; the `author` scope and every `Person`
-  are never read; a review missing a required field, a rating outside 1–5, a
-  date that does not parse, or a page with no `review` scope and no
-  end-of-list marker refuses the whole page, naming page, item and field.
-  Where the date, body and identifier sit, and which stats are data rather
-  than layout, are read off the redacted structure dump in the first hour
-  and written into `ingest/opinion_assurances.py`'s header — the spec
-  declares the fields, the build declares their addresses in the page;
-  **no stable identifier in the markup was a STOP-and-decide**, decided at
-  build (A2): the page marks none, `external_id` is the content hash of
-  (publication date, experience date, rating, body), an edited review is a
-  new review, and the BACKLOG row carries the trigger for keying on the dates
-  and rating instead. Peers on that platform may be declared the same way at
-  the developer's choice within the letter's scope (a traditional or
-  digital-challenger segment, capped by `MAX_PAGES`); each is a declaration,
-  not a branch.
-  The hand-entry path: `data/snapshots/manual_snapshots.csv`, tracked (the
-  subtree `.gitignore` already reserves for public aggregates), hand-edited,
-  exactly eight columns: `source` (a declared source name whose `fetchable`
-  is False), `captured_at` (`YYYY-MM-DD`, the day the figure was read),
-  `rating`, `review_count`, `one_star_share`, `response_rate`,
-  `response_delay_days` (the last three empty when the page does not show
-  them) and `read_from`, always the word `page` (the figure was read off the
-  declared address) — no address, no name, no free text. `make rebuild`
-  parses it strictly (an undeclared or fetchable source name, a bad number, a
-  share outside 0–1, a date that is not one, a
+  scope's declared `worstRating` 1 and `bestRating` 5; `review_date` = the
+  review's own date as `YYYY-MM-DD`; `body` = the review text; `title` = the
+  page's title-like field if the structure has one, else empty; `external_id`
+  = the content hash of (publication date, experience date, rating, body) —
+  the page marks no stable identifier, decided at build, A2); the page's one
+  `AggregateRating` (`ratingValue`, `ratingCount`) and its one-star share,
+  response rate and response delay, if the structure carries them as data,
+  yield the snapshot row; the `author` scope and every `Person` are never
+  read; a review missing a required field, a rating outside 1–5, a date that
+  does not parse, or a page with no `review` scope and no end-of-list marker
+  refuses the whole page, naming page, item and field. Where the date, body
+  and identifier sit, and which stats are data rather than layout, are read
+  off the redacted structure dump in the first hour and written into
+  `ingest/opinion_assurances.py`'s header — the spec declares the fields, the
+  build declares their addresses in the page; **no stable identifier in the
+  markup was a STOP-and-decide**, decided at build (A2): the page marks none,
+  `external_id` is the content hash of (publication date, experience date,
+  rating, body), an edited review is a new review, and the BACKLOG row carries
+  the trigger for keying on the dates and rating instead. Peers on that
+  platform may be declared the same way at the developer's choice within the
+  letter's scope (a traditional or digital-challenger segment, capped by
+  `MAX_PAGES`); each is a declaration, not a branch. The hand-entry path:
+  `data/snapshots/manual_snapshots.csv`, tracked (the subtree `.gitignore`
+  already reserves for public aggregates), hand-edited, exactly eight columns:
+  `source` (a declared source name whose `fetchable` is False), `captured_at`
+  (`YYYY-MM-DD`, the day the figure was read), `rating`, `review_count`,
+  `one_star_share`, `response_rate`, `response_delay_days` (the last three
+  empty when the page does not show them) and `read_from`, always the word
+  `page` (the figure was read off the declared address) — no address, no name,
+  no free text. `make rebuild` parses it strictly (an undeclared or fetchable
+  source name, a bad number, a share outside 0–1, a date that is not one, a
   wrong column set: one-line refusal naming the line and field); platform,
   address, profile, segment and channel come from the declaration; the row
   loads with `origin = manual`; a row entered twice loads once. No make
-  target: a person's reading is a person's edit, and the loader is the
-  guard. The 2026-09-02 App Store reading (4.9, about 13,000 ratings) is the
-  first row — the developer confirms it against the page before entering;
-  the Opinion Assurances aggregate comes from the fetch (A1).
-  Satisfies invariants 3, 5 and 6. Rejected: fetching a page whose terms say
-  no because its robots file says yes (both bind us); a `make snapshot`
-  target with eight variables (eight threat-model rows for a CSV edit);
-  storing the address in the file (D1 confines it to the declaration); a
-  clock stamp for a manual row (the reader states the day; the only clock
-  stays the fetcher's).
+  target: a person's reading is a person's edit, and the loader is the guard.
+  The 2026-09-02 App Store reading (4.9, about 13,000 ratings) is the first
+  row — the developer confirms it against the page before entering; the
+  Opinion Assurances aggregate comes from the fetch (A1). Satisfies invariants
+  3, 5 and 6. Rejected: fetching a page whose terms say no because its robots
+  file says yes (both bind us); a `make snapshot` target with eight variables
+  (eight threat-model rows for a CSV edit); storing the address in the file
+  (D1 confines it to the declaration); a clock stamp for a manual row (the
+  reader states the day; the only clock stays the fetcher's).
 - **`ROWS` names the rebuild input; `samples` runs every frozen sample (D4,
   BACKLOG rows "`FIXTURE=cache` naming" and "frozen `robots.txt` read by
   nothing").** `make rebuild [ROWS=captured|none|synthetic|samples]` and
@@ -885,17 +882,17 @@ New code:
   ("itunes.apple.com", "play.google.com", "www.opinion-assurances.fr")`;
   `MAX_PAGES = 60` (A1).
 - `pipeline/build.py` — `INPUTS = ("captured", "none", "synthetic",
-  "samples")`; `seed_anchors` and `load_manual_snapshots` (strict CSV →
+  "samples")`; `read_anchors` and `read_manual_snapshots` (strict CSV →
   `raw_platform_snapshots`), `load_snapshots`, `write_source_pages`; capture
   loading iterates `SOURCES`. `pipeline/cli.py` — `--rows`; the no-captures
-  hint names the cache root; reviews per month per source; `scrape` lists the fetchable
-  sources' hosts in its prompt. `pipeline/warehouse.py` — `database_for(rows)`.
-  `pipeline/sql_lint.py` — `like`, `similar to` (rounds 2 and 3: `ilike`,
-  `rlike`, `glob`, the tilde operators). `ingest/parsed.py` — `Measure`,
-  `MEASURES`, `rating_from_page`, `decode_json` (A4 (a), round 3);
-  `pipeline/cli.py` — `confirm` and `CONFIRM_STAMP` (A4 (d));
-  `ingest/captures.py` — the declared-page check (A4 (c));
-  `ingest/parsed.py` — `REVIEW_RATINGS`, `review_rating` (A6);
+  hint names the cache root; reviews per month per source; `scrape` lists the
+  fetchable sources' hosts in its prompt. `pipeline/warehouse.py` —
+  `database_for` (its `root` is A8 (e), below). `pipeline/sql_lint.py` —
+  `like`, `similar to` (rounds 2 and 3: `ilike`, `rlike`, `glob`, the tilde
+  operators). `ingest/parsed.py` — `Measure`, `MEASURES`, `rating_from_page`,
+  `decode_json` (A4 (a), round 3); `pipeline/cli.py` — `confirm` and
+  `CONFIRM_STAMP` (A4 (d)); `ingest/captures.py` — the declared-page check (A4
+  (c)); `ingest/parsed.py` — `REVIEW_RATINGS`, `review_rating` (A6);
   `sql/raw/raw_reviews.sql` — `rating decimal(2,1)` (A6);
   `ingest/opinion_assurances.py` — the body guard (A5), the declared-scale
   check (A6); `pipeline/build.py` — `check_raw_declaration` (A7);
@@ -904,7 +901,14 @@ New code:
   type and nullability from the default schema and refuses a multi-statement
   file (A8 (a)), `load_reviews` in one transaction (A8 (b)), `rebuild(root=)`
   (A8 (e)); `ingest/opinion_assurances.py` — `AGGREGATE_SCALE` (A8 (c));
-  `pipeline/cli.py` — the exclusive stamp and `--goals` (A8 (d)).
+  `pipeline/cli.py` — the exclusive stamp and `--goals` (A8 (d)). Round 5's
+  plain fixes: `pipeline/build.py` — `_columns` sorts on the catalog's
+  `ordinal_position`, the scratch execute relays `warehouse.DriverError` as
+  one line, `rebuild`'s loop variable is `capture_dir`;
+  `pipeline/warehouse.py` — `DriverError`; `ingest/opinion_assurances.py` —
+  `bounds_seen`; every shape guard in `pipeline/build.py`,
+  `ingest/sources.py`, `ingest/captures.py`, `ingest/app_store.py` and
+  `ingest/parsed.py` matches the whole value (`fullmatch`).
 - `sql/raw/raw_platform_snapshots.sql`, `sql/raw/raw_source_pages.sql`,
   `sql/staging/stg_platform_snapshots.sql`, `sql/marts/rating_trend.sql`,
   `sql/marts/channel_gap.sql`, `sql/marts/platform_stats.sql`,
@@ -927,15 +931,18 @@ Fixtures (frozen this phase; see the `Freeze:` lines):
 New and extended tests:
 - `tests/test_snapshots.py`, `tests/test_marts.py`,
   `tests/test_listing_parser.py`, `tests/test_opinion_assurances_parser.py`,
-  `tests/test_fetch_sources.py` new;
-  `tests/test_robots.py`, `tests/test_ingest_layout.py`,
-  `tests/test_ingest_rebuild.py`, `tests/test_provenance.py`,
-  `tests/test_sql_portable.py`, `tests/test_makefile.py`, `tests/test_cli.py`,
+  `tests/test_fetch_sources.py` new; `tests/test_robots.py`,
+  `tests/test_ingest_layout.py`, `tests/test_ingest_rebuild.py`,
+  `tests/test_provenance.py`, `tests/test_sql_portable.py`,
+  `tests/test_makefile.py`, `tests/test_cli.py`,
   `tests/test_fixtures_frozen.py`, `tests/conftest.py` (`ROWS` scrubbed in
   place of `FIXTURE`), `tests/pins.py` (anchor rows per mart; the listing
   sample's row), `tests/test_rebuild.py` (A6's loader check, A7's declaration
-  check) extended; the A5–A7 pins sit in `tests/test_opinion_assurances_parser.py`
-  and `tests/test_rebuild.py`.
+  check) extended; the A5–A8 pins sit in
+  `tests/test_opinion_assurances_parser.py`, `tests/test_rebuild.py`,
+  `tests/test_cli.py` and `tests/test_makefile.py`; round 5's in
+  `tests/test_rebuild.py`, `tests/test_opinion_assurances_parser.py`,
+  `tests/test_ingest_layout.py` and `tests/test_snapshots.py`.
 
 Records (see Record updates): `DECISIONS.md`, `BACKLOG.md`, `CLAUDE.md`,
 `BACKING.md`, `SPEC.md`, `PROJECT_BRIEF.md`, `docs/PLAN.md`, this spec.
@@ -964,19 +971,32 @@ Freeze: fixtures/opinion-assurances/
       rejected alternatives; the Gotchas on `$(origin)` and `MAKEFLAGS`, on a
       structure dump naming the fields and not their nesting, and on `create
       table if not exists` keeping the old column
-- [ ] `BACKLOG.md` — five rows closed (struck + "DONE Phase 3a"): the
-      wildcard bound, the `DEFAULT_CACHE` / `ALLOWED_HOSTS` binding, the
+- [ ] `BACKLOG.md` — five rows closed (struck + "DONE Phase 3a"): the wildcard
+      bound, the `DEFAULT_CACHE` / `ALLOWED_HOSTS` binding, the
       `FIXTURE=cache` naming, the hardwired capture path, the permissive
-      frozen `robots.txt`; the health-details row re-deferred with the
-      trigger "the first tracked file or published panel carrying review
-      text" (this phase's tracked file carries numbers only); rows opened:
-      the App Store listing's JSON-LD shape is unverified (trigger:
-      any future permission to fetch it); the weekly run's re-fetch stops at
-      the first page with no unseen row (trigger Phase 4)
+      frozen `robots.txt`; the health-details row re-deferred with the trigger
+      "the first tracked file or published panel carrying review text" (this
+      phase's tracked file carries numbers only); rows opened, each with its
+      trigger: the App Store listing's JSON-LD shape is unverified (any future
+      permission to fetch it); a re-fetch reads every page of a review profile
+      (Phase 4's weekly workflow stops at the first page with no unseen row);
+      an Opinion Assurances review's id is a content hash (Phase 4's first two
+      captures count edited bodies); the Opinion Assurances stat figures are
+      layout text (the page marks them as data, or Phase 4 decides on
+      complementing a capture); the D1 walk covers tracked files, not commit
+      messages (the first fix commit quoting a declaration, or the Phase 4
+      weekly commit); the Snowflake half of `default_schema` is unpinnable
+      offline (Phase 10's demonstration); `make review-gate` without `SPEC=`
+      is red on a phase branch and its two summary lines count different
+      things (the next change to `scripts/review_gate.py`, or Phase 3b's first
+      gate run)
 - [ ] `CLAUDE.md` — Current status; Commands (`ROWS`; `scrape`'s hosts; the
       manual file); Repo map (`ingest/captures.py`, `listing.py`, the four
       marts, `fixtures/listings/`, `data/snapshots/manual_snapshots.csv`,
-      `sql/marts/` no longer empty); BACKLOG count
+      `sql/marts/` no longer empty); Workflow rules (the `confirm` goal
+      replaces `CONFIRM=yes`); Git workflow (CI runs `ROWS=synthetic` and
+      `ROWS=samples`); Commands (`confirm`; `rebuild`'s declaration check and
+      one-file rule); BACKLOG count
 - [ ] `BACKING.md` — B1.2, B1.3, B1.4, B2.3 Pending → Documented with sources
       of the declared shape
 - [ ] `SPEC.md` — the four panels' tag sentences and the header's "Today
