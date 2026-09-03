@@ -502,8 +502,76 @@ def _sql_files(stage: str) -> list[Path]:
     return sorted((ROOT / "sql" / stage).glob("*.sql"))
 
 
+_CREATE_RAW = re.compile(r"create table if not exists ([a-z_]+)")
+
+
+def _columns(conn, table: str) -> list[tuple[str, str]]:
+    """(name, type) per column in order, in the engine's own vocabulary."""
+    return [
+        (name, kind)
+        for name, kind in conn.execute(
+            "select column_name, data_type from information_schema.columns "
+            "where table_name = ? order by ordinal_position",
+            [table],
+        ).fetchall()
+    ]
+
+
+def _table_exists(conn, table: str) -> bool:
+    return (
+        conn.execute(
+            "select count(*) from information_schema.tables where table_name = ?",
+            [table],
+        ).fetchone()[0]
+        > 0
+    )
+
+
+def check_raw_declaration(conn, path: Path) -> None:
+    """A raw table that already exists must be the one its file declares (A7).
+    `create table if not exists` keeps an older column silently and the
+    engine casts into it on insert — 109 half-step ratings rounded on the
+    first live run — so the declaration is created as a temporary table under
+    a scratch name, both column lists are read back from information_schema
+    in the engine's own words, and the first difference refuses the rebuild
+    naming table, column and both types. A table not yet created passes."""
+    sql = path.read_text(encoding="utf-8")
+    m = _CREATE_RAW.search(sql)
+    if m is None:
+        raise PageShapeError(f"{path}: no `create table if not exists` statement")
+    table = m.group(1)
+    if not _table_exists(conn, table):
+        return
+    scratch = f"declared_{table}"
+    conn.execute(_CREATE_RAW.sub(f"create temporary table {scratch}", sql, count=1))
+    try:
+        declared = _columns(conn, scratch)
+    finally:
+        conn.execute(f"drop table {scratch}")
+    existing = _columns(conn, table)
+    where = f"{path.relative_to(ROOT)}: the corpus's table {table}"
+    tail = "a changed raw declaration needs `make confirm reset` then `make rebuild`"
+    for (have_name, have_type), (want_name, want_type) in zip(
+        existing, declared, strict=False
+    ):
+        if (have_name, have_type) != (want_name, want_type):
+            raise PageShapeError(
+                f"{where}: column {have_name!r} is {have_type} in the database, "
+                f"{want_name!r} {want_type} in the file — {tail}"
+            )
+    if len(existing) != len(declared):
+        extra = existing[len(declared) :] or declared[len(existing) :]
+        side = (
+            "in the database only"
+            if len(existing) > len(declared)
+            else "in the file only"
+        )
+        raise PageShapeError(f"{where}: column {extra[0][0]!r} is {side} — {tail}")
+
+
 def create_raw(conn) -> None:
     for path in _sql_files("raw"):
+        check_raw_declaration(conn, path)
         warehouse.run_sql_file(conn, path)
 
 

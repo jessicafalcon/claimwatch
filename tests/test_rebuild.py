@@ -15,6 +15,7 @@ import pytest  # noqa: E402
 from ingest.parsed import PageShapeError  # noqa: E402
 from pipeline.build import (  # noqa: E402
     build_derived,
+    check_raw_declaration,
     content_hash,
     create_raw,
     load_reviews,
@@ -154,3 +155,75 @@ def test_content_hash_spells_a_rating_one_way():
     assert len(hashes) == 1
     assert content_hash(_review("1.5")) == content_hash(_review(Decimal("1.5")))
     assert content_hash(_review("1.5")) != content_hash(_review("1"))
+
+
+RAW_REVIEWS_SQL = (
+    Path(__file__).resolve().parents[1] / "sql" / "raw" / "raw_reviews.sql"
+)
+
+
+def _previous_declaration() -> str:
+    """raw_reviews as declared before A6: `rating integer`."""
+    sql = RAW_REVIEWS_SQL.read_text(encoding="utf-8")
+    assert "rating        decimal(2, 1) not null" in sql
+    return sql.replace(
+        "rating        decimal(2, 1) not null", "rating        integer not null"
+    )
+
+
+def test_a_raw_table_built_under_a_previous_declaration_refuses_the_rebuild():
+    """A7: the corpus file keeps the column it was built with; the engine
+    would cast into it. The rebuild refuses naming table, column and both
+    types, and inserts nothing."""
+    conn = connect("duckdb", database=":memory:")
+    try:
+        conn.execute(_previous_declaration())
+        with pytest.raises(PageShapeError) as exc:
+            create_raw(conn)
+        message = str(exc.value)
+        assert "raw_reviews" in message and "'rating'" in message
+        assert (
+            "INTEGER in the database" in message
+            and "DECIMAL(2,1) in the file" in message
+        )
+        assert "`make confirm reset`" in message and "\n" not in message
+        assert conn.execute("select count(*) from raw_reviews").fetchone() == (0,)
+        assert conn.execute(
+            "select count(*) from information_schema.tables "
+            "where table_name like 'declared_%'"
+        ).fetchone() == (0,)
+    finally:
+        conn.close()
+
+
+def test_a_raw_table_with_an_extra_column_refuses_the_rebuild():
+    conn = connect("duckdb", database=":memory:")
+    try:
+        create_raw(conn)
+        conn.execute("alter table raw_reviews add column extra text")
+        with pytest.raises(
+            PageShapeError, match="column 'extra' is in the database only"
+        ):
+            create_raw(conn)
+    finally:
+        conn.close()
+
+
+def test_a_matching_raw_table_passes_and_leaves_no_scratch_table():
+    """A7's happy path: a second create_raw on a database the files built is
+    a no-op that leaves nothing behind, so a rebuild on the corpus file is
+    unchanged when nothing changed."""
+    conn = connect("duckdb", database=":memory:")
+    try:
+        create_raw(conn)
+        before = conn.execute(
+            "select table_name from information_schema.tables order by 1"
+        ).fetchall()
+        create_raw(conn)
+        check_raw_declaration(conn, RAW_REVIEWS_SQL)
+        after = conn.execute(
+            "select table_name from information_schema.tables order by 1"
+        ).fetchall()
+        assert after == before and not any(n.startswith("declared_") for (n,) in after)
+    finally:
+        conn.close()
