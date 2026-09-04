@@ -511,3 +511,18 @@ def test_a_dangling_symlink_at_the_stamp_is_consumed_by_the_next_gated_run(capsy
     assert not os.path.lexists(cli.CONFIRM_STAMP)  # and the link is gone
     assert main(["confirm", "--make-pid=1", ORIGIN, "--goals=confirm reset"]) == 0
     cli.CONFIRM_STAMP.unlink()
+
+
+def test_model_error_is_one_line_exit_2(capsys, monkeypatch):
+    """A model failure on the developer-run paid path surfaces as one line and
+    exit 2, never a traceback (round 1, code-reviewer). The handler mirrors the
+    Refused/PageShapeError catches; record-snapshots stands in as a hijacked
+    command so no real model call or rebuild runs."""
+    import pipeline.cli as cli
+
+    def boom(_args):
+        raise cli.ModelError("model call failed for s:1 (model claude-haiku-4-5): boom")
+
+    monkeypatch.setattr(cli, "_do_record_snapshots", boom)
+    assert main(["record-snapshots"]) == 2
+    assert "refusing: model call failed" in capsys.readouterr().err

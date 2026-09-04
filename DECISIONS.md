@@ -1282,3 +1282,86 @@ done-when 2 to name the three-tier fallback (theme → `positive` → `unclassif
 added a `format_report` render test and a no-warehouse `classify-eval` CLI test
 for the two coverage gaps named. Accepted: the already-struck BACKLOG row 20
 (refreshed with the 5b test name; count unchanged).
+
+### Phase 6a
+
+Branch `phase-6a-model-fallback`, spec `specs/phase-6a-model-fallback.md`,
+APPROVED 2026-09-04. The first half of the Phase 6 split (the architect's call
+this session): the one model call site, the decision cache and the no-key
+guarantee. The held-out eval gate and the `classifier_quality` mart (B2.4) are
+6b. No mart, no BACKING row.
+
+- **One model call site, `classify/llm.py`, key-gated and lazy-imported.** A
+  language model is called from this module and nowhere else (the only
+  `import anthropic`, imported inside the real-call function), and it sees only
+  the reviews `rules.yaml` left `unclassified`. `model_available()` reads the key
+  from the environment; with no key `make_model_decider()` returns `None` and the
+  unresolved reviews stay `unclassified`. Pinned by `test_llm.py` (one call site,
+  lazy import, model input is only rules-unclassified) and the wall
+  (`test_labels_isolation.py`). *Rejected: importing `anthropic` at module top (an
+  offline/no-key run would load a paid SDK on the data path) or a second call
+  site.*
+- **Strict closed-set parse of the reply → the seven labels or `unclassified`.**
+  `parse_reply` reads only whole tokens equal to a label slug, so a near-miss
+  (`document-loop-ish`) is NOT `document-loop` — it, and any free text, becomes
+  `unclassified`. `normalize` enforces the review×theme grain (themes win, else
+  `positive`, else `unclassified`), so even a misbehaving decider can never add an
+  eighth label. Pinned by `test_llm.py::test_reply_outside_the_set_becomes_unclassified`
+  and `test_combined.py::test_model_never_adds_an_eighth_label`. *Rejected:
+  trusting the reply, or a fuzzy match to the nearest label.*
+- **The cache is a gitignored, text-free file keyed `(review_id, prompt_version,
+  model)`.** `data/classify/decisions.csv` (columns `review_id, prompt_version,
+  model, theme`; a review with two model themes is two rows, one it could not
+  place is one `unclassified` row). A run reads it and calls the model only for
+  keys absent, then writes it back, sorted, so a re-record is byte-identical and a
+  warm re-run makes zero model calls — deterministic despite a non-deterministic
+  model. Pinned by `test_cache.py`. *Rejected: committing the cache (corpus-
+  derived — brief §2.5 — and a committed synthetic cache would smuggle model
+  decisions into the no-key CI run, hiding the gray band); keying without
+  `prompt_version`/`model` (a prompt or model change would reuse stale decisions).*
+- **`MODEL` and `PROMPT_VERSION` are pinned constants in `classify/llm.py`.** Both
+  are in the cache key, so bumping either invalidates the cache by construction.
+  `MODEL = "claude-haiku-4-5"` — Haiku, the fast, low-cost tier apt for a
+  high-volume classifier over the reviews the rules left `unclassified` (the
+  spec's "fast model" — round 1, coherence-auditor: opus was pinned first, then
+  reconciled to Haiku); a single constant to change for a higher-judgment tier
+  (the study's quality figure, B2.4 in 6b, is measured against whatever model
+  ran). The real call is minimal (`model`, `max_tokens`, `system`, `messages`),
+  portable across `anthropic` 1.x. *Rejected: a runtime- or
+  environment-chosen model (non-reproducible; the cache key would drift silently).*
+- **`classified_reviews` stays a Python value; 6a writes no mart and populates no
+  BACKING row.** `classify/combined.py::classify_all` combines the rules with the
+  cached/model decisions into review×theme rows; it is used by 6b's gate and Phase
+  7's marts, not shown as a study number in 6a. B2.2/B2.4/B2.5 stay Pending. *Fix
+  the class, not the case is unaffected here — the model is a closed-set parse, not
+  a denylist.* *Rejected: materializing a mart now (no panel consumes it until
+  6b/7, and a number a reader sees must wear a tag).*
+- **`make rebuild` runs the classify step.** After staging, `rebuild` classifies
+  `stg_reviews` and prints a summary (reviews / theme rows / positive /
+  `unclassified` — the "not yet classified" band), so the no-key guarantee is
+  proven end to end through the DONE command; with a key the developer's run
+  populates the cache (paid, never an agent's). Over the synthetic corpus the
+  rules leave 7 of 39 reviews unclassified (25 theme rows, 7 positive), pinned in
+  `tests/pins.py`. *Rejected: a separate `make classify` the DONE does not
+  exercise.*
+
+The no-key run is green — the durable guarantee this phase adds and every phase
+after keeps (`tests/test_no_key.py`, re-run always): with the key unset,
+`make rebuild ROWS=synthetic` exits 0, no Anthropic client is constructed, no
+socket opens, and the combined output equals the rules-only output.
+
+`anthropic` (1.3.0) made a direct dependency (pre-approved, Phase 6 allowlist),
+imported lazily so a no-key run loads no paid SDK. The labels-isolation grep was
+widened to every code surface (`ingest`, `dags`, `study`, `scripts` added to the
+swept set), closing the Phase 6 trigger on that BACKLOG row. `make test`
+(704 tests) and `make rebuild ROWS=synthetic` (no key) are green.
+
+Review round 1 (all WORKS, no correctness or security findings) reconciled
+`MODEL` `claude-opus-5` → `claude-haiku-4-5` (the fast, low-cost classifier tier
+the spec's pinned decision names) and added a one-line refusal on the paid path:
+a `ModelError` maps an `anthropic.APIError` (a bad model id, a rate limit the
+SDK's retries could not clear, a transient network error) to one line naming the
+model in `pipeline/cli.main`, never a traceback — the developer-run paid path is
+now visible on failure rather than a stack trace. The no-key path never reaches
+it. *Fix the class, not the case: a closed exception type mapped to a clean
+refusal, the same shape as the `Refused`/`PageShapeError` catches.*

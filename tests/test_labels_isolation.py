@@ -19,7 +19,16 @@ READER_TOKENS = ("labels.csv", "labels_io", "read_labels", "LABELS_CSV")
 # Where a classifier or pipeline module could read the answer key from. The one
 # legitimate reader, classify/eval/, is excluded; tests, specs and docs may name
 # the file freely (they are not the pipeline).
-SURFACES = ("classify", "pipeline", "sql", "models")
+SURFACES = (
+    "classify",
+    "pipeline",
+    "sql",
+    "models",
+    "ingest",
+    "dags",
+    "study",
+    "scripts",
+)
 EXCLUDED = ROOT / "classify" / "eval"
 
 
@@ -56,6 +65,16 @@ def test_the_rules_layer_is_covered_by_the_wall():
     swept = {path.relative_to(ROOT).as_posix() for path in _source_files()}
     assert "classify/rules.py" in swept
     assert "classify/rules.yaml" in swept
+
+
+def test_the_model_call_site_is_covered_by_the_wall():
+    # Phase 6a's model call site and its cache must be swept surfaces — the model
+    # is never shown its own answer key. The whole classify/ tree outside eval/ is
+    # swept; assert the new modules are actually in the set.
+    swept = {path.relative_to(ROOT).as_posix() for path in _source_files()}
+    assert "classify/llm.py" in swept
+    assert "classify/cache.py" in swept
+    assert "classify/combined.py" in swept
 
 
 def test_the_one_reader_actually_reads_it():
