@@ -4,7 +4,7 @@
 # classify-eval (5); model (8); study (9).
 
 .PHONY: help setup test lint check-docs check-backing review-gate \
-        rebuild idempotency-check confirm reset scrape
+        rebuild idempotency-check confirm reset scrape record-snapshots
 
 # User variables reach recipes ONLY as make values via `$(call _Q,$(value VAR))`
 # — UNEXPANDED and single-quoted — so a value like `SPEC='$(shell …)'` or
@@ -73,3 +73,6 @@ reset: ## DESTRUCTIVE drop every DuckDB file this repo built (the corpus and one
 
 scrape: ## NETWORK fetch the declared source(s) into data/cache [SOURCE=<name>] — needs `make confirm scrape`; developer-run
 	uv run python -m pipeline scrape --source=$(call _Q,$(value SOURCE)) --make-pid=$$PPID
+
+record-snapshots: ## read the captures on disk, append this week's fetched figures to data/snapshots/fetched_snapshots.csv (offline; no confirm gate)
+	uv run python -m pipeline record-snapshots

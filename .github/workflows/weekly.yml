@@ -1,0 +1,54 @@
+name: weekly
+
+# The scheduled scrape (PROJECT_BRIEF §9, Phase 4): once a week, fetch the
+# fetchable sources politely, harvest the rating figures into the tracked
+# data/snapshots/fetched_snapshots.csv, and commit ONLY that subtree — the one
+# sanctioned exception to "never commit to main" (CLAUDE.md → Git workflow).
+# It runs on a clock and on manual dispatch, never on a pull request, so its
+# environment is the repo's own runner and no untrusted input drives it.
+on:
+  schedule:
+    - cron: "17 4 * * 1" # Mondays 04:17 UTC (off the hour, GitHub's guidance)
+  workflow_dispatch: {}
+
+# The one workflow that writes to the repo. contents: write is the whole grant;
+# the subtree limit is enforced by what the commit stages (data/snapshots/) and
+# by branch protection's one written exception.
+permissions:
+  contents: write
+
+# One weekly run at a time; a manual dispatch never races the cron.
+concurrency:
+  group: weekly
+  cancel-in-progress: false
+
+jobs:
+  scrape-and-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          version: "0.12.5" # match local; bump deliberately
+      - run: uv sync --locked
+      # NETWORK: the polite fetcher — robots first, >= 2 s per host, identifying
+      # UA, <= 60 pages/source, no proxy, no retry. `confirm` and `scrape` are
+      # one invocation, so the goal gate arms (origin: command line). Only
+      # fetchable sources are read; the rest are skipped with one line each.
+      - run: make confirm scrape
+      # Offline: read the fresh captures on disk, append this week's figures to
+      # the tracked file, numbers only.
+      - run: make record-snapshots
+      # Commit ONLY data/snapshots/, with a fixed brand-free message; nothing to
+      # commit is a clean no-op (no fake row is ever written).
+      - name: Commit the week's snapshots
+        run: |
+          git config user.name "friction-ledger-bot"
+          git config user.email "friction-ledger-bot@users.noreply.github.com"
+          git add data/snapshots/
+          if git diff --cached --quiet; then
+            echo "no new snapshot figures this week; nothing to commit"
+          else
+            git commit -m "data: weekly snapshot $(date -u +%F)"
+            git push
+          fi

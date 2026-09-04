@@ -11,6 +11,7 @@ fetcher tests use `httpx.MockTransport`, which opens no socket."""
 
 import socket
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 
@@ -43,6 +44,23 @@ def _no_network(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     monkeypatch.setattr(socket.socket, "connect", _blocked)
     monkeypatch.setattr(socket.socket, "connect_ex", _blocked)
     monkeypatch.setattr(socket, "create_connection", _blocked)
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _isolate_fetched_snapshots(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> Iterator[None]:
+    """The weekly cron appends real rows to the tracked
+    `data/snapshots/fetched_snapshots.csv`, so a unit test that rebuilds
+    `ROWS=captured` without naming its own fetched file must not couple to that
+    growing file (Phase 4). Point the default at a per-test path with no file,
+    so the default is zero rows; a test that exercises the fetched path passes
+    `fetched_file=` explicitly, and the guard on the committed file reads its
+    real path directly."""
+    monkeypatch.setattr(
+        "pipeline.build.FETCHED_SNAPSHOTS", tmp_path / "no-fetched-snapshots.csv"
+    )
     yield
 
 
