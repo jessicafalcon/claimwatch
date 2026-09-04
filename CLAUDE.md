@@ -68,9 +68,11 @@ in the middle, and come out on the right as the numbers the study shows.
   are local-only and gitignored.
 - `.github/workflows/ci.yml` — lint, check-docs, check-backing, test, then
   rebuild + idempotency-check twice: once on the synthetic reviews, once on
-  every frozen sample through its real parser. `weekly.yml` *(Phase 4)* — the
-  scheduled scrape + snapshot commit. `.github/pull_request_template.md` — the
-  PR body.
+  every frozen sample through its real parser. `weekly.yml` — the scheduled
+  scrape (`schedule`/`workflow_dispatch`, `contents: write`): `make confirm
+  scrape` then `make record-snapshots`, then a fixed brand-free commit of
+  `data/snapshots/` only (the one workflow that writes to the repo).
+  `.github/pull_request_template.md` — the PR body.
 - `pyproject.toml`, `uv.lock`, `.python-version`, `.pre-commit-config.yaml` —
   the toolchain (uv, ruff, pytest, pre-commit), versions pinned in lockstep.
 - `sql/raw/`, `sql/staging/`, `sql/marts/` — plain SQL, one file per table:
@@ -134,10 +136,12 @@ in the middle, and come out on the right as the numbers the study shows.
   `cost_model.py` (`FORMULAS`), `guardrail_sim.py`. *(Phase 9)* `study/` —
   Metabase setup + the HTML export. *(Phase 10)* `dags/friction_ledger.py`.
 - `data/` — gitignored working output (corpus, captured pages, `*.duckdb`);
-  `data/snapshots/` is the one tracked subtree: today `manual_snapshots.csv`,
-  the figures a person read off a page whose terms forbid a robot (a declared
+  `data/snapshots/` is the one tracked subtree: `manual_snapshots.csv`, the
+  figures a person read off a page whose terms forbid a robot (a declared
   source name, a day, five numbers and the word `page`; it carries no address
-  and no person's name), loaded as Measured; *(Phase 4)* the weekly captures.
+  and no person's name), loaded as Measured; and `fetched_snapshots.csv`, the
+  weekly cron's fetched figures (a source slug, the capture's instant and the
+  five figures; origin `fetch`, also Measured, also no address and no body).
 
 ## Commands (macOS, uv)
 
@@ -159,7 +163,8 @@ in the middle, and come out on the right as the numbers the study shows.
   print reviews per month. `ROWS` names what is loaded; each input builds its
   own database file, so a sample never lands in the corpus. The default,
   `captured`, loads the anchors, the hand-read rows in
-  `data/snapshots/manual_snapshots.csv` and every capture under `data/cache/`
+  `data/snapshots/manual_snapshots.csv`, the fetched series in
+  `data/snapshots/fetched_snapshots.csv` and every capture under `data/cache/`
   (with no capture it says so); `none` runs it end to end with zero rows;
   `synthetic` loads the review fixture and the anchors; `samples` runs every
   frozen sample through its real parser (CI does). A raw table already in the
@@ -189,6 +194,14 @@ in the middle, and come out on the right as the numbers the study shows.
   reason and date sit beside the source in code and in DECISIONS). It refuses
   — exit 2 — a source named by `SOURCE=` that we do not fetch, one with no
   page address filled in, and one whose page robots.txt disallows.
+- `make record-snapshots` — read the captures already on disk under
+  `data/cache/` and append each fetchable source's fresh snapshot figures to
+  the tracked `data/snapshots/fetched_snapshots.csv` (numbers only: a source
+  slug, the capture's instant and the five figures — the address and
+  attribution come from the declaration, so no brand and no review body enters
+  the file). Offline and non-destructive, so no `confirm` gate; idempotent
+  (recording the same capture twice writes no new row). The weekly workflow
+  runs it after `make confirm scrape`; `rebuild ROWS=captured` reads the file.
 - `make confirm` — arms the destructive or network target that follows it in
   the SAME invocation and nothing else: `make confirm reset`, `make confirm
   scrape`. The recipe stamps its make process's id; the gated target passes
@@ -492,26 +505,29 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 ## Current status
 
-**Phase 3c — Trustpilot, authorized import** (`phase-3c-trustpilot-import`,
-spec `specs/phase-3c-trustpilot-import.md`, APPROVED 2026-09-04 with amendment
-A1): being built. What changes: the studied insurer's 1,050 Trustpilot reviews
-are now ingested as a Measured **corpus** — the raw material Beat 2's theme
-shares (B2.2, B2.5) will classify in Phase 5 — while the hand-read 3.9/1,072
-rating point from Phase 3b is untouched. How: written authorization arrived, so
-Phase 3b's A1 (not fetchable, no parser) is reversed for the reviews — but only
-for an OFFLINE import, not a live fetch. The robots ban still stands for our
-crawler, so a SECOND source `fr-digital-first-trustpilot-reviews`
-(`parser=trustpilot`, `fetchable=False`, host `ca.trustpilot.com`) reads the
-authorized export (webscraper.io column shape) as a capture from disk; the
-snapshot source is left alone (the App Store feed/listing split), so the rating
-series is unchanged by construction. The `trustpilot` parser reads the rating
-from the star-image URL, the date from a locale-independent `Month D, YYYY`,
-and drops every personal column. Amendment A1 chose the two-source split over
-flipping the snapshot source (which `read_manual_snapshots` would refuse). The
-DONE command (`make rebuild && make idempotency-check ROWS=captured`) passes:
-1,050 rows reach `stg_reviews`, idempotent, the rating point unchanged; 588
-tests pass; lint clean. Phase 3b merged. Next: the Phase 3c review gate and
-agents, then the PR. (Earlier amendment history is in each spec and DECISIONS.)
+**Phase 4 — the weekly cron** (`phase-4-weekly-cron`, spec
+`specs/phase-4-weekly-cron.md`, APPROVED 2026-09-03): being built. What changes:
+a weekly GitHub Actions cron (`.github/workflows/weekly.yml`) scrapes the
+fetchable sources politely and commits the new rating figures under
+`data/snapshots/` — the one sanctioned exception to "never commit to `main`" —
+so the B1.2–B1.4 rating series accrues while the rest is built (PROJECT_BRIEF
+§9). How: the fetched points get a numbers-only tracked home,
+`data/snapshots/fetched_snapshots.csv` (origin `fetch`), written by a new
+non-network `make record-snapshots` that harvests the week's capture through
+the one parser path and read back by `rebuild ROWS=captured`; the file stores
+the capture's own instant so a fetched row and its live-cache twin share the
+snapshot key and never double-count. The developer chose ratings-only over
+banking review bodies weekly (the misflagged-claim signal comes from the
+already-ingested corpus classified by review date in Beat 2, so no body enters
+git and the personal-data excerpt rule stays deferred). The workflow runs on
+`schedule`/`workflow_dispatch` only — never a pull request — so its runner is
+trusted (this resolves the Phase 3a `MAKEFILES`/`PATH` residual for CI); it
+commits a fixed brand-free message (`data: weekly snapshot <date>`) touching
+`data/snapshots/` alone, under `permissions: contents: write`. The DONE command
+(`make test && make idempotency-check ROWS=captured`) passes; lint clean. Phase
+3c merged (PR #7). Next: the Phase 4 review gate and agents (security-reviewer
+mandatory), then the PR. (Earlier amendment history is in each spec and
+DECISIONS.)
 
 Open BACKLOG rows: **22**.
 

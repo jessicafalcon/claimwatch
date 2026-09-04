@@ -5,7 +5,7 @@ Phase 4 — a scheduled scrape that commits new snapshots so the rating
 time-series accrues while the rest of the study is built. Depends on Phase 3c
 merged (PR #7, 2026-09-04).
 
-**Status: PROPOSED — do not start until approved.** No new dependencies (uses
+**Status: APPROVED 2026-09-03 — in progress.** No new dependencies (uses
 the Phase 2 fetcher, DuckDB, stdlib csv; GitHub Actions is configuration, not a
 package). The allowlist is in CLAUDE.md → Conventions.
 
@@ -171,8 +171,8 @@ make test && make idempotency-check ROWS=captured
 - `Makefile` — the `record-snapshots` target (and `make help`).
 - `data/snapshots/fetched_snapshots.csv` — new tracked file, header row only at
   first (no fabricated Measured numbers land before the first real run).
-- `tests/test_harvest.py`, `tests/test_weekly.py` — new; `tests/test_backing.py`
-  (or the existing BACKING test file) for the tag check; `tests/pins.py`.
+- `tests/test_harvest.py`, `tests/test_weekly.py`, `tests/test_backing.py` — new
+  (the harvest/loader pins, the workflow-shape pins, the rating-tag pin).
 - `BACKING.md` — B1.2–B1.4 source cells gain the tracked file.
 - `DECISIONS.md` — Phase 4 entry; supersede pointer on the Phase 3a
   environment-residual note.
@@ -200,8 +200,8 @@ Freeze: none
   BACKLOG count; the `main`-commit exception now realized
 - [ ] `BACKING.md` — B1.2, B1.3, B1.4 source cells gain
   `data/snapshots/fetched_snapshots.csv` (tag stays Documented)
-- [ ] `SPEC.md` — none (no chart or beat changes)
-- [ ] `README.md` — the weekly command and the accrual sentence
+- [ ] SPEC — none (no chart or beat changes)
+- [ ] README — none (the README is a Phase 9 deliverable; it does not exist yet)
 - [ ] this spec — the "Delivered" paragraph appended at exit
 
 ## Threat model (REQUIRED)
