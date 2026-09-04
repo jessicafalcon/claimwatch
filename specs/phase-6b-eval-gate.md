@@ -342,6 +342,39 @@ Agents are selected by diff surface (CLAUDE.md → "Which review agents run").
   tuning-fold dev diagnostic. Reconsider only if a developer needs the held-out
   report without a full rebuild (BACKLOG if it comes up).
 
+## Amendment A1 — grade over the reviews both classified and labeled (2026-09-04)
+
+Round 1 (code-reviewer, functionality-tester) found that the gate graded the
+classifier's predictions against the answer key for **every** rebuild input, but
+the answer key covers only the synthetic corpus. So `make rebuild
+ROWS=captured|samples` wrote a **Measured** `classifier_quality` mart grading a
+real (or empty) corpus's predictions against synthetic labels — real and synthetic
+review-ids never intersect, so every figure was a garbage `0.0`/`None` tagged
+Measured. The invariant this restores:
+
+**For all gate scoring, precision and recall are computed only over reviews that
+are both classified and present in the answer key (on the held-out fold); a review
+labeled but not classified — or classified but not labeled — is not graded, and an
+input whose corpus the answer key does not cover writes no mart.**
+
+Mechanism (a coherence precondition on the measurement, not a per-input case
+check): `score_heldout` restricts both sides to `graded = {held-out review ids
+present in the predictions AND in the answer key}`. On the synthetic corpus every
+review is classified and labeled, so `graded` is the full held-out set and the
+pinned `RULES_HELDOUT` figures are unchanged. On a captured/real corpus with only
+synthetic labels, `graded` is empty, so every label scores `predicted = actual =
+0 → None`; the CLI then writes **no** mart (it populates only when at least one
+review was graded), leaving the empty shell `build_derived` created. When Phase 7
+appends real labels, those ids are classified and grade normally, while synthetic
+labels a real run did not classify are ignored — so a mixed answer key grades each
+corpus against its own labels. This tightens invariant 2 (the `predicted`/`actual`
+sets are over `graded`, not over all held-out predictions/labels) and adds the
+"no mart when nothing is graded" clause; the three crafted `test_gate.py` unit
+cases are updated so a "miss" is a review classified with the wrong label (in the
+predictions), not a label present only in the gold. *Rejected: guarding the write
+by `ROWS == "synthetic"` (a per-input case, and it would wrongly skip Phase 7's
+real captured grading under a mixed answer key).*
+
 ## Delivered
 
 (appended at phase exit)
