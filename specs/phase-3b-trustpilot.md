@@ -21,7 +21,8 @@ open` when the Delivered paragraph is appended.
 ## Amendment A1 — the terms check found Trustpilot not fetchable (2026-09-03)
 
 The developer's robots check (Phase 0a default #2) settled pinned decision 3's
-fork. `fr.trustpilot.com/robots.txt` (and `www.trustpilot.com`'s) ends with
+fork. `www.trustpilot.com/robots.txt` (where the profile lives) and
+`fr.trustpilot.com`'s both end with
 `User-agent: *` / `Disallow: /`, and our crawler's User-Agent matches none of
 the named groups, so under RFC 9309 the catch-all group governs and every path
 is disallowed. There is no page we may fetch, so none we may freeze — so the
@@ -31,7 +32,7 @@ hand-read branch is taken, mirroring the App Store listing:
   **dropped**; `ingest/trustpilot.py` and `fixtures/trustpilot/` are not built,
   and the `Freeze:` line is removed.
 - Trustpilot is declared as a not-fetchable source (`platform=trustpilot`,
-  `parser=None`, `fetchable=False`, `host=fr.trustpilot.com`), its `terms`
+  `parser=None`, `fetchable=False`, `host=www.trustpilot.com`), its `terms`
   naming fr's robots rule with the date read; refused before any request,
   whatever the file says on a later day.
 - Its rating and review count are read by hand off the profile page (robots
@@ -117,7 +118,7 @@ because no Trustpilot page may be fetched or frozen.)
    BACKLOG.)*
 2. **Trustpilot is one declared not-fetchable source (A1).** A `Source` for the
    studied insurer's Trustpilot profile is in `SOURCES`: `platform=trustpilot`,
-   `parser=None`, `fetchable=False`, `host=fr.trustpilot.com`, `unsolicited`
+   `parser=None`, `fetchable=False`, `host=www.trustpilot.com`, `unsolicited`
    channel, its `terms` naming fr's robots rule (`User-agent: *` → `Disallow:
    /`, read 2026-09-03) — recorded beside it and in DECISIONS → Phase 3b. It is
    refused before any request; its profile address is the only new
@@ -153,11 +154,11 @@ red.)
 | Done-when | Proof (test id / `make` target / output line) |
 |---|---|
 | 1 | DROPPED by A1 (no parser). |
-| 2 | `tests/test_fetch_sources.py::test_trustpilot_source_declared_not_fetchable`, `tests/test_makefile.py::test_scrape_refuses_a_source_not_fetchable` (Trustpilot named), `tests/test_ingest_layout.py::test_brand_carrying_strings_appear_only_in_the_declarations` |
-| 3 | `tests/test_snapshots.py::test_trustpilot_hand_read_row_matches_its_anchor_seed`, `make rebuild` prints the Trustpilot Measured snapshot loaded |
+| 2 | `tests/test_fetch_sources.py::test_trustpilot_source_declared_not_fetchable`, `tests/test_fetch_sources.py::test_a_non_fetchable_source_is_refused_before_any_request_whatever_robots_says`, `tests/test_ingest_layout.py::test_brand_carrying_strings_appear_only_in_the_declarations`, `tests/test_ingest_layout.py::test_every_brand_form_in_the_declarations_is_a_declared_token` |
+| 3 | `tests/test_snapshots.py::test_trustpilot_hand_read_row_matches_its_anchor_seed`, `tests/test_snapshots.py::test_the_tracked_manual_file_loads_and_names_no_address` |
 | 4 | DROPPED by A1 (no sample). |
-| 5 | `tests/test_rebuild.py::test_no_key_run_is_green` (existing), `make idempotency-check ROWS=captured` prints "row counts unchanged" |
-| 6 | If red: `tests/test_review_gate.py::test_no_spec_gate_green_on_a_phase_branch`; else `make review-gate` (no SPEC) prints an OK line on this branch |
+| 5 | `tests/test_idempotency.py::test_second_rebuild_adds_no_rows`, `make idempotency-check ROWS=captured` prints "every row count unchanged"; the no-key run is inherently green (no API call on the pipeline path before Phase 6, whose test is the durable guard — CLAUDE.md) |
+| 6 | Re-deferred by A1: `make review-gate` without `SPEC=` is already green (5/5) on this branch — no fixture change, so the freeze check does not bite; the BACKLOG trigger stands for the first branch that re-freezes a fixture |
 
 ## Invariants (REQUIRED)
 
@@ -166,7 +167,7 @@ red.)
 
 | Invariant ("for all …, … holds") | Falsified by (scenario test) |
 |---|---|
-| For all declared sources, no request is made to a source not recorded fetchable. | `tests/test_makefile.py::test_scrape_refuses_a_source_not_fetchable` — `make scrape SOURCE=<trustpilot>` on the not-fetchable declaration exits 2 before any fetch. |
+| For all declared sources, no request is made to a source not recorded fetchable. | `tests/test_fetch_sources.py::test_trustpilot_source_declared_not_fetchable` — `scrape` on the not-fetchable Trustpilot declaration raises `FetchRefused` before any request; the request log is empty. |
 | For all snapshot rows, the row's profile equals the anchor seed's profile for that platform and profile, so one profile is one series. | `tests/test_snapshots.py::test_trustpilot_hand_read_row_matches_its_anchor_seed` — a declaration whose profile is not the seed's is caught. |
 | For all hand-read rows, a second rebuild on the same input changes no row count. | `tests/test_idempotency.py` — a second load of `manual_snapshots.csv` inserts nothing (append-only on the content hash). |
 | For all Trustpilot addresses in the tree, the string appears only in `ingest/sources.py`. | `tests/test_ingest_layout.py::test_brand_carrying_strings_appear_only_in_the_declarations` — a brand token in any other tracked file fails. |
@@ -180,9 +181,10 @@ red.)
   A1** — no permitted page exists, so none is frozen.
 - **The terms position is the developer's recorded check, and the refusal
   takes the hand-read path (settled by A1).** Following Phase 0a default #2:
-  the developer's check found `fr.trustpilot.com/robots.txt` ends with
-  `User-agent: *` / `Disallow: /` and our User-Agent matches no named group
-  (RFC 9309: the catch-all group governs), so the source is `fetchable=False`
+  the developer's check found `www.trustpilot.com`'s and `fr.trustpilot.com`'s
+  robots.txt both end with `User-agent: *` / `Disallow: /` and our User-Agent
+  matches no named group (RFC 9309: the catch-all group governs), so the source
+  is declared on `www.trustpilot.com` (where the profile lives), `fetchable=False`
   with `terms` naming that rule and the date, and its figures are hand-read
   into `data/snapshots/manual_snapshots.csv` (Measured), as the App Store
   listing is. The position is recorded beside the source and in DECISIONS →
@@ -216,7 +218,7 @@ sample tests. The phase touches:
 
 - `ingest/sources.py` — the Trustpilot `Source` in `SOURCES`
   (`platform=trustpilot`, `parser=None`, `fetchable=False`,
-  `host=fr.trustpilot.com`, the profile `listing` address, `terms`); its brand
+  `host=www.trustpilot.com`, the profile `listing` address, `terms`); its brand
   form in `BRAND_TOKENS` if the profile domain is a new form.
 - `data/snapshots/manual_snapshots.csv` — one hand-read Measured Trustpilot
   row (rating + count).
@@ -235,8 +237,9 @@ Freeze: none
 ## Record updates (REQUIRED)
 
 - [ ] `DECISIONS.md` — Phase 3b entry: the Trustpilot robots position as
-  checked (`fr.trustpilot.com` `User-agent: *` → `Disallow: /`, our UA in no
-  named group, 2026-09-03 → not fetchable → hand-read), amendment A1, the
+  checked (`www.trustpilot.com` and `fr.trustpilot.com` both `User-agent: *` →
+  `Disallow: /`, our UA in no named group, 2026-09-03 → not fetchable →
+  hand-read), amendment A1, the
   re-defer of the §6 response figures and of the parser/sample; the D1
   brand-token note if the profile domain is a new form.
 - [ ] `BACKLOG.md` — closed: "A fetched peer may not join its anchor's series"
@@ -250,13 +253,13 @@ Freeze: none
 - [ ] `CLAUDE.md` — Current status; Repo map (the Trustpilot hand-read source
   in `ingest/sources.py`, the `manual_snapshots.csv` note); BACKLOG count; the
   line-count row (the audit reports growth against the ~400 cap).
-- [ ] `BACKING.md` — none (B1.2, B1.3, B1.4, B2.3 already name
+- [ ] BACKING — none (B1.2, B1.3, B1.4, B2.3 already name
   `https://www.trustpilot.com/` and `data/snapshots/manual_snapshots.csv`; the
   row tag stays Documented until measured points make the series).
-- [ ] `SPEC.md` — none (no panel changes). Beat 1's "under the hood" already
-  names Trustpilot and the hand-read path.
-- [ ] `README.md` — the Trustpilot source in the sources list (hand-read, not
-  fetchable — no `make scrape` path).
+- [ ] SPEC — none (no panel changes). Beat 1's "under the hood" already names
+  Trustpilot and the hand-read path.
+- [ ] README — none (no README file exists yet; the study's README lands with
+  Phase 9).
 - [ ] this spec — the "Delivered" paragraph appended at exit.
 
 ## Threat model (REQUIRED when the phase adds a `make` target that takes a variable, deletes anything, calls a paid API, or touches the network)
@@ -298,7 +301,7 @@ string reaches any file but `ingest/sources.py`.
 ## Out of scope (deferred, recorded)
 
 - **The Trustpilot JSON-LD parser and a frozen sample (A1).** Not built —
-  Trustpilot forbids our crawler on every path, so no page may be fetched or
+  Trustpilot disallows our crawler on every path, so no page may be fetched or
   frozen. Re-deferred to a future written authorization from Trustpilot (as
   Opinion Assurances granted); recorded in BACKLOG.
 - **Trustpilot peers as measured sources.** Peer profiles stay Documented

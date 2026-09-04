@@ -114,6 +114,20 @@ place and never deleted.
     aggregates and paraphrases only (brief §2.5). Fetchable: the studied
     insurer's profile, up to its own page count, ≥ 2 s apart; the reviewer
     pseudonym is never read. ([Phase 3a](#phase-3a))
+  - *Trustpilot review profile (Phase 3b).* The studied insurer's Trustpilot
+    profile, read for its TrustScore and review count. **Position as of
+    2026-09-03: not fetchable.** `robots.txt` (read on both
+    https://www.trustpilot.com/robots.txt and https://fr.trustpilot.com/robots.txt,
+    2026-09-03) names many crawlers explicitly and ends with a catch-all group
+    `User-agent: *` / `Disallow: /`; our User-Agent is in no named group, so
+    under RFC 9309 the catch-all governs and every path is disallowed. Declared
+    `fetchable=False`, refused before any request; its rating and count are read
+    by hand into `data/snapshots/manual_snapshots.csv`, tagged Measured (3.9 on
+    1,072 reviews, 2026-09-03), on the `fr-digital-first` profile so the point
+    joins the Trustpilot anchors' series. The review-profile parser and a frozen
+    sample are not built — no page may be fetched, so none may be frozen — and
+    are re-deferred to a future written authorization (BACKLOG). ([Phase
+    3b](#phase-3b))
 - **An address that spells the brand is a sourced data point and lives in
   `ingest/sources.py` only (Phase 3a, decision D1).** A store package id or a
   profile path names the insurer where a numeric store id does not. It may
@@ -926,3 +940,46 @@ renamed the rebuild input, closed five BACKLOG rows.
   dropping `rows_input` (the input still decides where a sample declaration
   exists). Found by review round 5 (2026-09-03); built in place of a sixth
   round, with one exit pass.
+
+### Phase 3b
+
+Branch `phase-3b-trustpilot`, spec `specs/phase-3b-trustpilot.md`, APPROVED
+2026-09-03 with amendment A1. The remaining polite source: Trustpilot, the
+platform behind the peer anchors and the studied insurer's Documented rating
+series (`fixtures/anchors/platform_snapshots_seed.csv`).
+
+- **A1 — Trustpilot is not fetchable; the hand-read path.** The developer's
+  robots check (Phase 0a default #2) is decisive: `www.trustpilot.com` and
+  `fr.trustpilot.com` both end their `robots.txt` with `User-agent: *` /
+  `Disallow: /`, and our User-Agent (`friction-ledger/…`) matches none of the
+  named crawler groups, so under RFC 9309 the catch-all group governs and every
+  path is disallowed. No page may be fetched, so none may be frozen — so the
+  spec's planned JSON-LD parser (done-when 1) and frozen sample (done-when 4)
+  are dropped, and pinned decision 3's hand-read branch is taken, mirroring the
+  App Store listing. Trustpilot is declared `fetchable=False` in
+  `ingest/sources.py` (`platform=trustpilot`, `parser=None`,
+  `host=www.trustpilot.com`, `channel=unsolicited`, `profile=fr-digital-first`,
+  `terms` naming the robots rule), refused before any request; its TrustScore
+  and count are read by hand into `data/snapshots/manual_snapshots.csv` (3.9 on
+  1,072 reviews, 2026-09-03, Measured). Rejected: a different User-Agent to slip
+  the catch-all (evasion — never); the Trustpilot Business API (a paid,
+  credentialed dependency — a STOP-and-ask, out of scope). The parser and
+  sample are re-deferred to a future written authorization (BACKLOG). Approved
+  by the developer 2026-09-03 after the robots check.
+- **The hand-read point reuses its anchor's profile.** The declaration's
+  `profile` is `fr-digital-first`, exactly the Trustpilot anchors' profile, so
+  `rating_trend` / `peer_ratings` keyed on `(source, profile)` read one series,
+  not two — pinned by
+  `tests/test_snapshots.py::test_trustpilot_hand_read_row_matches_its_anchor_seed`
+  (closes the BACKLOG row "A fetched peer may not join its anchor's series").
+- **The brand form.** The profile address's path is the platform name, the
+  word `review`, and the insurer's domain; the domain's brand word is already a
+  declared brand token, and `trustpilot` and `review` are generic platform/path
+  vocabulary added to the test's `ADDRESS_WORDS`, as `opinion assurances
+  assureur` and `google play store details` were. No new brand token; the
+  address lives only in `ingest/sources.py` (D1).
+- **The §6 response figures stay unseeded and B1.4 waits.** Trustpilot's
+  response rate and delay are layout text, not data, and Trustpilot is not
+  fetched, so no measured response figures land; SPEC B1.4 already states the
+  cross-platform comparison waits for a second platform's measured figures
+  (BACKLOG, re-deferred to Phase 9).
