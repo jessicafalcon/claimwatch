@@ -1,4 +1,4 @@
-# Phase 5a — Label sample + the labels wall (PROPOSED)
+# Phase 5a — Label sample + the labels wall
 
 Contract for the `phase-5a-label-sample` branch. Source: PROJECT_BRIEF.md §9
 Phase 5 ("Hand labels + rules layer"), split into 5a/5b per `docs/PLAN.md` §5
@@ -6,7 +6,7 @@ Phase 5 ("Hand labels + rules layer"), split into 5a/5b per `docs/PLAN.md` §5
 Rules layer"). Depends on Phase 4 merged (PR #8) and the Phase 4 docs hotfix
 merged (PR #9).
 
-**Status: PROPOSED — do not start until approved.** No new dependencies (uses
+**Status: APPROVED 2026-09-03 — in progress.** No new dependencies (uses
 DuckDB via `pipeline/warehouse.py`, stdlib `csv`/`hashlib`; no `pyyaml`, no
 `anthropic` — `rules.yaml` and the model are 5b and 6). The allowlist is in
 CLAUDE.md → Conventions.

@@ -86,7 +86,8 @@ in the middle, and come out on the right as the numbers the study shows.
   (raw→staging→marts), `cli.py`/`__main__.py` (the validating `make` entry),
   `sql_lint.py` (the portability/clock denylist the tests use),
   `metrics.py` (reviews per month — a pinned query, not a mart; folds into
-  B5.2 in Beat 5).
+  B5.2 in Beat 5), `label_sample.py` (the `make label-sample` draw — reads
+  `stg_reviews`, writes the gitignored labeling sheet; Phase 5a).
   `fixtures/synthetic/` — hand-written fake reviews, read-only after Phase 1;
   `fixtures/anchors/` — the brief's §6 public figures with source URLs, one
   row per snapshot with its profile, segment, channel and the stat-row
@@ -130,9 +131,12 @@ in the middle, and come out on the right as the numbers the study shows.
   reviews` *(Phase 3c)* is the review corpus, read from a written-authorized
   OFFLINE export (`parser=trustpilot`, `fetchable=False` — the crawler still
   never runs; the export is saved as a capture and read from disk). A live
-  fetch and a scheduled refresh stay deferred (BACKLOG). *(Phase 5+)*
-  `classify/` — `rules.yaml`, `rules.py`, `llm.py` (the ONE model call site),
-  `eval/` (the only reader of `labels.csv`). *(Phase 8)* `models/` —
+  fetch and a scheduled refresh stay deferred (BACKLOG). *(Phase 5a)*
+  `classify/` — `labels.py` (the closed seven-label set + `review_id`),
+  `split.py` (the `sha256(review_id) % 5` held-out split), `eval/` (the ONLY
+  reader of the hand-labeled answer key: `labels_io.py` + the header-only
+  `labels.csv`). *(Phase 5b)* `rules.yaml`, `rules.py`; *(Phase 6)* `llm.py`
+  (the ONE model call site). *(Phase 8)* `models/` —
   `cost_model.py` (`FORMULAS`), `guardrail_sim.py`. *(Phase 9)* `study/` —
   Metabase setup + the HTML export. *(Phase 10)* `dags/friction_ledger.py`.
 - `data/` — gitignored working output (corpus, captured pages, `*.duckdb`);
@@ -202,6 +206,15 @@ in the middle, and come out on the right as the numbers the study shows.
   the file). Offline and non-destructive, so no `confirm` gate; idempotent
   (recording the same capture twice writes no new row). The weekly workflow
   runs it after `make confirm scrape`; `rebuild ROWS=captured` reads the file.
+- `make label-sample N=<n>` — draw N reviews from the built corpus's
+  `stg_reviews` into the gitignored `data/label_sample.csv` (`review_id,
+  source_url, text`) for a person to hand-label, in `sha256(review_id)` order so
+  the draw is deterministic and a larger N is a superset. N is a positive
+  integer (validated in Python; the output path is fixed, not built from N).
+  Offline and non-destructive, so no `confirm` gate; a warehouse with no
+  `stg_reviews` writes a header-only sheet and says so. The person appends
+  `(review_id, theme)` rows to the tracked, text-free `classify/eval/labels.csv`
+  offline — the answer key, read only by `classify/eval/` (Phase 5a).
 - `make confirm` — arms the destructive or network target that follows it in
   the SAME invocation and nothing else: `make confirm reset`, `make confirm
   scrape`. The recipe stamps its make process's id; the gated target passes
@@ -510,38 +523,28 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 ## Current status
 
-**Phase 4 — the weekly cron** (`phase-4-weekly-cron`, spec
-`specs/phase-4-weekly-cron.md`, APPROVED 2026-09-03): merged to `main` (PR #8,
-2026-09-03). What it added:
-a weekly GitHub Actions cron (`.github/workflows/weekly.yml`) scrapes the
-fetchable sources politely and commits the new rating figures under
-`data/snapshots/` — the one sanctioned exception to "never commit to `main`" —
-so the B1.2–B1.4 rating series accrues while the rest is built (PROJECT_BRIEF
-§9). How: the fetched points get a numbers-only tracked home,
-`data/snapshots/fetched_snapshots.csv` (origin `fetch`), written by a new
-non-network `make record-snapshots` that harvests the week's capture through
-the one parser path and read back by `rebuild ROWS=captured`. The file stores
-the capture's own instant, so a fetched row and its live-cache twin share the
-snapshot key and never double-count. The developer chose ratings-only over
-banking review bodies weekly (the misflagged-claim signal comes from the
-already-ingested corpus classified by review date in Beat 2, so no body enters
-git and the personal-data excerpt rule stays deferred). The workflow runs on
-`schedule`/`workflow_dispatch` only — never a pull request — so its runner is
-trusted (this resolves the Phase 3a `MAKEFILES`/`PATH` residual for the weekly
-workflow); it
-commits a fixed brand-free message (`data: weekly snapshot <date>`) touching
-`data/snapshots/` alone, under `permissions: contents: write`. The DONE command
-(`make test && make idempotency-check ROWS=captured`) passes; lint clean;
-`review-gate` 7/7; 612 tests. Review round 1 passed (all agents), every finding
-fixed and the credential fix re-reviewed pass. Phase 3c merged (PR #7); Phase 4
-merged (PR #8). A follow-up docs hotfix (`fix/weekly-branch-protection-wording`)
-corrects records that had framed the bot's `data/snapshots/` limit as branch
-protection: `main` is unprotected on this private plan (no GitHub
-Team/Enterprise), so the limit is staging discipline (`git add data/snapshots/`,
-pinned by `tests/test_weekly.py`) — see DECISIONS → Gotchas. Next: confirm two
-scheduled runs accrue over the coming weeks. (Earlier amendment history is in
-each spec and DECISIONS.)
+**Phase 5a — label sample + the labels wall** (`phase-5a-label-sample`, spec
+`specs/phase-5a-label-sample.md`, APPROVED 2026-09-04): being built. Brief §9
+Phase 5 ("Hand labels + rules layer") is split 5a/5b per `docs/PLAN.md` §5; 5a
+is the trust foundation only — no rule, no model. What it adds: the closed
+seven-label set and a stable `review_id = "{source}:{external_id}"`
+(`classify/labels.py`); the deterministic held-out split `sha256(review_id) % 5`
+(`classify/split.py`, fold 4 held out for Phase 6's gate); `make label-sample
+N=<n>`, which draws N reviews from `stg_reviews` in `sha256(review_id)` order
+into the gitignored `data/label_sample.csv` for a human to hand-label; and the
+labels wall — `classify/eval/` is the ONLY reader of the tracked, text-free
+answer key `classify/eval/labels.csv` (`review_id, theme`, one row per review ×
+theme), which ships header-only until a person labels offline. The real 300–500
+labels are human offline work (BACKLOG). 5a populates no BACKING row (it shows
+no number): it is the wall Phase 6's eval gate writes B2.4 (`classifier_quality`)
+from, and B2.2/B2.5 rest on — those stay Pending. DONE (`make test`) passes: 644
+tests, 32 new (closed set, review_id, split determinism, sheet determinism + N
+validation, the text-free wall, labels isolation). Next: review round 1, then PR.
 
-Open BACKLOG rows: **22**.
+Phase 4 (the weekly cron) merged to `main` (PR #8, 2026-09-03); the docs hotfix
+merged (PR #9, 2026-09-04). (Earlier phase and amendment history is in each spec
+and DECISIONS.)
+
+Open BACKLOG rows: **23**.
 
 (Update this section at the end of every working day.)
