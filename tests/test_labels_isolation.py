@@ -49,6 +49,15 @@ def test_no_reader_of_labels_outside_eval():
     )
 
 
+def test_the_rules_layer_is_covered_by_the_wall():
+    # Phase 5b's rules classifier must be one of the swept surfaces — the wall
+    # actively covers classify/rules.py, not incidentally. If the rules ever read
+    # the answer key, test_no_reader_of_labels_outside_eval must catch it.
+    swept = {path.relative_to(ROOT).as_posix() for path in _source_files()}
+    assert "classify/rules.py" in swept
+    assert "classify/rules.yaml" in swept
+
+
 def test_the_one_reader_actually_reads_it():
     # A live wall: the reader package DOES carry the tokens (so the test above is
     # excluding a real reader, not passing on an empty repo).

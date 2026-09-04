@@ -1,0 +1,86 @@
+# The rules layer's patterns — the clear cases a rule decides, so the Phase 6
+# model sees only the rest (CLAUDE.md → Deterministic first). Data, not code: a
+# rule change is an edit here, not in Python, and pattern-matching lives here and
+# in classify/rules.py, never in SQL (the portability contract).
+#
+# One group per EMITTING label: the five PROJECT_BRIEF §5 themes and `positive`.
+# `unclassified` has no group — it is the fallback a review gets when no theme
+# and no positive pattern matches (the model decides it later). A group keyed by
+# anything outside the closed seven refuses the load (classify/rules.py); an
+# eighth label is impossible.
+#
+# Each pattern is a lower-case, accent-folded token matched at a WORD START:
+# classify/rules.py folds both the review text and the pattern (NFKD, drop
+# combining marks, casefold) and matches `\b` + pattern, so `refus` matches
+# `refusé`, `bot` matches `bot`/`bots` but not `rabotées`, and the corpus's
+# unaccented text matches too. A theme fires if ANY of its patterns matches; a
+# review may fire several themes (one row per review × theme). Patterns are
+# chosen narrow enough not to fire on another theme's reviews — precision over
+# coverage; the model catches what the rules leave `unclassified`.
+
+# §5.1 — a claim flagged, then document after harder-to-get document.
+document-loop:
+  - document
+  - justificatif
+  - piece
+  - papier
+  - reclame
+  - redemande
+  - un par un
+
+# §5.2 — rejected with no notification; the refusal found by chance in the app.
+silent-rejection:
+  - notification
+  - en silence
+  - sans alerte
+  - aucune alerte
+  - refus muet
+  - decouvert
+
+# §5.3 — secondary-coverage claims auto-rejected on the first pass.
+second-payer:
+  - deuxieme payeur
+  - part deja payee
+  - autre assureur
+  - decompte
+  - complementaire
+  - premier passage
+
+# §5.4 — chat off the mark, no phone, a callback that never comes; support
+# cannot unblock the claim.
+support-traction:
+  - telephone
+  - rappel
+  - bot
+  - interlocuteur
+  - support
+  - joindre
+  - debloque
+  - chat
+
+# §5.5 — benefit cuts, steering to the in-house shop, premiums rising.
+coverage-price:
+  - cotisation
+  - garantie
+  - boutique
+  - prix
+  - prime
+  - hausse
+  - grimpe
+  - rabotees
+  - moins couvert
+  - plus cher
+
+# Clear praise — a rule may say positive; it fires only when no theme matched
+# (classify/rules.py), so a complaint that happens to use a warm word is not
+# called positive.
+positive:
+  - rapide
+  - impeccable
+  - nickel
+  - super
+  - tout marche
+  - bonne experience
+  - satisfait
+  - rien a redire
+  - rien a dire

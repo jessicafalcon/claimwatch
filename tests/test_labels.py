@@ -38,12 +38,17 @@ def test_review_id_stable_and_distinct_over_corpus(synthetic_conn):
     assert len(set(ids)) == len(ids)  # distinct per staged review
 
 
-def test_labels_csv_ships_header_only():
-    # The tracked answer key is real, text-free, and empty until a human labels.
+def test_labels_csv_rows_are_closed_set_and_text_free():
+    # Phase 5b populated the answer key with the synthetic corpus's ground truth
+    # (was header-only in 5a). It stays text-free (two columns, no body) and
+    # every theme is one of the seven closed labels — an id and a theme, nothing
+    # a review body or a brand could ride in on.
     with LABELS_CSV.open(encoding="utf-8") as fh:
-        first = fh.readline().rstrip("\n")
-    assert tuple(first.split(",")) == LABEL_COLUMNS
-    assert read_labels() == []
+        header = fh.readline().rstrip("\n")
+    assert tuple(header.split(",")) == LABEL_COLUMNS  # only review_id, theme
+    rows = read_labels()
+    assert rows, "5b commits the synthetic ground truth; the file is not header-only"
+    assert all(theme in LABEL_SET for _, theme in rows)  # closed set, no eighth
 
 
 def test_out_of_set_theme_is_refused(tmp_path: Path):

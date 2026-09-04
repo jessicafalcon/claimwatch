@@ -1171,7 +1171,11 @@ between the two.
   Phase 4's header-only `fetched_snapshots.csv`. The real 300–500 labels are
   human offline work (BACKLOG, opened). *Decision the spec did not spell out:
   the synthetic fixture is left unlabeled in 5a; the reader/split tests use tmp
-  labels, so no in-session label generation happens.*
+  labels, so no in-session label generation happens.* **(Superseded in part,
+  Phase 5b: the synthetic fixture's 39 ground-truth rows ARE now committed to
+  `labels.csv` so `make classify-eval` has something to grade — fabricated
+  reviews, no personal data; the real 300–500 labels stay offline. See the
+  Phase 5b entry.)**
 - **The held-out split is `sha256(review_id) % 5`, fold 4 held out, never
   random.** `classify/split.py::fold` is a pure function of the id's UTF-8 bytes
   (same fold on macOS and Linux); four folds tune in 5b, fold 4 gates in 6.
@@ -1202,3 +1206,79 @@ cases pinned. Record/wording nits fixed: the spec approval date (2026-09-04),
 the over-cap BACKLOG trigger named to the 5b exit. Accepted to BACKLOG: widen
 the labels-isolation grep to `ingest/dags/study/scripts` when 5b/6 add
 `rules.py`/`llm.py`.
+
+### Phase 5b
+
+Branch `phase-5b-rules`, spec `specs/phase-5b-rules.md`, APPROVED 2026-09-04.
+The second half of the split: the rules layer that reads a review and tags what
+it is about — `classify/rules.yaml` (the patterns) + `classify/rules.py` (load,
+apply) — graded by `make classify-eval`, which prints per-theme precision on the
+four tuning folds. No model (Phase 6), no mart.
+
+- **`rules.yaml` is the only pattern home; one group per emitting label, checked
+  at load.** The file maps each of the five §5 themes and `positive` to a list of
+  patterns; `classify/rules.py::load_rules` refuses a group keyed by anything
+  outside the closed set (including `unclassified`, which is the fallback, not a
+  group), so an eighth label is impossible. Pattern-matching lives here and in
+  Python, never in SQL — the portability contract. Pinned by `test_rules.py`.
+  Rejected: patterns in Python literals (a rule change becomes a code change) or
+  in SQL (breaks portability).
+- **A pattern matches at a word start (`\b` + literal), not naive substring.**
+  `bot` matched `rabotées` under plain substring — a real precision miss the eval
+  caught (support-traction fell to 0.80) — so the matching KIND changed to
+  word-start (`re.escape`, `\b`-anchored, accent- and case-folded), killing the
+  class of short-token over-matches while still matching plurals (`piece` →
+  `pieces`). *Fix the class, not the case (CLAUDE.md): the mechanism changed, not
+  a denylist entry.* Pinned by `test_rules.py::test_word_start_match_not_naive_substring`.
+- **Grain is one row per review × theme; `positive` fires only when no theme
+  did; `unclassified` is the single fallback.** A review is scored against every
+  theme group (K matches → K rows); a warm word next to a complaint is the
+  complaint, not `positive`; a review nothing matches is one `unclassified` row
+  for the model to decide. The output is sorted by `(review_id, label)` — a pure
+  function of the reviews and `rules.yaml`, byte-identical on re-run. Pinned by
+  `test_rules.py`. Rejected: a packed multi-label cell; defaulting no-match to
+  `positive` (asserts praise where there is only silence).
+- **The synthetic corpus's ground truth is committed to `classify/eval/labels.csv`
+  (was header-only in 5a).** The fabricated reviews were written to cover all
+  seven labels; their hand labels are the answer key `classify-eval` grades
+  against — 39 rows, `review_id, theme`, text-free, closed-set. *This supersedes
+  the 5a "ships header-only" decision: 5a fabricated no labels before a human
+  labeled; 5b labels the fixture (fake reviews, no personal data, no brand) so
+  the rules can be graded on the synthetic corpus (CLAUDE.md → "build on the
+  synthetic fixture first").* The real 300–500 labels for the real corpus stay
+  offline (BACKLOG); their ids differ, so the two never collide. Rejected: a
+  separate synthetic key under `fixtures/` — two answer keys, one reader forked,
+  a fixture re-freeze.
+- **`make classify-eval` grades the tuning folds only; the held-out fold is
+  never read.** The recipe rebuilds the synthetic corpus, then the subcommand
+  runs the rules over `stg_reviews` and scores against the answer key for reviews
+  with `fold(review_id) != 4` (`classify/split`). The scorer (`classify/eval/
+  precision.py`) filters both predictions and labels to the tuning folds before
+  counting, so mutating a held-out label changes no printed number. Result: every
+  theme's precision is 1.0 on the clean corpus, decided share 27/34 (0.79) — the
+  rules decide the clear cases and leave the rest to the model. Pinned by
+  `test_classify_eval.py` (including a crafted 0.5 case that proves the formula
+  handles < 1.0). Rejected: reading the fixture CSV directly (skips the staging
+  dedup); a `ROWS=` variable (real-row eval needs the real labels, offline).
+- **`pyyaml` moved from transitive to a direct dependency.** Pre-approved for
+  Phase 2 (CLAUDE.md allowlist), first actually used here to read `rules.yaml`;
+  `uv lock --offline` moved it into `[project] dependencies` (already in the
+  lock, no download). `yaml.safe_load`, never `load`.
+
+This phase populates no BACKING row: per-theme precision and the decided share
+are developer-facing tuning numbers read at the command line, not a displayed
+study panel, and 5b writes no mart. B2.4 (`classifier_quality`) is the held-out
+precision *and recall* the Phase 6 gate writes as a mart; B2.2/B2.5 are the
+Phase 7 theme-share marts — all stay Pending. `make test` (670 tests, 24 new)
+passes; `make classify-eval` and `make idempotency-check ROWS=synthetic` are
+green.
+
+Review round 1 (code-reviewer, functionality-tester, study-editor,
+coherence-auditor; security-reviewer not triggered — no sensitive surface): all
+pass, no correctness or security findings; functionality-tester WORKS with every
+pin biting under hand-mutation (5/5). Applied: dropped a redundant `is_label`
+clause at the load check (`RULE_LABELS ⊆ LABEL_SET`); reworded spec invariant 3 /
+done-when 2 to name the three-tier fallback (theme → `positive` → `unclassified`);
+added a `format_report` render test and a no-warehouse `classify-eval` CLI test
+for the two coverage gaps named. Accepted: the already-struck BACKLOG row 20
+(refreshed with the 5b test name; count unchanged).

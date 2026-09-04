@@ -6,6 +6,7 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
     "duckdb>=1.5.5",
     "httpx>=0.28.1",
+    "pyyaml>=6.0.3",
 ]
 # Runtime packages land with their phase (CLAUDE.md → Conventions allowlist):
 # duckdb (Phase 1); pyyaml, httpx (Phase 2); anthropic (Phase 6);
