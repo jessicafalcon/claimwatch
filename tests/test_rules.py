@@ -159,4 +159,7 @@ def test_no_new_mart():
         "rating_trend.sql",
         # classifier_quality lands in 6b (DDL fed by Python, not by the rules).
         "classifier_quality.sql",
+        # the theme-share marts land in 7a (SQL over stg_classified_reviews).
+        "theme_share_by_month.sql",
+        "theme_share_by_segment.sql",
     }

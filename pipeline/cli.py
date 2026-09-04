@@ -35,11 +35,13 @@ from ingest.sources import SOURCES
 from pipeline.build import (
     FETCHED_SNAPSHOTS,
     INPUTS,
+    build_theme_share_marts,
     captures_for,
     idempotency_check,
     rebuild,
     record_snapshots,
     reset,
+    write_classified_reviews,
     write_classifier_quality,
 )
 from pipeline.label_sample import SHEET, label_sample
@@ -220,17 +222,27 @@ def _classify_and_print(db, rows_input: str) -> None:
     )
     write_decisions(decisions)
 
-    # Grade on the held-out fold and write the mart. The CLI hands the gate the
-    # classifier's predictions and gets scores back — it reads no answer key (the
-    # wall). run_id is the rebuild input name: provenance, byte-stable per input.
-    # The gate scores only reviews both classified and labeled (amendment A1), so
-    # a corpus the answer key does not cover grades nothing — write no mart then,
+    # Persist the classification at the (source, external_id, theme) grain and
+    # build the theme-share marts (B2.2, B2.5) over it. review_id maps back to
+    # (source, external_id) so nothing hashes in SQL. run_id is the rebuild input
+    # name: provenance, byte-stable per input.
+    identity = _review_identities(db)
+    classified = sorted(
+        (identity[rid][0], identity[rid][1], theme) for rid, theme in rows
+    )
+
+    # Grade on the held-out fold. The CLI hands the gate the classifier's
+    # predictions and gets scores back — it reads no answer key (the wall). The
+    # gate scores only reviews both classified and labeled (amendment A1), so a
+    # corpus the answer key does not cover grades nothing — write no mart then,
     # rather than a mart of all-`None` Measured rows for a corpus we did not grade.
     scores = score_heldout(rows)
     graded = any(s.predicted or s.actual for s in scores)
-    if graded:
-        conn = connect("duckdb", database=db)
-        try:
+    conn = connect("duckdb", database=db)
+    try:
+        write_classified_reviews(conn, classified, run_id=rows_input)
+        build_theme_share_marts(conn)
+        if graded:
             write_classifier_quality(
                 conn,
                 scores,
@@ -238,8 +250,8 @@ def _classify_and_print(db, rows_input: str) -> None:
                 heldout_fold=HELDOUT_FOLD,
                 run_id=rows_input,
             )
-        finally:
-            conn.close()
+    finally:
+        conn.close()
 
     theme_rows = sum(1 for _, label in rows if label in THEMES)
     positive = sum(1 for _, label in rows if label == POSITIVE)
@@ -369,6 +381,30 @@ def _staged_reviews_text(db) -> list[tuple[str, str]] | None:
         text = "\n".join(part for part in (title, body) if part).strip()
         out.append((review_id(source, external_id), text))
     return out
+
+
+def _review_identities(db) -> dict[str, tuple[str, str]]:
+    """`review_id -> (source, external_id)` for every staged review, so the
+    classifier's `(review_id, theme)` rows map back to the review's natural key
+    when they are persisted — the identity is a Python hash, never recomputed in
+    SQL. Empty when the warehouse has no `stg_reviews`."""
+    if not db.is_file():
+        return {}
+    conn = connect("duckdb", database=db)
+    try:
+        exists = conn.execute(
+            "select count(*) from information_schema.tables "
+            "where table_name = 'stg_reviews'"
+        ).fetchone()[0]
+        if not exists:
+            return {}
+        rows = conn.execute("select source, external_id from stg_reviews").fetchall()
+    finally:
+        conn.close()
+    return {
+        review_id(source, external_id): (source, external_id)
+        for source, external_id in rows
+    }
 
 
 def _do_classify_eval(args: argparse.Namespace) -> int:

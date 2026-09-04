@@ -268,3 +268,48 @@ RULES_HELDOUT = {
     "coverage-price": (0, 0, 0, None, None),
     "positive": (1, 1, 1, 1.0, 1.0),
 }
+
+# --- Phase 7a: the theme-share marts (B2.2, B2.5) over stg_classified_reviews ---
+
+# The classification persisted at the (source, external_id, theme) grain: one row
+# per theme a review carries — the same 39 rows the no-key combiner produces (25
+# theme + 7 positive + 7 unclassified). run_id is provenance; no clock, no address.
+CLASSIFIED_REVIEWS_ROWS = STG_REVIEWS_ROWS  # 39
+CLASSIFIED_REVIEWS_COLUMNS = ("source", "external_id", "theme", "run_id")
+
+# The theme-share marts count those rows. share = theme_rows / reviews, at the
+# review x theme grain (a review counts once in `reviews`, once per theme bar).
+# unclassified is a row, not a gap — the gray "not yet classified" band, and with
+# no key it is largest. Tag Measured; provenance is the tag (a computed share has
+# no address or capture instant), run_id lives one hop upstream.
+THEME_SHARE_TAG = "Measured"
+THEME_SHARE_BY_SEGMENT_COLUMNS = (
+    "segment",
+    "label",
+    "reviews",
+    "theme_rows",
+    "share",
+    "tag",
+)
+THEME_SHARE_BY_MONTH_COLUMNS = ("month",) + THEME_SHARE_BY_SEGMENT_COLUMNS
+
+# Every synthetic review is digital-first (all four platforms are), so by-segment
+# has one segment. theme_rows per label over the 39 reviews (no key): the five
+# themes, positive and unclassified. `document-loop` (held-claim, B2.5's subject)
+# is the largest theme; `unclassified` is the band a key would shrink.
+THEME_SHARE_SEGMENT = "digital-first"
+THEME_SHARE_BY_SEGMENT_REVIEWS = STG_REVIEWS_ROWS  # 39 (the denominator)
+THEME_SHARE_BY_SEGMENT_NOKEY = {
+    "document-loop": 9,
+    "silent-rejection": 4,
+    "second-payer": 4,
+    "support-traction": 4,
+    "coverage-price": 4,
+    "positive": 7,
+    "unclassified": 7,
+}
+
+# The month split (by the review's own date). Reviews per (month, digital-first);
+# every month carries at least one document-loop row, and every month a review
+# the rules left unclassified carries an unclassified band row.
+THEME_SHARE_BY_MONTH_REVIEWS = {"2026-01": 36, "2026-02": 2, "2026-03": 1}

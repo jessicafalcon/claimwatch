@@ -139,6 +139,44 @@ def test_no_key_mart_is_rules_only_and_populated(monkeypatch, tmp_path):
         conn.close()
 
 
+def test_theme_share_shows_unclassified_band(monkeypatch, tmp_path):
+    # Central constraint (Phase 7a): with no key the theme-share marts still
+    # populate and the `unclassified` band is non-empty — the rules leave
+    # ambiguous reviews unplaced, and the marts show them as the gray band, never
+    # dropped and never an empty mart. Runs the CLI classify step, which builds
+    # the marts.
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    from classify.cache import read_decisions, write_decisions
+    from pipeline import cli
+
+    cache = tmp_path / "decisions.csv"
+    monkeypatch.setattr(cli, "read_decisions", lambda: read_decisions(cache))
+    monkeypatch.setattr(cli, "write_decisions", lambda d: write_decisions(d, cache))
+
+    rebuild("duckdb", "synthetic", root=tmp_path, run_id="t")
+    db = database_for("synthetic", tmp_path)
+    cli._classify_and_print(db, "synthetic")
+    conn = connect("duckdb", database=db)
+    try:
+        (band,) = conn.execute(
+            "select theme_rows from theme_share_by_segment where label = 'unclassified'"
+        ).fetchone()
+        assert band == pins.THEME_SHARE_BY_SEGMENT_NOKEY["unclassified"]  # > 0
+        band_months = conn.execute(
+            "select count(*) from theme_share_by_month where label = 'unclassified'"
+        ).fetchone()[0]
+        assert band_months >= 1
+        tags = {
+            r[0]
+            for r in conn.execute(
+                "select distinct tag from theme_share_by_segment"
+            ).fetchall()
+        }
+        assert tags == {pins.THEME_SHARE_TAG}  # honest rules-only Measured output
+    finally:
+        conn.close()
+
+
 def test_no_key_scores_call_no_model(monkeypatch, tmp_path):
     # Grading is offline: even with the SDK importable, scoring and writing the
     # mart never touch it — the gate compares stored predictions to the key.
