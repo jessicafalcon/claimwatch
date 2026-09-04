@@ -554,7 +554,7 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 ## Current status
 
 **Phase 6b — held-out eval gate + classifier_quality mart** (`phase-6b-eval-gate`,
-spec `specs/phase-phase-6b-eval-gate.md`, APPROVED 2026-09-04): being built. The
+spec `specs/phase-6b-eval-gate.md`, APPROVED 2026-09-04): being built. The
 second half of the Phase 6 split: the gate that grades the classifier on the fold
 it never saw, and the one BACKING row this phase populates. `classify/eval/gate.py`
 scores precision AND recall per label on the held-out fold alone (fold 4):

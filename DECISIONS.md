@@ -1368,7 +1368,7 @@ refusal, the same shape as the `Refused`/`PageShapeError` catches.*
 
 ### Phase 6b
 
-Branch `phase-6b-eval-gate`, spec `specs/phase-phase-6b-eval-gate.md`, APPROVED
+Branch `phase-6b-eval-gate`, spec `specs/phase-6b-eval-gate.md`, APPROVED
 2026-09-04. The second half of the Phase 6 split: the held-out eval gate and the
 `classifier_quality` mart (B2.4) — the one BACKING row this phase populates.
 
