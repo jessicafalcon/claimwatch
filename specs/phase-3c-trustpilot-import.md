@@ -8,8 +8,9 @@ now met: the developer holds written authorization (2026-09-04) and the
 studied insurer's Trustpilot reviews are in hand as an authorized export.
 Depends on Phase 3b merged.
 
-**Status: APPROVED 2026-09-04 — in progress.** No new dependencies
-(stdlib `csv`; the export is a CSV, read like every other captured input).
+**Status: APPROVED 2026-09-04 — DELIVERED 2026-09-04, PR pending.** No new
+dependencies (stdlib `csv`; the export is a CSV, read like every other captured
+input).
 
 Four sections marked REQUIRED are mandatory. The status line moves `PROPOSED` →
 `APPROVED <date> — in progress` → `APPROVED <date> — DELIVERED <date>, PR open`
@@ -241,3 +242,34 @@ carries no real name or brand address.
   (BACKLOG).
 - **Refreshing the export on a schedule** — a one-time import now; a periodic
   refresh is later work if wanted (BACKLOG).
+
+## Delivered (2026-09-04)
+
+The studied insurer's 1,050 Trustpilot reviews are ingested as a Measured
+corpus, the raw material Phase 5 will classify for Beat 2's theme shares (B2.2,
+B2.5, still Pending). Written authorization lifted Phase 3b's A1 for an OFFLINE
+import only: the robots ban still governs our crawler, so a SECOND source
+`fr-digital-first-trustpilot-reviews` (`parser=trustpilot`, `fetchable=False`,
+host `ca.trustpilot.com`) reads the authorized export — saved as a capture and
+read from disk, never fetched — while the hand-read snapshot source is left
+untouched, so the 3.9/1,072 rating point is unchanged by construction (A1, the
+App Store feed/listing split). The `trustpilot` parser reads the rating from
+the star-image URL and the date from a locale-independent `Month D, YYYY`,
+drops every personal and layout column, and refuses anything outside the
+export's declared shape (§8). A synthetic, nameless sample in
+`fixtures/trustpilot/` runs the real parser under `ROWS=samples`. BACKLOG #41
+closed; a residual row (a live fetch and a scheduled refresh) opened. DONE
+(`make rebuild && make idempotency-check ROWS=captured`) passes: the 1,050 rows
+reach `stg_reviews`, idempotent, the rating series unchanged; 588 tests pass;
+`review-gate` 7/7.
+
+Review round: security-reviewer, study-editor, functionality-tester — no
+findings / WORKS. code-reviewer — one should-fix (the no-clock byte-stable
+guard now patches the `trustpilot` parser, CR1) and one suggestion (`_rating`
+gains `-> Decimal`, CR2). coherence-auditor — no blocker; four low items fixed
+(the in-place supersede tag on Phase 3b's A1, the re-deferred line-cap row, the
+test count, the spec title). Decisions the spec did not cover: content-derived
+`external_id` (the export has no stable public review id, so a re-import is one
+fingerprint; mirrors `opinion_assurances`); the offline capture is authored
+from the export with `status:200` standing for the authorized fetch (a
+DECISIONS Gotcha), not a live `fetch.py` capture.
