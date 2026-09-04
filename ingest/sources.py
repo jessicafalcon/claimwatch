@@ -34,7 +34,7 @@ ORIGINS = ("anchor", "manual", "fetch")  # how a snapshot row came to be
 # The parsers, by module name under `ingest/` — a closed set; each module
 # exposes parse(), EXTENSION, SAMPLE_PLATFORM, SAMPLE_HOST, SAMPLE_DIR and
 # SAMPLE_PAGES (the frozen meta files' addresses, A4 (c)).
-PARSERS = ("app_store", "listing", "opinion_assurances")
+PARSERS = ("app_store", "listing", "opinion_assurances", "trustpilot")
 SAMPLE = "sample"  # the name and attribution of a frozen sample's declaration
 
 _SLUG = re.compile(r"\A[a-z0-9-]+\Z")  # matched whole (round 5, exit pass)
@@ -316,6 +316,34 @@ SOURCES: tuple[Source, ...] = (
             " fr.trustpilot.com 2026-09-03"
         ),
         declared_on="2026-09-03",
+    ),
+    # The Trustpilot reviews, read from an authorized export (Phase 3c, A1):
+    # written authorization now lets us hold the studied insurer's reviews,
+    # which the crawler's robots ban still forbids fetching. So this is a
+    # SECOND trustpilot source — the App Store feed/listing split — leaving the
+    # hand-read snapshot source above untouched (its 3.9/1,072 point stays). It
+    # is `fetchable=False` (our crawler never runs against Trustpilot) with a
+    # parser: its authorized export is saved as a capture and read from disk,
+    # not fetched. The export came from `ca.trustpilot.com`; the profile path
+    # spells the brand: D1, here only.
+    Source(
+        name="fr-digital-first-trustpilot-reviews",
+        platform="trustpilot",
+        host="ca.trustpilot.com",
+        parser="trustpilot",
+        pages=("https://ca.trustpilot.com/review/alan.com?languages=all",),
+        profile="fr-digital-first",
+        segment="digital-first",
+        channel="unsolicited",
+        listing="https://ca.trustpilot.com/review/alan.com?languages=all",
+        fetchable=False,
+        terms=(
+            "written authorization from the site, granted 2026-09-04 (its"
+            " robots.txt disallows every path for our crawler and its terms"
+            " forbid automated collection without it); evidence held by the"
+            " developer"
+        ),
+        declared_on="2026-09-04",
     ),
 )
 

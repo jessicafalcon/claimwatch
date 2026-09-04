@@ -127,7 +127,10 @@ place and never deleted.
     joins the Trustpilot anchors' series. The review-profile parser and a frozen
     sample are not built — no page may be fetched, so none may be frozen — and
     are re-deferred to a future written authorization (BACKLOG). ([Phase
-    3b](#phase-3b))
+    3b](#phase-3b)) *Superseded by [Phase 3c](#phase-3c) (partly): the
+    authorization arrived, so the reviews are now imported OFFLINE (a parser on
+    a second source); the crawler ban stands, so the source stays
+    `fetchable=False`.*
 - **An address that spells the brand is a sourced data point and lives in
   `ingest/sources.py` only (Phase 3a, decision D1).** A store package id or a
   profile path names the insurer where a numeric store id does not. It may
@@ -965,7 +968,10 @@ series (`fixtures/anchors/platform_snapshots_seed.csv`).
   the catch-all (evasion — never); the Trustpilot Business API (a paid,
   credentialed dependency — a STOP-and-ask, out of scope). The parser and
   sample are re-deferred to a future written authorization (BACKLOG). Approved
-  by the developer 2026-09-03 after the robots check.
+  by the developer 2026-09-03 after the robots check. *Superseded by [Phase
+  3c](#phase-3c) (partly): the authorization arrived, so the parser and sample
+  are built and the reviews imported OFFLINE on a second source; the crawler
+  ban stands, so the source stays `fetchable=False` and is never fetched.*
 - **The hand-read point reuses its anchor's profile.** The declaration's
   `profile` is `fr-digital-first`, exactly the Trustpilot anchors' profile, so
   `rating_trend` / `peer_ratings` keyed on `(source, profile)` read one series,
@@ -983,3 +989,62 @@ series (`fixtures/anchors/platform_snapshots_seed.csv`).
   fetched, so no measured response figures land; SPEC B1.4 already states the
   cross-platform comparison waits for a second platform's measured figures
   (BACKLOG, re-deferred to Phase 9).
+
+### Phase 3c
+
+Branch `phase-3c-trustpilot-import`, spec `specs/phase-3c-trustpilot-import.md`,
+APPROVED 2026-09-04 with amendment A1. Written authorization from Trustpilot
+arrived, so this phase reverses Phase 3b's A1 ("not fetchable, `parser=None`")
+for the reviews — but only for an OFFLINE import, not a live fetch.
+
+**Supersedes Phase 3b's A1 (partly):** A1 said Trustpilot is not fetchable and
+built no parser, re-deferring both to "a future written authorization." That
+authorization is here. The robots ban still stands for our crawler, so the
+source stays `fetchable=False`; what changed is that the reviews now arrive as
+an authorized offline export and get a parser. A1's rating point (3.9/1,072,
+hand-read) is untouched.
+
+- **A1 — reviews are a second source, not a parser on the snapshot source.**
+  `read_manual_snapshots` refuses a source that has a parser ("a parsed
+  source's figures come from its capture"), so flipping `fr-digital-first-
+  trustpilot` to have a parser would drop its hand-read 3.9/1,072 row and
+  erase the rating point — the central constraint. So, mirroring the App Store
+  feed/listing split, the snapshot source is left untouched and a SECOND source
+  `fr-digital-first-trustpilot-reviews` (`platform=trustpilot`,
+  `parser=trustpilot`, `fetchable=False`, `host=ca.trustpilot.com`, the one
+  authorized profile page) reads the corpus. The rating series is now unchanged
+  by construction. Approved by the developer 2026-09-04. Rejected: one source
+  with a parser (drops the hand-read row).
+- **Authorized offline import, not a live fetch.** The data is an authorized
+  third-party export in hand; re-fetching with our crawler is redundant and
+  would hit a `Disallow: /` host. So `fetchable=False` (the crawler never
+  runs), and the export is saved as a capture and read from disk like any
+  parser's. Its `terms` records the authorization minimally, exactly as
+  Opinion Assurances does (a reason and a date; evidence held by the developer,
+  never committed). Rejected: `fetchable=True` + a live re-scrape; a different
+  User-Agent to slip robots (evasion — never).
+- **The TrustScore stays hand-read; the corpus is themes only.** Trustpilot's
+  3.9 is a weighted TrustScore, not the mean of the 1,050 rows (~4.0), and the
+  displayed count (1,072) is not the export's row count (1,050). The reviews
+  source emits NO snapshot, so `rating_trend`/`peer_ratings`/`channel_gap` read
+  the same figures as before. Recomputing the rating from the corpus would
+  fabricate a number. Pinned by `test_marts.py::test_trustpilot_rating_point_
+  unchanged_by_corpus`.
+- **The review's identity is its content.** The export carries no stable public
+  review id (`web_scraper_order` is the scraper's per-run counter), so
+  `external_id` is a content hash over (review_date, title, body, rating), like
+  `opinion_assurances`; a re-import of the same review is one fingerprint and
+  inserts nothing. All 1,050 rows are content-distinct (0 collisions).
+- **The date is parsed locale-independently.** The export writes `Month D, YYYY`
+  with an English month; the parser reads it with an explicit month table, not
+  `strptime('%B')`, so the reading does not depend on the process locale. A
+  French month name or a non-date refuses (§8). No clock reaches the data path.
+
+**Gotcha — the offline capture is authored, not fetched.** The export is saved
+as a capture (`page-1.csv` + `page-1.meta.json`, `status:200` standing for the
+authorized fetch that produced the export) under
+`data/cache/trustpilot/fr-digital-first-trustpilot-reviews/` (gitignored). It
+is NOT produced by `ingest/fetch.py`; the source stays `fetchable=False` and
+`make scrape` refuses it. The frozen sample (`fixtures/trustpilot/`) is a
+hand-written, nameless, brand-free capture in the export's exact column shape,
+so `ROWS=samples` runs the real parser without committing real reviews.

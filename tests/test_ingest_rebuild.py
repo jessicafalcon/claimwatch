@@ -61,7 +61,9 @@ def test_rebuild_from_sample_matches_pins(tmp_path):
     assert counts["raw_reviews"] == pins.SAMPLES_RAW_REVIEWS
     assert (
         counts["stg_reviews"]
-        == pins.APP_STORE_SAMPLE_STG_ROWS + pins.OA_SAMPLE_STG_ROWS
+        == pins.APP_STORE_SAMPLE_STG_ROWS
+        + pins.OA_SAMPLE_STG_ROWS
+        + pins.TRUSTPILOT_SAMPLE_STG_ROWS
     )
     rows = _query(
         database_for("samples", tmp_path),
@@ -70,6 +72,7 @@ def test_rebuild_from_sample_matches_pins(tmp_path):
     assert rows == [
         ("app-store", "sample:app-store", pins.APP_STORE_SAMPLE_CAPTURED_AT),
         ("opinion-assurances", "sample:opinion-assurances", pins.OA_SAMPLE_CAPTURED_AT),
+        ("trustpilot", "sample:trustpilot", pins.TRUSTPILOT_SAMPLE_CAPTURED_AT),
     ]
 
 
@@ -114,7 +117,9 @@ def test_samples_load_every_frozen_sample_through_its_parser(tmp_path):
         "group by 1, 2 order by 1, 2",
     )
     assert tuple(months) == (
-        pins.APP_STORE_SAMPLE_REVIEWS_PER_MONTH + pins.OA_SAMPLE_REVIEWS_PER_MONTH
+        pins.APP_STORE_SAMPLE_REVIEWS_PER_MONTH
+        + pins.OA_SAMPLE_REVIEWS_PER_MONTH
+        + pins.TRUSTPILOT_SAMPLE_REVIEWS_PER_MONTH
     )
 
 
@@ -162,7 +167,9 @@ def test_reviews_per_month_matches_pins(tmp_path):
     conn = connect("duckdb", database=db)
     try:
         assert tuple(reviews_per_month(conn)) == (
-            pins.APP_STORE_SAMPLE_REVIEWS_PER_MONTH + pins.OA_SAMPLE_REVIEWS_PER_MONTH
+            pins.APP_STORE_SAMPLE_REVIEWS_PER_MONTH
+            + pins.OA_SAMPLE_REVIEWS_PER_MONTH
+            + pins.TRUSTPILOT_SAMPLE_REVIEWS_PER_MONTH
         )
     finally:
         conn.close()
@@ -254,7 +261,9 @@ def test_reviews_per_month_is_stable_across_rebuilds(tmp_path):
             conn.close()
     assert seen[0] == seen[1] == seen[2]
     assert tuple(seen[0]) == (
-        pins.APP_STORE_SAMPLE_REVIEWS_PER_MONTH + pins.OA_SAMPLE_REVIEWS_PER_MONTH
+        pins.APP_STORE_SAMPLE_REVIEWS_PER_MONTH
+        + pins.OA_SAMPLE_REVIEWS_PER_MONTH
+        + pins.TRUSTPILOT_SAMPLE_REVIEWS_PER_MONTH
     )
 
 

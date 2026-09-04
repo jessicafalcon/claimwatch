@@ -97,7 +97,9 @@ in the middle, and come out on the right as the numbers the study shows.
   (frozen in Phase 3a);
   `fixtures/opinion-assurances/` — a hand-written review profile in the page's
   microdata shape, three pages of a fake, nameless profile (frozen in Phase
-  3a). Every set carries a `MANIFEST.sha256`; `ROWS=samples`
+  3a); `fixtures/trustpilot/` — a hand-written authorized export in
+  webscraper.io's column shape, four reviews of a fake, nameless profile
+  (frozen in Phase 3c). Every set carries a `MANIFEST.sha256`; `ROWS=samples`
   runs each through its real parser.
 - `ingest/` — the scrapers. A *capture* is one run's saved copy of the pages
   exactly as they arrived, with each page's address and time beside it and the
@@ -115,12 +117,18 @@ in the middle, and come out on the right as the numbers the study shows.
   back for any parser; the meta checked against the source's declared host),
   the parsers — `app_store.py` (the review feed), `listing.py` (a store or
   platform page's rating block, one snapshot row), `opinion_assurances.py`
-  (a profile page's schema.org microdata: review rows and one snapshot row) —
-  and `fetch.py` (the only `httpx` import; writes captures under
-  `data/cache/<platform>/<source>/`). Trustpilot *(Phase 3b)* is a hand-read
-  source in `ingest/sources.py` (not fetchable — its robots.txt disallows our
-  crawler; its rating and count are read into `manual_snapshots.csv`); its
-  parser is re-deferred to a future authorization (BACKLOG). *(Phase 5+)*
+  (a profile page's schema.org microdata: review rows and one snapshot row),
+  `trustpilot.py` (a profile's reviews from an authorized export in
+  webscraper.io's column shape: review rows, no snapshot) — and `fetch.py` (the
+  only `httpx` import; writes captures under `data/cache/<platform>/<source>/`).
+  Trustpilot has TWO sources in `ingest/sources.py`, the App Store feed/listing
+  split: `fr-digital-first-trustpilot` *(Phase 3b)* is the hand-read snapshot
+  (not fetchable — robots disallows our crawler; its 3.9/1,072 rating and count
+  are read into `manual_snapshots.csv`), and `fr-digital-first-trustpilot-
+  reviews` *(Phase 3c)* is the review corpus, read from a written-authorized
+  OFFLINE export (`parser=trustpilot`, `fetchable=False` — the crawler still
+  never runs; the export is saved as a capture and read from disk). A live
+  fetch and a scheduled refresh stay deferred (BACKLOG). *(Phase 5+)*
   `classify/` — `rules.yaml`, `rules.py`, `llm.py` (the ONE model call site),
   `eval/` (the only reader of `labels.csv`). *(Phase 8)* `models/` —
   `cost_model.py` (`FORMULAS`), `guardrail_sim.py`. *(Phase 9)* `study/` —
@@ -484,24 +492,26 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 ## Current status
 
-**Phase 3b — Trustpilot** (`phase-3b-trustpilot`, spec
-`specs/phase-3b-trustpilot.md`, APPROVED 2026-09-03 with amendment A1): being
-built. What a reader sees: the studied insurer's Trustpilot rating now carries
-a Measured point (3.9 on 1,072 reviews, read 2026-09-03) beside the Documented
-Trustpilot anchors already in the seed. How: the robots check found Trustpilot
-disallows our crawler on every path (`User-agent: *` → `Disallow: /`, our
-User-Agent in no named group), so — like the App Store listing — it is
-declared not fetchable and its rating and count are read by hand into
-`data/snapshots/manual_snapshots.csv`; the hand-read row carries the anchors'
-`fr-digital-first` profile, so the Measured point joins their series, not a new
-one. Amendment A1 (the terms check found Trustpilot not fetchable) dropped the
-planned JSON-LD parser and frozen sample — no page may be fetched, so none may
-be frozen; both are re-deferred to a future written authorization from
-Trustpilot (BACKLOG). The DONE command (`make rebuild && make
-idempotency-check ROWS=captured`) passes: 565 tests, idempotency OK, the
-Measured point reaches `peer_ratings` / `channel_gap` / `rating_trend`. Phase
-3a merged (PR #5, 2026-09-03). Next: the Phase 3b review gate and agents, then
-the PR. (Phase 3a's amendment history is in its spec and DECISIONS → Phase 3a.)
+**Phase 3c — Trustpilot, authorized import** (`phase-3c-trustpilot-import`,
+spec `specs/phase-3c-trustpilot-import.md`, APPROVED 2026-09-04 with amendment
+A1): being built. What changes: the studied insurer's 1,050 Trustpilot reviews
+are now ingested as a Measured **corpus** — the raw material Beat 2's theme
+shares (B2.2, B2.5) will classify in Phase 5 — while the hand-read 3.9/1,072
+rating point from Phase 3b is untouched. How: written authorization arrived, so
+Phase 3b's A1 (not fetchable, no parser) is reversed for the reviews — but only
+for an OFFLINE import, not a live fetch. The robots ban still stands for our
+crawler, so a SECOND source `fr-digital-first-trustpilot-reviews`
+(`parser=trustpilot`, `fetchable=False`, host `ca.trustpilot.com`) reads the
+authorized export (webscraper.io column shape) as a capture from disk; the
+snapshot source is left alone (the App Store feed/listing split), so the rating
+series is unchanged by construction. The `trustpilot` parser reads the rating
+from the star-image URL, the date from a locale-independent `Month D, YYYY`,
+and drops every personal column. Amendment A1 chose the two-source split over
+flipping the snapshot source (which `read_manual_snapshots` would refuse). The
+DONE command (`make rebuild && make idempotency-check ROWS=captured`) passes:
+1,050 rows reach `stg_reviews`, idempotent, the rating point unchanged; 588
+tests pass; lint clean. Phase 3b merged. Next: the Phase 3c review gate and
+agents, then the PR. (Earlier amendment history is in each spec and DECISIONS.)
 
 Open BACKLOG rows: **22**.
 
