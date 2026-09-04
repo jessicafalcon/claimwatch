@@ -514,14 +514,15 @@ so the B1.2–B1.4 rating series accrues while the rest is built (PROJECT_BRIEF
 §9). How: the fetched points get a numbers-only tracked home,
 `data/snapshots/fetched_snapshots.csv` (origin `fetch`), written by a new
 non-network `make record-snapshots` that harvests the week's capture through
-the one parser path and read back by `rebuild ROWS=captured`; the file stores
-the capture's own instant so a fetched row and its live-cache twin share the
+the one parser path and read back by `rebuild ROWS=captured`. The file stores
+the capture's own instant, so a fetched row and its live-cache twin share the
 snapshot key and never double-count. The developer chose ratings-only over
 banking review bodies weekly (the misflagged-claim signal comes from the
 already-ingested corpus classified by review date in Beat 2, so no body enters
 git and the personal-data excerpt rule stays deferred). The workflow runs on
 `schedule`/`workflow_dispatch` only — never a pull request — so its runner is
-trusted (this resolves the Phase 3a `MAKEFILES`/`PATH` residual for CI); it
+trusted (this resolves the Phase 3a `MAKEFILES`/`PATH` residual for the weekly
+workflow); it
 commits a fixed brand-free message (`data: weekly snapshot <date>`) touching
 `data/snapshots/` alone, under `permissions: contents: write`. The DONE command
 (`make test && make idempotency-check ROWS=captured`) passes; lint clean. Phase

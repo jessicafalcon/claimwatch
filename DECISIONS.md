@@ -667,9 +667,11 @@ renamed the rebuild input, closed five BACKLOG rows.
   `channel_gap` (B1.3), `platform_stats` (B1.4), `peer_ratings` (B2.3) are
   window selects over `stg_platform_snapshots`, each row carrying its point's
   tag; BACKING flips the four rows Pending → Documented with the anchors file
-  and the platform roots as sources; the flip to Measured is Phase 4's, when
-  scheduled captures make the series ours. SPEC.md's header and four panels
-  say so. Rejected: one shared mart under four rows; flipping to Measured on
+  and the platform roots as sources; the flip to Measured waits until the
+  points we measure make the series ours — NOT Phase 4 (Phase 4 gave the
+  fetched points a tracked home but decided the rows stay Documented, since a
+  handful of weekly points is not yet the series — see the Phase 4 entry).
+  SPEC.md's header and four panels say so. Rejected: one shared mart under four rows; flipping to Measured on
   a few 2026-09-02 points; leaving B1.4 Pending (the Opinion Assurances page
   and the anchors carry its numbers).
 - **A source is a declaration (pinned decision 3).** `ingest/sources.py::Source`
@@ -1084,7 +1086,8 @@ still-unwritten personal-data excerpt rule.
   `captured` (breaks `test_marts.py`'s Measured-fetched-point test).
 - **The workflow is `schedule` + `workflow_dispatch`, never `pull_request`.**
   It runs on the repo's own trusted runner on a weekly cron; `make confirm
-  scrape` is one invocation (the goal gate arms, origin `command line`), then
+  scrape` is one invocation (the goal gate arms — its `MAKECMDGOALS` origin is
+  make's own `default`, not an environment or command-line definition), then
   `make record-snapshots`, then a commit of `data/snapshots/` only. This
   **resolves the Phase 3a residual** "the confirm gate does not hold against an
   environment that chooses what make reads or runs (`MAKEFILES`, `PATH`)" for

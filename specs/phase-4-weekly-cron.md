@@ -3,7 +3,7 @@
 Contract for the `phase-4-weekly-cron` branch. Source: PROJECT_BRIEF.md §9
 Phase 4 — a scheduled scrape that commits new snapshots so the rating
 time-series accrues while the rest of the study is built. Depends on Phase 3c
-merged (PR #7, 2026-09-04).
+merged (PR #7).
 
 **Status: APPROVED 2026-09-03 — in progress.** No new dependencies (uses
 the Phase 2 fetcher, DuckDB, stdlib csv; GitHub Actions is configuration, not a
@@ -224,7 +224,11 @@ new residuals are the unattended run and the write token:
   workflow commits (`git add data/snapshots/`) and by branch protection's one
   written exception. Pinned by `tests/test_weekly.py`.
 - **No secret in the workflow.** The scrape needs no API key (no model on this
-  path); no `.env`, no key echoed; `persist-credentials` handled as in `ci.yml`.
+  path); no `.env`, no key echoed. The checkout runs with
+  `persist-credentials: false`, so the write token never enters `.git/config`
+  during the scrape or the `uv sync` install; the push is handed the token only
+  at the push step, via env, never echoed (the same intent as `ci.yml`, which
+  keeps even its read token off disk).
 - **Run twice.** A second run in the same week fetches again (polite, ≤ 60
   pages/source) and harvests; the `(source, captured_at)` key makes a same-day
   re-run a no-op in the tracked file, and an empty diff commits nothing.
