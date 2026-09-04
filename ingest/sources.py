@@ -291,6 +291,32 @@ SOURCES: tuple[Source, ...] = (
         ),
         declared_on="2026-09-02",
     ),
+    # The Trustpilot review profile (Phase 3b): its robots.txt ends with
+    # `User-agent: *` / `Disallow: /`, and our User-Agent is in no named group,
+    # so under RFC 9309 the catch-all group governs and every path is
+    # disallowed — not fetchable, refused before any request. Its TrustScore
+    # and review count are read by hand into data/snapshots/manual_snapshots.csv
+    # (Measured), as the App Store listing's are; the profile carries the same
+    # `fr-digital-first` profile as the Trustpilot anchors, so the Measured
+    # point joins their series. The profile path spells the brand: D1, here only.
+    Source(
+        name="fr-digital-first-trustpilot",
+        platform="trustpilot",
+        host="www.trustpilot.com",
+        parser=None,
+        pages=(),
+        profile="fr-digital-first",
+        segment="digital-first",
+        channel="unsolicited",
+        listing="https://www.trustpilot.com/review/alan.com",
+        fetchable=False,
+        terms=(
+            "robots.txt disallows every path for a crawler in no named group"
+            " (User-agent: * -> Disallow: /); read on www.trustpilot.com and"
+            " fr.trustpilot.com 2026-09-03"
+        ),
+        declared_on="2026-09-03",
+    ),
 )
 
 

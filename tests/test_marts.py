@@ -278,6 +278,45 @@ def test_a_hand_read_and_a_fetched_point_reach_the_marts_as_measured(tmp_path):
     assert tags == {"Documented", "Measured"}
 
 
+def test_the_tracked_trustpilot_hand_read_row_reaches_the_marts_in_its_anchor_series(
+    tmp_path,
+):
+    """Phase 3b: the delivered `data/snapshots/manual_snapshots.csv` Trustpilot
+    row, carried end to end through `ROWS=captured` (the tracked file, an empty
+    cache — deterministic, no machine cache), lands in the same (source,
+    profile) group as the Documented Trustpilot anchors: one series, mixed tags,
+    the Measured 2026-09 point the latest in rating_trend, channel_gap and
+    peer_ratings."""
+    from pipeline.build import MANUAL_SNAPSHOTS
+
+    cache = tmp_path / "cache"
+    cache.mkdir()
+    db = database_for("captured", tmp_path)
+    rebuild(
+        "duckdb",
+        "captured",
+        root=tmp_path,
+        cache_dir=cache,
+        manual_file=MANUAL_SNAPSHOTS,
+    )
+    key = "source = 'trustpilot' and profile = 'fr-digital-first'"
+    trend = _query(
+        db, f"select month, rating, tag from rating_trend where {key} order by month"
+    )
+    assert trend == [
+        ("2025-01", Decimal("4.200"), "Documented"),
+        ("2025-09", Decimal("3.800"), "Documented"),
+        ("2026-06", Decimal("3.900"), "Documented"),
+        ("2026-09", Decimal("3.900"), "Measured"),  # the hand-read point, one group
+    ]
+    assert _query(
+        db, f"select rating, review_count, tag from peer_ratings where {key}"
+    ) == [(Decimal("3.900"), 1072, "Measured")]
+    assert _query(
+        db, f"select channel, rating, review_count, tag from channel_gap where {key}"
+    ) == [("unsolicited", Decimal("3.900"), 1072, "Measured")]
+
+
 def test_a_same_day_measured_point_stands_in_front_of_an_anchor_in_every_mart(
     tmp_path,
 ):

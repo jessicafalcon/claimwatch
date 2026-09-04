@@ -181,6 +181,7 @@ def test_every_source_declares_parser_cache_host_and_attribution():
         "app-store",
         "google-play",
         "opinion-assurances",
+        "trustpilot",
     }
 
 
@@ -301,7 +302,8 @@ ADDRESS_WORDS = frozenset(
     "https www com fr html json id hl gl "
     "apple apps app itunes rss customerreviews sortby mostrecent "
     "google play store details "
-    "opinion assurances assureur page".split()
+    "opinion assurances assureur page "
+    "trustpilot review".split()
 )
 
 
