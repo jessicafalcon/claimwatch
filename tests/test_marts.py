@@ -640,3 +640,27 @@ def test_marts_are_byte_stable_across_rebuilds(tmp_path, monkeypatch, rows):
         )
     assert seen[0] == seen[1]
     assert all(seen[0][m] for m in MARTS)  # each mart holds rows to compare
+
+
+def test_reimport_inserts_nothing(tmp_path):
+    """Phase 3c done-when 6: re-importing the same authorized export inserts
+    nothing — content_hash idempotency over the review corpus, per-table counts
+    stable across two rebuilds."""
+    from ingest.sources import by_name
+    from pipeline.build import MANUAL_SNAPSHOTS, idempotency_check
+
+    src = by_name("fr-digital-first-trustpilot-reviews")
+    cache = tmp_path / "cache"
+    _trustpilot_capture(
+        cache,
+        src,
+        [
+            ("Bien", "Corps.", 5, "August 1, 2026"),
+            ("Mal", "Corps deux.", 1, "July 2, 2026"),
+        ],
+    )
+    ok, first, second = idempotency_check(
+        "duckdb", "captured", cache_dir=cache, manual_file=MANUAL_SNAPSHOTS
+    )
+    assert ok and first == second
+    assert first["stg_reviews"] == 2  # both reviews loaded once, unchanged on re-run

@@ -115,21 +115,21 @@ make rebuild && make idempotency-check ROWS=captured
 | Done-when | Proof (test id / `make` target / output line) |
 |---|---|
 | 1 | `make rebuild ROWS=captured` loads the 1,050 Trustpilot rows into `stg_reviews` (developer-run: the real export is gitignored, so the tracked proofs are the declaration test and the frozen sample below); `tests/test_fetch_sources.py::test_trustpilot_reviews_is_authorized_offline_import` |
-| 2 | `tests/test_ingest_trustpilot.py::test_rating_only_from_known_star_svg`, `::test_unparseable_date_refuses` |
+| 2 | `tests/test_ingest_trustpilot.py::test_maps_rating_date_title_body_and_only_those`, `::test_a_rating_that_is_not_a_known_star_url_refuses`, `::test_a_date_that_is_not_month_day_year_refuses`, `::test_a_header_that_is_not_the_export_refuses` |
 | 3 | `tests/test_ingest_trustpilot.py::test_dropped_columns_reach_no_field`; `tests/test_marts.py::test_review_tables_have_no_personal_columns` |
 | 4 | `tests/test_marts.py::test_trustpilot_rating_point_unchanged_by_corpus` |
-| 5 | `make idempotency-check ROWS=samples` prints "OK"; `tests/test_ingest_layout.py` sees `fixtures/trustpilot/` under MANIFEST |
-| 6 | `make idempotency-check ROWS=captured` prints "OK"; `tests/test_ingest_trustpilot.py::test_reimport_inserts_nothing` |
+| 5 | `make idempotency-check ROWS=samples` prints "OK"; `tests/test_fixtures_frozen.py::test_manifests_match` checks `fixtures/trustpilot/` against its MANIFEST |
+| 6 | `make idempotency-check ROWS=captured` prints "OK"; `tests/test_marts.py::test_reimport_inserts_nothing` |
 
 ## Invariants (REQUIRED)
 
 | Invariant ("for all …, … holds") | Falsified by (scenario test) |
 |---|---|
-| For all imported review rows, the rating is a member of `REVIEW_RATINGS`, or the parse refuses. | `tests/test_ingest_trustpilot.py::test_rating_seven_refuses` — a `stars-7.svg` row raises `PageShapeError`, loads nothing. |
+| For all imported review rows, the rating is a member of `REVIEW_RATINGS`, or the parse refuses. | `tests/test_ingest_trustpilot.py::test_a_rating_that_is_not_a_known_star_url_refuses` — a `stars-7.svg` (and `stars-0`, non-svg, non-host, digit, empty) row raises `PageShapeError`, loads nothing. |
 | For all imported reviews, no reviewer name, avatar or country appears in any raw or staging column. | `tests/test_marts.py::test_review_tables_have_no_personal_columns` — the column set of `raw_reviews`/`stg_reviews` excludes them. |
 | For all rebuilds, the Trustpilot rating series equals the hand-read snapshot, whatever the corpus holds. | `tests/test_marts.py::test_trustpilot_rating_point_unchanged_by_corpus` — corpus mean ≠ 3.9, and the snapshot point wins. |
-| For all re-imports of an unchanged export, per-table row counts are unchanged. | `tests/test_ingest_trustpilot.py::test_reimport_inserts_nothing`. |
-| For all `fetchable=False` sources, `make scrape` never fetches them, parser or not. | `tests/test_fetch_sources.py::test_scrape_skips_unfetchable` (extend to the parsered case). |
+| For all re-imports of an unchanged export, per-table row counts are unchanged. | `tests/test_marts.py::test_reimport_inserts_nothing`. |
+| For all `fetchable=False` sources, `make scrape` never fetches them, parser or not. | `tests/test_fetch_sources.py::test_trustpilot_reviews_is_authorized_offline_import` — the parsered, not-fetchable reviews source: `scrape` refuses before any request. |
 
 ## Pinned decisions (do not re-litigate)
 
