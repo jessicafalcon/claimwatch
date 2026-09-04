@@ -27,21 +27,32 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # Keep the write token OUT of .git/config (as ci.yml does with its
+          # read token): the network scrape and the third-party `uv sync` run
+          # before the push, and neither must find a push-capable token on
+          # disk. The push below is handed its credential only at that step.
+          persist-credentials: false
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
         with:
           version: "0.12.5" # match local; bump deliberately
       - run: uv sync --locked
       # NETWORK: the polite fetcher — robots first, >= 2 s per host, identifying
       # UA, <= 60 pages/source, no proxy, no retry. `confirm` and `scrape` are
-      # one invocation, so the goal gate arms (origin: command line). Only
+      # one invocation, so the goal gate arms (its MAKECMDGOALS origin is make's
+      # own `default`, not an environment or command-line definition). Only
       # fetchable sources are read; the rest are skipped with one line each.
       - run: make confirm scrape
       # Offline: read the fresh captures on disk, append this week's figures to
       # the tracked file, numbers only.
       - run: make record-snapshots
       # Commit ONLY data/snapshots/, with a fixed brand-free message; nothing to
-      # commit is a clean no-op (no fake row is ever written).
+      # commit is a clean no-op (no fake row is ever written). The token is
+      # given to the push alone, via env (never echoed), so it never lands in
+      # .git/config for the earlier steps to expose.
       - name: Commit the week's snapshots
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           git config user.name "friction-ledger-bot"
           git config user.email "friction-ledger-bot@users.noreply.github.com"
@@ -50,5 +61,5 @@ jobs:
             echo "no new snapshot figures this week; nothing to commit"
           else
             git commit -m "data: weekly snapshot $(date -u +%F)"
-            git push
+            git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:main
           fi
