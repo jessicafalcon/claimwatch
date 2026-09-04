@@ -185,11 +185,13 @@ its first `MANIFEST.sha256`. The DECISIONS entry records the new set.)
 - [ ] `BACKLOG.md` — #41 struck ("DONE Phase 3c"); BACKLOG count updated.
 - [ ] `CLAUDE.md` — Current status; Repo map (Trustpilot now has a parser and a
   fixture set); BACKLOG count.
-- [ ] `BACKING.md` — the Trustpilot review corpus now feeds B2.2 / B2.5; those
-  rows stay **Pending** until Phase 5 classifies (a note, not a tag change).
-- [ ] `SPEC.md` — none (no chart or beat changes; a chart change would be a
-  design change — STOP first).
-- [ ] `README.md` — only if a command or beat description changed; likely none.
+- [ ] BACKING — none: the review corpus feeds B2.2 / B2.5, but they stay
+  **Pending** until Phase 5 classifies — no displayed number, so no tag or
+  source change this phase.
+- [ ] SPEC — none: no chart or beat changes (a chart change would be a design
+  change — STOP first).
+- [ ] README — none: no command or beat description changed (the DONE command
+  is unchanged from Phase 3b).
 - [ ] this spec — the "Delivered" paragraph appended at exit.
 
 ## Threat model (REQUIRED when the phase adds a `make` target that takes a variable, deletes anything, calls a paid API, or touches the network)
