@@ -56,7 +56,7 @@ every rule below except the last sentence, which is editorial (PROJECT_BRIEF.md
 | B2.1 The five-theme taxonomy with paraphrased public examples (eventual Documented) | — (documented examples) | — | — | Pending |
 | B2.2 Theme share of negative reviews over time, by segment, via the gated classifier (eventual Measured) | theme_share_by_month | `sql/marts/theme_share_by_month.sql` | — | Pending |
 | B2.3 Peer context: public ratings across the market segment (three kinds of point, each carrying its own tag — see the note above the table) | peer_ratings | `sql/marts/peer_ratings.sql` | `fixtures/anchors/platform_snapshots_seed.csv`; https://www.trustpilot.com/; https://www.opinion-assurances.fr/ | Documented |
-| B2.4 Classifier quality: per-theme precision and recall vs hand labels (eventual Measured) | classifier_quality | `sql/marts/classifier_quality.sql` | — | Pending |
+| B2.4 Classifier quality: per-theme precision and recall vs hand labels, graded on the held-out fold | classifier_quality | `sql/marts/classifier_quality.sql` | `classify/eval/labels.csv` | Measured |
 | B2.5 Held-claim complaint share, digital-first vs traditional mutuelles (eventual Measured) | theme_share_by_segment | `sql/marts/theme_share_by_segment.sql` | — | Pending |
 | B3.1 Cost-model formulas printed next to their output (eventual Modeled) | cost_model_outputs | `sql/marts/cost_model_outputs.sql` | — | Pending |
 | B3.2 Fraud saved vs friction cost curves over the flag rate, with the crossover (eventual Modeled) | cost_curves | `sql/marts/cost_curves.sql` | — | Pending |

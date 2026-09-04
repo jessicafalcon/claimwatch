@@ -82,3 +82,14 @@ def test_the_one_reader_actually_reads_it():
     # excluding a real reader, not passing on an empty repo).
     reader = (EXCLUDED / "labels_io.py").read_text(encoding="utf-8")
     assert "labels.csv" in reader and "read_labels" in reader
+
+
+def test_the_gate_is_inside_the_wall():
+    # Phase 6b's held-out gate reads the answer key — it must live inside eval/
+    # (excluded from the sweep) and actually carry a reader token, so a classifier
+    # module can never quietly grow into a reader of its own scores.
+    gate = EXCLUDED / "gate.py"
+    assert gate.is_file() and gate.is_relative_to(EXCLUDED)
+    assert "read_labels" in gate.read_text(encoding="utf-8")
+    swept = {path.relative_to(ROOT).as_posix() for path in _source_files()}
+    assert "classify/eval/gate.py" not in swept  # excluded, correctly

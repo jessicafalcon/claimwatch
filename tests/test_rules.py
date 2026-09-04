@@ -157,4 +157,6 @@ def test_no_new_mart():
         "peer_ratings.sql",
         "platform_stats.sql",
         "rating_trend.sql",
+        # classifier_quality lands in 6b (DDL fed by Python, not by the rules).
+        "classifier_quality.sql",
     }

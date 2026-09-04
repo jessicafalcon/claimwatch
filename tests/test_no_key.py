@@ -11,11 +11,14 @@ from __future__ import annotations
 import sys
 
 from classify.combined import classify_all
+from classify.eval.gate import ANSWER_KEY, HELDOUT_FOLD, score_heldout
 from classify.labels import UNCLASSIFIED
 from classify.llm import make_model_decider, model_available
 from classify.rules import classify as rules_classify
 from classify.rules import load_rules
-from pipeline.warehouse import database_for
+from pipeline.build import rebuild, write_classifier_quality
+from pipeline.warehouse import connect, database_for
+from tests import pins
 
 
 def _reviews(conn):
@@ -98,7 +101,73 @@ def test_no_key_rebuild_classify_step_is_green(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(cli, "write_decisions", lambda d: write_decisions(d, cache))
 
     rebuild("duckdb", "synthetic", root=tmp_path, run_id="t")
-    cli._classify_and_print(database_for("synthetic", tmp_path))
+    cli._classify_and_print(database_for("synthetic", tmp_path), "synthetic")
     out = capsys.readouterr().out
     assert "not yet classified" in out
     assert "rules only" in out  # the no-key note
+    assert "held-out fold 4" in out  # the gate summary rides the same step
+
+
+def test_no_key_mart_is_rules_only_and_populated(monkeypatch, tmp_path):
+    # With no key the classifier is rules-only; the gate scores THOSE predictions
+    # and the mart populates honestly (never a faked with-key number).
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    rebuild("duckdb", "synthetic", root=tmp_path, run_id="synthetic")
+    conn = connect("duckdb", database=database_for("synthetic", tmp_path))
+    try:
+        preds, cache = classify_all(
+            _reviews(conn),
+            rules=load_rules(),
+            decide=make_model_decider(),
+            decisions={},
+        )
+        assert cache == {}  # no model decisions with no key
+        write_classifier_quality(
+            conn,
+            score_heldout(preds),
+            answer_key=ANSWER_KEY,
+            heldout_fold=HELDOUT_FOLD,
+            run_id="synthetic",
+        )
+        rows = conn.execute(
+            "select label, hits, predicted, actual, precision, recall "
+            "from classifier_quality"
+        ).fetchall()
+        got = {label: (h, p, a, prec, rec) for label, h, p, a, prec, rec in rows}
+        assert got == pins.RULES_HELDOUT
+    finally:
+        conn.close()
+
+
+def test_no_key_scores_call_no_model(monkeypatch, tmp_path):
+    # Grading is offline: even with the SDK importable, scoring and writing the
+    # mart never touch it — the gate compares stored predictions to the key.
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+    class _Boom:
+        def __getattr__(self, name):
+            raise AssertionError("anthropic was touched while grading")
+
+    monkeypatch.setitem(sys.modules, "anthropic", _Boom())
+    rebuild("duckdb", "synthetic", root=tmp_path, run_id="synthetic")
+    conn = connect("duckdb", database=database_for("synthetic", tmp_path))
+    try:
+        preds, _ = classify_all(
+            _reviews(conn),
+            rules=load_rules(),
+            decide=make_model_decider(),
+            decisions={},
+        )
+        write_classifier_quality(
+            conn,
+            score_heldout(preds),
+            answer_key=ANSWER_KEY,
+            heldout_fold=HELDOUT_FOLD,
+            run_id="synthetic",
+        )
+        assert (
+            conn.execute("select count(*) from classifier_quality").fetchone()[0]
+            == pins.CLASSIFIER_QUALITY_ROWS
+        )
+    finally:
+        conn.close()

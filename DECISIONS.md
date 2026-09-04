@@ -1365,3 +1365,93 @@ model in `pipeline/cli.main`, never a traceback — the developer-run paid path 
 now visible on failure rather than a stack trace. The no-key path never reaches
 it. *Fix the class, not the case: a closed exception type mapped to a clean
 refusal, the same shape as the `Refused`/`PageShapeError` catches.*
+
+### Phase 6b
+
+Branch `phase-6b-eval-gate`, spec `specs/phase-6b-eval-gate.md`, APPROVED
+2026-09-04. The second half of the Phase 6 split: the held-out eval gate and the
+`classifier_quality` mart (B2.4) — the one BACKING row this phase populates.
+
+- **The gate scores the held-out fold alone (fold 4), precision AND recall per
+  label, in `classify/eval/gate.py`.** It reuses `split.is_heldout` and the
+  answer key (through `labels_io`), and takes the classifier's predictions as
+  input — a pure function of predictions and labels, like 5b's
+  `precision.evaluate`. For a label T on fold 4: `hits = |predicted ∩ actual|`
+  (the shared numerator), `precision = hits/predicted`, `recall = hits/actual`,
+  each `None` when its denominator is 0 (0/0 is undefined, not 0). Pinned by
+  `test_gate.py` (fold-4-only, the formula, a crafted disagreement < 1, null on
+  zero). *Rejected: scoring every fold (leaks the tuning folds into the study
+  number and lets the gate be tuned against — the split's whole purpose); a
+  separate recall-only pass (two scorers drift).*
+- **`classifier_quality` is the first Python-fed mart — DDL fed by Python, not
+  logic in SQL.** `sql/marts/classifier_quality.sql` is `create or replace table
+  … (columns)` with no `select`; it runs in `build_derived` like every mart, so
+  the table always exists after a rebuild. The CLI classify step (6a's placement,
+  where the model and cache already live) scores fold 4 and calls
+  `build.write_classifier_quality`, which clears the table and inserts one row per
+  scored label in the gate's fixed label order (byte-stable). *Rejected: a
+  `create … as select` mart (there is no SQL source — the metric is computed in
+  Python against the answer key, which SQL may not read, portability contract);
+  populating inside `rebuild()` (its ~50 callers treat the return as a counts
+  dict, and the mart's row count is constant, so populating there costs a
+  return-type change for zero idempotency signal — the value-stability is pinned
+  by `test_classifier_quality.py::test_two_rebuilds_identical_mart_rows`, which
+  the count-diff of `idempotency-check` cannot see).*
+- **The mart carries a computed metric's provenance, not a scraped row's.**
+  Columns `label, hits, predicted, actual, precision, recall, heldout_fold (= 4),
+  answer_key (= 'classify/eval/labels.csv'), run_id, tag (= 'Measured')`. No
+  `source_url`, no `captured_at` — a quality metric has no address and no capture
+  instant, and a build timestamp would be a clock on the data path. `hits`,
+  `predicted`, `actual` are stored so `precision = hits/predicted` redoes by hand
+  (brief §2.1). Pinned by `test_classifier_quality.py`. *Rejected: faking
+  `source_url`/`captured_at` (dishonest provenance) or a `now()`/`current_date`
+  stamp (the banned clock — `sql_lint` forbids it in SQL, and the Python insert
+  carries no timestamp).*
+- **B2.4 flips Pending → Measured, upstream source `classify/eval/labels.csv`;
+  B2.2/B2.5 stay Pending.** The numbers are a direct measurement of the real
+  classifier against the real hand labels; the answer key is the honest upstream
+  source (accepted by `check-backing`'s dataset-name shape). *Rejected: Modeled
+  (there is no model or assumption — a measurement); the theme-share marts are
+  Phase 7.*
+- **The wall holds, now including the gate; the CLI hands the gate predictions,
+  not labels.** `gate.py` lives in `classify/eval/` and reads the answer key
+  there; the CLI, `build.py` and everything else pass predictions in and get
+  scores back, reading no `labels.csv` (`build.write_classifier_quality` takes the
+  provenance strings as parameters, so no reader token enters `build.py` or the
+  CLI). Pinned by `test_labels_isolation.py::test_the_gate_is_inside_the_wall`.
+  *Rejected: the CLI or `build.py` reading the key (a classifier that sees its own
+  answers makes its scores a lie).*
+- **No new `make` target; the gate rides `make rebuild`.** The held-out grade is a
+  real build output (it lands in the mart and prints a one-line summary under the
+  classify summary), unlike 5b's `make classify-eval`, a tuning-fold dev
+  diagnostic. *Rejected: a `make classify-gate` — surface the five parts do not
+  need (BACKLOG if a developer later needs the report without a full rebuild).*
+
+On the synthetic corpus fold 4 is 5 reviews, all clear cases the rules classify
+correctly, so every label present scores 1.0/1.0 and the two labels absent from
+fold 4 are `None` — pinned in `tests/pins.py` (`RULES_HELDOUT`). The formula (a
+disagreement scores below 1.0) is proven by a crafted unit test, not by this
+clean fixture. The no-key run stays green and populates the mart rules-only,
+truthfully (lower recall in general; here coincidentally perfect on the five
+clear held-out reviews). `make test` (722 tests, 18 new), `make rebuild
+ROWS=synthetic`, `make idempotency-check ROWS=synthetic` and `make check-backing`
+(B2.4 Measured) are green with no key.
+
+Review round 1 (code-reviewer, functionality-tester, study-editor, coherence-
+auditor; security-reviewer not triggered — no sensitive surface): no blockers.
+**Amendment A1** applied (spec) — the gate found by the code-reviewer to grade
+predictions against the synthetic answer key for *every* input, so
+`ROWS=captured|samples` wrote a garbage Measured mart (real ids never match
+synthetic labels). Fix: `score_heldout` grades only reviews both classified and in
+the answer key (the intersection on the held-out fold), and the CLI writes no mart
+when nothing is graded — chosen over a per-input `ROWS == "synthetic"` guard so a
+mixed answer key in Phase 7 grades a real corpus against its real labels while
+ignoring synthetic labels it did not classify. *Fix the class, not the case: a
+coherence precondition on the measurement, not a denylist of inputs.* Two pinning
+tests added for the functionality-tester's surviving mutations (the mart's
+precision/recall column mapping under asymmetry — invisible on the symmetric
+synthetic fold — and the re-populate `delete`). The branch and spec file were
+renamed from the doubled `phase-phase-6b-eval-gate` to `phase-6b-eval-gate`
+(coherence-auditor; `/phase-start` had prepended `phase-` to a slug already
+starting with it). Accepted to BACKLOG: the mart write is not warehouse-aware
+(hardcoded DuckDB connection; Snowflake is Phase 10).

@@ -80,10 +80,14 @@ in the middle, and come out on the right as the numbers the study shows.
   (`raw_platform_snapshots`, `stg_platform_snapshots` with each row's tag),
   the declared page addresses with their attribution (`raw_source_pages`,
   joined on exact `source_url`), and the four Beat 1–2 marts they feed
-  (`rating_trend`, `channel_gap`, `platform_stats`, `peer_ratings`);
+  (`rating_trend`, `channel_gap`, `platform_stats`, `peer_ratings`); plus
+  `classifier_quality` (B2.4, Beat 2), the first Python-fed mart — its `.sql` is
+  DDL only (the shape), the CLI classify step scores the held-out fold and
+  inserts (Phase 6b);
   `pipeline/` —
   `warehouse.py` (the one place that knows DuckDB from Snowflake), `build.py`
-  (raw→staging→marts), `cli.py`/`__main__.py` (the validating `make` entry),
+  (raw→staging→marts; `write_classifier_quality` fills the B2.4 mart from the
+  gate's scores), `cli.py`/`__main__.py` (the validating `make` entry),
   `sql_lint.py` (the portability/clock denylist the tests use),
   `metrics.py` (reviews per month — a pinned query, not a mart; folds into
   B5.2 in Beat 5), `label_sample.py` (the `make label-sample` draw — reads
@@ -135,7 +139,8 @@ in the middle, and come out on the right as the numbers the study shows.
   `classify/` — `labels.py` (the closed seven-label set + `review_id`),
   `split.py` (the `sha256(review_id) % 5` held-out split), `eval/` (the ONLY
   reader of the hand-labeled answer key: `labels_io.py`, `precision.py` — the
-  tuning-fold scorer — and `labels.csv`, carrying the synthetic corpus's ground
+  tuning-fold scorer — `gate.py` — the held-out precision+recall scorer (Phase
+  6b) — and `labels.csv`, carrying the synthetic corpus's ground
   truth since Phase 5b). *(Phase 5b)* `rules.yaml` (the patterns, one group per
   emitting label), `rules.py` (load + word-start match → `(review_id, theme)`
   rows); *(Phase 6a)* `llm.py` (the ONE model call site: lazy `anthropic` import,
@@ -176,7 +181,11 @@ in the middle, and come out on the right as the numbers the study shows.
   classifier is the rules plus, only when `ANTHROPIC_API_KEY` is set and only for
   the reviews the rules left `unclassified`, one model call each (cached in the
   gitignored `data/classify/decisions.csv`); with no key those reviews stay
-  `unclassified` and the run is still green (Phase 6a). `ROWS` names what is
+  `unclassified` and the run is still green (Phase 6a). It then grades the
+  classifier on the held-out fold (fold 4) and writes the `classifier_quality`
+  mart (B2.4, precision + recall per label, Measured), printing a one-line gate
+  summary; the mart reflects whatever classifier ran, so with no key it is
+  rules-only and honest (Phase 6b). `ROWS` names what is
   loaded; each input builds its own database file, so a sample never lands in the
   corpus. The default,
   `captured`, loads the anchors, the hand-read rows in
@@ -544,38 +553,45 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 ## Current status
 
-**Phase 6a — model fallback + graceful degradation** (`phase-6a-model-fallback`,
-spec `specs/phase-6a-model-fallback.md`, APPROVED 2026-09-04): being built. The
-first half of the Phase 6 split (the architect's call this session): the one
-model call site, the decision cache and the no-key guarantee; the held-out eval
-gate and the `classifier_quality` mart (B2.4) are 6b. It adds three
-`classify/` modules. `llm.py` is the one model call site: a language model called
-from here alone (the only, lazy, `import anthropic`), seeing only
-rules-`unclassified` reviews; `parse_reply` strict-parses the reply to the seven
-closed labels, a near-miss like `document-loop-ish` → `unclassified`, never an
-eighth label; no key → no decider; `MODEL = claude-haiku-4-5` (the fast, low-cost
-classifier tier, a swappable constant). `cache.py` is the gitignored, text-free
-`data/classify/decisions.csv`, keyed `(review_id, prompt_version, model)`, so a
-warm re-run makes zero model calls — deterministic despite a non-deterministic
-model. `combined.py::classify_all` combines the rules with the cached/model
-decisions into one row per review × theme, Python-only. And `make rebuild` now
-runs the classify step and prints the outcome. `classified_reviews` stays a Python
-value, so 6a populates no BACKING row — B2.2/B2.4/B2.5 stay Pending (B2.4 is 6b's
-held-out gate). DONE: `make rebuild ROWS=synthetic` is green with the key unset
-(no client, no socket, combined == rules-only; over the synthetic corpus 7 of 39
-reviews stay `unclassified`) AND, developer-run, with a key set. `make test`
-passes: 704 tests, 34 new. `anthropic` (1.3.0) made a direct dependency
-(pre-approved); the labels-isolation grep widened to every code surface. Review
-round 1 passed (code-reviewer, security-reviewer, functionality-tester,
-study-editor, coherence-auditor): no correctness or security findings; MODEL
-reconciled opus→haiku, a one-line refusal added on the paid path's API errors, and
-spec/record wording fixed. Next: PR.
+**Phase 6b — held-out eval gate + classifier_quality mart** (`phase-6b-eval-gate`,
+spec `specs/phase-6b-eval-gate.md`, APPROVED 2026-09-04): built, round 1 applied. The
+second half of the Phase 6 split: the gate that grades the classifier on the fold
+it never saw, and the one BACKING row this phase populates. `classify/eval/gate.py`
+scores precision AND recall per label on the held-out fold alone (fold 4):
+`hits = |predicted ∩ actual|`, `precision = hits/predicted`, `recall = hits/actual`,
+each `None` on a zero denominator; like 5b's `precision.py` it takes predictions in
+and reads the answer key inside the wall. `classifier_quality` (B2.4) is the first
+Python-fed mart: its `.sql` is DDL only (the shape), and the CLI classify step
+scores fold 4 and inserts one row per label, tagged Measured, carrying a computed
+metric's provenance (`answer_key`, `heldout_fold`, `run_id` — no `source_url`, no
+`captured_at`, no clock). B2.4 flips Pending → Measured (upstream source
+`classify/eval/labels.csv`); B2.2/B2.5 stay Pending (Phase 7). `make rebuild` now
+writes the mart and prints a one-line gate summary. The mart reflects whatever
+classifier ran, so with no key it is rules-only and honest. DONE: `make rebuild
+ROWS=synthetic && make idempotency-check ROWS=synthetic && make check-backing &&
+make test`, green with the key unset. `make test` passes: 722 tests, 18 new. On
+the synthetic corpus fold 4 is 5 clear reviews (rules score every present label
+1.0/1.0, two labels `None`), pinned in `tests/pins.py`; the formula (a disagreement
+< 1) is proven by a crafted unit test. No new dependency. Review round 1 passed
+(code-reviewer, functionality-tester, study-editor, coherence-auditor; security
+not triggered): applied amendment A1 (grade only reviews both classified and
+labeled, so `ROWS=captured` leaves the mart empty rather than a garbage Measured
+number), two pinning tests, and the branch/spec-file renamed to the single form.
+Next: PR.
+
+Phase 6a (model fallback + graceful degradation) merged to `main` (PR #12,
+2026-09-04): the one model call site (`classify/llm.py`, `MODEL =
+claude-haiku-4-5`, strict closed-set parse, no key → no decider, `ModelError` on
+paid-path API errors), the gitignored text-free decision cache, and
+`combined.py::classify_all`; `make rebuild` runs the classify step; the no-key run
+is green (durable `tests/test_no_key.py`). `anthropic` (1.3.0) made a direct
+dependency; the labels-isolation grep widened to every code surface.
 
 Phase 5b (the rules layer) merged to `main` (PR #11, 2026-09-04). Phase 5a (label
 sample + the labels wall) merged (PR #10, 2026-09-04). Phase 4 (the weekly cron)
 merged (PR #8, 2026-09-03); the docs hotfix merged (PR #9, 2026-09-04). (Earlier
 phase and amendment history is in each spec and DECISIONS.)
 
-Open BACKLOG rows: **23**.
+Open BACKLOG rows: **26**.
 
 (Update this section at the end of every working day.)

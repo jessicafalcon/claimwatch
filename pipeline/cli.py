@@ -21,6 +21,7 @@ import sys
 
 from classify.cache import read_decisions, write_decisions
 from classify.combined import classify_all
+from classify.eval.gate import ANSWER_KEY, HELDOUT_FOLD, format_gate, score_heldout
 from classify.eval.precision import evaluate, format_report
 from classify.labels import POSITIVE, THEMES, UNCLASSIFIED, review_id
 from classify.llm import ModelError, make_model_decider, model_available
@@ -39,6 +40,7 @@ from pipeline.build import (
     rebuild,
     record_snapshots,
     reset,
+    write_classifier_quality,
 )
 from pipeline.label_sample import SHEET, label_sample
 from pipeline.metrics import reviews_per_month
@@ -193,17 +195,20 @@ def _do_rebuild(args: argparse.Namespace) -> int:
         print(f"  {source:{width}} {month}  {n}")
     if not months:
         print("  (none)")
-    _classify_and_print(db)
+    _classify_and_print(db, rows)
     return 0
 
 
-def _classify_and_print(db) -> None:
+def _classify_and_print(db, rows_input: str) -> None:
     """Run the combined classification (rules + model) over the warehouse's
-    `stg_reviews` and print a summary. The model is called from `classify/llm.py`
-    only, and only when a key is set (developer-run, paid) and only for
-    rules-`unclassified` reviews not already in the cache. With no key the
+    `stg_reviews`, grade it on the held-out fold, write the `classifier_quality`
+    mart (B2.4), and print both summaries. The model is called from
+    `classify/llm.py` only, and only when a key is set (developer-run, paid) and
+    only for rules-`unclassified` reviews not already in the cache. With no key the
     ambiguous reviews stay `unclassified` — the gray 'not yet classified' band —
-    and the run is still green. Deterministic given the cache; no mart (6a)."""
+    the classifier is rules-only, and the gate scores that truthfully (lower
+    recall). Deterministic given the cache; the gate itself is offline (it grades
+    stored predictions against the hand answer key — no model call)."""
     reviews = _staged_reviews_text(db)
     if reviews is None:
         print("classification: no stg_reviews yet (nothing to classify)")
@@ -214,6 +219,28 @@ def _classify_and_print(db) -> None:
         reviews, rules=load_rules(), decide=decide, decisions=decisions
     )
     write_decisions(decisions)
+
+    # Grade on the held-out fold and write the mart. The CLI hands the gate the
+    # classifier's predictions and gets scores back — it reads no answer key (the
+    # wall). run_id is the rebuild input name: provenance, byte-stable per input.
+    # The gate scores only reviews both classified and labeled (amendment A1), so
+    # a corpus the answer key does not cover grades nothing — write no mart then,
+    # rather than a mart of all-`None` Measured rows for a corpus we did not grade.
+    scores = score_heldout(rows)
+    graded = any(s.predicted or s.actual for s in scores)
+    if graded:
+        conn = connect("duckdb", database=db)
+        try:
+            write_classifier_quality(
+                conn,
+                scores,
+                answer_key=ANSWER_KEY,
+                heldout_fold=HELDOUT_FOLD,
+                run_id=rows_input,
+            )
+        finally:
+            conn.close()
+
     theme_rows = sum(1 for _, label in rows if label in THEMES)
     positive = sum(1 for _, label in rows if label == POSITIVE)
     unclassified = sum(1 for _, label in rows if label == UNCLASSIFIED)
@@ -227,6 +254,14 @@ def _classify_and_print(db) -> None:
     print(f"  theme rows      {theme_rows}")
     print(f"  positive        {positive}")
     print(f"  unclassified    {unclassified}   (the 'not yet classified' band)")
+    if graded:
+        print(format_gate(scores))
+    else:
+        print(
+            f"classifier quality — no reviews on the held-out fold {HELDOUT_FOLD} "
+            "are in the answer key for this corpus; classifier_quality left empty "
+            "(the answer key covers the synthetic corpus; real labels are Phase 7)"
+        )
 
 
 def _do_scrape(args: argparse.Namespace) -> int:
