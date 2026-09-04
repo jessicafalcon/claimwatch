@@ -149,6 +149,39 @@ def test_a_fetched_row_and_its_cache_twin_are_one_row(tmp_path):
     assert both["raw_platform_snapshots"] == only["raw_platform_snapshots"]
 
 
+def test_an_opinion_assurances_row_and_its_cache_twin_are_one_row(tmp_path):
+    """The twin collapse over the multi-page profile source, not only the
+    single-page listing: page 1 carries the aggregate, so `pages[0]` is the
+    snapshot's address and the fetched row and its live-cache twin are one row
+    for a 14-page source too (the coupling code-reviewer flagged)."""
+    cache = tmp_path / "cache"
+    _oa_capture(cache, "2026-09-10T05:00:00")
+    fetched = tmp_path / "f.csv"
+    record_snapshots(fetched, cache_root=cache)
+    empty = _write_csv(tmp_path / "empty.csv", FETCHED_COLUMNS, [])
+    manual = tmp_path / "m.csv"
+    both_root, only_root = tmp_path / "both", tmp_path / "only"
+    both_root.mkdir()
+    only_root.mkdir()
+    both = rebuild(
+        "duckdb",
+        "captured",
+        root=both_root,
+        cache_dir=cache,
+        manual_file=manual,
+        fetched_file=fetched,
+    )
+    only = rebuild(
+        "duckdb",
+        "captured",
+        root=only_root,
+        cache_dir=cache,
+        manual_file=manual,
+        fetched_file=empty,
+    )
+    assert both["raw_platform_snapshots"] == only["raw_platform_snapshots"]
+
+
 def test_the_tracked_fetched_series_rebuilds_identically(tmp_path):
     fetched = _write_csv(
         tmp_path / "f.csv",
@@ -201,6 +234,29 @@ def test_a_fetched_captured_at_must_be_an_instant(tmp_path):
         tmp_path / "f.csv",
         FETCHED_COLUMNS,
         [_row(PLAY.name, "2026-09-10", rating="4.5", review_count="800")],
+    )
+    with pytest.raises(PageShapeError):
+        read_fetched_snapshots(f)
+
+
+@pytest.mark.parametrize(
+    "bad_instant",
+    [
+        "2026-9-10T3:0:0",  # not zero-padded — strptime accepts it, the regex must not
+        "2026-09-10T03:00:00Z",  # a trailing zone
+        "2026-09-10T03:00:00+00:00",  # an offset
+        "2026-09-10 03:00:00",  # a space, not a T
+    ],
+)
+def test_a_non_canonical_instant_is_refused(tmp_path, bad_instant):
+    """The fetched `captured_at` must be byte-equal to the live-cache meta stamp
+    for the snapshot key to match and the double read to stay a no-op, so the
+    canonical zero-padded `YYYY-MM-DDTHH:MM:SS` is enforced by the `_INSTANT`
+    regex — not left to `strptime`, which accepts `2026-9-10T3:0:0`."""
+    f = _write_csv(
+        tmp_path / "f.csv",
+        FETCHED_COLUMNS,
+        [_row(PLAY.name, bad_instant, rating="4.5", review_count="800")],
     )
     with pytest.raises(PageShapeError):
         read_fetched_snapshots(f)
