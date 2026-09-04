@@ -103,10 +103,25 @@ def test_positive_int_accepts_a_positive_integer():
     assert positive_int("1", "N") == 1
 
 
-@pytest.mark.parametrize("bad", ["", "../x", '"; rm -rf x', "0", "-5", "3.5", "abc"])
+@pytest.mark.parametrize(
+    "bad",
+    [
+        "",
+        "../x",
+        '"; rm -rf x',
+        "0",
+        "-5",
+        "3.5",
+        "abc",
+        "²",  # superscript two: str.isdigit True, int() raises ValueError
+        "٣",  # Arabic-Indic three: str.isdigit True, int() would give 3
+    ],
+)
 def test_n_rejects_empty_path_and_metachar_and_env(bad: str):
-    # The CLI validates N as a positive integer in Python, whatever its origin
-    # (command line or an environment-set make variable both reach this guard as
-    # the same string); the output path is fixed, never built from N, so a
-    # traversal or a metacharacter is just a string that is not an integer.
+    # The CLI validates N as a positive ASCII integer in Python, whatever its
+    # origin (command line or an environment-set make variable both reach this
+    # guard as the same string); the output path is fixed, never built from N,
+    # so a traversal or a metacharacter is just a string that is not an integer.
+    # A non-ASCII digit refuses with one line — never a traceback (superscript),
+    # never a surprise value (other-script digit).
     assert main(["label-sample", "--n", bad]) == 2

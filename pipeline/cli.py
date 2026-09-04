@@ -52,8 +52,13 @@ def positive_int(value: str, name: str) -> int:
     same guard shape as `resolve_choice` for a closed set. Empty, a
     non-digit (`../x`, `"; …`), a sign or zero is refused; the value is never
     used to build a path (the sheet path is fixed), so a traversal or a
-    metacharacter is just a string that is not a positive integer."""
-    if not value.isdigit() or int(value) <= 0:
+    metacharacter is just a string that is not a positive integer. The digit
+    check is ASCII-only: `str.isdigit` is true for superscripts (`²`, which
+    `int()` then refuses with a `ValueError`) and other-script digits (`٣`,
+    which `int()` would silently accept as 3), so `isascii()` guards the
+    `int()` and the closed shape stays ASCII decimal — one refusal line, never
+    a traceback and never a surprise value (round 1, code-reviewer)."""
+    if not (value.isascii() and value.isdigit()) or int(value) <= 0:
         raise Refused(f"refusing: {name} must be a positive integer, got {value!r}")
     return int(value)
 
