@@ -127,8 +127,11 @@ def test_combined_writes_no_mart():
 
     assert "execute(" not in inspect.getsource(combined)
     marts = {p.name for p in (ROOT / "sql" / "marts").glob("*.sql")}
-    assert {"classifier_quality.sql", "theme_share_by_month.sql",
-            "theme_share_by_segment.sql"} <= marts
+    assert {
+        "classifier_quality.sql",
+        "theme_share_by_month.sql",
+        "theme_share_by_segment.sql",
+    } <= marts
 
 
 def test_unresolved_ids_are_exactly_the_all_unclassified_reviews():

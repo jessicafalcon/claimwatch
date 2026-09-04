@@ -158,10 +158,7 @@ def test_rebuild_twice_stable(tmp_path):
     )
     first = {t: _rows(db, f"select * from {t} order by 1, 2, 3") for t in tables}
     _classify_and_build(db, run_id="t")  # run the classify path again on the same db
-    second = {
-        t: _rows(db, f"select * from {t} order by 1, 2, 3")
-        for t in first
-    }
+    second = {t: _rows(db, f"select * from {t} order by 1, 2, 3") for t in first}
     assert first == second
 
 
