@@ -138,7 +138,12 @@ in the middle, and come out on the right as the numbers the study shows.
   tuning-fold scorer — and `labels.csv`, carrying the synthetic corpus's ground
   truth since Phase 5b). *(Phase 5b)* `rules.yaml` (the patterns, one group per
   emitting label), `rules.py` (load + word-start match → `(review_id, theme)`
-  rows); *(Phase 6)* `llm.py` (the ONE model call site). *(Phase 8)* `models/` —
+  rows); *(Phase 6a)* `llm.py` (the ONE model call site: lazy `anthropic` import,
+  strict closed-set parse of the reply, `None` decider when no key), `cache.py`
+  (the gitignored, text-free decision cache under `data/classify/`, keyed
+  `(review_id, prompt_version, model)`), `combined.py` (`classify_all`: rules +
+  the model for what they left `unclassified` → one row per review × theme,
+  Python-only, no mart). *(Phase 8)* `models/` —
   `cost_model.py` (`FORMULAS`), `guardrail_sim.py`. *(Phase 9)* `study/` —
   Metabase setup + the HTML export. *(Phase 10)* `dags/friction_ledger.py`.
 - `data/` — gitignored working output (corpus, captured pages, `*.duckdb`);
@@ -165,9 +170,15 @@ in the middle, and come out on the right as the numbers the study shows.
   Record-updates files. One line per check, exit 1 on FAIL, 2 on a refused
   SPEC/BASE. `/review-round N` runs it first.
 - `make rebuild [TARGET=duckdb] [ROWS=captured|none|synthetic|samples]` —
-  build the warehouse from raw (DuckDB; Snowflake defers to Phase 10) and
-  print reviews per month. `ROWS` names what is loaded; each input builds its
-  own database file, so a sample never lands in the corpus. The default,
+  build the warehouse from raw (DuckDB; Snowflake defers to Phase 10), print
+  reviews per month, then classify `stg_reviews` and print the outcome (reviews
+  / theme rows / positive / `unclassified` — the "not yet classified" band). The
+  classifier is the rules plus, only when `ANTHROPIC_API_KEY` is set and only for
+  the reviews the rules left `unclassified`, one model call each (cached in the
+  gitignored `data/classify/decisions.csv`); with no key those reviews stay
+  `unclassified` and the run is still green (Phase 6a). `ROWS` names what is
+  loaded; each input builds its own database file, so a sample never lands in the
+  corpus. The default,
   `captured`, loads the anchors, the hand-read rows in
   `data/snapshots/manual_snapshots.csv`, the fetched series in
   `data/snapshots/fetched_snapshots.csv` and every capture under `data/cache/`
@@ -533,36 +544,36 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 ## Current status
 
-**Phase 5b — the rules layer** (`phase-5b-rules`, spec `specs/phase-5b-rules.md`,
-APPROVED 2026-09-04): being built. The second half of the Phase 5 split
-(`docs/PLAN.md` §5): the rules that read a review and tag what it is about, with
-no model (Phase 6). What it adds: `classify/rules.yaml` (patterns, one group per
-emitting label — the five §5 themes and `positive`) and `classify/rules.py`
-(strict load with a closed-set check, word-start matching that folds accents and
-case, output one row per review × theme, `unclassified` the single fallback);
-`classify/eval/precision.py`, the scorer that grades the rules on the four tuning
-folds only (the held-out fold 4 is Phase 6's); and `make classify-eval`, which
-prints per-theme precision plus the decided share. The synthetic corpus's 39
-ground-truth rows are committed to `classify/eval/labels.csv` (was header-only in
-5a) so there is something to grade; the real labels stay offline (BACKLOG). 5b
-shows no displayed number, so it populates no BACKING row — B2.2/B2.4/B2.5 stay
-Pending (B2.4 is Phase 6's held-out gate + recall mart). DONE (`make
-classify-eval`) prints precision 1.00 for every theme with a decided share of
-27/34 (0.79); `make test` passes: 670 tests, 24 new (closed set at load, strict
-parse, determinism, review×theme grain, word-start-not-substring, precision vs
-pins incl. a crafted 0.5 case, held-out untouched). One in-build fix: `bot`
-matched `rabotées` under naive substring (support-traction precision 0.80) → the
-matching KIND changed to word-start, fixing the class. `pyyaml` made a direct
-dependency (pre-approved). Review round 1 passed (code-reviewer,
-functionality-tester, study-editor, coherence-auditor; security-reviewer not
-triggered): no correctness or security findings; the redundant `is_label` clause,
-two spec wording nits and two coverage-gap tests applied. Next: PR.
+**Phase 6a — model fallback + graceful degradation** (`phase-6a-model-fallback`,
+spec `specs/phase-6a-model-fallback.md`, APPROVED 2026-09-04): being built. The
+first half of the Phase 6 split (the architect's call this session): the one
+model call site, the decision cache and the no-key guarantee; the held-out eval
+gate and the `classifier_quality` mart (B2.4) are 6b. What it adds:
+`classify/llm.py` (a language model called from here alone — the only, lazy,
+`import anthropic` — seeing only rules-`unclassified` reviews; `parse_reply`
+strict-parses the reply to the seven closed labels, a near-miss like
+`document-loop-ish` → `unclassified`, never an eighth label; no key → no decider);
+`classify/cache.py` (the gitignored, text-free `data/classify/decisions.csv`,
+keyed `(review_id, prompt_version, model)`, so a warm re-run makes zero model
+calls — deterministic despite a non-deterministic model); `classify/combined.py`
+(`classify_all`: rules + the cached/model decisions → one row per review × theme,
+Python-only, no mart); and `make rebuild` now runs the classify step and prints
+the outcome. `classified_reviews` stays a Python value, so 6a populates no BACKING
+row — B2.2/B2.4/B2.5 stay Pending (B2.4 is 6b's held-out gate). DONE: `make
+rebuild ROWS=synthetic` is green with the key unset (no client, no socket,
+combined == rules-only; over the synthetic corpus 7 of 39 reviews stay
+`unclassified`) AND, developer-run, with a key set. `make test` passes: 702
+tests, 32 new (one call site, lazy import, strict parse, warm-cache zero calls,
+review×theme grain, no-eighth-label, no-key green + never-touches-anthropic, no
+clock). `anthropic` (1.3.0) made a direct dependency (pre-approved); the
+labels-isolation grep widened to every code surface. Review round pending. Next:
+review, then PR.
 
-Phase 5a (label sample + the labels wall) merged to `main` (PR #10, 2026-09-04).
-Phase 4 (the weekly cron) merged (PR #8, 2026-09-03); the docs hotfix merged
-(PR #9, 2026-09-04). (Earlier phase and amendment history is in each spec and
-DECISIONS.)
+Phase 5b (the rules layer) merged to `main` (PR #11, 2026-09-04). Phase 5a (label
+sample + the labels wall) merged (PR #10, 2026-09-04). Phase 4 (the weekly cron)
+merged (PR #8, 2026-09-03); the docs hotfix merged (PR #9, 2026-09-04). (Earlier
+phase and amendment history is in each spec and DECISIONS.)
 
-Open BACKLOG rows: **24**.
+Open BACKLOG rows: **23**.
 
 (Update this section at the end of every working day.)

@@ -19,7 +19,9 @@ READER_TOKENS = ("labels.csv", "labels_io", "read_labels", "LABELS_CSV")
 # Where a classifier or pipeline module could read the answer key from. The one
 # legitimate reader, classify/eval/, is excluded; tests, specs and docs may name
 # the file freely (they are not the pipeline).
-SURFACES = ("classify", "pipeline", "sql", "models")
+SURFACES = (
+    "classify", "pipeline", "sql", "models", "ingest", "dags", "study", "scripts"
+)
 EXCLUDED = ROOT / "classify" / "eval"
 
 
