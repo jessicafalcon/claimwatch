@@ -1,11 +1,11 @@
-# Phase 4 — The weekly cron (PROPOSED)
+# Phase 4 — The weekly cron
 
 Contract for the `phase-4-weekly-cron` branch. Source: PROJECT_BRIEF.md §9
 Phase 4 — a scheduled scrape that commits new snapshots so the rating
 time-series accrues while the rest of the study is built. Depends on Phase 3c
 merged (PR #7).
 
-**Status: APPROVED 2026-09-03 — in progress.** No new dependencies (uses
+**Status: APPROVED 2026-09-03 — DELIVERED 2026-09-03, PR open.** No new dependencies (uses
 the Phase 2 fetcher, DuckDB, stdlib csv; GitHub Actions is configuration, not a
 package). The allowlist is in CLAUDE.md → Conventions.
 
@@ -186,9 +186,9 @@ Freeze: none
 
 ## Record updates (REQUIRED)
 
-- [ ] `DECISIONS.md` — Phase 4 entry; supersede the Phase 3a "environment that
+- [x] `DECISIONS.md` — Phase 4 entry; supersede the Phase 3a "environment that
   chooses what make reads" residual (trusted runner, schedule-only)
-- [ ] `BACKLOG.md` — closed: "Phase 4 has no tracked path into
+- [x] `BACKLOG.md` — closed: "Phase 4 has no tracked path into
   `platform_snapshots`", "The D1 walk covers tracked files, not commit
   messages" (weekly commit); re-deferred with new triggers: "Health details
   arrive in review bodies" (numbers-only path carries none — trigger moves to
@@ -196,13 +196,13 @@ Freeze: none
   (stop-at-known-page), "An Opinion Assurances review's id is a content hash"
   (edit counting on two real captures), "read_captures parses every capture
   into memory", the hashed naming-check row
-- [ ] `CLAUDE.md` — Current status; Commands (`record-snapshots`); Repo map;
+- [x] `CLAUDE.md` — Current status; Commands (`record-snapshots`); Repo map;
   BACKLOG count; the `main`-commit exception now realized
-- [ ] `BACKING.md` — B1.2, B1.3, B1.4 source cells gain
+- [x] `BACKING.md` — B1.2, B1.3, B1.4 source cells gain
   `data/snapshots/fetched_snapshots.csv` (tag stays Documented)
-- [ ] SPEC — none (no chart or beat changes)
-- [ ] README — none (the README is a Phase 9 deliverable; it does not exist yet)
-- [ ] this spec — the "Delivered" paragraph appended at exit
+- [x] SPEC — none (no chart or beat changes)
+- [x] README — none (the README is a Phase 9 deliverable; it does not exist yet)
+- [x] this spec — the "Delivered" paragraph appended at exit
 
 ## Threat model (REQUIRED)
 
@@ -277,3 +277,49 @@ Agents are selected by diff surface (CLAUDE.md → "Which review agents run").
   agent-only"; the weekly commit is a fixed brand-free template, so the name
   cannot leak through it by construction; the D1 walk is extended to the
   message.
+
+## Delivered (2026-09-03)
+
+A weekly GitHub Actions cron (`.github/workflows/weekly.yml`, `schedule` +
+`workflow_dispatch` only) scrapes the fetchable sources through `make confirm
+scrape`, harvests the fresh captures' snapshot figures into the tracked
+`data/snapshots/fetched_snapshots.csv` with `make record-snapshots`, and
+commits `data/snapshots/` alone under `permissions: contents: write` with a
+fixed brand-free message — the one sanctioned exception to "never commit to
+`main`". The fetched file is numbers-only (a source slug, the capture's
+instant, the five figures; the address and attribution come from the
+declaration, so no brand and no review body enters git); `rebuild ROWS=captured`
+reads it via `read_fetched_snapshots` (`origin=fetch`, Measured), and because
+the row stores the capture's own instant and derives its address as
+`source.pages[0]`, a fetched row and its live-cache twin share the snapshot key
+— the double read never double-counts (pinned for the single-page listing and
+the 14-page profile). B1.2–B1.4 stay Documented (a handful of weekly points is
+not yet the series). The checkout runs `persist-credentials: false` so the
+write token never sits in `.git/config` during the scrape or install; the push
+is handed the token only at its step. The developer chose ratings-only over
+banking review bodies weekly (the misflagged-claim signal comes from the
+already-ingested corpus classified by review date in Beat 2), so the
+personal-data excerpt rule stays deferred to Phase 9. BACKLOG "Phase 4 has no
+tracked path into `platform_snapshots`" closed; the Phase 3a `MAKEFILES`/`PATH`
+residual resolved for the trusted weekly runner; two rows opened (two scheduled
+runs observed over weeks; a partial-scrape refusal). DONE (`make test && make
+idempotency-check ROWS=captured`) passes; 612 tests; `review-gate` 7/7.
+
+Review round 1: code-reviewer — pass (six invariants verified, the no-op
+double-read confirmed), one should-fix (a comment said the confirm gate arms on
+origin `command line`; it is `default`) and one suggestion (the multi-page
+twin-collapse was untested) — both fixed. security-reviewer — one should-fix
+(the write token sat in `.git/config` through the scrape/install; the spec
+claimed otherwise), fixed with `persist-credentials: false` + a push-only
+credential and re-reviewed pass, plus one note (branch protection must scope the
+bot to `data/snapshots/`, out of repo). functionality-tester — WORKS (DONE
+passes, every Evidence row genuine, mutations bite), one coverage gap (the
+`_INSTANT` regex was unpinned on its own; `strptime` accepts `2026-9-10T3:0:0`)
+— fixed with a non-canonical-instant refusal test. study-editor — pass, two
+wording suggestions fixed. coherence-auditor — pass, one record drift (a stale
+Phase 3a prediction that Phase 4 would flip the rows to Measured) fixed, one
+date note settled. Decisions the spec did not cover: the fetched file stores
+the capture instant (not the day) so its key matches the live-cache twin; the
+loader derives the address as `pages[0]`, safe because every fetchable source
+carries its aggregate on page 1 (pinned); a conftest autouse fixture isolates
+unit tests from the tracked file the cron will grow.
