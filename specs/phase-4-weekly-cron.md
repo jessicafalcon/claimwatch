@@ -219,10 +219,13 @@ new residuals are the unattended run and the write token:
 | `record-snapshots` (no variable) | n/a — takes no variable; reads all fetchable captures | n/a | n/a | n/a | n/a | `tests/test_harvest.py` (path is derived, not passed) |
 | `confirm scrape` in the workflow | — | — | — | goals come from the workflow's own command line, origin `command line`, arms | `command line` | `tests/test_makefile.py` (unchanged) |
 
-- **Write token.** `permissions: contents: write`, no other scope; the token
-  cannot be scoped to a path, so the subtree limit is enforced by what the
-  workflow commits (`git add data/snapshots/`) and by branch protection's one
-  written exception. Pinned by `tests/test_weekly.py`.
+- **Write token.** `permissions: contents: write`, no other scope; GitHub
+  cannot scope a token to a path, so the subtree limit is self-imposed: the
+  workflow stages only `git add data/snapshots/` (pinned by
+  `tests/test_weekly.py`). `main` is unprotected on this private repo (no GitHub
+  Team/Enterprise plan), so no branch-protection rule backs this — the staging
+  discipline is the whole subtree guard (DECISIONS → Gotchas). Token hygiene is
+  a separate control, in the next bullet (`persist-credentials: false`).
 - **No secret in the workflow.** The scrape needs no API key (no model on this
   path); no `.env`, no key echoed. The checkout runs with
   `persist-credentials: false`, so the write token never enters `.git/config`
@@ -311,8 +314,13 @@ origin `command line`; it is `default`) and one suggestion (the multi-page
 twin-collapse was untested) — both fixed. security-reviewer — one should-fix
 (the write token sat in `.git/config` through the scrape/install; the spec
 claimed otherwise), fixed with `persist-credentials: false` + a push-only
-credential and re-reviewed pass, plus one note (branch protection must scope the
-bot to `data/snapshots/`, out of repo). functionality-tester — WORKS (DONE
+credential and re-reviewed pass, plus one note (the bot's `data/snapshots/`
+scope is enforced out of repo, not by the token). That note first read as
+"branch protection must scope the bot"; corrected in
+`fix/weekly-branch-protection-wording` — `main` is unprotected on this private
+repo (no GitHub Team/Enterprise plan), so the scope is self-discipline (`git add
+data/snapshots/` + `persist-credentials: false`), not branch protection
+(DECISIONS → Gotchas). functionality-tester — WORKS (DONE
 passes, every Evidence row genuine, mutations bite), one coverage gap (the
 `_INSTANT` regex was unpinned on its own; `strptime` accepts `2026-9-10T3:0:0`)
 — fixed with a non-canonical-instant refusal test. study-editor — pass, two

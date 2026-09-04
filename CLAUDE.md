@@ -419,9 +419,14 @@ one, and write one sentence in the README about why.
 
 ## Git workflow (one branch + one PR per phase)
 
-- `main` is protected: never commit to it directly; never force-push. The one
-  exception, written down when Phase 4 lands: the weekly workflow's identity
-  commits under `data/snapshots/` only.
+- `main` is unprotected on this private repo (no GitHub Team/Enterprise plan),
+  so "never commit to it directly, never force-push" is a self-imposed rule, not
+  a branch-protection rule. The one written exception: the weekly workflow's
+  identity commits under `data/snapshots/` only — the subtree limit is the
+  commit staging only `git add data/snapshots/` (no branch-protection rule backs
+  it; `persist-credentials: false` is a separate guard that keeps the write
+  token off `.git/config`). DECISIONS → Gotchas; revisit if the repo goes public
+  or onto a paid plan.
 - Review gate BEFORE the remote: run the agents on the finished work and
   report verdicts. Do NOT push or open a PR until the developer has seen the
   verdicts and says to.

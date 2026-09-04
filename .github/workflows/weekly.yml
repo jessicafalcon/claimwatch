@@ -11,9 +11,16 @@ on:
     - cron: "17 4 * * 1" # Mondays 04:17 UTC (off the hour, GitHub's guidance)
   workflow_dispatch: {}
 
-# The one workflow that writes to the repo. contents: write is the whole grant;
-# the subtree limit is enforced by what the commit stages (data/snapshots/) and
-# by branch protection's one written exception.
+# The one workflow that writes to the repo. contents: write is the whole grant.
+# Two separate guards, not one. Which paths get committed is bounded by the
+# commit staging only `git add data/snapshots/` — the subtree limit, pinned by
+# tests/test_weekly.py. Who can reach the write token is bounded by
+# persist-credentials: false, which keeps it out of .git/config during the
+# untrusted uv sync and scrape steps (the push gets it inline via env). GitHub
+# cannot scope a token to a path, and main is unprotected on this private repo
+# (no GitHub Team/Enterprise plan), so no branch-protection rule backs the
+# subtree limit — the staging discipline is the whole subtree guard (DECISIONS →
+# Gotchas).
 permissions:
   contents: write
 

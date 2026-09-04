@@ -288,6 +288,29 @@ Each entry: the surprise, the official-docs check, what we did.
   guessed nesting is a second shape the tests cannot see. Found by the first
   `make confirm scrape`, 2026-09-03.
 
+- **Phase 4 — `main` is unprotected, so the weekly bot's subtree limit is
+  self-discipline, not branch protection (2026-09-03).** This is a private repo
+  on a plan without GitHub Team/Enterprise, so branch-protection rules are not
+  available and `main` is not a protected branch. Several Phase 4 records first
+  said the weekly bot's "commit only under `data/snapshots/`" limit was enforced
+  by "branch protection's one written exception"; that rule does not exist.
+  GitHub cannot scope a token to a path, so two separate guards stand in, one
+  per threat. The subtree limit — which paths get committed — is the commit
+  staging only `git add data/snapshots/` (pinned by
+  `tests/test_weekly.py::test_workflow_commits_only_data_snapshots`). Token
+  hygiene — who can reach the `contents: write` token — is a different control:
+  the checkout runs `persist-credentials: false`, keeping the token out of
+  `.git/config` during the untrusted `uv sync` and scrape steps, and the push is
+  handed it inline via env. This also supersedes the Phase 0a decision #4
+  wording "a CI check refuses any other path from that author" (the appendix
+  entry, now marked superseded): no such CI check was built; staging discipline
+  took its place. Official-docs check: GitHub's branch-protection and rulesets docs
+  gate these features on Team/Enterprise for private repos. Revisit if the repo
+  goes public or onto a paid plan — then add a real branch-protection rule (or a
+  ruleset) that scopes the bot identity to `data/snapshots/`, and this becomes
+  enforced rather than self-imposed. Corrected in
+  `fix/weekly-branch-protection-wording`.
+
 ## Appendix — by phase
 
 ### Phase 0a
@@ -304,7 +327,10 @@ defaults from `docs/PLAN.md` §6, approved 2026-09-01:
    export is the permanent artifact.
 4. **A bot committing to `main`** — one written exception: the weekly
    workflow's identity commits only under `data/snapshots/`; a CI check
-   refuses any other path from that author (Phase 4).
+   refuses any other path from that author (Phase 4). *(Superseded: `main` is
+   unprotected on this private repo and no such CI check was built; Phase 4
+   bounds the subtree by staging only `git add data/snapshots/`, pinned by
+   `tests/test_weekly.py`. See Gotchas.)*
 5. **Model API** — the Anthropic API via the `anthropic` package (Phase 6);
    key in `.env` only; prompt and model id versioned in `classified_reviews`.
 6. **Naming** — `friction_ledger`; directory unchanged.
