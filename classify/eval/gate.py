@@ -87,7 +87,6 @@ def format_gate(scores: tuple[LabelScore, ...]) -> str:
     for s in scores:
         p = f"{s.precision:.2f}" if s.precision is not None else " n/a"
         r = f"{s.recall:.2f}" if s.recall is not None else " n/a"
-        lines.append(
-            f"  {s.label:{width}}  {p} / {r}   ({s.hits}/{s.predicted}, {s.hits}/{s.actual})"
-        )
+        counts = f"({s.hits}/{s.predicted}, {s.hits}/{s.actual})"
+        lines.append(f"  {s.label:{width}}  {p} / {r}   {counts}")
     return "\n".join(lines)
