@@ -5,11 +5,14 @@ test here runs with no key and no network (the fake decider stands in)."""
 
 from __future__ import annotations
 
+import pytest
+
 from classify.combined import classify_all, unresolved_ids
 from classify.labels import LABEL_SET, POSITIVE, THEMES, UNCLASSIFIED
 from classify.llm import (
     MODEL,
     PROMPT_VERSION,
+    ModelError,
     make_model_decider,
     model_available,
     normalize,
@@ -135,3 +138,27 @@ def test_cache_key_fields_are_pinned():
     # The cache key is (review_id, prompt_version, model); both constants exist.
     assert isinstance(PROMPT_VERSION, str) and PROMPT_VERSION
     assert isinstance(MODEL, str) and MODEL.startswith("claude-")
+
+
+def test_paid_path_api_error_becomes_a_one_line_refusal(monkeypatch):
+    # With a key set, a model call that raises an anthropic API error maps to
+    # ModelError (one line naming the model), never a traceback — the paid path.
+    import anthropic
+    import httpx2
+
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-test-not-real")
+
+    class _RaisingClient:
+        class messages:
+            @staticmethod
+            def create(**kwargs):
+                req = httpx2.Request("POST", "https://api.anthropic.com/v1/messages")
+                raise anthropic.APIConnectionError(message="boom", request=req)
+
+    monkeypatch.setattr(anthropic, "Anthropic", lambda: _RaisingClient())
+    decide = make_model_decider()
+    assert decide is not None
+    with pytest.raises(ModelError) as exc:
+        decide([("s:1", "some review text")])
+    assert "model call failed" in str(exc.value)
+    assert MODEL in str(exc.value)

@@ -29,9 +29,11 @@ from classify.labels import LABEL_SET, LABELS, POSITIVE, THEMES, UNCLASSIFIED
 
 # Pinned constants, both part of the cache key: bumping either invalidates the
 # cache by construction (the next run re-decides). MODEL is one current Claude id
-# — a single constant to change if a different model is wanted; the study's
-# quality figure (B2.4, Phase 6b) is measured against whatever model ran.
-MODEL = "claude-opus-5"
+# — Haiku, the fast, low-cost tier apt for a high-volume classifier over the
+# reviews the rules could not decide; a single constant to change for a
+# higher-judgment tier. The study's quality figure (B2.4, Phase 6b) is measured
+# against whatever model ran.
+MODEL = "claude-haiku-4-5"
 PROMPT_VERSION = "v1"
 API_KEY_ENV = "ANTHROPIC_API_KEY"
 
@@ -61,6 +63,13 @@ Give every slug that applies. If none clearly applies, answer exactly: unclassif
 # a label count — so `document-loop-ish` is NOT `document-loop` (a foreign input
 # is refused, never coerced to the nearest label).
 _TOKEN_SPLIT = re.compile(r"[^a-z-]+")
+
+
+class ModelError(Exception):
+    """A model call failed (a bad model id, a rate limit the SDK's retries could
+    not clear, a transient network error): one line naming the model and the
+    cause, never a traceback. Raised only on the developer-run paid path; the
+    no-key path never reaches it."""
 
 
 def model_available() -> bool:
@@ -121,7 +130,16 @@ def make_model_decider() -> Decide | None:
     def decide(reviews: Sequence[tuple[str, str]]) -> dict[str, tuple[str, ...]]:
         import anthropic  # lazy: the one SDK import, off the no-key path
 
-        client = anthropic.Anthropic()
-        return {rid: parse_reply(_call_model(client, text)) for rid, text in reviews}
+        client = anthropic.Anthropic()  # reads the key itself; never printed here
+        out: dict[str, tuple[str, ...]] = {}
+        for rid, text in reviews:
+            try:
+                out[rid] = parse_reply(_call_model(client, text))
+            except anthropic.APIError as exc:  # status/connection/timeout, post-retry
+                raise ModelError(
+                    f"model call failed for {rid} (model {MODEL}): "
+                    + " ".join(str(exc).split())
+                ) from exc
+        return out
 
     return decide

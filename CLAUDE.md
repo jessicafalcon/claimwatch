@@ -548,26 +548,28 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 spec `specs/phase-6a-model-fallback.md`, APPROVED 2026-09-04): being built. The
 first half of the Phase 6 split (the architect's call this session): the one
 model call site, the decision cache and the no-key guarantee; the held-out eval
-gate and the `classifier_quality` mart (B2.4) are 6b. What it adds:
-`classify/llm.py` (a language model called from here alone — the only, lazy,
-`import anthropic` — seeing only rules-`unclassified` reviews; `parse_reply`
-strict-parses the reply to the seven closed labels, a near-miss like
-`document-loop-ish` → `unclassified`, never an eighth label; no key → no decider);
-`classify/cache.py` (the gitignored, text-free `data/classify/decisions.csv`,
-keyed `(review_id, prompt_version, model)`, so a warm re-run makes zero model
-calls — deterministic despite a non-deterministic model); `classify/combined.py`
-(`classify_all`: rules + the cached/model decisions → one row per review × theme,
-Python-only, no mart); and `make rebuild` now runs the classify step and prints
-the outcome. `classified_reviews` stays a Python value, so 6a populates no BACKING
-row — B2.2/B2.4/B2.5 stay Pending (B2.4 is 6b's held-out gate). DONE: `make
-rebuild ROWS=synthetic` is green with the key unset (no client, no socket,
-combined == rules-only; over the synthetic corpus 7 of 39 reviews stay
-`unclassified`) AND, developer-run, with a key set. `make test` passes: 702
-tests, 32 new (one call site, lazy import, strict parse, warm-cache zero calls,
-review×theme grain, no-eighth-label, no-key green + never-touches-anthropic, no
-clock). `anthropic` (1.3.0) made a direct dependency (pre-approved); the
-labels-isolation grep widened to every code surface. Review round pending. Next:
-review, then PR.
+gate and the `classifier_quality` mart (B2.4) are 6b. It adds three
+`classify/` modules. `llm.py` is the one model call site: a language model called
+from here alone (the only, lazy, `import anthropic`), seeing only
+rules-`unclassified` reviews; `parse_reply` strict-parses the reply to the seven
+closed labels, a near-miss like `document-loop-ish` → `unclassified`, never an
+eighth label; no key → no decider; `MODEL = claude-haiku-4-5` (the fast, low-cost
+classifier tier, a swappable constant). `cache.py` is the gitignored, text-free
+`data/classify/decisions.csv`, keyed `(review_id, prompt_version, model)`, so a
+warm re-run makes zero model calls — deterministic despite a non-deterministic
+model. `combined.py::classify_all` combines the rules with the cached/model
+decisions into one row per review × theme, Python-only. And `make rebuild` now
+runs the classify step and prints the outcome. `classified_reviews` stays a Python
+value, so 6a populates no BACKING row — B2.2/B2.4/B2.5 stay Pending (B2.4 is 6b's
+held-out gate). DONE: `make rebuild ROWS=synthetic` is green with the key unset
+(no client, no socket, combined == rules-only; over the synthetic corpus 7 of 39
+reviews stay `unclassified`) AND, developer-run, with a key set. `make test`
+passes: 704 tests, 34 new. `anthropic` (1.3.0) made a direct dependency
+(pre-approved); the labels-isolation grep widened to every code surface. Review
+round 1 passed (code-reviewer, security-reviewer, functionality-tester,
+study-editor, coherence-auditor): no correctness or security findings; MODEL
+reconciled opus→haiku, a one-line refusal added on the paid path's API errors, and
+spec/record wording fixed. Next: PR.
 
 Phase 5b (the rules layer) merged to `main` (PR #11, 2026-09-04). Phase 5a (label
 sample + the labels wall) merged (PR #10, 2026-09-04). Phase 4 (the weekly cron)

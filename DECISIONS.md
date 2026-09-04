@@ -1321,10 +1321,13 @@ guarantee. The held-out eval gate and the `classifier_quality` mart (B2.4) are
   `prompt_version`/`model` (a prompt or model change would reuse stale decisions).*
 - **`MODEL` and `PROMPT_VERSION` are pinned constants in `classify/llm.py`.** Both
   are in the cache key, so bumping either invalidates the cache by construction.
-  `MODEL = "claude-opus-5"` — a single constant to change for a cheaper/faster
-  classifier (the study's quality figure, B2.4 in 6b, is measured against whatever
-  model ran); the real call is minimal (`model`, `max_tokens`, `system`,
-  `messages`), portable across `anthropic` 1.x. *Rejected: a runtime- or
+  `MODEL = "claude-haiku-4-5"` — Haiku, the fast, low-cost tier apt for a
+  high-volume classifier over the reviews the rules left `unclassified` (the
+  spec's "fast model" — round 1, coherence-auditor: opus was pinned first, then
+  reconciled to Haiku); a single constant to change for a higher-judgment tier
+  (the study's quality figure, B2.4 in 6b, is measured against whatever model
+  ran). The real call is minimal (`model`, `max_tokens`, `system`, `messages`),
+  portable across `anthropic` 1.x. *Rejected: a runtime- or
   environment-chosen model (non-reproducible; the cache key would drift silently).*
 - **`classified_reviews` stays a Python value; 6a writes no mart and populates no
   BACKING row.** `classify/combined.py::classify_all` combines the rules with the
@@ -1351,4 +1354,14 @@ socket opens, and the combined output equals the rules-only output.
 imported lazily so a no-key run loads no paid SDK. The labels-isolation grep was
 widened to every code surface (`ingest`, `dags`, `study`, `scripts` added to the
 swept set), closing the Phase 6 trigger on that BACKLOG row. `make test`
-(702 tests) and `make rebuild ROWS=synthetic` (no key) are green.
+(704 tests) and `make rebuild ROWS=synthetic` (no key) are green.
+
+Review round 1 (all WORKS, no correctness or security findings) reconciled
+`MODEL` `claude-opus-5` → `claude-haiku-4-5` (the fast, low-cost classifier tier
+the spec's pinned decision names) and added a one-line refusal on the paid path:
+a `ModelError` maps an `anthropic.APIError` (a bad model id, a rate limit the
+SDK's retries could not clear, a transient network error) to one line naming the
+model in `pipeline/cli.main`, never a traceback — the developer-run paid path is
+now visible on failure rather than a stack trace. The no-key path never reaches
+it. *Fix the class, not the case: a closed exception type mapped to a clean
+refusal, the same shape as the `Refused`/`PageShapeError` catches.*

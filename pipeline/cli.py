@@ -23,7 +23,7 @@ from classify.cache import read_decisions, write_decisions
 from classify.combined import classify_all
 from classify.eval.precision import evaluate, format_report
 from classify.labels import POSITIVE, THEMES, UNCLASSIFIED, review_id
-from classify.llm import make_model_decider, model_available
+from classify.llm import ModelError, make_model_decider, model_available
 from classify.rules import classify as classify_reviews
 from classify.rules import load_rules
 from ingest import sources
@@ -179,9 +179,10 @@ def _do_rebuild(args: argparse.Namespace) -> int:
             f"no captures under {shown} — nothing to load from the scraper; "
             "`make confirm scrape` fetches them (developer-run)"
         )
+    db = database_for(rows)
     for name, n in rebuild(target, rows).items():  # the file is the input's own
         print(f"{name:24} {n}")
-    conn = connect(target, database=database_for(rows))
+    conn = connect(target, database=db)
     try:
         months = reviews_per_month(conn)
     finally:
@@ -192,7 +193,7 @@ def _do_rebuild(args: argparse.Namespace) -> int:
         print(f"  {source:{width}} {month}  {n}")
     if not months:
         print("  (none)")
-    _classify_and_print(database_for(rows))
+    _classify_and_print(db)
     return 0
 
 
@@ -430,5 +431,11 @@ def main(argv: list[str] | None = None) -> int:
     except PageShapeError as exc:
         # A stored capture that is not the declared shape (hand-edited, or a
         # parser tightened since it was written): one line, never a traceback.
+        print(f"refusing: {exc}", file=sys.stderr)
+        return 2
+    except ModelError as exc:
+        # A model call failed on the developer-run paid path (a bad model id, a
+        # rate limit, a network error): one line, never a traceback. The no-key
+        # path never reaches here.
         print(f"refusing: {exc}", file=sys.stderr)
         return 2

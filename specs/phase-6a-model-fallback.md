@@ -6,7 +6,7 @@ call): 6a is the model call site, the decision cache and the no-key guarantee;
 6b is the held-out eval gate and the `classifier_quality` mart (B2.4). Depends on
 Phase 5b merged (PR #11).
 
-**Status: APPROVED 2026-09-04 — in progress.** One new dependency:
+**Status: APPROVED 2026-09-04 — DELIVERED 2026-09-04, PR open.** One new dependency:
 `anthropic` — pre-approved for Phase 6 in CLAUDE.md → Conventions ("anthropic
 (6)"), the client the one model call site uses. No other new dependency. The
 allowlist is in CLAUDE.md → Conventions.
@@ -210,9 +210,10 @@ code works.
   → sorted `(review_id, theme)` rows combining rules with the cached/model
   decisions for the rules-`unclassified` reviews; `unclassified` the single
   fallback.
-- `pipeline/build.py`, `pipeline/cli.py` — `rebuild` runs `classify_all` over
-  `stg_reviews` after staging and prints a classify summary (counts by outcome);
-  no mart, no user variable added.
+- `pipeline/cli.py` — `_do_rebuild` runs `classify_all` over `stg_reviews` after
+  staging (`_classify_and_print`) and prints a classify summary (counts by
+  outcome); no mart, no user variable added. (`pipeline/build.py` is unchanged —
+  the classify step lives in the CLI, beside the reviews-per-month print.)
 - `tests/test_llm.py` — new; one call site, lazy import, model input is only
   rules-`unclassified`, strict parse (foreign reply → `unclassified`, valid reply
   → closed labels), no clock.
@@ -245,21 +246,21 @@ Freeze: none
 
 ## Record updates (REQUIRED)
 
-- [ ] `DECISIONS.md` — Phase 6a entry: one lazy-imported model call site; strict
+- [x] `DECISIONS.md` — Phase 6a entry: one lazy-imported model call site; strict
   closed-set parse (foreign reply → `unclassified`); the gitignored, text-free
   decision cache keyed `(review_id, prompt_version, model)`; `classified_reviews`
   stays Python (no mart; B2.4 is 6b's gate); `rebuild` runs the classify step;
   `anthropic` made a direct dependency
-- [ ] `BACKLOG.md` — closed: any 5b-deferred row 6a lands; opened: the with-key
+- [x] `BACKLOG.md` — closed: any 5b-deferred row 6a lands; opened: the with-key
   eval numbers / real-corpus classification (Phase 6b / 7); BACKLOG count refreshed
-- [ ] `CLAUDE.md` — Current status; Commands (`rebuild` classifies); Repo map
+- [x] `CLAUDE.md` — Current status; Commands (`rebuild` classifies); Repo map
   (the three new `classify/` modules); allowlist (`anthropic`); BACKLOG count
-- [ ] BACKING — none (6a populates no BACKING row; `classified_reviews` is a
+- [x] BACKING — none (6a populates no BACKING row; `classified_reviews` is a
   Python value, not a displayed number; B2.2/B2.4/B2.5 stay Pending, B2.4 for 6b)
-- [ ] SPEC — none (the grain and the gray "not yet classified" band were settled
+- [x] SPEC — none (the grain and the gray "not yet classified" band were settled
   in Phase 0b; no chart or beat changes)
-- [ ] README — none (the README is a Phase 9 deliverable; it does not exist yet)
-- [ ] this spec — the "Delivered" paragraph appended at exit
+- [x] README — none (the README is a Phase 9 deliverable; it does not exist yet)
+- [x] this spec — the "Delivered" paragraph appended at exit
 
 ## Threat model (REQUIRED when the phase adds a `make` target that takes a variable, deletes anything, calls a paid API, or touches the network)
 
@@ -359,4 +360,50 @@ Agents are selected by diff surface (CLAUDE.md → "Which review agents run").
 
 ## Delivered
 
-<!-- appended at phase exit -->
+2026-09-04. The model fallback ships: `classify/llm.py` (the ONE model call site
+— the only, lazy, `import anthropic`, inside the real-call function; it sees only
+the reviews the rules left `unclassified`; `parse_reply` strict-parses the reply
+to the seven closed labels by whole-token match, so a near-miss like
+`document-loop-ish` is `unclassified`, never an eighth label; `model_available()`
+gates on the key, no key → `None` decider); `classify/cache.py` (the gitignored,
+text-free `data/classify/decisions.csv`, keyed `(review_id, prompt_version,
+model)`, sorted/byte-stable, so a warm re-run makes zero model calls);
+`classify/combined.py::classify_all` (rules + the cached/model decisions → one row
+per review × theme, `unclassified` the single fallback, sorted, pure); and
+`make rebuild` now runs the classify step and prints the outcome. Over the
+synthetic corpus the rules leave 7 of 39 reviews `unclassified` (25 theme rows, 7
+positive), pinned in `tests/pins.py`. `classified_reviews` stays a Python value —
+6a populates no BACKING row; B2.2/B2.4/B2.5 stay Pending (B2.4 is 6b's held-out
+gate). `anthropic` (1.3.0) made a direct dependency (pre-approved). The
+labels-isolation grep was widened to every code surface.
+
+The no-key run is green — the durable guarantee this phase adds and every phase
+after keeps (`tests/test_no_key.py`): with the key unset, `make rebuild
+ROWS=synthetic` exits 0, no Anthropic client is constructed, no socket opens, and
+the combined output equals the rules-only output. `make test` passes (704 tests,
+34 new); `make idempotency-check ROWS=synthetic` and the gate (7/7) are green. The
+with-key DONE line is developer-run (paid), never an agent's.
+
+Review round 1 (code-reviewer, security-reviewer — mandatory, key path —
+functionality-tester, study-editor, coherence-auditor): all WORKS, no correctness
+or security findings; the functionality-tester's hand-mutation bit 4 of 5 sites
+(the survivor is proven-redundant defensive code in `normalize`). Applied from the
+round: **MODEL reconciled `claude-opus-5` → `claude-haiku-4-5`** (the fast,
+low-cost classifier tier the spec's pinned decision names — opus was pinned first
+against the API skill's default, then reconciled to the spec and DECISIONS, all
+three now agree); **a one-line refusal added on the paid path** (`ModelError`:
+an `anthropic.APIError` on a with-key run refuses with one line naming the model,
+never a traceback, caught in `pipeline/cli.main`), pinned by
+`test_llm.py::test_paid_path_api_error_becomes_a_one_line_refusal` and
+`test_cli.py::test_model_error_is_one_line_exit_2`; the spec Scope corrected
+(`pipeline/cli.py`, not `build.py`); a `database_for(rows)` recompute folded to a
+local; and the long Current-status sentence in CLAUDE.md split.
+
+Decisions the spec did not spell out: `MODEL`/`PROMPT_VERSION` being *in* the
+cache key is what makes a model or prompt change a fresh decision (no stale hit)
+— a re-tune needs no cache purge; the real model call is deliberately minimal
+(`model`, `max_tokens`, `system`, `messages`) for portability across `anthropic`
+1.x, and its exact labels are unpinned (the model varies) while the strict parse
+guarantees the closed set; a failed paid batch does not persist its partial
+decisions (the SDK already retried the transient classes), which is acceptable at
+today's volume and noted for 6b if it bites.
