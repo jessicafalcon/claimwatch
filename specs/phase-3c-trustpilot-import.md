@@ -8,7 +8,7 @@ now met: the developer holds written authorization (2026-09-04) and the
 studied insurer's Trustpilot reviews are in hand as an authorized export.
 Depends on Phase 3b merged.
 
-**Status: PROPOSED — do not start until approved.** No new dependencies
+**Status: APPROVED 2026-09-04 — in progress.** No new dependencies
 (stdlib `csv`; the export is a CSV, read like every other captured input).
 
 Four sections marked REQUIRED are mandatory. The status line moves `PROPOSED` →
@@ -17,6 +17,32 @@ when the Delivered paragraph is appended.
 
 > **Phase number is the developer's call** (docs/PLAN.md owns the phase cut).
 > "3c" is a proposal — this reverses A1, so it is a new phase, not a fix PR.
+
+## Amendment A1 — reviews are a second source, not a parser on the snapshot source (2026-09-04)
+
+`read_manual_snapshots` (pipeline/build.py) refuses a source that has a parser
+("a parsed source's figures come from its capture"). The
+`fr-digital-first-trustpilot` source owns the hand-read 3.9/1,072 row in
+`data/snapshots/manual_snapshots.csv`, so giving it a parser (done-when 1 as
+written) would make `make rebuild` refuse that row and erase the rating point —
+the exact thing the central constraint forbids. Instead, mirror the App Store
+feed/listing split:
+
+- `fr-digital-first-trustpilot` is **untouched** — `parser=None`,
+  `fetchable=False`, its hand-read 3.9/1,072 Measured point kept.
+- A **new** source `fr-digital-first-trustpilot-reviews` reads the corpus:
+  `platform="trustpilot"`, `parser="trustpilot"`, `fetchable=False`,
+  `host="ca.trustpilot.com"` (the export's start_url host, not `www`),
+  `pages=("https://ca.trustpilot.com/review/alan.com?languages=all",)`, its
+  authorized-export capture under `data/cache/trustpilot/`.
+
+This strengthens the central constraint: the rating series is unchanged **by
+construction**, because its source never changes. Done-when **1** and Scope
+update accordingly; done-when **4**'s invariant is satisfied structurally.
+`"ca"` joins the brand-token allowlist in `tests/test_ingest_layout.py`. The
+capture is authored from the authorized export (one `page-1.csv` + `meta.json`,
+`status:200` for the authorized fetch that produced it) — a DECISIONS Gotcha
+records that it is not a live `fetch.py` capture.
 
 ## Why
 
@@ -57,11 +83,12 @@ make rebuild && make idempotency-check ROWS=captured
 
 ## Done-when
 
-1. **The export parses into `raw_reviews` as an authorized offline import.** The
-   `fr-digital-first-trustpilot` source gains `parser="trustpilot"`, stays
-   `fetchable=False` (our crawler never runs against it), and its authorized
-   export is read as a capture under `data/cache/trustpilot/`; `make rebuild
-   ROWS=captured` loads the 1,050 review rows. *Evidence: row 1.*
+1. **The export parses into `raw_reviews` as an authorized offline import.** A
+   new source `fr-digital-first-trustpilot-reviews` (`parser="trustpilot"`,
+   `fetchable=False` — our crawler never runs against it) reads its authorized
+   export as a capture under `data/cache/trustpilot/`; the existing
+   `fr-digital-first-trustpilot` snapshot source is untouched (A1). `make
+   rebuild ROWS=captured` loads the 1,050 review rows. *Evidence: row 1.*
 2. **The parser accepts only the export's declared shape and refuses the rest.**
    A rating comes only from a `stars-N.svg` URL with N a member of
    `REVIEW_RATINGS`; an unknown rating URL or an unparseable date raises
@@ -87,7 +114,7 @@ make rebuild && make idempotency-check ROWS=captured
 
 | Done-when | Proof (test id / `make` target / output line) |
 |---|---|
-| 1 | `make rebuild ROWS=captured` prints "stg_reviews … 1050"; `tests/test_fetch_sources.py::test_trustpilot_is_authorized_offline_import` |
+| 1 | `make rebuild ROWS=captured` prints "stg_reviews … 1050"; `tests/test_fetch_sources.py::test_trustpilot_reviews_is_authorized_offline_import` |
 | 2 | `tests/test_ingest_trustpilot.py::test_rating_only_from_known_star_svg`, `::test_unparseable_date_refuses` |
 | 3 | `tests/test_ingest_trustpilot.py::test_dropped_columns_reach_no_field`; `tests/test_marts.py::test_review_tables_have_no_personal_columns` |
 | 4 | `tests/test_marts.py::test_trustpilot_rating_point_unchanged_by_corpus` |
@@ -130,8 +157,10 @@ make rebuild && make idempotency-check ROWS=captured
 
 ## Scope (files)
 
-- `ingest/sources.py` — flip the Trustpilot source: `parser="trustpilot"`, the
-  authorization `terms=` line; `fetchable=False` kept.
+- `ingest/sources.py` — ADD `fr-digital-first-trustpilot-reviews`
+  (`parser="trustpilot"`, `fetchable=False`, `host="ca.trustpilot.com"`, the
+  authorized profile page, the authorization `terms=` line); the existing
+  `fr-digital-first-trustpilot` snapshot source is left as-is (A1).
 - `ingest/trustpilot.py` — new parser: the authorized export CSV → review rows
   + refusal; the `_CONTENT` fingerprint columns only.
 - `ingest/captures.py` — register `trustpilot` in `PARSERS`.
