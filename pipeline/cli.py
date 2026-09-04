@@ -223,18 +223,23 @@ def _classify_and_print(db, rows_input: str) -> None:
     # Grade on the held-out fold and write the mart. The CLI hands the gate the
     # classifier's predictions and gets scores back — it reads no answer key (the
     # wall). run_id is the rebuild input name: provenance, byte-stable per input.
+    # The gate scores only reviews both classified and labeled (amendment A1), so
+    # a corpus the answer key does not cover grades nothing — write no mart then,
+    # rather than a mart of all-`None` Measured rows for a corpus we did not grade.
     scores = score_heldout(rows)
-    conn = connect("duckdb", database=db)
-    try:
-        write_classifier_quality(
-            conn,
-            scores,
-            answer_key=ANSWER_KEY,
-            heldout_fold=HELDOUT_FOLD,
-            run_id=rows_input,
-        )
-    finally:
-        conn.close()
+    graded = any(s.predicted or s.actual for s in scores)
+    if graded:
+        conn = connect("duckdb", database=db)
+        try:
+            write_classifier_quality(
+                conn,
+                scores,
+                answer_key=ANSWER_KEY,
+                heldout_fold=HELDOUT_FOLD,
+                run_id=rows_input,
+            )
+        finally:
+            conn.close()
 
     theme_rows = sum(1 for _, label in rows if label in THEMES)
     positive = sum(1 for _, label in rows if label == POSITIVE)
@@ -249,7 +254,14 @@ def _classify_and_print(db, rows_input: str) -> None:
     print(f"  theme rows      {theme_rows}")
     print(f"  positive        {positive}")
     print(f"  unclassified    {unclassified}   (the 'not yet classified' band)")
-    print(format_gate(scores))
+    if graded:
+        print(format_gate(scores))
+    else:
+        print(
+            f"classifier quality — no reviews on the held-out fold {HELDOUT_FOLD} "
+            "are in the answer key for this corpus; classifier_quality left empty "
+            "(the answer key covers the synthetic corpus; real labels are Phase 7)"
+        )
 
 
 def _do_scrape(args: argparse.Namespace) -> int:

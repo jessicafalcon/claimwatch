@@ -45,45 +45,65 @@ def test_scores_heldout_fold_only():
 
 
 def test_precision_and_recall_formula():
+    # Grading is over reviews both classified and labeled (amendment A1). r5, h3,
+    # t2 are all classified AND labeled; t2 is a genuine miss — classified as
+    # silent-rejection but truly document-loop, so it lowers document-loop recall.
     predictions = [
         ("r5", "document-loop"),
-        ("h3", "document-loop"),
-        ("t1", "silent-rejection"),
+        (
+            "h3",
+            "document-loop",
+        ),  # classified document-loop but truly silent — a false positive
+        (
+            "t2",
+            "silent-rejection",
+        ),  # classified silent but truly document-loop — a miss
     ]
     labels = [
         ("r5", "document-loop"),
-        ("h3", "silent-rejection"),  # classifier said document-loop — a miss
-        ("t2", "document-loop"),  # classifier missed this one
+        ("h3", "silent-rejection"),
+        ("t2", "document-loop"),
     ]
-    by = _by_label(score_heldout(predictions, labels=labels))
-    dl = by["document-loop"]
+    dl = _by_label(score_heldout(predictions, labels=labels))["document-loop"]
     assert (dl.hits, dl.predicted, dl.actual) == (1, 2, 2)
     assert dl.precision == 0.5 and dl.recall == 0.5
 
 
 def test_a_crafted_disagreement_scores_below_one():
-    # The metric earns its keep: a wrong prediction drops precision below 1.
+    # The metric earns its keep: a wrong prediction on a LABELED review drops
+    # precision below 1. h3 is labeled (silent-rejection), so it is graded.
     predictions = [("r5", "document-loop"), ("h3", "document-loop")]
-    labels = [("r5", "document-loop")]  # h3 is not document-loop
+    labels = [("r5", "document-loop"), ("h3", "silent-rejection")]
     dl = _by_label(score_heldout(predictions, labels=labels))["document-loop"]
     assert dl.precision == 0.5 and dl.precision < 1.0
 
 
 def test_null_when_denominator_is_zero():
-    # A label the classifier never predicted and the key never marks: both
-    # denominators are 0 -> both ratios undefined (None, not 0).
-    scores = _by_label(
-        score_heldout([("r5", "document-loop")], labels=[("r5", "document-loop")])
+    # r5 is classified coverage-price but truly document-loop (both graded).
+    # coverage-price: predicted but never true -> precision 0.0, recall undefined.
+    # document-loop: true but never predicted -> precision undefined, recall 0.0.
+    # support-traction: neither predicted nor true -> both undefined.
+    by = _by_label(
+        score_heldout([("r5", "coverage-price")], labels=[("r5", "document-loop")])
     )
-    empty = scores["coverage-price"]
-    assert (empty.predicted, empty.actual) == (0, 0)
-    assert empty.precision is None and empty.recall is None
-    # Predicted but never true: precision defined (0.0), recall undefined.
-    only_pred = _by_label(score_heldout([("r5", "coverage-price")], labels=[]))[
-        "coverage-price"
-    ]
-    assert only_pred.predicted == 1 and only_pred.actual == 0
-    assert only_pred.precision == 0.0 and only_pred.recall is None
+    cp = by["coverage-price"]
+    assert (cp.predicted, cp.actual) == (1, 0)
+    assert cp.precision == 0.0 and cp.recall is None
+    dl = by["document-loop"]
+    assert (dl.predicted, dl.actual) == (0, 1)
+    assert dl.precision is None and dl.recall == 0.0
+    st = by["support-traction"]
+    assert (st.predicted, st.actual) == (0, 0)
+    assert st.precision is None and st.recall is None
+
+
+def test_uncovered_corpus_grades_nothing():
+    # A corpus the answer key does not cover (predictions and labels share no id)
+    # grades nothing: every label is undefined, never a garbage 0.0 (amendment A1).
+    scores = score_heldout([("r5", "document-loop")], labels=[("h3", "document-loop")])
+    for s in scores:
+        assert (s.predicted, s.actual, s.hits) == (0, 0, 0)
+        assert s.precision is None and s.recall is None
 
 
 def test_gate_takes_predictions_not_the_corpus(monkeypatch):

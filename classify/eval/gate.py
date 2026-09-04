@@ -60,11 +60,21 @@ def score_heldout(
     tracked answer key; a test may pass its own. Every fold but `HELDOUT_FOLD` is
     dropped from both sides and read nowhere below, so no scored number can depend
     on a tuning-fold review. One `LabelScore` per scored label (the five themes +
-    `positive`); `unclassified` is the absence of a decision, not scored."""
+    `positive`); `unclassified` is the absence of a decision, not scored.
+
+    Precision and recall are computed only over the reviews both classified and
+    present in the answer key, on the held-out fold (amendment A1): a review
+    labeled but not classified — or classified but not labeled — is not graded. So
+    a corpus the answer key does not cover (a captured/real run against synthetic
+    labels) grades nothing and every label is `None`, rather than a garbage `0.0`
+    tagged Measured; a mixed answer key grades each corpus against its own labels."""
     gold = read_labels() if labels is None else labels
 
-    heldout_pred = {(rid, lab) for rid, lab in predictions if is_heldout(rid)}
-    heldout_gold = {(rid, lab) for rid, lab in gold if is_heldout(rid)}
+    classified = {rid for rid, _ in predictions}
+    labeled = {rid for rid, _ in gold}
+    graded = {rid for rid in classified & labeled if is_heldout(rid)}
+    heldout_pred = {(rid, lab) for rid, lab in predictions if rid in graded}
+    heldout_gold = {(rid, lab) for rid, lab in gold if rid in graded}
 
     scores: list[LabelScore] = []
     for label in SCORED_LABELS:
