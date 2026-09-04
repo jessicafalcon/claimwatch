@@ -5,10 +5,17 @@ the precision formula on a crafted disagreement. Offline; no service, no key."""
 from __future__ import annotations
 
 from classify.eval.labels_io import read_labels
-from classify.eval.precision import SCORED_LABELS, evaluate
+from classify.eval.precision import (
+    SCORED_LABELS,
+    Precision,
+    Report,
+    evaluate,
+    format_report,
+)
 from classify.labels import review_id
 from classify.rules import classify, load_rules
 from classify.split import HELDOUT_FOLD, is_heldout
+from pipeline.cli import main
 from tests import pins
 
 
@@ -103,6 +110,39 @@ def test_scored_labels_exclude_unclassified():
 
     assert UNCLASSIFIED not in SCORED_LABELS
     assert HELDOUT_FOLD == pins.HELDOUT_FOLD
+
+
+def test_format_report_renders_na_and_share():
+    # The printout: a None precision shows " n/a" (not 0.00), a value shows two
+    # decimals, and the decided share shows its fraction and ratio.
+    report = Report(
+        precisions=(
+            Precision("document-loop", 0, 0, None),
+            Precision("positive", 3, 4, 0.75),
+        ),
+        decided=3,
+        tuning_reviews=4,
+        heldout_fold=HELDOUT_FOLD,
+    )
+    out = format_report(report)
+    assert "document-loop" in out and "n/a" in out  # 0/0 -> n/a, never 0.00
+    assert "0.75" in out and "(3/4)" in out
+    assert "decided share: 3/4" in out and "(0.75)" in out
+    assert f"held-out fold {HELDOUT_FOLD}" in out
+
+
+def test_classify_eval_says_so_with_no_synthetic_warehouse(
+    tmp_path, monkeypatch, capsys
+):
+    # The CLI's no-warehouse branch: point the default db at an empty temp dir so
+    # database_for("synthetic") names a file that does not exist -> exit 1 and a
+    # one-line hint, never a traceback (a fresh clone before a rebuild).
+    import pipeline.warehouse as warehouse
+
+    monkeypatch.setattr(warehouse, "DEFAULT_DB", tmp_path / "w.duckdb")
+    assert main(["classify-eval"]) == 1
+    out = capsys.readouterr().out
+    assert "no stg_reviews" in out and "make rebuild ROWS=synthetic" in out
 
 
 def _two_tuning_ids() -> tuple[str, str]:

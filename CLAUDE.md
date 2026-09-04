@@ -548,12 +548,15 @@ ground-truth rows are committed to `classify/eval/labels.csv` (was header-only i
 shows no displayed number, so it populates no BACKING row — B2.2/B2.4/B2.5 stay
 Pending (B2.4 is Phase 6's held-out gate + recall mart). DONE (`make
 classify-eval`) prints precision 1.00 for every theme with a decided share of
-27/34 (0.79); `make test` passes: 668 tests, 22 new (closed set at load, strict
+27/34 (0.79); `make test` passes: 670 tests, 24 new (closed set at load, strict
 parse, determinism, review×theme grain, word-start-not-substring, precision vs
 pins incl. a crafted 0.5 case, held-out untouched). One in-build fix: `bot`
 matched `rabotées` under naive substring (support-traction precision 0.80) → the
 matching KIND changed to word-start, fixing the class. `pyyaml` made a direct
-dependency (pre-approved). Next: review round 1, then PR.
+dependency (pre-approved). Review round 1 passed (code-reviewer,
+functionality-tester, study-editor, coherence-auditor; security-reviewer not
+triggered): no correctness or security findings; the redundant `is_label` clause,
+two spec wording nits and two coverage-gap tests applied. Next: PR.
 
 Phase 5a (label sample + the labels wall) merged to `main` (PR #10, 2026-09-04).
 Phase 4 (the weekly cron) merged (PR #8, 2026-09-03); the docs hotfix merged

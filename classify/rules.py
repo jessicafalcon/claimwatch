@@ -33,7 +33,7 @@ from pathlib import Path
 
 import yaml
 
-from classify.labels import POSITIVE, THEMES, UNCLASSIFIED, is_label
+from classify.labels import POSITIVE, THEMES, UNCLASSIFIED
 from pipeline.warehouse import ROOT
 
 RULES_YAML = ROOT / "classify" / "rules.yaml"
@@ -81,7 +81,7 @@ def load_rules(path: str | Path = RULES_YAML) -> dict[str, tuple[re.Pattern[str]
         raise RuleError(f"{where}: top level must be a mapping of label to patterns")
     rules: dict[str, tuple[re.Pattern[str], ...]] = {}
     for label, patterns in doc.items():
-        if not is_label(label) or label not in RULE_LABELS:
+        if label not in RULE_LABELS:  # RULE_LABELS ⊆ LABEL_SET, so this is the check
             raise RuleError(
                 f"{where}: {label!r} is not a rule label; a group may be keyed only "
                 f"by a theme or 'positive' {RULE_LABELS} — never an eighth label"

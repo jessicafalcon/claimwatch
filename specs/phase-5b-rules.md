@@ -1,4 +1,4 @@
-# Phase 5b — The rules layer (PROPOSED)
+# Phase 5b — The rules layer
 
 Contract for the `phase-5b-rules` branch. Source: PROJECT_BRIEF.md §9 Phase 5
 ("Hand labels + rules layer"), split into 5a/5b per `docs/PLAN.md` §5 ("5b —
@@ -6,7 +6,7 @@ Rules layer": `rules.yaml` + `classify/rules.py`; per-theme precision on the
 tuning folds; share decided by rules reported; no model). Depends on Phase 5a
 merged (PR #10).
 
-**Status: APPROVED 2026-09-04 — in progress.** One dependency moves from
+**Status: APPROVED 2026-09-04 — DELIVERED 2026-09-04, PR open.** One dependency moves from
 transitive to direct: `pyyaml` — pre-approved for Phase 2 in CLAUDE.md →
 Conventions ("pyyaml, httpx (2)"), first actually used here to read `rules.yaml`.
 No other new dependency; no `anthropic` (the model is Phase 6). The allowlist is
@@ -81,8 +81,9 @@ make classify-eval
 2. **The rules are deterministic, idempotent and review×theme-grained.** For one
    corpus the rules emit identical `(review_id, theme)` rows in identical
    (`review_id`, `theme`) order on every run (no clock, no random, no dict-order
-   leak); a review matching K theme groups is K rows; a review matching none is
-   exactly one `unclassified` row. *Evidence: row 2.*
+   leak); a review matching K theme groups is K rows; a review matching no theme
+   is exactly one row — `positive` if a positive pattern matched, else
+   `unclassified`. *Evidence: row 2.*
 3. **`make classify-eval` prints per-theme precision on the tuning folds and the
    decided share, matching pins.** Precision per theme = |rules said T ∧ hand
    says T| / |rules said T| over tuning-fold reviews; the decided share is the
@@ -124,7 +125,7 @@ code works.
 |---|---|
 | For all labels a rule emits, the label is one of the seven closed labels; a rules.yaml group keyed by anything else refuses the load. | `tests/test_rules.py::test_out_of_set_rule_key_refuses_load` — a `rules.yaml` with a group keyed `document-loop-ish`; the loader refuses rather than admitting an eighth label. |
 | For all corpora, the rules emit identical rows in identical order on re-run — a pure function of the reviews and `rules.yaml`. | `tests/test_rules.py::test_rules_are_idempotent` — the classifier run twice over one corpus yields byte-equal `(review_id, theme)` rows; a dict-order or clock leak would drift. |
-| For all reviews, a review matching K theme groups produces K theme rows and a review matching none produces exactly one `unclassified` row. | `tests/test_rules.py::test_review_times_theme_grain` — a review written to match two themes yields two rows; one written to match none yields one `unclassified` row. |
+| For all reviews, a review matching K theme groups produces K theme rows; a review matching no theme produces exactly one row — `positive` if a positive pattern matched, else `unclassified`. | `tests/test_rules.py::test_review_times_theme_grain`, `::test_positive_only_when_no_theme_matched`, `::test_no_match_is_one_unclassified_row` — two-theme text yields two rows; a warm word alone yields one `positive`; neutral text yields one `unclassified`. |
 | For all review ids in the held-out fold, `classify-eval`'s printed numbers do not depend on their labels. | `tests/test_classify_eval.py::test_heldout_fold_never_read` — mutating the held-out fold's rows in a temp `labels.csv` leaves every printed number unchanged. |
 | For all modules outside `classify/eval/` (sql, pipeline, `classify/rules*`, and — when they exist — `classify/llm*`, models), none reads `labels.csv`. | `tests/test_labels_isolation.py::test_no_reader_of_labels_outside_eval` — a grep of those surfaces (now including `classify/rules*`) for the answer-key path returns nothing. |
 | For all classification logic, the pattern-matching lives in `rules.yaml` and Python, never in SQL; 5b adds no mart. | `tests/test_rules.py::test_no_new_mart` — `sql/marts/` gains no file (the pattern-matching never became SQL). |
@@ -280,3 +281,43 @@ Agents are selected by diff surface (CLAUDE.md → "Which review agents run").
   5b grades on the synthetic ground truth committed here.
 - **Paraphrased public seed examples for the taxonomy (B2.1)** — Documented prose
   for a later phase (9); 5b defines patterns, not the examples.
+
+## Delivered
+
+2026-09-04. The rules layer ships: `classify/rules.yaml` (patterns, one group per
+emitting label — the five §5 themes and `positive`) and `classify/rules.py`
+(strict load with a closed-set check at load, word-start matching that folds
+accents and case, one `(review_id, theme)` row per review × matched theme sorted,
+`positive` only when no theme matched, `unclassified` the single fallback);
+`classify/eval/precision.py`, the scorer that grades on the four tuning folds and
+never reads the held-out fold; and `make classify-eval`, which rebuilds the
+synthetic corpus and prints per-theme precision (1.00 for every theme on the
+clean corpus) plus the decided share (27/34, 0.79). The synthetic corpus's 39
+ground-truth rows were committed to `classify/eval/labels.csv` (was header-only
+in 5a) so the eval has something to grade; the real labels stay offline (BACKLOG).
+`pyyaml` became a direct dependency (pre-approved, Phase 2 allowlist). All six
+done-when items pass with the tests named in Evidence; `make test` is 670
+(24 new), `make idempotency-check ROWS=synthetic` and the gate are green. 5b
+populates no BACKING row — B2.2/B2.4/B2.5 stay Pending (B2.4 is Phase 6's
+held-out gate + recall mart).
+
+One in-build correctness fix folded into the implementation: `bot` matched
+`rabotées` under naive substring (support-traction precision fell to 0.80), so
+the matching KIND changed to word-start (`\b` + `re.escape`), fixing the class of
+short-token over-matches rather than the one case.
+
+Review round 1 (code-reviewer, functionality-tester, study-editor,
+coherence-auditor; security-reviewer not triggered — no sensitive surface): all
+pass, no correctness or security findings. functionality-tester WORKS — every pin
+bit under hand-mutation (5/5), no-key run green, byte-identical re-run. Applied
+from the round: dropped a redundant `is_label` clause at the load check
+(`RULE_LABELS ⊆ LABEL_SET`); reworded invariant 3 / done-when 2 to name the
+three-tier fallback; added a `format_report` render test and a no-warehouse CLI
+test for the two coverage gaps the tester named. Accepted: the already-struck
+BACKLOG row 20 (refreshed with the 5b test name, count unchanged).
+
+Decisions the spec did not spell out: the `_do_classify_eval` recipe rebuilds the
+synthetic corpus itself (two-line recipe) so `make classify-eval` works from a
+clean tree without a separate rebuild step; `pipeline/cli.py::_staged_reviews_text`
+is the second place pipeline code assembles review text from `stg_reviews` (thin
+glue beside `label_sample`), noted for a future shared reader if a third appears.

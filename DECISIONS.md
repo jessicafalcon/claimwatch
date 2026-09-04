@@ -1171,7 +1171,11 @@ between the two.
   Phase 4's header-only `fetched_snapshots.csv`. The real 300–500 labels are
   human offline work (BACKLOG, opened). *Decision the spec did not spell out:
   the synthetic fixture is left unlabeled in 5a; the reader/split tests use tmp
-  labels, so no in-session label generation happens.*
+  labels, so no in-session label generation happens.* **(Superseded in part,
+  Phase 5b: the synthetic fixture's 39 ground-truth rows ARE now committed to
+  `labels.csv` so `make classify-eval` has something to grade — fabricated
+  reviews, no personal data; the real 300–500 labels stay offline. See the
+  Phase 5b entry.)**
 - **The held-out split is `sha256(review_id) % 5`, fold 4 held out, never
   random.** `classify/split.py::fold` is a pure function of the id's UTF-8 bytes
   (same fold on macOS and Linux); four folds tune in 5b, fold 4 gates in 6.
@@ -1265,6 +1269,16 @@ This phase populates no BACKING row: per-theme precision and the decided share
 are developer-facing tuning numbers read at the command line, not a displayed
 study panel, and 5b writes no mart. B2.4 (`classifier_quality`) is the held-out
 precision *and recall* the Phase 6 gate writes as a mart; B2.2/B2.5 are the
-Phase 7 theme-share marts — all stay Pending. `make test` (668 tests, 22 new)
+Phase 7 theme-share marts — all stay Pending. `make test` (670 tests, 24 new)
 passes; `make classify-eval` and `make idempotency-check ROWS=synthetic` are
 green.
+
+Review round 1 (code-reviewer, functionality-tester, study-editor,
+coherence-auditor; security-reviewer not triggered — no sensitive surface): all
+pass, no correctness or security findings; functionality-tester WORKS with every
+pin biting under hand-mutation (5/5). Applied: dropped a redundant `is_label`
+clause at the load check (`RULE_LABELS ⊆ LABEL_SET`); reworded spec invariant 3 /
+done-when 2 to name the three-tier fallback (theme → `positive` → `unclassified`);
+added a `format_report` render test and a no-warehouse `classify-eval` CLI test
+for the two coverage gaps named. Accepted: the already-struck BACKLOG row 20
+(refreshed with the 5b test name; count unchanged).
