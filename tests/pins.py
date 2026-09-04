@@ -155,3 +155,40 @@ SAMPLES_RAW_REVIEWS = (
 )
 SAMPLES_RAW_SNAPSHOTS = ANCHOR_ROWS + 1 + 1  # the listing's row and the profile's
 # (the trustpilot sample emits no snapshot: its rating stays hand-read)
+
+# --- Phase 5a: the label set, the review id and the held-out split ---
+
+# The closed label set (PROJECT_BRIEF §5 + positive + unclassified): exactly
+# seven labels, of which five are complaint themes. An eighth is impossible.
+LABEL_COUNT = 7
+THEME_COUNT = 5
+
+# The deterministic eval split, `sha256(review_id) % 5` (docs/PLAN §4.4). Four
+# folds tune the rules in 5b; fold 4 is held out for Phase 6's gate.
+SPLIT_FOLDS = 5
+HELDOUT_FOLD = 4
+# The fold of fixed ids — pins that `fold` is `sha256(review_id) % 5` over the
+# id's UTF-8 bytes, the same number on every machine.
+FOLD_OF = {
+    "app-store:900000001": 0,
+    "opinion-assurances:OA-101": 0,
+}
+
+# The synthetic corpus, addressed as review ids: one per distinct staged review,
+# so the count equals STG_REVIEWS_ROWS (39). Over these ids the held-out fold
+# (4) is non-empty and so are the tuning folds — a usable split.
+SYNTHETIC_REVIEW_IDS = STG_REVIEWS_ROWS
+SYNTHETIC_HELDOUT_REVIEW_IDS = 5  # ids in fold 4; the other 34 tune
+
+# `make label-sample` draws reviews in `sha256(review_id)` order and takes the
+# first N, so the sheet is deterministic and a larger N is a superset. The first
+# three ids in that order over the synthetic corpus:
+SAMPLE_ORDER_FIRST_3 = (
+    "opinion-assurances:OA-107",
+    "opinion-assurances:OA-108",
+    "app-store:AS-302",
+)
+# The labeling sheet's columns (with the review text) and the tracked answer
+# key's columns (text-free) — the wall stated as two shapes.
+LABEL_SHEET_COLUMNS = ("review_id", "source_url", "text")
+LABELS_CSV_COLUMNS = ("review_id", "theme")

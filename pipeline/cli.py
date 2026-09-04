@@ -33,6 +33,7 @@ from pipeline.build import (
     record_snapshots,
     reset,
 )
+from pipeline.label_sample import SHEET, label_sample
 from pipeline.metrics import reviews_per_month
 from pipeline.warehouse import ROOT, TARGETS, connect, database_for
 
@@ -44,6 +45,17 @@ CONFIRM_STAMP = ROOT / "data" / ".confirm"
 
 class Refused(Exception):
     """A one-line refusal: printed as-is, exit 2, never a traceback."""
+
+
+def positive_int(value: str, name: str) -> int:
+    """A user value that must be a positive integer, validated in Python — the
+    same guard shape as `resolve_choice` for a closed set. Empty, a
+    non-digit (`../x`, `"; …`), a sign or zero is refused; the value is never
+    used to build a path (the sheet path is fixed), so a traversal or a
+    metacharacter is just a string that is not a positive integer."""
+    if not value.isdigit() or int(value) <= 0:
+        raise Refused(f"refusing: {name} must be a positive integer, got {value!r}")
+    return int(value)
 
 
 def resolve_choice(value: str, allowed: tuple[str, ...], default: str) -> str:
@@ -234,6 +246,24 @@ def _do_record_snapshots(args: argparse.Namespace) -> int:
     return 0
 
 
+def _do_label_sample(args: argparse.Namespace) -> int:
+    """Non-network, non-destructive: draw N reviews from the built corpus into
+    the gitignored `data/label_sample.csv` for a human to label. N is validated
+    as a positive integer here; the output path is fixed, not built from N. No
+    `confirm` gate — it fetches nothing and deletes nothing."""
+    n = positive_int(args.n, "N")
+    written = label_sample(n)
+    shown = SHEET.relative_to(ROOT)
+    if written == 0:
+        print(
+            f"label-sample: no stg_reviews in the warehouse — wrote a header-only "
+            f"{shown}; run `make rebuild` first"
+        )
+    else:
+        print(f"label-sample: {written} review(s) -> {shown} (label offline)")
+    return 0
+
+
 def _do_idempotency(args: argparse.Namespace) -> int:
     target = resolve_choice(args.target, TARGETS, "duckdb")
     rows = resolve_choice(args.rows, INPUTS, "synthetic")
@@ -288,6 +318,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--source", default="")
     p.add_argument("--make-pid", dest="make_pid", default="")
     sub.add_parser("record-snapshots", add_help=False)  # no user variable
+    p = sub.add_parser("label-sample", add_help=False)
+    p.add_argument("--n", default="")
 
     args = ap.parse_args(argv)
     dispatch = {
@@ -297,6 +329,7 @@ def main(argv: list[str] | None = None) -> int:
         "reset": _do_reset,
         "scrape": _do_scrape,
         "record-snapshots": _do_record_snapshots,
+        "label-sample": _do_label_sample,
     }
     try:
         return dispatch[args.command](args)
