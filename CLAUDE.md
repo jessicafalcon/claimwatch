@@ -206,11 +206,12 @@ in the middle, and come out on the right as the numbers the study shows.
   the file). Offline and non-destructive, so no `confirm` gate; idempotent
   (recording the same capture twice writes no new row). The weekly workflow
   runs it after `make confirm scrape`; `rebuild ROWS=captured` reads the file.
-- `make label-sample N=<n>` — draw N reviews from the built corpus's
-  `stg_reviews` into the gitignored `data/label_sample.csv` (`review_id,
-  source_url, text`) for a person to hand-label, in `sha256(review_id)` order so
-  the draw is deterministic and a larger N is a superset. N is a positive
-  integer (validated in Python; the output path is fixed, not built from N).
+- `make label-sample N=<n>` — draw N reviews for a person to hand-label. The
+  draw is written to the gitignored `data/label_sample.csv` (`review_id,
+  source_url, text`), read from the built corpus's `stg_reviews`; the reviews
+  are taken in `sha256(review_id)` order, so the draw is deterministic and a
+  larger N is a superset. N is a positive ASCII integer (validated in Python;
+  the output path is fixed, not built from N).
   Offline and non-destructive, so no `confirm` gate; a warehouse with no
   `stg_reviews` writes a header-only sheet and says so. The person appends
   `(review_id, theme)` rows to the tracked, text-free `classify/eval/labels.csv`
@@ -535,16 +536,20 @@ into the gitignored `data/label_sample.csv` for a human to hand-label; and the
 labels wall — `classify/eval/` is the ONLY reader of the tracked, text-free
 answer key `classify/eval/labels.csv` (`review_id, theme`, one row per review ×
 theme), which ships header-only until a person labels offline. The real 300–500
-labels are human offline work (BACKLOG). 5a populates no BACKING row (it shows
-no number): it is the wall Phase 6's eval gate writes B2.4 (`classifier_quality`)
-from, and B2.2/B2.5 rest on — those stay Pending. DONE (`make test`) passes: 644
-tests, 32 new (closed set, review_id, split determinism, sheet determinism + N
-validation, the text-free wall, labels isolation). Next: review round 1, then PR.
+labels are human offline work (BACKLOG). 5a shows no number, so it populates no
+BACKING row. It is the wall Phase 6's eval gate later writes `classifier_quality`
+(B2.4) from, and that B2.2/B2.5 rest on — those stay Pending. DONE (`make test`)
+passes: 646 tests, 34 new (closed set, review_id, split determinism, sheet
+determinism + N validation, the text-free wall, labels isolation). Review round
+1 passed (code-reviewer, functionality-tester, study-editor, coherence-auditor;
+security-reviewer not triggered — no sensitive surface): the one should-fix (N
+gated on `str.isdigit`, true for non-ASCII digits — now ASCII-only) fixed, plus
+record/wording nits. Next: PR.
 
 Phase 4 (the weekly cron) merged to `main` (PR #8, 2026-09-03); the docs hotfix
 merged (PR #9, 2026-09-04). (Earlier phase and amendment history is in each spec
 and DECISIONS.)
 
-Open BACKLOG rows: **23**.
+Open BACKLOG rows: **24**.
 
 (Update this section at the end of every working day.)

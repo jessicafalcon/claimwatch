@@ -1188,5 +1188,17 @@ between the two.
 
 This phase populates no BACKING row: it produces no displayed number. It is the
 wall the Phase 6 eval gate writes B2.4 (`classifier_quality`) from, and the
-labels B2.2/B2.5 rest on — those rows stay Pending. `make test` (644 tests)
+labels B2.2/B2.5 rest on — those rows stay Pending. `make test` (646 tests)
 passes.
+
+Review round 1 (code-reviewer, functionality-tester, study-editor,
+coherence-auditor; security-reviewer not triggered — no sensitive surface):
+functionality-tester WORKS (all six pins bite under hand-mutation), all seven
+invariants verified pinned. One should-fix — `positive_int` gated on
+`str.isdigit`, true for non-ASCII digits (`N=²` reached `int()` and raised an
+uncaught `ValueError`; `N=٣` would parse as 3), breaking the Threat model's
+"never a traceback" — fixed by guarding `int()` with `isascii()`, with both
+cases pinned. Record/wording nits fixed: the spec approval date (2026-09-04),
+the over-cap BACKLOG trigger named to the 5b exit. Accepted to BACKLOG: widen
+the labels-isolation grep to `ingest/dags/study/scripts` when 5b/6 add
+`rules.py`/`llm.py`.
