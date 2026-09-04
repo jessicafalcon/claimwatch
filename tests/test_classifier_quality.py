@@ -6,7 +6,7 @@ fold 4, and the mart is deterministic across reruns."""
 
 from __future__ import annotations
 
-from classify.eval.gate import ANSWER_KEY, HELDOUT_FOLD, score_heldout
+from classify.eval.gate import ANSWER_KEY, HELDOUT_FOLD, LabelScore, score_heldout
 from classify.labels import review_id
 from classify.rules import classify as rules_classify
 from classify.rules import load_rules
@@ -120,6 +120,60 @@ def test_rules_only_heldout_values_are_pinned(tmp_path):
         ).fetchall()
         got = {label: (h, p, a, prec, rec) for label, h, p, a, prec, rec in rows}
         assert got == pins.RULES_HELDOUT
+    finally:
+        conn.close()
+
+
+def test_mart_column_mapping_under_asymmetry(tmp_path):
+    # The synthetic fold-4 rows all have precision == recall, so a precision/recall
+    # column swap in the INSERT would be invisible there. Craft an asymmetric score
+    # (precision 0.5, recall 1.0) and assert each column carries its own value.
+    rebuild("duckdb", "synthetic", root=tmp_path, run_id="t")
+    conn = connect("duckdb", database=database_for("synthetic", tmp_path))
+    try:
+        scores = (
+            LabelScore(
+                "document-loop",
+                hits=1,
+                predicted=2,
+                actual=1,
+                precision=0.5,
+                recall=1.0,
+            ),
+        )
+        write_classifier_quality(
+            conn,
+            scores,
+            answer_key=ANSWER_KEY,
+            heldout_fold=HELDOUT_FOLD,
+            run_id="synthetic",
+        )
+        row = conn.execute(
+            "select hits, predicted, actual, precision, recall from classifier_quality "
+            "where label = 'document-loop'"
+        ).fetchone()
+        assert row == (1, 2, 1, 0.5, 1.0)  # precision != recall, each in its own column
+    finally:
+        conn.close()
+
+
+def test_write_is_idempotent_on_one_connection(tmp_path):
+    # The inserter clears the table first, so re-populating on the same connection
+    # keeps the row count (pins the `delete`, which create-or-replace would mask).
+    conn = _build_and_populate(tmp_path)
+    try:
+        predictions = rules_classify(_staged_reviews(conn), load_rules())
+        write_classifier_quality(
+            conn,
+            score_heldout(predictions),
+            answer_key=ANSWER_KEY,
+            heldout_fold=HELDOUT_FOLD,
+            run_id="synthetic",
+        )
+        assert (
+            conn.execute("select count(*) from classifier_quality").fetchone()[0]
+            == pins.CLASSIFIER_QUALITY_ROWS
+        )
     finally:
         conn.close()
 
