@@ -272,7 +272,11 @@ model).
    commit to main directly". Proposal: a written exception — the workflow
    identity may commit only under `data/snapshots/`; a CI check refuses any
    other path from that author. Alternative: cron opens a PR each week (weekly
-   manual merge friction).
+   manual merge friction). *(As built in Phase 4 the CI author-path check was
+   not needed: `main` is unprotected on this private plan, so the subtree limit
+   is staging discipline — `git add data/snapshots/`, pinned by
+   `tests/test_weekly.py` — plus `persist-credentials: false` for token hygiene.
+   See DECISIONS → Gotchas.)*
 5. **Which model API.** The brief does not name one. Assumption: the Anthropic
    API through the `anthropic` package, key from `.env`, prompt and model id
    versioned in `classified_reviews`. The `claude-api` skill is the reference

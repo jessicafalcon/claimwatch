@@ -419,9 +419,14 @@ one, and write one sentence in the README about why.
 
 ## Git workflow (one branch + one PR per phase)
 
-- `main` is protected: never commit to it directly; never force-push. The one
-  exception, written down when Phase 4 lands: the weekly workflow's identity
-  commits under `data/snapshots/` only.
+- `main` is unprotected on this private repo (no GitHub Team/Enterprise plan),
+  so "never commit to it directly, never force-push" is a self-imposed rule, not
+  a branch-protection rule. The one written exception: the weekly workflow's
+  identity commits under `data/snapshots/` only — the subtree limit comes from
+  the commit staging only `git add data/snapshots/` (no branch-protection rule
+  backs it; `persist-credentials: false` is a separate guard that keeps the
+  write token off `.git/config`). DECISIONS → Gotchas; revisit if the repo goes public
+  or onto a paid plan.
 - Review gate BEFORE the remote: run the agents on the finished work and
   report verdicts. Do NOT push or open a PR until the developer has seen the
   verdicts and says to.
@@ -506,7 +511,8 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 ## Current status
 
 **Phase 4 — the weekly cron** (`phase-4-weekly-cron`, spec
-`specs/phase-4-weekly-cron.md`, APPROVED 2026-09-03): being built. What changes:
+`specs/phase-4-weekly-cron.md`, APPROVED 2026-09-03): merged to `main` (PR #8,
+2026-09-03). What it added:
 a weekly GitHub Actions cron (`.github/workflows/weekly.yml`) scrapes the
 fetchable sources politely and commits the new rating figures under
 `data/snapshots/` — the one sanctioned exception to "never commit to `main`" —
@@ -527,10 +533,14 @@ commits a fixed brand-free message (`data: weekly snapshot <date>`) touching
 `data/snapshots/` alone, under `permissions: contents: write`. The DONE command
 (`make test && make idempotency-check ROWS=captured`) passes; lint clean;
 `review-gate` 7/7; 612 tests. Review round 1 passed (all agents), every finding
-fixed and the credential fix re-reviewed pass. Phase 3c merged (PR #7). Next:
-**PR #8 open, awaiting the developer's squash merge**; then confirm two
-scheduled runs accrue over the coming weeks. (Earlier amendment history is in each spec and
-DECISIONS.)
+fixed and the credential fix re-reviewed pass. Phase 3c merged (PR #7); Phase 4
+merged (PR #8). A follow-up docs hotfix (`fix/weekly-branch-protection-wording`)
+corrects records that had framed the bot's `data/snapshots/` limit as branch
+protection: `main` is unprotected on this private plan (no GitHub
+Team/Enterprise), so the limit is staging discipline (`git add data/snapshots/`,
+pinned by `tests/test_weekly.py`) — see DECISIONS → Gotchas. Next: confirm two
+scheduled runs accrue over the coming weeks. (Earlier amendment history is in
+each spec and DECISIONS.)
 
 Open BACKLOG rows: **22**.
 
