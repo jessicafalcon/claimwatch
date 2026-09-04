@@ -192,3 +192,27 @@ SAMPLE_ORDER_FIRST_3 = (
 # key's columns (text-free) — the wall stated as two shapes.
 LABEL_SHEET_COLUMNS = ("review_id", "source_url", "text")
 LABELS_CSV_COLUMNS = ("review_id", "theme")
+
+# --- Phase 5b: the rules layer graded on the tuning folds ---
+
+# Per-theme precision on the four tuning folds (`sha256(review_id) % 5 != 4`),
+# each as (hits, predicted): of the reviews the rules gave the label, how many
+# the synthetic answer key agrees with. The rules fire only at a clear word-start
+# match, so on the clean hand-written corpus every firing is right — precision
+# 1.0. The metric earns its keep on the decided share and the formula unit test
+# (a crafted disagreement scores below 1.0). Held-out reviews (fold 4) are not
+# counted here — they are Phase 6's to grade.
+RULES_PRECISION = {
+    "document-loop": (7, 7),
+    "silent-rejection": (3, 3),
+    "second-payer": (3, 3),
+    "support-traction": (4, 4),
+    "coverage-price": (4, 4),
+    "positive": (6, 6),
+}
+# The tuning corpus: every staged review not in the held-out fold.
+RULES_TUNING_REVIEWS = STG_REVIEWS_ROWS - SYNTHETIC_HELDOUT_REVIEW_IDS  # 39 - 5 = 34
+# Reviews the rules placed in a theme or `positive` (vs left `unclassified` for
+# the model), over the tuning folds. The rules decide the clear cases and leave
+# the rest — a decided share below 1 is the point of the layer.
+RULES_DECIDED = 27

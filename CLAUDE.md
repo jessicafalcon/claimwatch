@@ -134,9 +134,11 @@ in the middle, and come out on the right as the numbers the study shows.
   fetch and a scheduled refresh stay deferred (BACKLOG). *(Phase 5a)*
   `classify/` — `labels.py` (the closed seven-label set + `review_id`),
   `split.py` (the `sha256(review_id) % 5` held-out split), `eval/` (the ONLY
-  reader of the hand-labeled answer key: `labels_io.py` + the header-only
-  `labels.csv`). *(Phase 5b)* `rules.yaml`, `rules.py`; *(Phase 6)* `llm.py`
-  (the ONE model call site). *(Phase 8)* `models/` —
+  reader of the hand-labeled answer key: `labels_io.py`, `precision.py` — the
+  tuning-fold scorer — and `labels.csv`, carrying the synthetic corpus's ground
+  truth since Phase 5b). *(Phase 5b)* `rules.yaml` (the patterns, one group per
+  emitting label), `rules.py` (load + word-start match → `(review_id, theme)`
+  rows); *(Phase 6)* `llm.py` (the ONE model call site). *(Phase 8)* `models/` —
   `cost_model.py` (`FORMULAS`), `guardrail_sim.py`. *(Phase 9)* `study/` —
   Metabase setup + the HTML export. *(Phase 10)* `dags/friction_ledger.py`.
 - `data/` — gitignored working output (corpus, captured pages, `*.duckdb`);
@@ -216,6 +218,13 @@ in the middle, and come out on the right as the numbers the study shows.
   `stg_reviews` writes a header-only sheet and says so. The person appends
   `(review_id, theme)` rows to the tracked, text-free `classify/eval/labels.csv`
   offline — the answer key, read only by `classify/eval/` (Phase 5a).
+- `make classify-eval` — the rules classifier's report: rebuild the synthetic
+  corpus, run the `rules.yaml` patterns over its `stg_reviews`, and print
+  per-theme precision on the four tuning folds (`sha256(review_id) % 5 != 4`)
+  plus the share of reviews the rules decided (vs left `unclassified` for the
+  model). Offline, no variable, no `confirm` gate; it grades against the
+  synthetic ground truth in `labels.csv` and never reads the held-out fold —
+  that is Phase 6's gate. `make test` pins the numbers (Phase 5b).
 - `make confirm` — arms the destructive or network target that follows it in
   the SAME invocation and nothing else: `make confirm reset`, `make confirm
   scrape`. The recipe stamps its make process's id; the gated target passes
@@ -524,31 +533,32 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 ## Current status
 
-**Phase 5a — label sample + the labels wall** (`phase-5a-label-sample`, spec
-`specs/phase-5a-label-sample.md`, APPROVED 2026-09-04): being built. Brief §9
-Phase 5 ("Hand labels + rules layer") is split 5a/5b per `docs/PLAN.md` §5; 5a
-is the trust foundation only — no rule, no model. What it adds: the closed
-seven-label set and a stable `review_id = "{source}:{external_id}"`
-(`classify/labels.py`); the deterministic held-out split `sha256(review_id) % 5`
-(`classify/split.py`, fold 4 held out for Phase 6's gate); `make label-sample
-N=<n>`, which draws N reviews from `stg_reviews` in `sha256(review_id)` order
-into the gitignored `data/label_sample.csv` for a human to hand-label; and the
-labels wall — `classify/eval/` is the ONLY reader of the tracked, text-free
-answer key `classify/eval/labels.csv` (`review_id, theme`, one row per review ×
-theme), which ships header-only until a person labels offline. The real 300–500
-labels are human offline work (BACKLOG). 5a shows no number, so it populates no
-BACKING row. It is the wall Phase 6's eval gate later writes `classifier_quality`
-(B2.4) from, and that B2.2/B2.5 rest on — those stay Pending. DONE (`make test`)
-passes: 646 tests, 34 new (closed set, review_id, split determinism, sheet
-determinism + N validation, the text-free wall, labels isolation). Review round
-1 passed (code-reviewer, functionality-tester, study-editor, coherence-auditor;
-security-reviewer not triggered — no sensitive surface): the one should-fix (N
-gated on `str.isdigit`, true for non-ASCII digits — now ASCII-only) fixed, plus
-record/wording nits. Next: PR.
+**Phase 5b — the rules layer** (`phase-5b-rules`, spec `specs/phase-5b-rules.md`,
+APPROVED 2026-09-04): being built. The second half of the Phase 5 split
+(`docs/PLAN.md` §5): the rules that read a review and tag what it is about, with
+no model (Phase 6). What it adds: `classify/rules.yaml` (patterns, one group per
+emitting label — the five §5 themes and `positive`) and `classify/rules.py`
+(strict load with a closed-set check, word-start matching that folds accents and
+case, output one row per review × theme, `unclassified` the single fallback);
+`classify/eval/precision.py`, the scorer that grades the rules on the four tuning
+folds only (the held-out fold 4 is Phase 6's); and `make classify-eval`, which
+prints per-theme precision plus the decided share. The synthetic corpus's 39
+ground-truth rows are committed to `classify/eval/labels.csv` (was header-only in
+5a) so there is something to grade; the real labels stay offline (BACKLOG). 5b
+shows no displayed number, so it populates no BACKING row — B2.2/B2.4/B2.5 stay
+Pending (B2.4 is Phase 6's held-out gate + recall mart). DONE (`make
+classify-eval`) prints precision 1.00 for every theme with a decided share of
+27/34 (0.79); `make test` passes: 668 tests, 22 new (closed set at load, strict
+parse, determinism, review×theme grain, word-start-not-substring, precision vs
+pins incl. a crafted 0.5 case, held-out untouched). One in-build fix: `bot`
+matched `rabotées` under naive substring (support-traction precision 0.80) → the
+matching KIND changed to word-start, fixing the class. `pyyaml` made a direct
+dependency (pre-approved). Next: review round 1, then PR.
 
-Phase 4 (the weekly cron) merged to `main` (PR #8, 2026-09-03); the docs hotfix
-merged (PR #9, 2026-09-04). (Earlier phase and amendment history is in each spec
-and DECISIONS.)
+Phase 5a (label sample + the labels wall) merged to `main` (PR #10, 2026-09-04).
+Phase 4 (the weekly cron) merged (PR #8, 2026-09-03); the docs hotfix merged
+(PR #9, 2026-09-04). (Earlier phase and amendment history is in each spec and
+DECISIONS.)
 
 Open BACKLOG rows: **24**.
 

@@ -5,7 +5,7 @@
 
 .PHONY: help setup test lint check-docs check-backing review-gate \
         rebuild idempotency-check confirm reset scrape record-snapshots \
-        label-sample
+        label-sample classify-eval
 
 # User variables reach recipes ONLY as make values via `$(call _Q,$(value VAR))`
 # — UNEXPANDED and single-quoted — so a value like `SPEC='$(shell …)'` or
@@ -80,3 +80,7 @@ record-snapshots: ## read the captures on disk, append this week's fetched figur
 
 label-sample: ## draw N reviews from the corpus to hand-label into data/label_sample.csv (offline, gitignored; N required)
 	uv run python -m pipeline label-sample --n=$(call _Q,$(value N))
+
+classify-eval: ## rules classifier: per-theme precision on the tuning folds vs the synthetic answer key (offline, no variable)
+	uv run python -m pipeline rebuild --rows=synthetic >/dev/null
+	uv run python -m pipeline classify-eval

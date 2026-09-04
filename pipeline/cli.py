@@ -19,6 +19,10 @@ import argparse
 import os
 import sys
 
+from classify.eval.precision import evaluate, format_report
+from classify.labels import review_id
+from classify.rules import classify as classify_reviews
+from classify.rules import load_rules
 from ingest import sources
 from ingest.captures import has_pages, parser_module
 from ingest.parsed import PageShapeError
@@ -269,6 +273,50 @@ def _do_label_sample(args: argparse.Namespace) -> int:
     return 0
 
 
+def _staged_reviews_text(db) -> list[tuple[str, str]] | None:
+    """`(review_id, text)` for every staged review, or None if the warehouse has
+    no `stg_reviews` yet. `text` is the review's title and body — the words the
+    rules read; the answer key is never touched here."""
+    if not db.is_file():
+        return None
+    conn = connect("duckdb", database=db)
+    try:
+        exists = conn.execute(
+            "select count(*) from information_schema.tables "
+            "where table_name = 'stg_reviews'"
+        ).fetchone()[0]
+        if not exists:
+            return None
+        rows = conn.execute(
+            "select source, external_id, title, body from stg_reviews"
+        ).fetchall()
+    finally:
+        conn.close()
+    out: list[tuple[str, str]] = []
+    for source, external_id, title, body in rows:
+        text = "\n".join(part for part in (title, body) if part).strip()
+        out.append((review_id(source, external_id), text))
+    return out
+
+
+def _do_classify_eval(args: argparse.Namespace) -> int:
+    """Non-network, non-destructive: run the rules over the synthetic corpus's
+    `stg_reviews` and print per-theme precision on the tuning folds. No user
+    variable — the corpus is the fixed synthetic input for 5b (real rows are
+    Phase 7). The rules read the reviews and rules.yaml only; the answer key is
+    read inside classify/eval/, not here."""
+    reviews = _staged_reviews_text(database_for("synthetic"))
+    if reviews is None:
+        print(
+            "classify-eval: no stg_reviews in the synthetic warehouse — "
+            "run `make rebuild ROWS=synthetic` first"
+        )
+        return 1
+    predictions = classify_reviews(reviews, load_rules())
+    print(format_report(evaluate(predictions)))
+    return 0
+
+
 def _do_idempotency(args: argparse.Namespace) -> int:
     target = resolve_choice(args.target, TARGETS, "duckdb")
     rows = resolve_choice(args.rows, INPUTS, "synthetic")
@@ -325,6 +373,7 @@ def main(argv: list[str] | None = None) -> int:
     sub.add_parser("record-snapshots", add_help=False)  # no user variable
     p = sub.add_parser("label-sample", add_help=False)
     p.add_argument("--n", default="")
+    sub.add_parser("classify-eval", add_help=False)  # no user variable
 
     args = ap.parse_args(argv)
     dispatch = {
@@ -335,6 +384,7 @@ def main(argv: list[str] | None = None) -> int:
         "scrape": _do_scrape,
         "record-snapshots": _do_record_snapshots,
         "label-sample": _do_label_sample,
+        "classify-eval": _do_classify_eval,
     }
     try:
         return dispatch[args.command](args)

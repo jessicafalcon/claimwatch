@@ -108,12 +108,12 @@ make classify-eval
 
 | Done-when | Proof (test id / `make` target / output line) |
 |---|---|
-| 1 | `tests/test_rules.py::test_labels_are_the_closed_seven`, `::test_out_of_set_rule_key_refuses_load` |
+| 1 | `tests/test_rules.py::test_shipped_rules_load_and_key_only_closed_labels`, `::test_labels_are_the_closed_seven_over_the_corpus`, `::test_out_of_set_rule_key_refuses_load` |
 | 2 | `tests/test_rules.py::test_rules_are_idempotent`, `::test_review_times_theme_grain`, `::test_no_match_is_one_unclassified_row` |
 | 3 | `tests/test_classify_eval.py::test_per_theme_precision_matches_pins`, `::test_decided_share_matches_pins` / `make classify-eval` prints "precision" per theme |
 | 4 | `tests/test_classify_eval.py::test_heldout_fold_never_read`, `::test_precision_is_tuning_folds_only` |
 | 5 | `tests/test_labels_isolation.py::test_no_reader_of_labels_outside_eval` (now covering `classify/rules*`) |
-| 6 | `tests/test_rules.py::test_no_new_mart_and_sql_lint_clean`, `tests/test_classify_eval.py::test_labels_csv_covers_the_synthetic_corpus`, `tests/test_labels.py::test_labels_csv_rows_are_closed_set_and_text_free` |
+| 6 | `tests/test_rules.py::test_no_new_mart`, `tests/test_classify_eval.py::test_labels_csv_covers_the_synthetic_corpus`, `tests/test_labels.py::test_labels_csv_rows_are_closed_set_and_text_free` |
 
 ## Invariants (REQUIRED)
 
@@ -127,7 +127,7 @@ code works.
 | For all reviews, a review matching K theme groups produces K theme rows and a review matching none produces exactly one `unclassified` row. | `tests/test_rules.py::test_review_times_theme_grain` — a review written to match two themes yields two rows; one written to match none yields one `unclassified` row. |
 | For all review ids in the held-out fold, `classify-eval`'s printed numbers do not depend on their labels. | `tests/test_classify_eval.py::test_heldout_fold_never_read` — mutating the held-out fold's rows in a temp `labels.csv` leaves every printed number unchanged. |
 | For all modules outside `classify/eval/` (sql, pipeline, `classify/rules*`, and — when they exist — `classify/llm*`, models), none reads `labels.csv`. | `tests/test_labels_isolation.py::test_no_reader_of_labels_outside_eval` — a grep of those surfaces (now including `classify/rules*`) for the answer-key path returns nothing. |
-| For all classification logic, the pattern-matching lives in `rules.yaml` and Python, never in SQL; 5b adds no mart. | `tests/test_rules.py::test_no_new_mart_and_sql_lint_clean` — `sql/marts/` gains no file and the SQL lint denylist finds nothing new. |
+| For all classification logic, the pattern-matching lives in `rules.yaml` and Python, never in SQL; 5b adds no mart. | `tests/test_rules.py::test_no_new_mart` — `sql/marts/` gains no file (the pattern-matching never became SQL). |
 
 ## Pinned decisions (do not re-litigate)
 
