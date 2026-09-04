@@ -31,7 +31,7 @@ def test_cache_columns_are_text_free():
     assert "text" not in DECISION_COLUMNS and "body" not in DECISION_COLUMNS
 
 
-def test_round_trip_and_order_stable(tmp_path):
+def test_cache_round_trip_is_text_free(tmp_path):
     path = tmp_path / "decisions.csv"
     decisions = {
         ("s:2", PROMPT_VERSION, MODEL): ("coverage-price", "document-loop"),
@@ -91,7 +91,7 @@ def test_warm_rerun_makes_zero_model_calls(synthetic_conn):
     assert cache1 == cache2
 
 
-def test_prompt_or_model_change_is_a_new_key(synthetic_conn):
+def test_prompt_version_or_model_change_is_a_new_key(synthetic_conn):
     reviews = _reviews(synthetic_conn)
     rules = load_rules()
     # Seed the cache under an OLD prompt version: the current run must not hit it.

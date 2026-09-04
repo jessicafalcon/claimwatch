@@ -48,7 +48,7 @@ def test_no_key_combined_equals_rules_only(monkeypatch, synthetic_conn):
     assert cache == {}  # no decisions made
 
 
-def test_no_key_unresolved_reviews_stay_unclassified(monkeypatch, synthetic_conn):
+def test_no_key_classify_stays_unclassified(monkeypatch, synthetic_conn):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     reviews = _reviews(synthetic_conn)
     rules = load_rules()
@@ -65,7 +65,7 @@ def test_no_key_unresolved_reviews_stay_unclassified(monkeypatch, synthetic_conn
         assert by_id[rid] == {UNCLASSIFIED}  # never a theme, never positive
 
 
-def test_no_key_never_touches_anthropic(monkeypatch, synthetic_conn):
+def test_no_key_constructs_no_client_and_no_network(monkeypatch, synthetic_conn):
     # Even with the SDK importable, the no-key path never accesses it: the decider
     # is None before any `import anthropic` can run.
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
