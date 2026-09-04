@@ -117,7 +117,10 @@ in the middle, and come out on the right as the numbers the study shows.
   platform page's rating block, one snapshot row), `opinion_assurances.py`
   (a profile page's schema.org microdata: review rows and one snapshot row) —
   and `fetch.py` (the only `httpx` import; writes captures under
-  `data/cache/<platform>/<source>/`). *(Phase 3b)* Trustpilot. *(Phase 5+)*
+  `data/cache/<platform>/<source>/`). Trustpilot *(Phase 3b)* is a hand-read
+  source in `ingest/sources.py` (not fetchable — its robots.txt disallows our
+  crawler; its rating and count are read into `manual_snapshots.csv`); its
+  parser is re-deferred to a future authorization (BACKLOG). *(Phase 5+)*
   `classify/` — `rules.yaml`, `rules.py`, `llm.py` (the ONE model call site),
   `eval/` (the only reader of `labels.csv`). *(Phase 8)* `models/` —
   `cost_model.py` (`FORMULAS`), `guardrail_sim.py`. *(Phase 9)* `study/` —
@@ -481,57 +484,24 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 ## Current status
 
-**Phase 3a — Snapshots and the remaining polite sources**
-(`phase-3a-snapshots`, spec `specs/phase-3a-snapshots.md`, APPROVED 2026-09-02
-with amendment A1): being built. What a reader sees: the rating each platform
-shows is now a table of its own, seeded from the brief's public figures
-(Documented) and extended by the figures we capture or read off a page
-ourselves (Measured), with four Beat 1–2 charts built from it. How: every
-source is one declaration — which parser reads it, where its pages are,
-whether its site lets us fetch it — and `ROWS` names what a rebuild loads. Of
-the three sites checked, Google Play's listing may be fetched, Apple's may not
-(its terms), and Opinion Assurances gave written authorization for its review
-pages (recorded beside the source in `ingest/sources.py` and in DECISIONS →
-Phase 3a). The first live run (2026-09-03) captured Google Play's listing (one
-Measured row) and the profile's first page, which refused twice against a
-shape the hand-written sample had guessed — the text's nesting and the
-half-star ratings (DECISIONS → Gotchas); A5 and A6 corrected the shape and the
-page parses: 40 reviews and the aggregate. The full 14-page scrape then ran:
-14 pages, 534 reviews, and the profile's aggregate (3.8 on 534 reviews,
-Measured); the DONE command passes on it.
-
-Amendments this phase, each approved and built: A2 (the snapshot key names its
-declaration and a same-key pair refuses; the stat row is one row per stat), A3
-(a changed attribution refuses; the sample declaration is a property, not a
-name; a hand entry names a source with no parser), A4 (every measure's bound
-is its column's and a refused batch loads nothing; the loader checks its
-closed sets; a capture's address is a declared page; `make confirm <target>`
-replaces the CONFIRM variable; the ranged peer anchors are placements), A5
-(the review text is a child of the review scope), A6 (a review's rating is a
-half-step, 1 to 5, exactly the scale the site declares) and A7 (a rebuild
-refuses a raw table that is not its declaration). A8, approved and built after
-round 4: the raw comparison is the whole declaration; the review loader loads
-a batch or nothing; the aggregate's declared scale is read; the confirm gate's
-claim is narrowed and written down; the database file and the label set are
-derived from the input. Review rounds 1–5 done and their plain fixes built
-(round 5's six: a column's position is the catalog's ordinal, the schema
-filters are pinned, a declaration the engine cannot run refuses with one line,
-a doubled bound refuses, every shape guard matches the whole value, one name
-for the capture directory). A9, approved and built after round 5: the confirm
-gate arms a gated goal or nothing and reads a goal list of make's own origin
-only; the declared-page writer writes a batch or nothing; the `sample` label
-is the sample declaration's row's.
-
-The exit pass ran 2026-09-03 in place of a sixth round (the coherence audit
-over the repo, code and security review scoped to A9): no blocker; its
-findings are fixed as suggested (goals serialised under `-j`, the stamp
-consumed in any state, the relay over the whole scratch block, every shape
-anchored, the anchors reader's profile guard) or stand as three BACKLOG rows
-with triggers, and the Delivered paragraph is appended. The PR is open. The
-DONE command is `make rebuild && make idempotency-check ROWS=captured`; Phase
-1's line stays green (raw 40 / staging 39); CI runs `ROWS=synthetic` and
-`ROWS=samples`. Phase 2 merged (PR #4). Next: the Phase 3a PR; then Phase 3b —
-Trustpilot.
+**Phase 3b — Trustpilot** (`phase-3b-trustpilot`, spec
+`specs/phase-3b-trustpilot.md`, APPROVED 2026-09-03 with amendment A1): being
+built. What a reader sees: the studied insurer's Trustpilot rating now carries
+a Measured point (3.9 on 1,072 reviews, read 2026-09-03) beside the Documented
+Trustpilot anchors already in the seed. How: the robots check found Trustpilot
+disallows our crawler on every path (`User-agent: *` → `Disallow: /`, our
+User-Agent in no named group), so — like the App Store listing — it is
+declared not fetchable and its rating and count are read by hand into
+`data/snapshots/manual_snapshots.csv`; the hand-read row carries the anchors'
+`fr-digital-first` profile, so the Measured point joins their series, not a new
+one. Amendment A1 (the terms check found Trustpilot not fetchable) dropped the
+planned JSON-LD parser and frozen sample — no page may be fetched, so none may
+be frozen; both are re-deferred to a future written authorization from
+Trustpilot (BACKLOG). The DONE command (`make rebuild && make
+idempotency-check ROWS=captured`) passes: 565 tests, idempotency OK, the
+Measured point reaches `peer_ratings` / `channel_gap` / `rating_trend`. Phase
+3a merged (PR #5, 2026-09-03). Next: the Phase 3b review gate and agents, then
+the PR. (Phase 3a's amendment history is in its spec and DECISIONS → Phase 3a.)
 
 Open BACKLOG rows: **22**.
 

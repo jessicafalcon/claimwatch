@@ -572,6 +572,38 @@ def test_the_tracked_manual_file_loads_and_names_no_address():
     assert text.splitlines()[0] == ",".join(MANUAL_COLUMNS)
 
 
+def test_trustpilot_hand_read_row_matches_its_anchor_seed():
+    """Phase 3b (A1), done-when 3: the hand-read Trustpilot source declares the
+    same (platform, profile, segment, channel) as the studied insurer's
+    Trustpilot anchor rows, so the Measured point and the Documented anchors are
+    one series in rating_trend / peer_ratings, never two (closes the BACKLOG row
+    'A fetched peer may not join its anchor's series')."""
+    src = by_name("fr-digital-first-trustpilot")
+    assert src.parser is None and src.fetchable is False
+    assert (src.platform, src.profile, src.segment, src.channel) == (
+        "trustpilot",
+        "fr-digital-first",
+        "digital-first",
+        "unsolicited",
+    )
+    anchors = [
+        r
+        for r in read_anchors()
+        if r["source"] == "trustpilot" and r["profile"] == "fr-digital-first"
+    ]
+    assert anchors, "the Trustpilot anchor series exists"
+    for r in anchors:
+        assert (r["segment"], r["channel"]) == (src.segment, src.channel)
+    # the tracked hand-read row loads on that same series, Measured (origin manual)
+    row = next(
+        r
+        for r in read_manual_snapshots()
+        if r["source"] == "trustpilot" and r["profile"] == "fr-digital-first"
+    )
+    assert row["origin"] == "manual" and row["captured_at"] == "2026-09-03"
+    assert row["rating"] == Decimal("3.900") and row["review_count"] == 1072
+
+
 def test_a_hand_entry_names_a_source_with_no_parser(tmp_path):
     """A3 (c): the set of sources a hand entry may name is exactly the set
     `hand_entries_are_unique` checks — those with no parser — so the App

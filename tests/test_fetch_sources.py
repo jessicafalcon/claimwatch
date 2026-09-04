@@ -209,6 +209,22 @@ def test_a_non_fetchable_source_is_refused_before_any_request_whatever_robots_sa
     assert not (tmp_path / declared.platform).exists()
 
 
+def test_trustpilot_source_declared_not_fetchable(tmp_path):
+    """Phase 3b (A1): Trustpilot's robots.txt disallows our crawler on every
+    path (`User-agent: *` -> `Disallow: /`), so the source is declared not
+    fetchable and refused before any request — like the App Store listing, its
+    figures are hand-read into manual_snapshots.csv."""
+    src = by_name("fr-digital-first-trustpilot")
+    assert src.platform == "trustpilot" and src.host == "www.trustpilot.com"
+    assert src.parser is None and src.pages == ()
+    assert src.fetchable is False and "Disallow: /" in src.terms
+    sites = Sites()
+    with pytest.raises(FetchRefused, match="not fetchable"):
+        scrape(src, tmp_path, client=_polite(sites, Clock()), stamp=lambda: STAMP)
+    assert sites.requests == []
+    assert not (tmp_path / src.platform).exists()
+
+
 def test_a_listing_page_outside_the_shape_is_kept_as_evidence_and_never_loaded(
     tmp_path,
 ):
