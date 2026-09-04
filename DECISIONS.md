@@ -667,9 +667,11 @@ renamed the rebuild input, closed five BACKLOG rows.
   `channel_gap` (B1.3), `platform_stats` (B1.4), `peer_ratings` (B2.3) are
   window selects over `stg_platform_snapshots`, each row carrying its point's
   tag; BACKING flips the four rows Pending → Documented with the anchors file
-  and the platform roots as sources; the flip to Measured is Phase 4's, when
-  scheduled captures make the series ours. SPEC.md's header and four panels
-  say so. Rejected: one shared mart under four rows; flipping to Measured on
+  and the platform roots as sources; the flip to Measured waits until the
+  points we measure make the series ours — NOT Phase 4 (Phase 4 gave the
+  fetched points a tracked home but decided the rows stay Documented, since a
+  handful of weekly points is not yet the series — see the Phase 4 entry).
+  SPEC.md's header and four panels say so. Rejected: one shared mart under four rows; flipping to Measured on
   a few 2026-09-02 points; leaving B1.4 Pending (the Opinion Assurances page
   and the anchors carry its numbers).
 - **A source is a declaration (pinned decision 3).** `ingest/sources.py::Source`
@@ -1048,3 +1050,59 @@ is NOT produced by `ingest/fetch.py`; the source stays `fetchable=False` and
 `make scrape` refuses it. The frozen sample (`fixtures/trustpilot/`) is a
 hand-written, nameless, brand-free capture in the export's exact column shape,
 so `ROWS=samples` runs the real parser without committing real reviews.
+
+### Phase 4
+
+Branch `phase-4-weekly-cron`, spec `specs/phase-4-weekly-cron.md`, APPROVED
+2026-09-03. A weekly GitHub Actions cron scrapes the fetchable sources and
+commits the new rating figures, so the time-series accrues while the rest is
+built (PROJECT_BRIEF §9). The developer chose ratings-only over also banking
+the review corpus weekly (2026-09-03): the misflagged-claim signal comes from
+the already-ingested corpus classified by review date (Beat 2, Phase 5), so
+the cron need not commit review bodies — and committing bodies would force the
+still-unwritten personal-data excerpt rule.
+
+- **The tracked path is a numbers-only file, not a tracked capture root.**
+  `data/snapshots/fetched_snapshots.csv` carries a source slug, the capture's
+  instant and the five figures; the address, profile, segment and channel come
+  from the declaration (D1), so no brand and no review body enters git. Rejected:
+  tracking the raw captures under `data/snapshots/` (commits review bodies —
+  health text — with no paraphrase rule written). Closes BACKLOG "Phase 4 has
+  no tracked path into `platform_snapshots`".
+- **A non-network `record-snapshots` harvests captures to the file.** `make
+  record-snapshots` reads the freshest capture per fetchable source via
+  `read_captures` (the one parser path, no duplicated extraction) and appends
+  each unseen `(source, captured_at)` as numbers; it fetches nothing and
+  deletes nothing, so it needs no `confirm` gate. Rejected: a rebuild
+  side-effect that writes a tracked file.
+- **`rebuild ROWS=captured` reads the tracked file too, and the overlap is a
+  no-op.** The fetched row's key `(platform, profile, fetch, pages[0], instant)`
+  and fingerprint equal its live-cache twin's exactly — the file stores the
+  capture's own instant and the loader derives the address as `pages[0]` (the
+  page every fetchable source carries its aggregate on) — so the double read
+  never double-counts. Pinned by `test_harvest.py::test_a_fetched_row_and_its_
+  cache_twin_are_one_row`. Rejected: reading the file instead of the cache
+  (hides a fresh point until the next commit); skipping capture snapshots under
+  `captured` (breaks `test_marts.py`'s Measured-fetched-point test).
+- **The workflow is `schedule` + `workflow_dispatch`, never `pull_request`.**
+  It runs on the repo's own trusted runner on a weekly cron; `make confirm
+  scrape` is one invocation (the goal gate arms — its `MAKECMDGOALS` origin is
+  make's own `default`, not an environment or command-line definition), then
+  `make record-snapshots`, then a commit of `data/snapshots/` only. This
+  **resolves the Phase 3a residual** "the confirm gate does not hold against an
+  environment that chooses what make reads or runs (`MAKEFILES`, `PATH`)" for
+  this context: no untrusted input drives the workflow, so its environment is
+  the runner's own. Rejected: refusing when `MAKEFILES` is set (moves the
+  boundary one variable, as Phase 3a found).
+- **The commit is one bot identity, a fixed brand-free message,
+  `data/snapshots/` only.** `data: weekly snapshot <YYYY-MM-DD>`; the message
+  is a literal in the tracked `weekly.yml`, so the D1 brand walk (`git
+  ls-files`) already scans it, and `test_weekly.py` asserts it. `contents:
+  write` is the whole token grant; the subtree limit is what the commit stages.
+  This handles the weekly commit under BACKLOG "The D1 walk covers tracked
+  files, not commit messages"; the general git-log walk over arbitrary commits
+  stays deferred there.
+- **B1.2–B1.4 stay Documented.** A handful of weekly points do not make the
+  series ours to call Measured (BACKING's rating-row note); the source cells
+  gain `data/snapshots/fetched_snapshots.csv` as the Measured points' tracked
+  home. Pinned by `test_backing.py`.

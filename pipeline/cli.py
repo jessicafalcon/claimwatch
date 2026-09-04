@@ -24,7 +24,15 @@ from ingest.captures import has_pages, parser_module
 from ingest.parsed import PageShapeError
 from ingest.politeness import MAX_PAGES
 from ingest.sources import SOURCES
-from pipeline.build import INPUTS, captures_for, idempotency_check, rebuild, reset
+from pipeline.build import (
+    FETCHED_SNAPSHOTS,
+    INPUTS,
+    captures_for,
+    idempotency_check,
+    rebuild,
+    record_snapshots,
+    reset,
+)
 from pipeline.metrics import reviews_per_month
 from pipeline.warehouse import ROOT, TARGETS, connect, database_for
 
@@ -214,6 +222,18 @@ def _do_scrape(args: argparse.Namespace) -> int:
     return 2 if refused else 0
 
 
+def _do_record_snapshots(args: argparse.Namespace) -> int:
+    """Non-network, non-destructive: read the captures already on disk under
+    data/cache and append this week's fetched snapshot figures to the tracked
+    `data/snapshots/fetched_snapshots.csv`, numbers only. No `confirm` gate —
+    it fetches nothing and deletes nothing. Idempotent: recording the same
+    capture twice writes no new row."""
+    new = record_snapshots()
+    shown = FETCHED_SNAPSHOTS.relative_to(ROOT)
+    print(f"record-snapshots: {new} new row(s) -> {shown}")
+    return 0
+
+
 def _do_idempotency(args: argparse.Namespace) -> int:
     target = resolve_choice(args.target, TARGETS, "duckdb")
     rows = resolve_choice(args.rows, INPUTS, "synthetic")
@@ -267,6 +287,7 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("scrape", add_help=False)
     p.add_argument("--source", default="")
     p.add_argument("--make-pid", dest="make_pid", default="")
+    sub.add_parser("record-snapshots", add_help=False)  # no user variable
 
     args = ap.parse_args(argv)
     dispatch = {
@@ -275,6 +296,7 @@ def main(argv: list[str] | None = None) -> int:
         "confirm": _do_confirm,
         "reset": _do_reset,
         "scrape": _do_scrape,
+        "record-snapshots": _do_record_snapshots,
     }
     try:
         return dispatch[args.command](args)

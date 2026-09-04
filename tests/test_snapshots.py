@@ -24,6 +24,7 @@ from pipeline.build import (
     MANUAL_SNAPSHOTS,
     idempotency_check,
     read_anchors,
+    read_fetched_snapshots,
     read_manual_snapshots,
     rebuild,
 )
@@ -541,10 +542,11 @@ def test_reseeding_reentering_and_rebuilding_add_no_snapshot_row(tmp_path):
 
 def test_the_only_tracked_files_under_data_are_hand_read_snapshot_csvs():
     """`data/` is gitignored but `data/snapshots/` is re-included whole, and
-    Phase 4's weekly commit will `git add` it: every tracked path under
-    `data/` must be a `data/snapshots/*.csv` that parses under the declared
-    eight columns — never a capture, a corpus extract or a file carrying
-    reviewer text (round 2, security-reviewer #5)."""
+    Phase 4's weekly commit `git add`s it: every tracked path under `data/`
+    must be a `data/snapshots/*.csv` that parses under one of the two declared
+    numbers-only shapes — the hand-read (`origin=manual`) or the fetched
+    (`origin=fetch`) — never a capture, a corpus extract or a file carrying
+    reviewer text (round 2, security-reviewer #5; Phase 4)."""
     import subprocess
 
     root = Path(__file__).resolve().parents[1]
@@ -557,8 +559,15 @@ def test_the_only_tracked_files_under_data_are_hand_read_snapshot_csvs():
         parts = Path(rel).parts
         assert parts[:2] == ("data", "snapshots") and len(parts) == 3, rel
         assert rel.endswith(".csv"), rel
-        rows = read_manual_snapshots(root / rel)  # the declared shape, or a refusal
-        assert all(r["origin"] == "manual" for r in rows), rel
+        parsed = None
+        for reader in (read_manual_snapshots, read_fetched_snapshots):
+            try:
+                parsed = reader(root / rel)  # the declared shape, or a refusal
+                break
+            except PageShapeError:
+                continue
+        assert parsed is not None, f"{rel} parses under neither declared shape"
+        assert all(r["origin"] in ("manual", "fetch") for r in parsed), rel
 
 
 def test_the_tracked_manual_file_loads_and_names_no_address():

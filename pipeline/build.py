@@ -32,7 +32,7 @@ import csv
 import hashlib
 import re
 import tempfile
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -104,12 +104,35 @@ MANUAL_COLUMNS = (
     "response_delay_days",
     "read_from",
 )
+# The fetched rating series' tracked home (spec Phase 4, pinned decision 1): a
+# numbers-only file under the one tracked subtree of data/, written by `make
+# record-snapshots` from the week's capture, read by `rebuild ROWS=captured`.
+# It names a source by its slug and carries only the capture's instant and the
+# five figures — the address, profile, segment and channel come from the
+# declaration (D1), so no brand and no review body ever enters the file. The
+# instant is the capture's own (`captured_at`, stamped once per fetch), so a
+# fetched row here and its live-cache twin share the snapshot key and the
+# double read is a no-op (invariant: offline-stable).
+FETCHED_SNAPSHOTS = ROOT / "data" / "snapshots" / "fetched_snapshots.csv"
+FETCHED_COLUMNS = (
+    "source",
+    "captured_at",
+    "rating",
+    "review_count",
+    "one_star_share",
+    "response_rate",
+    "response_delay_days",
+)
 # A shape guard matches the whole value: `fullmatch` at the call, and `\A…\Z`
 # in the shape itself so any other call matches whole too — a `$` under
 # `match` accepts a trailing newline, so `x\n` would pass as the slug `x`
 # (round 5, code-reviewer #6; exit pass, #8).
 _SLUG = re.compile(r"\A[a-z0-9-]+\Z")
 _DAY = re.compile(r"\A[0-9]{4}-[0-9]{2}-[0-9]{2}\Z")
+# A capture instant, the shape `ingest/captures.py` writes in each meta and the
+# fetched file carries as its `captured_at` (the snapshot key), so a fetched
+# row matches its live-cache twin exactly.
+_INSTANT = re.compile(r"\A[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\Z")
 
 
 def content_hash(row: dict[str, str]) -> str:
@@ -198,6 +221,20 @@ def _day(value: str, *, where: str, line: int, field: str) -> str:
         date.fromisoformat(value)
     except ValueError as exc:
         raise _refuse_row(where, line, field, f"is not a real day: {value!r}") from exc
+    return value
+
+
+def _stamp(value: str, *, where: str, line: int, field: str) -> str:
+    """A capture instant, `YYYY-MM-DDTHH:MM:SS` and a real one — the shape the
+    fetched file carries so its key matches the live capture's."""
+    if not _INSTANT.fullmatch(value):
+        raise _refuse_row(where, line, field, f"is not an instant: {value!r}")
+    try:
+        datetime.strptime(value, "%Y-%m-%dT%H:%M:%S")
+    except ValueError as exc:
+        raise _refuse_row(
+            where, line, field, f"is not a real instant: {value!r}"
+        ) from exc
     return value
 
 
@@ -312,6 +349,55 @@ def read_manual_snapshots(path: Path = MANUAL_SNAPSHOTS) -> list[dict[str, objec
                 **_measures(row, where=where, line=i),
                 "source_url": source.listing,
                 "captured_at": _day(
+                    row["captured_at"], where=where, line=i, field="captured_at"
+                ),
+                "seeded_from": "",
+            }
+        )
+    return out
+
+
+def read_fetched_snapshots(path: Path = FETCHED_SNAPSHOTS) -> list[dict[str, object]]:
+    """The tracked fetched series -> snapshot rows with `origin = fetch`
+    (Measured downstream). The row names a declared source that IS fetchable
+    and HAS a parser — the mirror of a hand entry (which names a source with no
+    parser) — since only such a source produces a fetched capture; the
+    address, profile, segment and channel come from its declaration, so the
+    file carries no brand and no review body. The address is the source's first
+    page (`pages[0]`), the page every declared fetchable source carries its
+    aggregate on, so a fetched row's key equals its live-cache twin's and the
+    two never double-count. A missing file is zero rows (a clone before the
+    first weekly run)."""
+    if not path.is_file():
+        return []
+    where = str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path)
+    out: list[dict[str, object]] = []
+    for i, row in enumerate(_read_csv(path, FETCHED_COLUMNS), 2):
+        try:
+            source = by_name(row["source"])
+        except KeyError as exc:
+            raise _refuse_row(
+                where, i, "source", f"is not a declared source: {row['source']!r}"
+            ) from exc
+        if not (source.fetchable and source.parser is not None):
+            raise _refuse_row(
+                where,
+                i,
+                "source",
+                f"{row['source']!r} is not a fetchable, parsed source: a fetched "
+                "row names a source the weekly scrape reads into a capture",
+            )
+        out.append(
+            {
+                "where": f"{where}: line {i}",
+                "source": source.platform,
+                "profile": source.profile,
+                "segment": source.segment,
+                "channel": source.channel,
+                "origin": "fetch",
+                **_measures(row, where=where, line=i),
+                "source_url": source.pages[0],
+                "captured_at": _stamp(
                     row["captured_at"], where=where, line=i, field="captured_at"
                 ),
                 "seeded_from": "",
@@ -764,6 +850,63 @@ def captures_for(
     return []
 
 
+def harvest_snapshots(
+    cache_root: str | Path | None = None,
+) -> list[dict[str, str]]:
+    """The week's fetched snapshots as tracked-file rows: for every declared
+    fetchable, parsed source, each capture's snapshot as a source slug, the
+    capture's instant and the five figures in one canonical spelling — nothing
+    else, so no address and no review body leaves the capture. Reuses
+    `read_captures` (the one parser path); reads captures from disk, never the
+    network."""
+    from ingest import sources  # the module attribute, so tests can redirect it
+
+    root = Path(cache_root) if cache_root is not None else sources.CACHE_ROOT
+    rows: list[dict[str, str]] = []
+    for s in SOURCES:
+        if not (s.fetchable and s.parser is not None):
+            continue
+        for _capture_id, parsed in read_captures(root / s.platform / s.name, s):
+            for snap in parsed.snapshots:
+                rows.append(
+                    {
+                        "source": s.name,
+                        "captured_at": str(snap["captured_at"]),
+                        **{f: _canonical(snap.get(f, "")) for f in _FIGURES},
+                    }
+                )
+    return rows
+
+
+def record_snapshots(
+    path: str | Path = FETCHED_SNAPSHOTS, cache_root: str | Path | None = None
+) -> int:
+    """Append this week's fetched snapshots to the tracked file, numbers only,
+    and return how many rows were new. A `(source, captured_at)` already in the
+    file is left alone (re-recording the same capture is a no-op), so the write
+    is idempotent; the file is rewritten in a stable `(source, captured_at)`
+    order so a re-record with nothing new leaves a byte-identical file and an
+    empty git diff. A missing file starts from the header."""
+    path = Path(path)
+    existing = _read_csv(path, FETCHED_COLUMNS) if path.is_file() else []
+    seen = {(r["source"], r["captured_at"]) for r in existing}
+    new = 0
+    merged = {(r["source"], r["captured_at"]): r for r in existing}
+    for r in harvest_snapshots(cache_root):
+        key = (r["source"], r["captured_at"])
+        if key not in seen:
+            seen.add(key)
+            new += 1
+        merged[key] = {c: r[c] for c in FETCHED_COLUMNS}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8", newline="") as fh:
+        writer = csv.DictWriter(fh, fieldnames=FETCHED_COLUMNS)
+        writer.writeheader()
+        for key in sorted(merged):
+            writer.writerow(merged[key])
+    return new
+
+
 def rebuild(
     target: str = "duckdb",
     rows: str = "none",
@@ -772,10 +915,12 @@ def rebuild(
     run_id: str | None = None,
     cache_dir: str | Path | None = None,
     manual_file: str | Path | None = None,
+    fetched_file: str | Path | None = None,
 ) -> dict[str, int]:
     """Build the warehouse from raw and return the per-table row counts.
-    `captured` loads the anchors, the hand-entry file and every capture under
-    data/cache (zero captures -> the anchors and the file); `none` runs the
+    `captured` loads the anchors, the hand-entry file, the tracked fetched
+    file and every capture under data/cache (zero captures -> the anchors and
+    the two files); `none` runs the
     pipeline end to end with zero rows; `synthetic` loads the review fixture
     and the anchors; `samples` loads the anchors and the frozen samples
     through the real parsers. Every input goes through the same guards. The
@@ -800,6 +945,12 @@ def rebuild(
         if rows == "captured":
             path = Path(manual_file) if manual_file is not None else MANUAL_SNAPSHOTS
             load_snapshots(conn, read_manual_snapshots(path), run_id or "manual", rows)
+            fetched = (
+                Path(fetched_file) if fetched_file is not None else FETCHED_SNAPSHOTS
+            )
+            load_snapshots(
+                conn, read_fetched_snapshots(fetched), run_id or "fetched", rows
+            )
         for source, capture_dir, prefix in captures_for(rows, cache_dir):
             for capture_id, parsed in read_captures(capture_dir, source):
                 stamp = prefix if rows == "samples" else f"{prefix}/{capture_id}"
@@ -817,6 +968,7 @@ def idempotency_check(
     *,
     cache_dir: str | Path | None = None,
     manual_file: str | Path | None = None,
+    fetched_file: str | Path | None = None,
 ) -> tuple[bool, dict[str, int], dict[str, int]]:
     """Rebuild twice into one fresh database (different `run_id` each time, to
     prove `run_id` is not in the natural key) and compare per-table counts. Uses a
@@ -829,6 +981,7 @@ def idempotency_check(
             run_id="run-1",
             cache_dir=cache_dir,
             manual_file=manual_file,
+            fetched_file=fetched_file,
         )
         second = rebuild(
             target,
@@ -837,6 +990,7 @@ def idempotency_check(
             run_id="run-2",
             cache_dir=cache_dir,
             manual_file=manual_file,
+            fetched_file=fetched_file,
         )
     return first == second, first, second
 
