@@ -26,6 +26,7 @@ import hashlib
 import io
 import re
 from datetime import date
+from decimal import Decimal
 from pathlib import Path
 
 from ingest.parsed import Parsed, refuse, review_rating
@@ -104,7 +105,7 @@ _MONTHS = {
 _SEP = "\x1f"  # the external-id payload separator (unit separator; not in text)
 
 
-def _rating(value: str, page_url: str, item: str):
+def _rating(value: str, page_url: str, item: str) -> Decimal:
     """The review's rating from the star-image URL, or a refusal naming the
     field: the URL must be a Trustpilot star URL and its number a half-step
     1..5 (`parsed.REVIEW_RATINGS`)."""

@@ -127,7 +127,10 @@ place and never deleted.
     joins the Trustpilot anchors' series. The review-profile parser and a frozen
     sample are not built — no page may be fetched, so none may be frozen — and
     are re-deferred to a future written authorization (BACKLOG). ([Phase
-    3b](#phase-3b))
+    3b](#phase-3b)) *Superseded by [Phase 3c](#phase-3c) (partly): the
+    authorization arrived, so the reviews are now imported OFFLINE (a parser on
+    a second source); the crawler ban stands, so the source stays
+    `fetchable=False`.*
 - **An address that spells the brand is a sourced data point and lives in
   `ingest/sources.py` only (Phase 3a, decision D1).** A store package id or a
   profile path names the insurer where a numeric store id does not. It may
@@ -965,7 +968,10 @@ series (`fixtures/anchors/platform_snapshots_seed.csv`).
   the catch-all (evasion — never); the Trustpilot Business API (a paid,
   credentialed dependency — a STOP-and-ask, out of scope). The parser and
   sample are re-deferred to a future written authorization (BACKLOG). Approved
-  by the developer 2026-09-03 after the robots check.
+  by the developer 2026-09-03 after the robots check. *Superseded by [Phase
+  3c](#phase-3c) (partly): the authorization arrived, so the parser and sample
+  are built and the reviews imported OFFLINE on a second source; the crawler
+  ban stands, so the source stays `fetchable=False` and is never fetched.*
 - **The hand-read point reuses its anchor's profile.** The declaration's
   `profile` is `fr-digital-first`, exactly the Trustpilot anchors' profile, so
   `rating_trend` / `peer_ratings` keyed on `(source, profile)` read one series,

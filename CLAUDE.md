@@ -509,7 +509,7 @@ from the star-image URL, the date from a locale-independent `Month D, YYYY`,
 and drops every personal column. Amendment A1 chose the two-source split over
 flipping the snapshot source (which `read_manual_snapshots` would refuse). The
 DONE command (`make rebuild && make idempotency-check ROWS=captured`) passes:
-1,050 rows reach `stg_reviews`, idempotent, the rating point unchanged; 587
+1,050 rows reach `stg_reviews`, idempotent, the rating point unchanged; 588
 tests pass; lint clean. Phase 3b merged. Next: the Phase 3c review gate and
 agents, then the PR. (Earlier amendment history is in each spec and DECISIONS.)
 

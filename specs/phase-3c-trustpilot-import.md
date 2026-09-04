@@ -1,4 +1,4 @@
-# Phase 3c — Trustpilot, authorized import (PROPOSED)
+# Phase 3c — Trustpilot, authorized import (APPROVED)
 
 Contract for the `phase-3c-trustpilot-import` branch. Source: PROJECT_BRIEF.md
 §6 (the Trustpilot figures) and the Phase 3b amendment A1's deferral — "the
