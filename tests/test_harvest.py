@@ -131,12 +131,20 @@ def test_a_fetched_row_and_its_cache_twin_are_one_row(tmp_path):
     both_root.mkdir()
     only_root.mkdir()
     both = rebuild(
-        "duckdb", "captured", root=both_root,
-        cache_dir=cache, manual_file=manual, fetched_file=fetched,
+        "duckdb",
+        "captured",
+        root=both_root,
+        cache_dir=cache,
+        manual_file=manual,
+        fetched_file=fetched,
     )
     only = rebuild(
-        "duckdb", "captured", root=only_root,
-        cache_dir=cache, manual_file=manual, fetched_file=empty,
+        "duckdb",
+        "captured",
+        root=only_root,
+        cache_dir=cache,
+        manual_file=manual,
+        fetched_file=empty,
     )
     assert both["raw_platform_snapshots"] == only["raw_platform_snapshots"]
 
