@@ -317,6 +317,132 @@ def test_the_tracked_trustpilot_hand_read_row_reaches_the_marts_in_its_anchor_se
     ) == [("unsolicited", Decimal("3.900"), 1072, "Measured")]
 
 
+def test_review_tables_have_no_personal_columns(anchors_db):
+    """Phase 3c done-when 3 / §2.5: the review tables hold no reviewer identity
+    — the parser can write a name, avatar or country into no column because
+    none exists. The column set is exactly the raw-review fields."""
+    from pipeline import warehouse
+
+    expected = {
+        "source",
+        "external_id",
+        "source_url",
+        "captured_at",
+        "run_id",
+        "review_date",
+        "rating",
+        "title",
+        "body",
+        "content_hash",
+    }
+    personal = {
+        "name",
+        "name2",
+        "reviewer",
+        "avatar",
+        "image",
+        "addresscountry",
+        "country",
+    }
+    conn = connect("duckdb", database=anchors_db)
+    try:
+        for table in ("raw_reviews", "stg_reviews"):
+            cols = {
+                r[0]
+                for r in conn.execute(
+                    "select column_name from information_schema.columns "
+                    "where table_schema = ? and table_name = ?",
+                    [warehouse.default_schema(conn), table],
+                ).fetchall()
+            }
+            assert cols == expected, table
+            assert not (cols & personal), table
+    finally:
+        conn.close()
+
+
+def _trustpilot_capture(cache, source, reviews, captured_at="2026-09-04T12:00:00"):
+    """Write an authorized-export capture (`page-1.csv` + meta) for `source`
+    into `cache`, addressed to the source's declared page — read from the
+    declaration, never a brand literal in this file (D1). `reviews` is
+    (title, body, stars, 'Month D, YYYY') tuples."""
+    import csv
+    import io
+    import json
+
+    from ingest.trustpilot import COLUMNS
+
+    capdir = cache / source.platform / source.name / captured_at.replace(":", "-")
+    capdir.mkdir(parents=True)
+    buf = io.StringIO()
+    w = csv.DictWriter(buf, fieldnames=COLUMNS)
+    w.writeheader()
+    for i, (title, body, stars, day) in enumerate(reviews, 1):
+        row = {c: "" for c in COLUMNS}
+        row.update(
+            web_scraper_order=f"c{i}",
+            web_scraper_start_url=source.pages[0],
+            headline=title,
+            reviewbody=body,
+            data3=day,
+            rating=f"https://cdn.trustpilot.net/brand-assets/4.1.0/stars/stars-{stars}.svg",
+        )
+        w.writerow(row)
+    (capdir / "page-1.csv").write_text("﻿" + buf.getvalue(), encoding="utf-8")
+    (capdir / "page-1.meta.json").write_text(
+        json.dumps(
+            {"source_url": source.pages[0], "captured_at": captured_at, "status": 200}
+        ),
+        encoding="utf-8",
+    )
+
+
+def test_trustpilot_rating_point_unchanged_by_corpus(tmp_path):
+    """Central constraint / done-when 4: loading the authorized review corpus
+    does not move the hand-read 3.9/1,072 rating point. The reviews are a
+    separate source with no snapshot, so rating_trend/peer_ratings/channel_gap
+    read the same figures as `test_the_tracked_trustpilot_hand_read_row…` pins
+    with an empty cache — here the corpus is present and they are identical."""
+    from ingest.sources import by_name
+    from pipeline.build import MANUAL_SNAPSHOTS
+
+    src = by_name("fr-digital-first-trustpilot-reviews")
+    cache = tmp_path / "cache"
+    _trustpilot_capture(
+        cache,
+        src,
+        [
+            ("Bien", "Corps un.", 5, "August 1, 2026"),
+            ("Mal", "Corps deux.", 1, "July 2, 2026"),
+        ],
+    )
+    db = database_for("captured", tmp_path)
+    rebuild(
+        "duckdb",
+        "captured",
+        root=tmp_path,
+        cache_dir=cache,
+        manual_file=MANUAL_SNAPSHOTS,
+    )
+    # the corpus loaded …
+    assert _query(
+        db, "select count(*) from stg_reviews where source = 'trustpilot'"
+    ) == [(2,)]
+    # … and the rating series is exactly the hand-read-only pins, unmoved.
+    key = "source = 'trustpilot' and profile = 'fr-digital-first'"
+    assert _query(
+        db, f"select month, rating, tag from rating_trend where {key} order by month"
+    ) == [
+        ("2025-01", Decimal("4.200"), "Documented"),
+        ("2025-09", Decimal("3.800"), "Documented"),
+        ("2026-06", Decimal("3.900"), "Documented"),
+        ("2026-09", Decimal("3.900"), "Measured"),
+    ]
+    assert _query(
+        db, f"select rating, review_count, tag from peer_ratings where {key}"
+    ) == [(Decimal("3.900"), 1072, "Measured")]
+
+
 def test_a_same_day_measured_point_stands_in_front_of_an_anchor_in_every_mart(
     tmp_path,
 ):

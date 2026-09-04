@@ -225,6 +225,23 @@ def test_trustpilot_source_declared_not_fetchable(tmp_path):
     assert not (tmp_path / src.platform).exists()
 
 
+def test_trustpilot_reviews_is_authorized_offline_import(tmp_path):
+    """Phase 3c (A1): the reviews are a SECOND trustpilot source, read from an
+    authorized export saved as a capture — a parser is set, but `fetchable`
+    stays False, so our crawler never runs against Trustpilot. `scrape` refuses
+    it before any request; the rebuild reads it from disk instead."""
+    src = by_name("fr-digital-first-trustpilot-reviews")
+    assert src.platform == "trustpilot" and src.host == "ca.trustpilot.com"
+    assert src.parser == "trustpilot" and src.fetchable is False
+    assert len(src.pages) == 1 and src.pages[0].startswith("https://ca.trustpilot.com/")
+    assert "authorization" in src.terms and "2026-09-04" in src.terms
+    sites = Sites()
+    with pytest.raises(FetchRefused, match="not fetchable"):
+        scrape(src, tmp_path, client=_polite(sites, Clock()), stamp=lambda: STAMP)
+    assert sites.requests == []
+    assert not (tmp_path / src.platform / src.name).exists()
+
+
 def test_a_listing_page_outside_the_shape_is_kept_as_evidence_and_never_loaded(
     tmp_path,
 ):

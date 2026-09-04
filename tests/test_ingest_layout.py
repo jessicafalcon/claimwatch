@@ -303,7 +303,7 @@ ADDRESS_WORDS = frozenset(
     "apple apps app itunes rss customerreviews sortby mostrecent "
     "google play store details "
     "opinion assurances assureur page "
-    "trustpilot review".split()
+    "trustpilot review ca languages all".split()
 )
 
 

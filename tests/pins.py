@@ -134,6 +134,24 @@ OA_SAMPLE_SNAPSHOT = ("3.600", 512)
 # `ROWS=samples` carries a half star through the real parser and the real
 # `decimal(2, 1)` column (A6). (review_date, rating as the column spells it.)
 OA_SAMPLE_HALF_STEP = ("2026-08-18", "4.5")
+# fixtures/trustpilot/: a hand-written export in webscraper.io's column shape —
+# four reviews (5, 1, 4 and 3 stars; the 3-star is rating-only, empty body) on
+# one page, no snapshot (the rating stays hand-read, Phase 3c). external_id is
+# a content hash, so it is pinned by shape, not value.
+TRUSTPILOT_SAMPLE_PAGES = 1
+TRUSTPILOT_SAMPLE_RAW_ROWS = 4
+TRUSTPILOT_SAMPLE_STG_ROWS = 4
+TRUSTPILOT_SAMPLE_CAPTURED_AT = "2026-09-01T10:00:00"
+TRUSTPILOT_SAMPLE_REVIEWS_PER_MONTH = (
+    ("trustpilot", "2026-06", 1),
+    ("trustpilot", "2026-07", 1),
+    ("trustpilot", "2026-08", 1),
+    ("trustpilot", "2026-09", 1),
+)
+
 # `ROWS=samples`: every frozen sample through its parser, plus the anchors.
-SAMPLES_RAW_REVIEWS = APP_STORE_SAMPLE_RAW_ROWS + OA_SAMPLE_RAW_ROWS
+SAMPLES_RAW_REVIEWS = (
+    APP_STORE_SAMPLE_RAW_ROWS + OA_SAMPLE_RAW_ROWS + TRUSTPILOT_SAMPLE_RAW_ROWS
+)
 SAMPLES_RAW_SNAPSHOTS = ANCHOR_ROWS + 1 + 1  # the listing's row and the profile's
+# (the trustpilot sample emits no snapshot: its rating stays hand-read)

@@ -32,9 +32,9 @@ feed/listing split:
   `fetchable=False`, its hand-read 3.9/1,072 Measured point kept.
 - A **new** source `fr-digital-first-trustpilot-reviews` reads the corpus:
   `platform="trustpilot"`, `parser="trustpilot"`, `fetchable=False`,
-  `host="ca.trustpilot.com"` (the export's start_url host, not `www`),
-  `pages=("https://ca.trustpilot.com/review/alan.com?languages=all",)`, its
-  authorized-export capture under `data/cache/trustpilot/`.
+  `host="ca.trustpilot.com"` (the export's start_url host, not `www`), the one
+  authorized profile page (its address lives only in `ingest/sources.py`, D1),
+  its authorized-export capture under `data/cache/trustpilot/`.
 
 This strengthens the central constraint: the rating series is unchanged **by
 construction**, because its source never changes. Done-when **1** and Scope
@@ -114,7 +114,7 @@ make rebuild && make idempotency-check ROWS=captured
 
 | Done-when | Proof (test id / `make` target / output line) |
 |---|---|
-| 1 | `make rebuild ROWS=captured` prints "stg_reviews … 1050"; `tests/test_fetch_sources.py::test_trustpilot_reviews_is_authorized_offline_import` |
+| 1 | `make rebuild ROWS=captured` loads the 1,050 Trustpilot rows into `stg_reviews` (developer-run: the real export is gitignored, so the tracked proofs are the declaration test and the frozen sample below); `tests/test_fetch_sources.py::test_trustpilot_reviews_is_authorized_offline_import` |
 | 2 | `tests/test_ingest_trustpilot.py::test_rating_only_from_known_star_svg`, `::test_unparseable_date_refuses` |
 | 3 | `tests/test_ingest_trustpilot.py::test_dropped_columns_reach_no_field`; `tests/test_marts.py::test_review_tables_have_no_personal_columns` |
 | 4 | `tests/test_marts.py::test_trustpilot_rating_point_unchanged_by_corpus` |
