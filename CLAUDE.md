@@ -76,18 +76,26 @@ in the middle, and come out on the right as the numbers the study shows.
 - `pyproject.toml`, `uv.lock`, `.python-version`, `.pre-commit-config.yaml` —
   the toolchain (uv, ruff, pytest, pre-commit), versions pinned in lockstep.
 - `sql/raw/`, `sql/staging/`, `sql/marts/` — plain SQL, one file per table:
-  reviews (`raw_reviews`, `stg_reviews`), platform snapshots
+  reviews (`raw_reviews` carrying each review's `segment`, stamped at load;
+  `stg_reviews`), platform snapshots
   (`raw_platform_snapshots`, `stg_platform_snapshots` with each row's tag),
-  the declared page addresses with their attribution (`raw_source_pages`,
-  joined on exact `source_url`), and the four Beat 1–2 marts they feed
+  the declared page addresses with their attribution (`raw_source_pages`, the
+  declared-page registry captures are checked against — NOT how a review gets
+  its segment, since Phase 7a A1), and the four Beat 1–2 marts they feed
   (`rating_trend`, `channel_gap`, `platform_stats`, `peer_ratings`); plus
   `classifier_quality` (B2.4, Beat 2), the first Python-fed mart — its `.sql` is
   DDL only (the shape), the CLI classify step scores the held-out fold and
-  inserts (Phase 6b);
+  inserts (Phase 6b); plus `stg_classified_reviews` (the persisted review × theme
+  classification, Python-fed) and the two theme-share marts over it,
+  `theme_share_by_month` (B2.2) and `theme_share_by_segment` (B2.5), grouped by
+  the review's `segment` (Phase 7a);
   `pipeline/` —
   `warehouse.py` (the one place that knows DuckDB from Snowflake), `build.py`
-  (raw→staging→marts; `write_classifier_quality` fills the B2.4 mart from the
-  gate's scores), `cli.py`/`__main__.py` (the validating `make` entry),
+  (raw→staging→marts; the review load stamps `segment`;
+  `write_classifier_quality` fills the B2.4 mart; `write_classified_reviews` +
+  `build_theme_share_marts` fill B2.2/B2.5, run by the classify step and
+  excluded from the generic marts loop), `cli.py`/`__main__.py` (the validating
+  `make` entry),
   `sql_lint.py` (the portability/clock denylist the tests use),
   `metrics.py` (reviews per month — a pinned query, not a mart; folds into
   B5.2 in Beat 5), `label_sample.py` (the `make label-sample` draw — reads
@@ -185,7 +193,13 @@ in the middle, and come out on the right as the numbers the study shows.
   classifier on the held-out fold (fold 4) and writes the `classifier_quality`
   mart (B2.4, precision + recall per label, Measured), printing a one-line gate
   summary; the mart reflects whatever classifier ran, so with no key it is
-  rules-only and honest (Phase 6b). `ROWS` names what is
+  rules-only and honest (Phase 6b). It also persists the classification to
+  `stg_classified_reviews` and builds the two theme-share marts —
+  `theme_share_by_month` (B2.2) and `theme_share_by_segment` (B2.5), the share of
+  each theme by segment, `unclassified` shown as its own band; the marts group by
+  the review's `segment` (stamped at load) and reflect whatever classifier ran,
+  so the no-key run populates them rules-only and honest (Phase 7a). `ROWS` names
+  what is
   loaded; each input builds its own database file, so a sample never lands in the
   corpus. The default,
   `captured`, loads the anchors, the hand-read rows in
@@ -553,31 +567,32 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 ## Current status
 
-**Phase 6b — held-out eval gate + classifier_quality mart** (`phase-6b-eval-gate`,
-spec `specs/phase-6b-eval-gate.md`, APPROVED 2026-09-04): built, round 1 applied. The
-second half of the Phase 6 split: the gate that grades the classifier on the fold
-it never saw, and the one BACKING row this phase populates. `classify/eval/gate.py`
-scores precision AND recall per label on the held-out fold alone (fold 4):
-`hits = |predicted ∩ actual|`, `precision = hits/predicted`, `recall = hits/actual`,
-each `None` on a zero denominator; like 5b's `precision.py` it takes predictions in
-and reads the answer key inside the wall. `classifier_quality` (B2.4) is the first
-Python-fed mart: its `.sql` is DDL only (the shape), and the CLI classify step
-scores fold 4 and inserts one row per label, tagged Measured, carrying a computed
-metric's provenance (`answer_key`, `heldout_fold`, `run_id` — no `source_url`, no
-`captured_at`, no clock). B2.4 flips Pending → Measured (upstream source
-`classify/eval/labels.csv`); B2.2/B2.5 stay Pending (Phase 7). `make rebuild` now
-writes the mart and prints a one-line gate summary. The mart reflects whatever
-classifier ran, so with no key it is rules-only and honest. DONE: `make rebuild
-ROWS=synthetic && make idempotency-check ROWS=synthetic && make check-backing &&
-make test`, green with the key unset. `make test` passes: 722 tests, 18 new. On
-the synthetic corpus fold 4 is 5 clear reviews (rules score every present label
-1.0/1.0, two labels `None`), pinned in `tests/pins.py`; the formula (a disagreement
-< 1) is proven by a crafted unit test. No new dependency. Review round 1 passed
-(code-reviewer, functionality-tester, study-editor, coherence-auditor; security
-not triggered): applied amendment A1 (grade only reviews both classified and
-labeled, so `ROWS=captured` leaves the mart empty rather than a garbage Measured
-number), two pinning tests, and the branch/spec-file renamed to the single form.
-Next: PR.
+**Phase 7a — findings marts: theme share** (`phase-7a-findings-marts`, spec
+`specs/phase-7a-findings-marts.md`, APPROVED 2026-09-04, amendment A1): built,
+pre-review. Phase 7 cut to its deterministic half (7b is the DAMIR slice + fitted
+distributions). `classify_all`'s output is persisted to `stg_classified_reviews`
+(review × theme grain, Python-fed), and two portable `create … as select` marts
+count it: `theme_share_by_month` (B2.2) and `theme_share_by_segment` (B2.5), one
+row per (month/segment, label) with `reviews`, `theme_rows`, `share`, tagged
+Measured; `unclassified` is its own row — the gray band, largest with no key. The
+classify step fills the classification and runs the two marts (they read a
+Python-filled table, so they are excluded from the generic marts loop).
+**Amendment A1:** a review's `segment` is stamped onto the review at load
+(`raw_reviews.segment`), not joined at query time — the documented `source_url`
+join matches 0/39 on synthetic and the `source`/platform slug is two segments on
+`samples`, so no query-time key works everywhere; the marts group by
+`stg_reviews.segment`. B2.2/B2.5 flip Pending → Measured (upstream the review
+platforms); B1.1/B2.1 stay Pending (Documented, no mart, Phase 9). The corpus is
+all `digital-first`, so the "vs traditional" half is empty (BACKLOG; noted beside
+B2.5). DONE: `make rebuild ROWS=synthetic && make idempotency-check
+ROWS=synthetic && make check-backing && make test`, green with the key unset:
+729 tests (8 new), check-backing 19 rows / 7 marts. No new dependency. Next:
+review round 1.
+
+Phase 6b (held-out eval gate + `classifier_quality` mart, B2.4) merged to `main`
+(PR #13, 2026-09-04): `classify/eval/gate.py` scores precision + recall per label
+on the held-out fold alone; the first Python-fed mart, filled by the CLI classify
+step; the no-key run populates it rules-only and honest.
 
 Phase 6a (model fallback + graceful degradation) merged to `main` (PR #12,
 2026-09-04): the one model call site (`classify/llm.py`, `MODEL =
@@ -592,6 +607,6 @@ sample + the labels wall) merged (PR #10, 2026-09-04). Phase 4 (the weekly cron)
 merged (PR #8, 2026-09-03); the docs hotfix merged (PR #9, 2026-09-04). (Earlier
 phase and amendment history is in each spec and DECISIONS.)
 
-Open BACKLOG rows: **26**.
+Open BACKLOG rows: **27**.
 
 (Update this section at the end of every working day.)

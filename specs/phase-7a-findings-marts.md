@@ -205,7 +205,7 @@ Freeze: none
 - [ ] `BACKING.md` — B2.2, B2.5 Pending → Measured; fill their upstream source.
 - [ ] `SPEC.md` — B2.2/B2.5 panels: drop the "(Pending until its mart lands)"
   notes (status, not a chart change).
-- [ ] `README.md` — Beat 2 / commands: `rebuild` builds the theme-share marts.
+- [ ] README — none (no README.md yet; it is a Phase 9 output).
 - [ ] this spec — the "Delivered" paragraph appended at exit.
 
 ## Threat model (REQUIRED when the phase adds a `make` target that takes a variable, deletes anything, calls a paid API, or touches the network)

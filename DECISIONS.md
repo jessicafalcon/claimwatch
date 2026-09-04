@@ -1437,6 +1437,68 @@ clear held-out reviews). `make test` (722 tests, 18 new), `make rebuild
 ROWS=synthetic`, `make idempotency-check ROWS=synthetic` and `make check-backing`
 (B2.4 Measured) are green with no key.
 
+### Phase 7a
+
+Branch `phase-7a-findings-marts`, spec `specs/phase-7a-findings-marts.md`,
+APPROVED 2026-09-04. Phase 7 cut to its deterministic first half: the
+classifier-fed theme-share marts. The open-data half (DAMIR slice + fitted cost
+distributions) is Phase 7b.
+
+- **The classification is persisted to `stg_classified_reviews`, then two
+  marts count it in SQL.** `classify_all` returned a value only (6a); Phase 7a
+  writes it at the `(source, external_id, theme)` grain to a Python-fed staging
+  table, so `theme_share_by_month` (B2.2) and `theme_share_by_segment` (B2.5)
+  are portable `create … as select` marts over it — SQL does the aggregation,
+  the Portability contract holds. *Rejected: aggregating in Python (pandas-free
+  counting, and SQL is where the work belongs).*
+- **The classify step runs the two theme marts, after filling
+  `stg_classified_reviews`; `build_derived`'s marts loop excludes them
+  (`POST_CLASSIFY_MARTS`).** They read a table Python fills between staging and
+  the rest, so running them in the generic marts pass would build them empty.
+  *Rejected: reordering `build_derived` into staging→classify→marts (a wider
+  refactor that also forces `classifier_quality`'s DDL to become
+  non-destructive); running them empty then again (pointless double build).*
+- **Amendment A1: a review's segment is stamped onto the review at load time
+  (`raw_reviews.segment`), not joined at query time.** The marts split by
+  segment. `raw_source_pages` was built to supply it by an exact `source_url`
+  join, but that join matches 0/39 on the synthetic corpus (the fixture's
+  `source_url` is a brand-free host root, not a page address) and the
+  `source`/platform slug is declared under two segments on the `samples` input
+  (real `digital-first` + the per-parser `sample`), so no query-time key
+  resolves segment on every input. A review is loaded from exactly one source
+  whose `segment` is known in Python then, so `raw_reviews` gains a `segment`
+  column (outside the content hash — attribution, like `run_id`), stamped from
+  the source (`segment_by_platform` for the segment-less synthetic fixture);
+  the marts group by `stg_reviews.segment`, unambiguous on synthetic, captured
+  and samples. An existing pre-7a database refuses the rebuild (the A8
+  column-check) until `make confirm reset`; CI builds fresh. *Rejected: the
+  `source_url` join (0/39 synthetic); the `source`/platform join (two segments
+  per platform on samples); re-freezing the synthetic reviews to carry page
+  addresses (would inject real-brand URLs into the brand-free corpus).* Decided
+  with the developer; committed as the spec amendment alone before the code.
+- **The marts carry the Measured tag as their provenance — no `run_id`,
+  `source_url` or `captured_at`.** A computed share has no address or capture
+  instant; `month` is `substr(review_date, 1, 7)`, the review's own date (no
+  clock). The inputs (`reviews`, `theme_rows`) are stored so `share =
+  theme_rows/reviews` redoes by hand, and `run_id` lives one hop upstream on
+  `stg_classified_reviews`. *Rejected: a scalar `run_id` on a `create … as
+  select` mart (no way to inject it in static SQL without templating; the
+  upstream table carries it).*
+- **B2.2/B2.5 flip Pending → Measured; upstream the four review platforms.**
+  The numbers are the gated classifier's own output over the review corpus,
+  counted. B1.1 (hero case) and B2.1 (taxonomy examples) stay Pending — they are
+  Documented rows with no mart, flipping when their prose is curated with links
+  (Phase 9). *Rejected: Modeled (a count, not a model).*
+- **The "vs traditional" half is empty.** Every declared source is
+  `digital-first`; the marts split by whatever segments the data has. Recorded
+  as a BACKLOG row (revisit when a traditional-mutuelle source is added), noted
+  beside the B2.5 panel in SPEC.
+
+The multi-segment guard the first design needed is gone with A1 (segment is a
+review column, unambiguous). `make rebuild ROWS=synthetic`, `make
+idempotency-check ROWS=synthetic`, `make check-backing` (B2.2/B2.5 Measured) and
+`make test` (729 tests) are green with no key.
+
 Review round 1 (code-reviewer, functionality-tester, study-editor, coherence-
 auditor; security-reviewer not triggered — no sensitive surface): no blockers.
 **Amendment A1** applied (spec) — the gate found by the code-reviewer to grade
