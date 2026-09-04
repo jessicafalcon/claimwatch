@@ -216,3 +216,15 @@ RULES_TUNING_REVIEWS = STG_REVIEWS_ROWS - SYNTHETIC_HELDOUT_REVIEW_IDS  # 39 - 5
 # the model), over the tuning folds. The rules decide the clear cases and leave
 # the rest — a decided share below 1 is the point of the layer.
 RULES_DECIDED = 27
+
+# --- Phase 6a: the combined classification over the full synthetic corpus ---
+
+# The rules + model combiner runs over every staged review (not just the tuning
+# folds — the held-out fold is special only for 6b's grading). With NO key the
+# model never runs, so these are the rules-only outcome at the review x theme
+# grain: 39 reviews -> 25 theme rows + 7 positive + 7 unclassified. The 7
+# unclassified are the reviews a model would decide with a key (the gray band).
+CLASSIFY_NOKEY_REVIEWS = STG_REVIEWS_ROWS  # 39
+CLASSIFY_NOKEY_THEME_ROWS = 25
+CLASSIFY_NOKEY_POSITIVE = 7
+CLASSIFY_NOKEY_UNCLASSIFIED = 7

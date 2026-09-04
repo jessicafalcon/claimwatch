@@ -19,8 +19,11 @@ import argparse
 import os
 import sys
 
+from classify.cache import read_decisions, write_decisions
+from classify.combined import classify_all
 from classify.eval.precision import evaluate, format_report
-from classify.labels import review_id
+from classify.labels import POSITIVE, THEMES, UNCLASSIFIED, review_id
+from classify.llm import make_model_decider, model_available
 from classify.rules import classify as classify_reviews
 from classify.rules import load_rules
 from ingest import sources
@@ -189,7 +192,40 @@ def _do_rebuild(args: argparse.Namespace) -> int:
         print(f"  {source:{width}} {month}  {n}")
     if not months:
         print("  (none)")
+    _classify_and_print(database_for(rows))
     return 0
+
+
+def _classify_and_print(db) -> None:
+    """Run the combined classification (rules + model) over the warehouse's
+    `stg_reviews` and print a summary. The model is called from `classify/llm.py`
+    only, and only when a key is set (developer-run, paid) and only for
+    rules-`unclassified` reviews not already in the cache. With no key the
+    ambiguous reviews stay `unclassified` — the gray 'not yet classified' band —
+    and the run is still green. Deterministic given the cache; no mart (6a)."""
+    reviews = _staged_reviews_text(db)
+    if reviews is None:
+        print("classification: no stg_reviews yet (nothing to classify)")
+        return
+    decide = make_model_decider()  # None when no key
+    decisions = read_decisions()
+    rows, decisions = classify_all(
+        reviews, rules=load_rules(), decide=decide, decisions=decisions
+    )
+    write_decisions(decisions)
+    theme_rows = sum(1 for _, label in rows if label in THEMES)
+    positive = sum(1 for _, label in rows if label == POSITIVE)
+    unclassified = sum(1 for _, label in rows if label == UNCLASSIFIED)
+    key_note = (
+        "rules + model"
+        if model_available()
+        else "rules only — no ANTHROPIC_API_KEY, ambiguous reviews are unclassified"
+    )
+    print(f"classification ({key_note}; one row per review x theme):")
+    print(f"  reviews         {len(reviews)}")
+    print(f"  theme rows      {theme_rows}")
+    print(f"  positive        {positive}")
+    print(f"  unclassified    {unclassified}   (the 'not yet classified' band)")
 
 
 def _do_scrape(args: argparse.Namespace) -> int:

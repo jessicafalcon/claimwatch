@@ -10,6 +10,7 @@ from classify.llm import MODEL, PROMPT_VERSION
 from classify.rules import classify as rules_classify
 from classify.rules import load_rules
 from pipeline.warehouse import ROOT
+from tests import pins
 
 
 def _reviews(conn):
@@ -98,6 +99,21 @@ def test_every_review_appears_and_labels_are_closed(synthetic_conn):
 
     assert {rid for rid, _ in rows} == {rid for rid, _ in reviews}  # no review dropped
     assert all(label in LABEL_SET for _, label in rows)
+
+
+def test_no_key_synthetic_outcome_matches_pins(synthetic_conn):
+    # The no-key (rules-only) combined outcome over the full corpus, pinned.
+    from classify.labels import POSITIVE
+
+    reviews = _reviews(synthetic_conn)
+    rows, _ = classify_all(reviews, rules=load_rules(), decide=None, decisions={})
+    theme_rows = sum(1 for _, label in rows if label in THEMES)
+    positive = sum(1 for _, label in rows if label == POSITIVE)
+    unclassified = sum(1 for _, label in rows if label == UNCLASSIFIED)
+    assert len(reviews) == pins.CLASSIFY_NOKEY_REVIEWS
+    assert theme_rows == pins.CLASSIFY_NOKEY_THEME_ROWS
+    assert positive == pins.CLASSIFY_NOKEY_POSITIVE
+    assert unclassified == pins.CLASSIFY_NOKEY_UNCLASSIFIED
 
 
 def test_no_new_mart():
