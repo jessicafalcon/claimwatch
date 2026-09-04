@@ -622,6 +622,7 @@ def test_marts_are_byte_stable_across_rebuilds(tmp_path, monkeypatch, rows):
     import ingest.app_store as app_store
     import ingest.captures as captures
     import ingest.opinion_assurances as opinion_assurances
+    import ingest.trustpilot as trustpilot
     import pipeline.build as build
 
     for module, name in (
@@ -629,6 +630,7 @@ def test_marts_are_byte_stable_across_rebuilds(tmp_path, monkeypatch, rows):
         (captures, "datetime"),
         (app_store, "datetime"),
         (opinion_assurances, "date"),
+        (trustpilot, "date"),  # the Phase 3c parser's clock import (code-reviewer CR1)
     ):
         monkeypatch.setattr(module, name, _no_clock(getattr(module, name)))
     seen = []
