@@ -6,7 +6,7 @@ session): 6a shipped the model call site, the decision cache and the no-key
 guarantee; 6b is the held-out eval gate and the `classifier_quality` mart (B2.4).
 Depends on Phase 6a merged (PR #12).
 
-**Status: APPROVED 2026-09-04 — in progress.** No new dependency:
+**Status: APPROVED 2026-09-04 — DELIVERED 2026-09-04, PR open.** No new dependency:
 `anthropic` already landed in 6a; the gate itself is offline (it scores
 predictions against the hand answer key, no model call). The allowlist is in
 CLAUDE.md → Conventions.
@@ -377,4 +377,45 @@ real captured grading under a mixed answer key).*
 
 ## Delivered
 
-(appended at phase exit)
+2026-09-04. The held-out eval gate ships: `classify/eval/gate.py::score_heldout`
+grades the full classifier's predictions on the held-out fold (fold 4) alone —
+`hits = |predicted ∩ actual|` (the shared numerator), `precision = hits/predicted`,
+`recall = hits/actual`, each `None` on a zero denominator — reading the answer key
+inside the wall and taking predictions in (a pure function, like 5b's
+`precision.evaluate`). `sql/marts/classifier_quality.sql` is the first Python-fed
+mart: DDL only (the fixed shape) run in `build_derived`, filled by
+`pipeline/build.py::write_classifier_quality` from the CLI classify step — one row
+per scored label (five themes + `positive`), tagged **Measured**, carrying a
+computed metric's provenance (`answer_key`, `heldout_fold`, `run_id`) and no
+`source_url`/`captured_at`/clock. B2.4 flips Pending → Measured (upstream source
+`classify/eval/labels.csv`); B2.2/B2.5 stay Pending (Phase 7). `make rebuild` writes
+the mart and prints a one-line gate summary. No new dependency.
+
+Per **amendment A1**, the gate grades only reviews both classified and present in
+the answer key, and the CLI writes no mart when nothing is graded — so `make
+rebuild ROWS=captured` (the real corpus, whose ids the synthetic answer key does
+not cover) leaves `classifier_quality` empty and says so, rather than a garbage
+`0.0` tagged Measured. On the synthetic corpus fold 4 is five clear reviews the
+rules classify correctly, so every present label scores 1.00/1.00 and two labels
+are `n/a`, pinned in `tests/pins.py` (`RULES_HELDOUT`); the formula (a disagreement
+scores below 1) is proven by crafted unit tests. The no-key run stays green and
+populates the mart rules-only, truthfully. `make test` passes (722 tests, 18 new);
+`make rebuild ROWS=synthetic`, `make idempotency-check ROWS=synthetic` and `make
+check-backing` (B2.4 Measured) are green with no key.
+
+Review round 1 (code-reviewer, functionality-tester, study-editor, coherence-
+auditor; security-reviewer not triggered — no sensitive surface): no blockers.
+Applied — **amendment A1** (grade over classified ∩ labeled; no mart when nothing
+graded), fixing the code-reviewer's should-fix that `ROWS=captured|samples` wrote a
+garbage Measured mart; **two pinning tests** for the functionality-tester's
+surviving mutations (the mart's precision/recall column mapping under asymmetry,
+and the re-populate `delete`); and the **branch/spec-file renamed** to the single
+form `phase-6b-eval-gate` (coherence-auditor: `/phase-start` had doubled the slug).
+Accepted to BACKLOG: the mart write is not warehouse-aware (Snowflake, Phase 10).
+
+Decisions the spec did not spell out: grading over the intersection (not a
+per-input `ROWS == "synthetic"` guard) is what lets a *mixed* answer key in Phase 7
+grade a real captured corpus against its real labels while ignoring synthetic
+labels the real run did not classify; the mart's `run_id` deliberately carries the
+input name (byte-stable provenance), not a per-run id, so a reader must not read
+raw-row `run_id` semantics into it.

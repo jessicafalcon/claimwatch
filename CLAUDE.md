@@ -554,7 +554,7 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 ## Current status
 
 **Phase 6b — held-out eval gate + classifier_quality mart** (`phase-6b-eval-gate`,
-spec `specs/phase-6b-eval-gate.md`, APPROVED 2026-09-04): being built. The
+spec `specs/phase-6b-eval-gate.md`, APPROVED 2026-09-04): built, round 1 applied. The
 second half of the Phase 6 split: the gate that grades the classifier on the fold
 it never saw, and the one BACKING row this phase populates. `classify/eval/gate.py`
 scores precision AND recall per label on the held-out fold alone (fold 4):
@@ -569,10 +569,15 @@ metric's provenance (`answer_key`, `heldout_fold`, `run_id` — no `source_url`,
 writes the mart and prints a one-line gate summary. The mart reflects whatever
 classifier ran, so with no key it is rules-only and honest. DONE: `make rebuild
 ROWS=synthetic && make idempotency-check ROWS=synthetic && make check-backing &&
-make test`, green with the key unset. `make test` passes: 719 tests, 15 new. On
+make test`, green with the key unset. `make test` passes: 722 tests, 18 new. On
 the synthetic corpus fold 4 is 5 clear reviews (rules score every present label
 1.0/1.0, two labels `None`), pinned in `tests/pins.py`; the formula (a disagreement
-< 1) is proven by a crafted unit test. No new dependency. Next: review round 1.
+< 1) is proven by a crafted unit test. No new dependency. Review round 1 passed
+(code-reviewer, functionality-tester, study-editor, coherence-auditor; security
+not triggered): applied amendment A1 (grade only reviews both classified and
+labeled, so `ROWS=captured` leaves the mart empty rather than a garbage Measured
+number), two pinning tests, and the branch/spec-file renamed to the single form.
+Next: PR.
 
 Phase 6a (model fallback + graceful degradation) merged to `main` (PR #12,
 2026-09-04): the one model call site (`classify/llm.py`, `MODEL =
@@ -587,6 +592,6 @@ sample + the labels wall) merged (PR #10, 2026-09-04). Phase 4 (the weekly cron)
 merged (PR #8, 2026-09-03); the docs hotfix merged (PR #9, 2026-09-04). (Earlier
 phase and amendment history is in each spec and DECISIONS.)
 
-Open BACKLOG rows: **25**.
+Open BACKLOG rows: **26**.
 
 (Update this section at the end of every working day.)

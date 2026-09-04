@@ -1433,6 +1433,25 @@ fold 4 are `None` — pinned in `tests/pins.py` (`RULES_HELDOUT`). The formula (
 disagreement scores below 1.0) is proven by a crafted unit test, not by this
 clean fixture. The no-key run stays green and populates the mart rules-only,
 truthfully (lower recall in general; here coincidentally perfect on the five
-clear held-out reviews). `make test` (719 tests, 15 new), `make rebuild
+clear held-out reviews). `make test` (722 tests, 18 new), `make rebuild
 ROWS=synthetic`, `make idempotency-check ROWS=synthetic` and `make check-backing`
 (B2.4 Measured) are green with no key.
+
+Review round 1 (code-reviewer, functionality-tester, study-editor, coherence-
+auditor; security-reviewer not triggered — no sensitive surface): no blockers.
+**Amendment A1** applied (spec) — the gate found by the code-reviewer to grade
+predictions against the synthetic answer key for *every* input, so
+`ROWS=captured|samples` wrote a garbage Measured mart (real ids never match
+synthetic labels). Fix: `score_heldout` grades only reviews both classified and in
+the answer key (the intersection on the held-out fold), and the CLI writes no mart
+when nothing is graded — chosen over a per-input `ROWS == "synthetic"` guard so a
+mixed answer key in Phase 7 grades a real corpus against its real labels while
+ignoring synthetic labels it did not classify. *Fix the class, not the case: a
+coherence precondition on the measurement, not a denylist of inputs.* Two pinning
+tests added for the functionality-tester's surviving mutations (the mart's
+precision/recall column mapping under asymmetry — invisible on the symmetric
+synthetic fold — and the re-populate `delete`). The branch and spec file were
+renamed from the doubled `phase-phase-6b-eval-gate` to `phase-6b-eval-gate`
+(coherence-auditor; `/phase-start` had prepended `phase-` to a slug already
+starting with it). Accepted to BACKLOG: the mart write is not warehouse-aware
+(hardcoded DuckDB connection; Snowflake is Phase 10).
