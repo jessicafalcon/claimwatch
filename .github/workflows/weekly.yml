@@ -19,7 +19,7 @@ on:
 # untrusted uv sync and scrape steps (the push gets it inline via env). GitHub
 # cannot scope a token to a path, and main is unprotected on this private repo
 # (no GitHub Team/Enterprise plan), so no branch-protection rule backs the
-# subtree limit — the staging discipline is the whole subtree guard (DECISIONS →
+# subtree limit. The staging discipline is the whole subtree guard (DECISIONS →
 # Gotchas).
 permissions:
   contents: write
