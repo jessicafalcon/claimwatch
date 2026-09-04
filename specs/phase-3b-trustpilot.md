@@ -8,7 +8,7 @@ refusal, the manual snapshot path; no evasion") and the Phase 3a Gotcha
 permitted real page, names replaced, before the parser is written"). Depends
 on Phase 3a merged (PR #5, 2026-09-03).
 
-**Status: APPROVED 2026-09-03 — in progress.** No new dependencies. (A1: the
+**Status: APPROVED 2026-09-03 — DELIVERED 2026-09-03, PR pending.** No new dependencies. (A1: the
 robots check found Trustpilot not fetchable, so no parser is built at all — the
 phase is a source declaration, one hand-read row, and records. The
 JSON-LD/`httpx` notes below are pre-A1 and stand only as the plan for a future
@@ -33,7 +33,7 @@ hand-read branch is taken, mirroring the App Store listing:
   and the `Freeze:` line is removed.
 - Trustpilot is declared as a not-fetchable source (`platform=trustpilot`,
   `parser=None`, `fetchable=False`, `host=www.trustpilot.com`), its `terms`
-  naming fr's robots rule with the date read; refused before any request,
+  naming the robots rule (read on both hosts) with the date; refused before any request,
   whatever the file says on a later day.
 - Its rating and review count are read by hand off the profile page (robots
   governs a crawler, not a person reading) and loaded as one **Measured** row
@@ -119,8 +119,9 @@ because no Trustpilot page may be fetched or frozen.)
 2. **Trustpilot is one declared not-fetchable source (A1).** A `Source` for the
    studied insurer's Trustpilot profile is in `SOURCES`: `platform=trustpilot`,
    `parser=None`, `fetchable=False`, `host=www.trustpilot.com`, `unsolicited`
-   channel, its `terms` naming fr's robots rule (`User-agent: *` → `Disallow:
-   /`, read 2026-09-03) — recorded beside it and in DECISIONS → Phase 3b. It is
+   channel, its `terms` naming the robots rule (`User-agent: *` → `Disallow:
+   /`, read on both hosts 2026-09-03) — recorded beside it and in DECISIONS →
+   Phase 3b. It is
    refused before any request; its profile address is the only new
    brand-carrying string, added to `BRAND_TOKENS` if it is a new form.
    *Evidence: rows 2, 3.*
@@ -313,3 +314,39 @@ string reaches any file but `ingest/sources.py`.
   workflow, with the Opinion Assurances re-fetch/edit-id rows (BACKLOG).
 - **The App Store listing's JSON-LD block.** Unverified; its trigger is a
   future permission to fetch that listing, not this phase (BACKLOG).
+
+## Delivered (2026-09-03)
+
+Phase 3b landed as the hand-read path (amendment A1). The developer's robots
+check found Trustpilot disallows our crawler on every path (`www.trustpilot.com`
+and `fr.trustpilot.com` both `User-agent: *` → `Disallow: /`, our User-Agent in
+no named group), so no page may be fetched or frozen: the planned JSON-LD parser
+(done-when 1) and frozen sample (done-when 4) were dropped and re-deferred to a
+future written authorization (BACKLOG). What shipped: one not-fetchable
+Trustpilot `Source` in `ingest/sources.py` (refused before any request) and one
+Measured row in `data/snapshots/manual_snapshots.csv` (3.9 on 1,072 reviews,
+2026-09-03), on the anchors' `fr-digital-first` profile so the Measured point
+joins their series — one group, mixed tags — the latest point in `rating_trend`,
+`channel_gap` and `peer_ratings`. The surviving done-when (2, 3, 5) pass; the
+no-`SPEC` gate (6) was already green (no fixture change), so its fix is
+re-deferred. DONE command (`make rebuild && make idempotency-check
+ROWS=captured`): idempotency OK, 566 tests. review-gate `SPEC=`: 7/7.
+
+Review round (5 agents, phase exit): 0 blockers; the findings were all
+should-fix or drift, fixed as one batch — the host reconciled to
+`www.trustpilot.com` (the profile's host; both hosts' robots read), the CLAUDE
+Repo-map marker reframed to the hand-read source, a deterministic end-to-end
+mart test added, the cosmetic verb made uniform, and the brand literal kept out
+of every commit body (a clean soft-reset re-commit; the security-reviewer's
+finding).
+
+The coherence-auditor's four exit questions: (1) the Repo map now names the
+hand-read source, parser re-deferred; (2) `manual_snapshots.csv` holds two
+hand-read rows (the App Store listing and Trustpilot), both because robots or
+terms forbid a robot — the tracked hand-read file is still the right home, and
+Phase 4 decides the tracked shape for *fetched* captures (its own BACKLOG row);
+(3) A1's call stands — hand-reading one Measured point beside the anchors is the
+honest outcome of the robots check, and the Trustpilot Business API (paid,
+credentialed) is a STOP-and-ask out of scope; (4) 3b introduces no Phase 4
+break — Trustpilot is `fetchable=False`, so `make scrape` skips it and its
+figures reach `platform_snapshots` through the already-tracked manual file.
