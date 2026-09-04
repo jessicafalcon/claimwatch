@@ -4,7 +4,8 @@
 # classify-eval (5); model (8); study (9).
 
 .PHONY: help setup test lint check-docs check-backing review-gate \
-        rebuild idempotency-check confirm reset scrape record-snapshots
+        rebuild idempotency-check confirm reset scrape record-snapshots \
+        label-sample
 
 # User variables reach recipes ONLY as make values via `$(call _Q,$(value VAR))`
 # — UNEXPANDED and single-quoted — so a value like `SPEC='$(shell …)'` or
@@ -34,7 +35,7 @@
 # Goals run in order even under -j: `reset` must not start before `confirm`
 # has stamped (exit pass, security-reviewer #1; pinned by a -j2 probe).
 .NOTPARALLEL:
-unexport SPEC BASE TARGET ROWS SOURCE
+unexport SPEC BASE TARGET ROWS SOURCE N
 _Q = '$(subst ','\'',$(1))'
 
 help: ## list the targets
@@ -76,3 +77,6 @@ scrape: ## NETWORK fetch the declared source(s) into data/cache [SOURCE=<name>] 
 
 record-snapshots: ## read the captures on disk, append this week's fetched figures to data/snapshots/fetched_snapshots.csv (offline; no confirm gate)
 	uv run python -m pipeline record-snapshots
+
+label-sample: ## draw N reviews from the corpus to hand-label into data/label_sample.csv (offline, gitignored; N required)
+	uv run python -m pipeline label-sample --n=$(call _Q,$(value N))

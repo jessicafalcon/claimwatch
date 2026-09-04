@@ -1132,3 +1132,73 @@ still-unwritten personal-data excerpt rule.
   series ours to call Measured (BACKING's rating-row note); the source cells
   gain `data/snapshots/fetched_snapshots.csv` as the Measured points' tracked
   home. Pinned by `test_backing.py`.
+
+### Phase 5a
+
+Branch `phase-5a-label-sample`, spec `specs/phase-5a-label-sample.md`, APPROVED
+2026-09-04. PROJECT_BRIEF §9 Phase 5 ("Hand labels + rules layer") is split
+5a/5b as `docs/PLAN.md` §5 already named it: 5a is the trust foundation — the
+closed label set, a stable review id, `make label-sample`, the text-free answer
+key, the deterministic held-out split, and the labels wall — with no rule and no
+model (5b writes `rules.yaml`/`rules.py`; 6 the one model call). Splitting keeps
+each phase under six done-when items and lets the human labeling happen offline
+between the two.
+
+- **The seven labels are defined once, as data, and membership is a check.**
+  `classify/labels.py::LABELS` is the five §5 themes (`document-loop`,
+  `silent-rejection`, `second-payer`, `support-traction`, `coverage-price`) plus
+  `positive` and `unclassified`; the labels reader refuses a theme outside the
+  set rather than coercing it. Pinned by `test_labels.py`. Rejected: a free-text
+  theme column or a coerce-to-default — either admits an eighth label.
+- **`review_id = "{source}:{external_id}"`, derived in Python — no SQL change.**
+  `stg_reviews` has no id column (its grain is `(source, external_id)`), so the
+  id is that pair joined in `classify/labels.py`; the eval split hashes it and
+  the answer key keys on it. A source slug and an external id (a numeric feed id,
+  an `OA-…` id, a content hash) carry no `:`, so the join is unambiguous.
+  Rejected: adding a `review_id` column to `stg_reviews` — a Phase 1 SQL change,
+  hence its own fix PR, not 5a's to make.
+- **`make label-sample N=<n>` writes a text sheet to gitignored `data/`; the
+  tracked answer key carries no text.** The sheet is `review_id, source_url,
+  text` at `data/label_sample.csv` (matched by the gitignored `data/*` rule);
+  `classify/eval/labels.csv` is `review_id, theme`, tracked and text-free. The
+  draw is `sha256(review_id)` order, first N, capped at the corpus — deterministic
+  and nested in N (a larger N is a superset). Pinned by `test_label_sample.py`.
+  Rejected: committing the text sheet — would track review bodies and force the
+  unwritten personal-data excerpt rule (BACKLOG).
+- **The answer key ships header-only.** No fabricated labels — not even for the
+  synthetic fixture — land in `classify/eval/labels.csv` before a human labels;
+  the reader returns zero rows for a header-only or absent file. This mirrors
+  Phase 4's header-only `fetched_snapshots.csv`. The real 300–500 labels are
+  human offline work (BACKLOG, opened). *Decision the spec did not spell out:
+  the synthetic fixture is left unlabeled in 5a; the reader/split tests use tmp
+  labels, so no in-session label generation happens.*
+- **The held-out split is `sha256(review_id) % 5`, fold 4 held out, never
+  random.** `classify/split.py::fold` is a pure function of the id's UTF-8 bytes
+  (same fold on macOS and Linux); four folds tune in 5b, fold 4 gates in 6.
+  Pinned by `test_split.py`. Rejected: `random.shuffle` or a stored split —
+  breaks cross-machine reproducibility.
+- **`classify/eval/` is the only reader of the answer key.** `test_labels_
+  isolation.py` greps `classify/` (minus `eval/`), `pipeline/`, `sql/` and
+  `models/` for the reader tokens (`labels.csv`, `labels_io`, `read_labels`,
+  `LABELS_CSV`) and finds none. *Decision the spec did not spell out: the grep
+  is filename/symbol based, so docstrings elsewhere describe the wall without
+  naming the file — `classify/__init__.py` and `label_sample.py` say "the answer
+  key", not the filename, on purpose.* Rejected: letting `rules.py`/`llm.py`
+  read the labels to "help decide" — the exact leakage the wall stops.
+
+This phase populates no BACKING row: it produces no displayed number. It is the
+wall the Phase 6 eval gate writes B2.4 (`classifier_quality`) from, and the
+labels B2.2/B2.5 rest on — those rows stay Pending. `make test` (646 tests)
+passes.
+
+Review round 1 (code-reviewer, functionality-tester, study-editor,
+coherence-auditor; security-reviewer not triggered — no sensitive surface):
+functionality-tester WORKS (all six pins bite under hand-mutation), all seven
+invariants verified pinned. One should-fix — `positive_int` gated on
+`str.isdigit`, true for non-ASCII digits (`N=²` reached `int()` and raised an
+uncaught `ValueError`; `N=٣` would parse as 3), breaking the Threat model's
+"never a traceback" — fixed by guarding `int()` with `isascii()`, with both
+cases pinned. Record/wording nits fixed: the spec approval date (2026-09-04),
+the over-cap BACKLOG trigger named to the 5b exit. Accepted to BACKLOG: widen
+the labels-isolation grep to `ingest/dags/study/scripts` when 5b/6 add
+`rules.py`/`llm.py`.
