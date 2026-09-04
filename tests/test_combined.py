@@ -116,14 +116,14 @@ def test_no_key_synthetic_outcome_matches_pins(synthetic_conn):
     assert unclassified == pins.CLASSIFY_NOKEY_UNCLASSIFIED
 
 
-def test_no_new_mart():
-    # 6a adds no mart; classifier_quality is Phase 6b's DDL-fed-by-Python table.
-    assert not (ROOT / "sql" / "marts" / "classifier_quality.sql").exists()
+def test_combined_writes_no_mart():
+    # combined.py stays Python-only: the combined classification is a value, not
+    # a table. 6b's classifier_quality is written by the CLI gate step (DDL fed by
+    # Python), never by the combiner; Phase 7's theme-share marts do not exist yet.
     marts = {p.name for p in (ROOT / "sql" / "marts").glob("*.sql")}
-    # None of the Beat-2 classifier marts exist yet (they are 6b / Phase 7).
-    assert "classifier_quality.sql" not in marts
-    assert "theme_share_by_month.sql" not in marts
-    assert "theme_share_by_segment.sql" not in marts
+    assert "classifier_quality.sql" in marts  # 6b landed it
+    assert "theme_share_by_month.sql" not in marts  # Phase 7
+    assert "theme_share_by_segment.sql" not in marts  # Phase 7
 
 
 def test_unresolved_ids_are_exactly_the_all_unclassified_reviews():

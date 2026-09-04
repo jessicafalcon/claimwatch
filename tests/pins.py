@@ -228,3 +228,43 @@ CLASSIFY_NOKEY_REVIEWS = STG_REVIEWS_ROWS  # 39
 CLASSIFY_NOKEY_THEME_ROWS = 25
 CLASSIFY_NOKEY_POSITIVE = 7
 CLASSIFY_NOKEY_UNCLASSIFIED = 7
+
+# --- Phase 6b: the held-out eval gate + the classifier_quality mart (B2.4) ---
+
+# The gate grades the FULL classifier on the held-out fold alone (fold 4). The
+# classifier_quality mart is one row per scored label (the five themes + positive
+# — `unclassified` is the absence of a decision, not scored), every figure
+# Measured. Its columns are a computed metric's provenance: no source_url, no
+# captured_at, no clock (precision = hits/predicted, recall = hits/actual).
+CLASSIFIER_QUALITY_COLUMNS = (
+    "label",
+    "hits",
+    "predicted",
+    "actual",
+    "precision",
+    "recall",
+    "heldout_fold",
+    "answer_key",
+    "run_id",
+    "tag",
+)
+CLASSIFIER_QUALITY_ROWS = THEME_COUNT + 1  # five themes + positive = 6
+CLASSIFIER_QUALITY_TAG = "Measured"
+CLASSIFIER_QUALITY_ANSWER_KEY = "classify/eval/labels.csv"
+
+# Rules-only (no key) held-out grades on the synthetic corpus, per scored label:
+# (hits, predicted, actual, precision, recall). The five held-out reviews
+# (SYNTHETIC_HELDOUT_REVIEW_IDS) are clear cases the rules classify correctly, so
+# every label present in fold 4 scores 1.0/1.0 and the two labels absent from
+# fold 4 are undefined (None, not 0). The formula — a disagreement scores below
+# 1.0 — is proven by a crafted unit test (test_gate.py), not by this clean
+# fixture; here the point is that the gate reads only fold 4 and populates the
+# mart honestly with no key.
+RULES_HELDOUT = {
+    "document-loop": (2, 2, 2, 1.0, 1.0),
+    "silent-rejection": (1, 1, 1, 1.0, 1.0),
+    "second-payer": (1, 1, 1, 1.0, 1.0),
+    "support-traction": (0, 0, 0, None, None),
+    "coverage-price": (0, 0, 0, None, None),
+    "positive": (1, 1, 1, 1.0, 1.0),
+}

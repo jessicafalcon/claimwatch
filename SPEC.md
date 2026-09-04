@@ -107,7 +107,8 @@ traction, and coverage-and-price frustration (PROJECT_BRIEF.md §5).
   one averaged point.
 - **B2.4 — Classifier quality.** How often each theme label is right and how many
   true cases it catches, measured against the hand labels and shown next to the
-  charts it feeds. Tag: *Measured* (Pending until the eval gate writes its mart).
+  charts it feeds. The classifier is graded only on reviews it never saw while it
+  was built (the held-out fold), so the scores are not flattered. Tag: *Measured*.
 - **B2.5 — Held-claim complaints, digital-first versus traditional.** The share
   of document-loop complaints at digital-first insurers next to the same share
   at traditional mutuelles. This is the study's hypothesis, not its verdict: if

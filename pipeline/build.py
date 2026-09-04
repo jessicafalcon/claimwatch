@@ -750,6 +750,51 @@ def build_derived(conn) -> None:
             warehouse.run_sql_file(conn, path)
 
 
+def write_classifier_quality(
+    conn,
+    scores,
+    *,
+    answer_key: str,
+    heldout_fold: int,
+    run_id: str,
+    tag: str = "Measured",
+) -> None:
+    """Fill the `classifier_quality` mart its `.sql` created empty: one row per
+    scored label. `scores` is the gate's per-label grades (attributes `label`,
+    `hits`, `predicted`, `actual`, `precision`, `recall`); the scoring itself,
+    which reads the answer key, lives in `classify/eval/` — this inserter takes the
+    grades in and never reads the key. The three provenance values a computed
+    metric has (`answer_key`, `heldout_fold`, `run_id`) and the `tag` are passed
+    in, so no clock and no address is invented here. The table is cleared first,
+    so a re-populate is idempotent; rows go in the order given (the gate's fixed
+    label order), so a re-run is byte-identical."""
+    conn.execute("begin transaction")
+    try:
+        conn.execute("delete from classifier_quality")
+        for s in scores:
+            conn.execute(
+                "insert into classifier_quality (label, hits, predicted, actual, "
+                " precision, recall, heldout_fold, answer_key, run_id, tag) "
+                "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [
+                    s.label,
+                    s.hits,
+                    s.predicted,
+                    s.actual,
+                    s.precision,
+                    s.recall,
+                    heldout_fold,
+                    answer_key,
+                    run_id,
+                    tag,
+                ],
+            )
+    except BaseException:
+        conn.execute("rollback")
+        raise
+    conn.execute("commit")
+
+
 def read_fixture(name: str) -> list[dict[str, str]]:
     with (ROOT / "fixtures" / name / "reviews.csv").open(encoding="utf-8") as fh:
         return list(csv.DictReader(fh))

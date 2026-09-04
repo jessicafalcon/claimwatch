@@ -1,4 +1,4 @@
-# Phase 6b — Held-out eval gate + the classifier_quality mart (PROPOSED)
+# Phase 6b — Held-out eval gate + the classifier_quality mart
 
 Contract for the `phase-6b-eval-gate` branch. Source: PROJECT_BRIEF.md §9 Phase 6
 ("Model fallback + gate"), split into 6a/6b (the architect's call, prior
@@ -6,7 +6,7 @@ session): 6a shipped the model call site, the decision cache and the no-key
 guarantee; 6b is the held-out eval gate and the `classifier_quality` mart (B2.4).
 Depends on Phase 6a merged (PR #12).
 
-**Status: PROPOSED — do not start until approved.** No new dependency:
+**Status: APPROVED 2026-09-04 — in progress.** No new dependency:
 `anthropic` already landed in 6a; the gate itself is offline (it scores
 predictions against the hand answer key, no model call). The allowlist is in
 CLAUDE.md → Conventions.
