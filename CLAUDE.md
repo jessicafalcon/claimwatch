@@ -525,9 +525,11 @@ trusted (this resolves the Phase 3a `MAKEFILES`/`PATH` residual for the weekly
 workflow); it
 commits a fixed brand-free message (`data: weekly snapshot <date>`) touching
 `data/snapshots/` alone, under `permissions: contents: write`. The DONE command
-(`make test && make idempotency-check ROWS=captured`) passes; lint clean. Phase
-3c merged (PR #7). Next: the Phase 4 review gate and agents (security-reviewer
-mandatory), then the PR. (Earlier amendment history is in each spec and
+(`make test && make idempotency-check ROWS=captured`) passes; lint clean;
+`review-gate` 7/7; 612 tests. Review round 1 passed (all agents), every finding
+fixed and the credential fix re-reviewed pass. Phase 3c merged (PR #7). Next:
+**PR #8 open, awaiting the developer's squash merge**; then confirm two
+scheduled runs accrue over the coming weeks. (Earlier amendment history is in each spec and
 DECISIONS.)
 
 Open BACKLOG rows: **22**.
