@@ -35,7 +35,11 @@ def _build_and_populate(tmp_path):
     predictions = rules_classify(_staged_reviews(conn), load_rules())
     scores = score_heldout(predictions)
     write_classifier_quality(
-        conn, scores, answer_key=ANSWER_KEY, heldout_fold=HELDOUT_FOLD, run_id="synthetic"
+        conn,
+        scores,
+        answer_key=ANSWER_KEY,
+        heldout_fold=HELDOUT_FOLD,
+        run_id="synthetic",
     )
     return conn
 
@@ -57,7 +61,9 @@ def test_mart_exists_empty_after_rebuild(tmp_path):
     conn = connect("duckdb", database=database_for("synthetic", tmp_path))
     try:
         assert _columns(conn) == pins.CLASSIFIER_QUALITY_COLUMNS
-        assert conn.execute("select count(*) from classifier_quality").fetchone()[0] == 0
+        assert (
+            conn.execute("select count(*) from classifier_quality").fetchone()[0] == 0
+        )
     finally:
         conn.close()
 

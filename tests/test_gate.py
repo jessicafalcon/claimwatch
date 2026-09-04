@@ -72,12 +72,16 @@ def test_a_crafted_disagreement_scores_below_one():
 def test_null_when_denominator_is_zero():
     # A label the classifier never predicted and the key never marks: both
     # denominators are 0 -> both ratios undefined (None, not 0).
-    scores = _by_label(score_heldout([("r5", "document-loop")], labels=[("r5", "document-loop")]))
+    scores = _by_label(
+        score_heldout([("r5", "document-loop")], labels=[("r5", "document-loop")])
+    )
     empty = scores["coverage-price"]
     assert (empty.predicted, empty.actual) == (0, 0)
     assert empty.precision is None and empty.recall is None
     # Predicted but never true: precision defined (0.0), recall undefined.
-    only_pred = _by_label(score_heldout([("r5", "coverage-price")], labels=[]))["coverage-price"]
+    only_pred = _by_label(score_heldout([("r5", "coverage-price")], labels=[]))[
+        "coverage-price"
+    ]
     assert only_pred.predicted == 1 and only_pred.actual == 0
     assert only_pred.precision == 0.0 and only_pred.recall is None
 
@@ -88,7 +92,9 @@ def test_gate_takes_predictions_not_the_corpus(monkeypatch):
     import classify.eval.gate as gate
 
     monkeypatch.setattr(
-        gate, "read_labels", lambda *a, **k: (_ for _ in ()).throw(AssertionError("read"))
+        gate,
+        "read_labels",
+        lambda *a, **k: (_ for _ in ()).throw(AssertionError("read")),
     )
     scores = score_heldout([("r5", "positive")], labels=[("r5", "positive")])
     assert _by_label(scores)["positive"].precision == 1.0

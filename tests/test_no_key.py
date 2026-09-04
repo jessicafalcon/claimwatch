@@ -116,7 +116,10 @@ def test_no_key_mart_is_rules_only_and_populated(monkeypatch, tmp_path):
     conn = connect("duckdb", database=database_for("synthetic", tmp_path))
     try:
         preds, cache = classify_all(
-            _reviews(conn), rules=load_rules(), decide=make_model_decider(), decisions={}
+            _reviews(conn),
+            rules=load_rules(),
+            decide=make_model_decider(),
+            decisions={},
         )
         assert cache == {}  # no model decisions with no key
         write_classifier_quality(
@@ -150,7 +153,10 @@ def test_no_key_scores_call_no_model(monkeypatch, tmp_path):
     conn = connect("duckdb", database=database_for("synthetic", tmp_path))
     try:
         preds, _ = classify_all(
-            _reviews(conn), rules=load_rules(), decide=make_model_decider(), decisions={}
+            _reviews(conn),
+            rules=load_rules(),
+            decide=make_model_decider(),
+            decisions={},
         )
         write_classifier_quality(
             conn,
