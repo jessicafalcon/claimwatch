@@ -6,10 +6,13 @@
 credentials*
 
 # Data — publish aggregates and code, never the raw corpus (PROJECT_BRIEF §2.5).
-# data/snapshots/ (the weekly public aggregates, Phase 4) is the one tracked
-# subtree; `data/*` (not `data/`) is what lets the negation below work.
+# data/snapshots/ (the weekly public aggregates, Phase 4) and data/damir/ (the
+# tracked, numbers-only claim-cost fit, Phase 7b) are the tracked subtrees;
+# `data/*` (not `data/`) is what lets the negations below work. The raw fetched
+# DAMIR month under data/cache/damir/ stays ignored (gigabytes, never committed).
 data/*
 !data/snapshots/
+!data/damir/
 *.duckdb
 *.duckdb.wal
 

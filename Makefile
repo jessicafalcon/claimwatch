@@ -5,7 +5,7 @@
 
 .PHONY: help setup test lint check-docs check-backing review-gate \
         rebuild idempotency-check confirm reset scrape record-snapshots \
-        label-sample classify-eval
+        label-sample classify-eval fetch-damir sample-damir fit-damir
 
 # User variables reach recipes ONLY as make values via `$(call _Q,$(value VAR))`
 # — UNEXPANDED and single-quoted — so a value like `SPEC='$(shell …)'` or
@@ -35,7 +35,7 @@
 # Goals run in order even under -j: `reset` must not start before `confirm`
 # has stamped (exit pass, security-reviewer #1; pinned by a -j2 probe).
 .NOTPARALLEL:
-unexport SPEC BASE TARGET ROWS SOURCE N
+unexport SPEC BASE TARGET ROWS SOURCE N MONTH
 _Q = '$(subst ','\'',$(1))'
 
 help: ## list the targets
@@ -84,3 +84,12 @@ label-sample: ## draw N reviews from the corpus to hand-label into data/label_sa
 classify-eval: ## rules classifier: per-theme precision on the tuning folds vs the synthetic answer key (offline, no variable)
 	uv run python -m pipeline rebuild --rows=synthetic >/dev/null
 	uv run python -m pipeline classify-eval
+
+fetch-damir: ## NETWORK download one month of Open DAMIR into data/cache/damir [MONTH=YYYY-MM] — needs `make confirm fetch-damir`; developer-run
+	uv run python -m pipeline fetch-damir --month=$(call _Q,$(value MONTH)) --make-pid=$$PPID
+
+sample-damir: ## draw a representative fixture from a cached DAMIR month into fixtures/damir [MONTH=YYYY-MM] [N=1000] (offline, developer-run)
+	uv run python -m pipeline sample-damir --month=$(call _Q,$(value MONTH)) --n=$(call _Q,$(value N))
+
+fit-damir: ## fit the lognormal to fixtures/damir and write data/damir/claim_cost_fit.csv (offline, deterministic)
+	uv run python -m pipeline fit-damir

@@ -32,6 +32,23 @@ from ingest.captures import has_pages, parser_module
 from ingest.parsed import PageShapeError
 from ingest.politeness import MAX_PAGES
 from ingest.sources import SOURCES
+from opendata.fetch import FetchError, fetch_month
+from opendata.fit import (
+    ARTIFACT,
+    fit_lognormal,
+    format_fit,
+    goodness_of_fit,
+    write_fit,
+)
+from opendata.slice import (
+    DEFAULT_SAMPLE_N,
+    FIXTURE_CSV,
+    freeze_manifest,
+    read_amounts,
+    systematic_sample,
+    write_fixture,
+)
+from opendata.sources import cache_path, valid_month
 from pipeline.build import (
     FETCHED_SNAPSHOTS,
     INPUTS,
@@ -56,6 +73,15 @@ CONFIRM_STAMP = ROOT / "data" / ".confirm"
 
 class Refused(Exception):
     """A one-line refusal: printed as-is, exit 2, never a traceback."""
+
+
+def _rel(path):
+    """A path shown relative to the repo root when it is under it, else as-is —
+    so a display line never crashes on a path outside ROOT (a test's tmp dir)."""
+    try:
+        return path.relative_to(ROOT)
+    except ValueError:
+        return path
 
 
 def positive_int(value: str, name: str) -> int:
@@ -86,8 +112,9 @@ def resolve_choice(value: str, allowed: tuple[str, ...], default: str) -> str:
 
 
 # The goals `confirm` may arm — a closed set; `make confirm <anything else>`
-# refuses and leaves no stamp (A9 (a)).
-GATED = ("reset", "scrape")
+# refuses and leaves no stamp (A9 (a)). `fetch-damir` joined in Phase 7b (the
+# open-data download is network, developer-run).
+GATED = ("reset", "scrape", "fetch-damir")
 
 
 def confirmed(make_pid: str) -> bool:
@@ -155,8 +182,9 @@ def _do_confirm(args: argparse.Namespace) -> int:
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
         fh.write(args.make_pid + "\n")
     print(
-        "confirm: armed for this make invocation — `reset` or `scrape` must follow "
-        "in the same command (`make confirm reset`, `make confirm scrape`)"
+        "confirm: armed for this make invocation — a gated goal "
+        f"({', '.join(GATED)}) must follow in the same command "
+        "(`make confirm reset`, `make confirm scrape`, `make confirm fetch-damir`)"
     )
     return 0
 
@@ -425,6 +453,91 @@ def _do_classify_eval(args: argparse.Namespace) -> int:
     return 0
 
 
+def _do_fetch_damir(args: argparse.Namespace) -> int:
+    """Developer-run, network: download one month of Open DAMIR into the
+    gitignored cache. MONTH is a closed `YYYY-MM` shape validated here before
+    any path is built from it; the `confirm` goal gates it like `scrape`, so an
+    agent's non-interactive call refuses. A plain bulk GET over urllib — no
+    key, no account (DAMIR is open data). A re-fetch overwrites the same file."""
+    armed = confirmed(args.make_pid)  # consumed first, before any refusal (A9)
+    try:
+        valid_month(args.month)  # empty / ../x / "; / a bad month -> Refused
+    except ValueError as exc:
+        raise Refused(f"refusing: {exc}") from exc
+    if not armed:
+        ok = _prompt(
+            f"Download Open DAMIR {args.month} (a large file) from data.gouv.fr "
+            "into data/cache/damir/? [y/N] ",
+            "fetch-damir: refusing — run `make confirm fetch-damir` (the confirm "
+            "goal in the same invocation; no variable and no environment counts); "
+            "nothing fetched",
+        )
+        if not ok:
+            return 2
+    path, size = fetch_month(args.month)  # FetchError -> one line, exit 2 in main
+    print(f"fetch-damir: {size} bytes -> {_rel(path)}")
+    return 0
+
+
+def _do_sample_damir(args: argparse.Namespace) -> int:
+    """Offline, developer-run: draw a small, representative fixture from a
+    cached month — every k-th valid amount across the whole file (no RNG). N is
+    a positive integer (default DEFAULT_SAMPLE_N); MONTH names which cached
+    month. Writes the one-column fixture and re-freezes its MANIFEST. No
+    `confirm` gate — it fetches nothing and deletes no data."""
+    try:
+        valid_month(args.month)
+    except ValueError as exc:
+        raise Refused(f"refusing: {exc}") from exc
+    n = positive_int(args.n, "N") if args.n else DEFAULT_SAMPLE_N
+    src = cache_path(args.month)
+    if not src.is_file():
+        print(
+            f"sample-damir: no cached month at {_rel(src)} — run "
+            "`make confirm fetch-damir MONTH=... ` first (developer-run)"
+        )
+        return 1
+    sample = systematic_sample(src, n)
+    if not sample.values:
+        print(
+            f"sample-damir: no positive PRS_REM_MNT in {src.name} "
+            f"({sample.dropped} row(s) dropped) — nothing written"
+        )
+        return 1
+    write_fixture(sample.values)
+    freeze_manifest()
+    print(
+        f"sample-damir: {len(sample.values)} of {sample.total_valid} amounts "
+        f"(every {sample.stride}th; {sample.dropped} dropped) -> "
+        f"{_rel(FIXTURE_CSV)} + MANIFEST.sha256"
+    )
+    return 0
+
+
+def _do_fit_damir(args: argparse.Namespace) -> int:
+    """Offline, deterministic: fit a lognormal to the frozen DAMIR fixture and
+    write the tracked fit artifact (mu, sigma, n + the goodness-of-fit deciles)
+    Phase 8 reads. Closed-form arithmetic, no key, no clock, no RNG — the same
+    fixture always gives the same numbers. Prints the fit and the fit-vs-real
+    table. A missing fixture is a clear message and exit 1, not a traceback."""
+    if not FIXTURE_CSV.is_file():
+        print(
+            f"fit-damir: no fixture at {_rel(FIXTURE_CSV)} yet — run "
+            "`make confirm fetch-damir MONTH=YYYY-MM` then "
+            "`make sample-damir MONTH=YYYY-MM` (developer-run)"
+        )
+        return 1
+    amounts = read_amounts(FIXTURE_CSV)
+    fit = fit_lognormal(amounts.values)
+    gof = goodness_of_fit(amounts.values, fit)
+    write_fit(fit, gof, ARTIFACT)
+    print(format_fit(fit, gof))
+    if amounts.dropped:
+        print(f"  ({amounts.dropped} fixture row(s) dropped: not a positive number)")
+    print(f"fit written -> {_rel(ARTIFACT)}")
+    return 0
+
+
 def _do_idempotency(args: argparse.Namespace) -> int:
     target = resolve_choice(args.target, TARGETS, "duckdb")
     rows = resolve_choice(args.rows, INPUTS, "synthetic")
@@ -482,6 +595,13 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("label-sample", add_help=False)
     p.add_argument("--n", default="")
     sub.add_parser("classify-eval", add_help=False)  # no user variable
+    p = sub.add_parser("fetch-damir", add_help=False)
+    p.add_argument("--month", default="")
+    p.add_argument("--make-pid", dest="make_pid", default="")
+    p = sub.add_parser("sample-damir", add_help=False)
+    p.add_argument("--month", default="")
+    p.add_argument("--n", default="")
+    sub.add_parser("fit-damir", add_help=False)  # no user variable
 
     args = ap.parse_args(argv)
     dispatch = {
@@ -493,6 +613,9 @@ def main(argv: list[str] | None = None) -> int:
         "record-snapshots": _do_record_snapshots,
         "label-sample": _do_label_sample,
         "classify-eval": _do_classify_eval,
+        "fetch-damir": _do_fetch_damir,
+        "sample-damir": _do_sample_damir,
+        "fit-damir": _do_fit_damir,
     }
     try:
         return dispatch[args.command](args)
@@ -508,5 +631,11 @@ def main(argv: list[str] | None = None) -> int:
         # A model call failed on the developer-run paid path (a bad model id, a
         # rate limit, a network error): one line, never a traceback. The no-key
         # path never reaches here.
+        print(f"refusing: {exc}", file=sys.stderr)
+        return 2
+    except FetchError as exc:
+        # The developer-run DAMIR download hit no matching month or an empty
+        # body: one line, exit 2, never a traceback. The offline fit path (the
+        # DONE command, CI) never reaches here.
         print(f"refusing: {exc}", file=sys.stderr)
         return 2
