@@ -21,12 +21,20 @@ month. Systematic sampling is deterministic (no RNG) and spans the file."""
 from __future__ import annotations
 
 import csv
+import gzip
 import hashlib
 from collections.abc import Iterator
 from dataclasses import dataclass
+from io import TextIOBase
 from pathlib import Path
 
 from opendata.sources import AMOUNT_COLUMN, DELIMITER, LEGAL_TYPES, TYPE_COLUMN
+
+# The two bytes every gzip stream begins with (RFC 1952). We detect gzip by
+# these, not by the file name, so a gzipped national month and a plain tracked
+# fixture read through one path — a mis-named file is read by what it is, not
+# what it is called (Amendment A2).
+_GZIP_MAGIC = b"\x1f\x8b"
 
 # The frozen fixture: a small, real, brand-free slice CI fits offline.
 FIXTURE_DIR = Path(__file__).resolve().parent.parent / "fixtures" / "damir"
@@ -87,11 +95,24 @@ def parse_amount(cell: str) -> float | None:
     return value
 
 
+def _open_text(path: Path) -> TextIOBase:
+    """Open a DAMIR CSV as a streaming UTF-8 text handle, transparently
+    decompressing a gzip file. Gzip is detected by its magic bytes, not the file
+    name, so the gzipped national month the portal serves and the plain tracked
+    fixture read through one path (Amendment A2). Streams either way — a
+    gigabyte month never lands in memory at once."""
+    with path.open("rb") as probe:
+        is_gzip = probe.read(2) == _GZIP_MAGIC
+    if is_gzip:
+        return gzip.open(path, mode="rt", encoding="utf-8", newline="")
+    return path.open(encoding="utf-8", newline="")
+
+
 def _iter_rows(path: Path) -> Iterator[tuple[str, str]]:
     """Yield the `(PRS_REM_MNT, PRS_REM_TYP)` cells of every data row, streaming.
     Raises `ValueError` if the file is missing either declared column — a file
     that is not the declared shape refuses; it does not read as an empty slice."""
-    with path.open(encoding="utf-8", newline="") as fh:
+    with _open_text(path) as fh:
         reader = csv.DictReader(fh, delimiter=DELIMITER)
         fields = reader.fieldnames or []
         missing = [c for c in (AMOUNT_COLUMN, TYPE_COLUMN) if c not in fields]

@@ -151,6 +151,28 @@ def test_amount_domain_guard_drops_and_counts(tmp_path):
     assert amounts.read == 8
 
 
+def test_reads_a_gzip_file_like_a_plain_one(tmp_path):
+    """The portal serves DAMIR months gzipped; the slice reads a gzip file the
+    same as a plain one, detected by magic bytes not the name (Amendment A2).
+    read_amounts and systematic_sample give identical results either way."""
+    import gzip
+
+    plain = _write_csv(
+        tmp_path / "m.csv",
+        ["10", "20", "30", "40"],
+        types=["0", "2", "1", "0"],
+    )
+    body = plain.read_bytes()
+    gz = tmp_path / "m.csv.gz"  # a .gz name
+    gz.write_bytes(gzip.compress(body))
+    misnamed = tmp_path / "looks_plain.csv"  # gzip bytes under a .csv name
+    misnamed.write_bytes(gzip.compress(body))
+
+    assert read_amounts(gz).values == read_amounts(plain).values == [10.0, 30.0, 40.0]
+    assert read_amounts(misnamed).values == [10.0, 30.0, 40.0]  # read by content
+    assert systematic_sample(gz, 10).rows == systematic_sample(plain, 10).rows
+
+
 def test_read_amounts_refuses_a_file_missing_either_column(tmp_path):
     """A CSV missing either declared column refuses; it does not read as an
     empty slice as if it were valid data."""
@@ -261,6 +283,12 @@ def test_valid_month_refuses_bad_shapes():
 def test_month_token_is_the_A_prefixed_period():
     assert month_token("2024-01") == "A202401"
     assert month_token("2016-07") == "A201607"
+
+
+def test_cache_path_keeps_the_gzip_extension():
+    """The portal serves DAMIR months as A<YYYYMM>.csv.gz; the cache keeps that
+    real extension and the slice reads it gzipped (Amendment A2)."""
+    assert cache_path("2025-07").name == "A202507.csv.gz"
 
 
 def test_fetch_damir_month_validation_refuses_before_any_network():

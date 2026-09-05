@@ -75,5 +75,7 @@ def month_token(month: str) -> str:
 
 
 def cache_path(month: str) -> Path:
-    """Where a fetched month is cached — derived only from a validated month."""
-    return CACHE_DIR / f"{month_token(month)}.csv"
+    """Where a fetched month is cached — derived only from a validated month.
+    Keeps the portal's real `.csv.gz` extension: DAMIR months are served
+    gzipped and the slice reads them so (Amendment A2)."""
+    return CACHE_DIR / f"{month_token(month)}.csv.gz"
