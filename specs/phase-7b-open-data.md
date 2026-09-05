@@ -93,7 +93,7 @@ make fit-damir && make idempotency-check ROWS=synthetic && make check-backing &&
 | 2 | `tests/test_damir.py::test_fit_reproducible_by_hand` (recomputes `mu`/`sigma` the hand way) |
 | 3 | `tests/test_damir.py::test_artifact_equals_recompute` (skips until fixture) and `::test_write_fit_is_byte_identical_on_rerun` |
 | 4 | `tests/test_damir.py::test_goodness_of_fit_deciles`; `make fit-damir` prints the decile table |
-| 5 | `tests/test_damir.py::test_amount_domain_guard_drops_and_counts`, `::test_parse_amount_keeps_only_positive_numbers`, `::test_read_amounts_refuses_a_file_without_the_column` |
+| 5 | `tests/test_damir.py::test_amount_domain_guard_drops_and_counts`, `::test_parse_amount_keeps_only_positive_numbers`, `::test_read_amounts_refuses_a_file_missing_either_column` |
 | 6 | `tests/test_damir.py::test_fetch_damir_refuses_without_the_confirm_goal`, `::test_confirm_arms_fetch_damir_and_the_armed_path_proceeds`, `::test_fetch_damir_month_validation_refuses_before_any_network` |
 
 ## Invariants (REQUIRED)
@@ -165,10 +165,12 @@ make fit-damir && make idempotency-check ROWS=synthetic && make check-backing &&
 - `.gitignore` — add `!data/damir/`.
 - `tests/test_damir.py`, `tests/pins.py` — the pins.
 
-Freeze: none
+Freeze: fixtures/damir/
 
-(`fixtures/damir/` is created new in this phase — it is not a re-freeze, so no
-`Freeze:` grant is needed; it becomes read-only after 7b.)
+(`fixtures/damir/` is created new in this phase — its first freeze, not a
+re-freeze. The review gate requires a `Freeze:` line for any `fixtures/**` change
+in the diff, new or not, with its `MANIFEST.sha256` present; this grant covers the
+directory. It becomes read-only after 7b.)
 
 ## Record updates (REQUIRED)
 
@@ -188,7 +190,7 @@ Freeze: none
 - [ ] README — none (no README.md exists yet; it lands in Phase 9). The
   teaching sentence on why the boring closed-form fit lives in
   `opendata/fit.py`'s module docstring until then.
-- [ ] this spec — the "Delivered" paragraph appended at exit.
+- [x] this spec — amendments A1 and A2, and the "Delivered" paragraph, appended.
 
 ## Threat model (REQUIRED)
 
@@ -281,9 +283,9 @@ holds literally.
   `LEGAL_TYPES = frozenset({"0", "1"})`; `slice.py` reads both cells and refuses a
   file missing **either** declared column.
 - Tests: the domain-guard test gains a `PRS_REM_TYP = 2` row (asserted dropped and
-  counted); the "refuses a file without the column" test covers the missing type
-  column. `mu`/`sigma`/`n` are pinned over the legal-only fixture (they do not
-  exist yet — no re-pin).
+  counted); the "refuses a file missing either column" test covers the missing
+  type column. `mu`/`sigma`/`n` are pinned over the legal-only fixture (they do
+  not exist yet — no re-pin).
 
 **Rejected alternatives.** (b) Switch the sourced column to the pre-filtered
 sibling `FLT_REM_MNT` — changes the BACKING source column name for no gain over an
