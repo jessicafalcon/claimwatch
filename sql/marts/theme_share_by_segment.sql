@@ -7,8 +7,9 @@
 --   review in `reviews` and one row in each of its theme bars, so shares across
 --   labels can sum past 1. The document-loop share the panel highlights is one
 --   of these rows.
--- segment is the review's source segment, joined by source (one segment per
---   source), not by the page address. Portable: string-concat distinct count,
+-- segment is the review's own `segment` column, stamped onto the review at load
+--   from its source (Phase 7a A1) — no join, so a review is counted under
+--   exactly one segment on every input. Portable: string-concat distinct count,
 --   no regex, no like, no clock, no reader.
 -- Provenance: the Measured tag. A computed share has no single address, capture
 --   instant or run; its inputs (reviews, theme_rows) are stored so the share can
@@ -18,20 +19,15 @@
 -- Feeds: B2.5. Built by the classify step after stg_classified_reviews is
 --   filled (excluded from the generic marts pass, which runs before classify).
 create or replace table theme_share_by_segment as
-with review_segment as (
-    select distinct source, segment from raw_source_pages
-),
-labeled as (
+with labeled as (
     select
-        s.segment     as segment,
+        r.segment     as segment,
         c.theme       as label,
         r.source      as source,
         r.external_id as external_id
     from stg_classified_reviews c
     join stg_reviews r
         on c.source = r.source and c.external_id = r.external_id
-    join review_segment s
-        on r.source = s.source
 ),
 totals as (
     select
