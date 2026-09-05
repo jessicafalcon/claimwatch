@@ -1437,6 +1437,25 @@ clear held-out reviews). `make test` (722 tests, 18 new), `make rebuild
 ROWS=synthetic`, `make idempotency-check ROWS=synthetic` and `make check-backing`
 (B2.4 Measured) are green with no key.
 
+Review round 1 (code-reviewer, functionality-tester, study-editor, coherence-
+auditor; security-reviewer not triggered — no sensitive surface): no blockers.
+**Amendment A1** applied (spec) — the gate found by the code-reviewer to grade
+predictions against the synthetic answer key for *every* input, so
+`ROWS=captured|samples` wrote a garbage Measured mart (real ids never match
+synthetic labels). Fix: `score_heldout` grades only reviews both classified and in
+the answer key (the intersection on the held-out fold), and the CLI writes no mart
+when nothing is graded — chosen over a per-input `ROWS == "synthetic"` guard so a
+mixed answer key in Phase 7 grades a real corpus against its real labels while
+ignoring synthetic labels it did not classify. *Fix the class, not the case: a
+coherence precondition on the measurement, not a denylist of inputs.* Two pinning
+tests added for the functionality-tester's surviving mutations (the mart's
+precision/recall column mapping under asymmetry — invisible on the symmetric
+synthetic fold — and the re-populate `delete`). The branch and spec file were
+renamed from the doubled `phase-phase-6b-eval-gate` to `phase-6b-eval-gate`
+(coherence-auditor; `/phase-start` had prepended `phase-` to a slug already
+starting with it). Accepted to BACKLOG: the mart write is not warehouse-aware
+(hardcoded DuckDB connection; Snowflake is Phase 10).
+
 ### Phase 7a
 
 Branch `phase-7a-findings-marts`, spec `specs/phase-7a-findings-marts.md`,
@@ -1497,23 +1516,25 @@ distributions) is Phase 7b.
 The multi-segment guard the first design needed is gone with A1 (segment is a
 review column, unambiguous). `make rebuild ROWS=synthetic`, `make
 idempotency-check ROWS=synthetic`, `make check-backing` (B2.2/B2.5 Measured) and
-`make test` (729 tests) are green with no key.
+`make test` are green with no key (test count at build below the round-1 note).
 
 Review round 1 (code-reviewer, functionality-tester, study-editor, coherence-
-auditor; security-reviewer not triggered — no sensitive surface): no blockers.
-**Amendment A1** applied (spec) — the gate found by the code-reviewer to grade
-predictions against the synthetic answer key for *every* input, so
-`ROWS=captured|samples` wrote a garbage Measured mart (real ids never match
-synthetic labels). Fix: `score_heldout` grades only reviews both classified and in
-the answer key (the intersection on the held-out fold), and the CLI writes no mart
-when nothing is graded — chosen over a per-input `ROWS == "synthetic"` guard so a
-mixed answer key in Phase 7 grades a real corpus against its real labels while
-ignoring synthetic labels it did not classify. *Fix the class, not the case: a
-coherence precondition on the measurement, not a denylist of inputs.* Two pinning
-tests added for the functionality-tester's surviving mutations (the mart's
-precision/recall column mapping under asymmetry — invisible on the symmetric
-synthetic fold — and the re-populate `delete`). The branch and spec file were
-renamed from the doubled `phase-phase-6b-eval-gate` to `phase-6b-eval-gate`
-(coherence-auditor; `/phase-start` had prepended `phase-` to a slug already
-starting with it). Accepted to BACKLOG: the mart write is not warehouse-aware
-(hardcoded DuckDB connection; Snowflake is Phase 10).
+auditor; security-reviewer not triggered — no sensitive surface): one BLOCKER,
+found independently by all three code agents. The two theme-share marts still
+joined `raw_source_pages` by `source` — the platform-slug join A1 rejected — so on
+the `samples` input, where a platform is declared under two segments, every review
+was counted twice (16 reviews → 32 theme rows, `sample` data mis-tagged
+`digital-first`). The segment stamped at load was correct but unread by the marts:
+A1 was applied everywhere except the two files it existed to fix. Fix: both marts
+rewritten to group by `stg_reviews.segment` (joined to `stg_classified_reviews` on
+source + external_id), the `raw_source_pages` join removed, the mart headers
+corrected. *Fix the class: the marts read the load-time segment A1 added, not a
+query-time join.* Two coverage gaps closed — no test built the marts on `samples`
+(`test_marts_on_samples_count_each_review_once`), and the `distinct` in the reviews
+denominator survived a mutation because no synthetic review is multi-theme
+(`test_distinct_denominator_counts_a_multi_theme_review_once`, which crafts one).
+One prose reword: the B2.2 no-key note put in plain language (study-editor). Round
+2 (the same agents) confirmed the fix under adversarial hand-mutation — both
+mutations now fail their guard — with no new code findings; it caught only record
+drift (this note's placement and stale counts), corrected here. `make test` is 731
+tests; the DONE command and `make review-gate SPEC=…` are green with no key.

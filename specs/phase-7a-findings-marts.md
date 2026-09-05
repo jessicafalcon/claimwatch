@@ -1,12 +1,13 @@
-# Phase 7a — Findings marts: theme share (PROPOSED)
+# Phase 7a — Findings marts: theme share
 
 Contract for the `phase-7a-findings-marts` branch. Source: PROJECT_BRIEF.md §9
 Phase 7 ("Findings marts + open data"), cut to its deterministic first half —
 the classifier-fed theme-share marts, no network. Depends on Phase 6b (the
 held-out gate + `classifier_quality`) merged.
 
-**Status: APPROVED — in progress. Amendment A1 (2026-09-04): segment is a
-load-time column on the review, not a query-time join.** No new dependencies
+**Status: APPROVED 2026-09-04 — DELIVERED 2026-09-04, PR open. Amendment A1
+(2026-09-04): segment is a load-time column on the review, not a query-time
+join.** No new dependencies
 (the allowlist is in CLAUDE.md → Conventions; this phase is DuckDB + stdlib SQL).
 
 ## Amendment A1 — segment stamped at load, not joined at query time
@@ -91,8 +92,8 @@ make rebuild ROWS=synthetic && make idempotency-check ROWS=synthetic && make che
 2. **Theme share by month.** `theme_share_by_month` has one row per
    `(month, segment, label)` with `reviews`, `theme_rows`, `share`, built by
    portable SQL over `stg_classified_reviews` ⋈ `stg_reviews` (month from the
-   review's own date) ⋈ the source-grain segment; the synthetic counts are
-   pinned. *Evidence: row 2.*
+   review's own date; segment the review's own column, stamped at load per A1 —
+   no join); the synthetic counts are pinned. *Evidence: row 2.*
 3. **Theme share by segment.** `theme_share_by_segment` has one row per
    `(segment, label)` with the same columns; the synthetic counts are pinned,
    and the `document-loop` share B2.5 highlights is among them. *Evidence: row 3.*
@@ -111,7 +112,7 @@ make rebuild ROWS=synthetic && make idempotency-check ROWS=synthetic && make che
 
 | Done-when | Proof (test id / `make` target / output line) |
 |---|---|
-| 1 | `tests/test_theme_share.py::test_classified_reviews_grain_and_sorted` / `make idempotency-check ROWS=synthetic` diff is empty |
+| 1 | `tests/test_theme_share.py::test_classified_reviews_grain_and_sorted`; stability by `::test_rebuild_twice_stable` (the classify path run twice — `make idempotency-check` does not run the classify step, so it does not build these tables) |
 | 2 | `tests/test_theme_share.py::test_by_month_pins` (reproduces `THEME_SHARE_BY_MONTH_*` in `tests/pins.py`) |
 | 3 | `tests/test_theme_share.py::test_by_segment_pins` (reproduces `THEME_SHARE_BY_SEGMENT_*`) |
 | 4 | `tests/test_theme_share.py::test_review_segment_is_its_source_segment` |
@@ -251,3 +252,30 @@ Agents are selected by diff surface (CLAUDE.md → "Which review agents run").
 - **The "vs traditional" comparison** — no traditional-mutuelle source exists;
   the marts split by whatever segments the data has (all `digital-first` today).
   BACKLOG row.
+
+## Delivered (2026-09-04)
+
+`stg_classified_reviews` (the review × theme classification, Python-fed) plus the
+two theme-share marts `theme_share_by_month` (B2.2) and `theme_share_by_segment`
+(B2.5), portable `create … as select` over it; the classify step fills the table
+and runs the marts (excluded from the generic marts loop). Amendment A1 landed:
+`raw_reviews.segment`/`stg_reviews.segment` stamped at load (`segment_by_platform`
+for the fixture), outside the content hash; the marts group by it, no join. B2.2
+and B2.5 flip Pending → Measured (upstream the four review platforms); B1.1/B2.1
+stay Pending (Documented, no mart). No new dependency.
+
+DONE green with the key unset: `make rebuild ROWS=synthetic && make
+idempotency-check ROWS=synthetic && make check-backing && make test` — 731 tests,
+check-backing 19 rows / 7 marts, `make review-gate SPEC=…` 7/7.
+
+Review round 1 (code-reviewer, functionality-tester, coherence-auditor,
+study-editor; security not triggered): one BLOCKER — the marts still joined
+`raw_source_pages` instead of grouping by the load-time segment, double-counting
+on `samples` (16 → 32 theme rows). Fixed (marts read `stg_reviews.segment`);
+added a samples-mart test and a `distinct`-denominator test for the two coverage
+gaps; reworded the B2.2 no-key note. Round 2 confirmed the fix under
+hand-mutation, no new code findings — only record drift (a misfiled DECISIONS
+note, stale counts), corrected. Decisions the spec didn't cover: segment stamped
+at load (A1, developer-approved) rather than any query-time join; the marts carry
+Measured with `run_id` one hop upstream rather than a scalar on a
+`create … as select`.

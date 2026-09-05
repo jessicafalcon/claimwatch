@@ -569,7 +569,7 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 **Phase 7a — findings marts: theme share** (`phase-7a-findings-marts`, spec
 `specs/phase-7a-findings-marts.md`, APPROVED 2026-09-04, amendment A1): built,
-pre-review. Phase 7 cut to its deterministic half (7b is the DAMIR slice + fitted
+rounds 1–2 reviewed and applied. Phase 7 cut to its deterministic half (7b is the DAMIR slice + fitted
 distributions). `classify_all`'s output is persisted to `stg_classified_reviews`
 (review × theme grain, Python-fed), and two portable `create … as select` marts
 count it: `theme_share_by_month` (B2.2) and `theme_share_by_segment` (B2.5), one
@@ -586,8 +586,10 @@ platforms); B1.1/B2.1 stay Pending (Documented, no mart, Phase 9). The corpus is
 all `digital-first`, so the "vs traditional" half is empty (BACKLOG; noted beside
 B2.5). DONE: `make rebuild ROWS=synthetic && make idempotency-check
 ROWS=synthetic && make check-backing && make test`, green with the key unset:
-729 tests (8 new), check-backing 19 rows / 7 marts. No new dependency. Next:
-review round 1.
+731 tests, check-backing 19 rows / 7 marts. No new dependency. Round 1 found one
+BLOCKER (the marts still joined `raw_source_pages` instead of grouping by the
+load-time segment — double-counting on `samples`); fixed, and round 2 confirmed
+the fix under hand-mutation with no new code findings. Next: PR.
 
 Phase 6b (held-out eval gate + `classifier_quality` mart, B2.4) merged to `main`
 (PR #13, 2026-09-04): `classify/eval/gate.py` scores precision + recall per label
