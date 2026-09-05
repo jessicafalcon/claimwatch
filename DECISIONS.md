@@ -1594,13 +1594,32 @@ Also decided in this phase:
   DAMIR names no insurer, so nothing under `opendata/` carries a brand token.
 
 Gotcha (stack): a national Open DAMIR month is ~5.7 GB uncompressed
-(2021 figure), an order larger than PLAN's "hundreds of MB". So the real fetch is
-firmly developer-run and its output stays under the gitignored
-`data/cache/damir/`; CI and the DONE command fit only the small frozen fixture.
-The reimbursed-amount column is `PRS_REM_MNT`, `;`-delimited, and French cells may
-use a `,` decimal separator (the slice guard accepts both).
+(July 2025: 950 MB gzipped, 5.7 GB raw), an order larger than PLAN's "hundreds of
+MB". So the real fetch is firmly developer-run and its output stays under the
+gitignored `data/cache/damir/`; CI and the DONE command fit only the small frozen
+fixture. The reimbursed-amount column is `PRS_REM_MNT`, `;`-delimited, and French
+cells may use a `,` decimal separator (the slice guard accepts both).
 
-Finalization (developer step): `make confirm fetch-damir MONTH=<a real month>`
-then `make sample-damir MONTH=<same>` produces `fixtures/damir/`; then the fit
-artifact, the real-fixture pins (`tests/pins.py`), `_check("damir")` in the frozen
-test, and the Delivered paragraph land, and the review round runs.
+Gotcha (Amendment A1 — the reimbursement-type column): the official variable
+dictionary (`2024_descriptif-variables_open-damir-base-complete.xlsx`) shows
+`PRS_REM_MNT` read without a `PRS_REM_TYP` filter pools the legal Assurance
+Maladie reimbursement (type 0/1) with *parts supplémentaires* (type ≥ 2). The
+slice keeps only `PRS_REM_TYP ∈ {0,1}` so the fit is the claim cost, not a pool —
+a closed-set filter, the "fix the class" kind, not a special-case skip. Confirmed
+against July 2025: of 35.5 M rows, type 0 = 18.6 M and type 1 = 0.5 M (both legal,
+comparable per-row scale), type 99 = 14.4 M and other types the rest; 16.1 M legal
+rows carry a positive amount, a large representative population. The fixture
+carries both columns so the filter is reproducible offline.
+
+Gotcha (Amendment A2 — the portal serves gzip): the real DAMIR resource is
+`A<YYYYMM>.csv.gz`. `cache_path` keeps the `.csv.gz` name and `slice.py` opens a
+file by its gzip magic bytes (`\x1f\x8b`), not its name, so one reader serves the
+gzipped national month and the plain tracked fixture and `fetch-damir →
+sample-damir` needs no manual decompression. Caught when the developer fetched
+July 2025; the byte-identical fixture reproduces from the gzip directly.
+
+Finalization (2026-09-05): month 2025-07 (`A202507`), an ordinary non-holiday
+month; a systematic `N=5000` draw (its `sigma` within 0.04 % of the full-
+population value, vs ~7 % for `N=500`) is the frozen `fixtures/damir/`; the fit
+(`mu`, `sigma`, `n` + deciles) is pinned in `tests/pins.py` and committed as
+`data/damir/claim_cost_fit.csv`; `_check("damir")` guards the frozen fixture.

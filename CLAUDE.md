@@ -606,29 +606,32 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 ## Current status
 
 **Phase 7b — open data: DAMIR slice + fitted claim-cost distribution**
-(`phase-7b-open-data`, spec `specs/phase-7b-open-data.md`, APPROVED 2026-09-04):
-code built and green, awaiting the developer's fetch to produce the fixture. The
-open-data half of the Phase 7 split (7a merged, PR #14). New `opendata/` package:
-`make fetch-damir` (network, developer-run, `confirm`-gated) downloads one Open
-DAMIR month over stdlib `urllib` into the gitignored `data/cache/damir/`; `make
-sample-damir` draws a small, representative systematic fixture of the
+(`phase-7b-open-data`, spec `specs/phase-7b-open-data.md`, APPROVED 2026-09-04;
+amendments A1 + A2 2026-09-05): fixture fetched and frozen, fit pinned, awaiting
+the review round. The open-data half of the Phase 7 split (7a merged, PR #14). New
+`opendata/` package: `make fetch-damir` (network, developer-run, `confirm`-gated)
+downloads one Open DAMIR month over stdlib `urllib` into the gitignored
+`data/cache/damir/` (the portal serves `A<YYYYMM>.csv.gz`; the cache keeps that
+name); `make sample-damir` draws a small, representative systematic fixture of the
 `PRS_REM_MNT` column into `fixtures/damir/`; `make fit-damir` fits a lognormal by
 log-moments (`mu = mean(ln x)`, `sigma = std(ln x)` — closed-form, no optimizer,
 no clock, no RNG) and writes the tracked `data/damir/claim_cost_fit.csv` (`mu`,
 `sigma`, `n` + goodness-of-fit deciles) Phase 8 reads. `GATED` extends to
 `fetch-damir`; the identifying User-Agent header moved to
 `ingest/politeness.py::IDENTIFYING_HEADERS` so the urllib downloader and the httpx
-crawler identify us once. **No mart, no BACKING flip:** B3.3 (`cost_model_params`)
-and B4.3 (`guardrail_sim`) stay Pending — their marts are Phase 8; 7b lands only
-the upstream fixture + fit they consume. No new dependency. The suite is green
-with no key (757 tests: the fit is offline arithmetic, no model on this path); the
-two real-fixture pins skip until `fixtures/damir/` exists. **Remaining before
-DONE (developer step):** `make confirm fetch-damir MONTH=<a real month>` then
-`make sample-damir MONTH=<same>` to create `fixtures/damir/`; then the committed
-fit artifact, the `mu`/`sigma`/`n` pins in `tests/pins.py`, `_check("damir")` in
-`tests/test_fixtures_frozen.py`, the Delivered paragraph, and the review round.
-DONE command: `make fit-damir && make idempotency-check ROWS=synthetic && make
-check-backing && make test`.
+crawler identify us once. **Amendment A1:** the slice keeps only the legal
+reimbursement (`PRS_REM_TYP ∈ {0,1}`; type ≥ 2 is a *part supplémentaire*, dropped)
+— a two-column declared shape, the fixture carries both columns so the filter is
+reproducible offline. **Amendment A2:** `slice.py` reads a file by its gzip magic
+bytes, so the gzipped month and the plain fixture read through one path and
+`fetch-damir → sample-damir` needs no manual decompression. The frozen fixture is
+July 2025 (`A202507`), a systematic `N=5000` draw (mu 3.809814, sigma 2.187981;
+sigma within 0.04 % of the full-population value). **No mart, no BACKING flip:**
+B3.3 (`cost_model_params`) and B4.3 (`guardrail_sim`) stay Pending — their marts
+are Phase 8; 7b lands only the upstream fixture + fit they consume. No new
+dependency. The suite is green with no key (the fit is offline arithmetic, no model
+on this path). DONE command: `make fit-damir && make idempotency-check
+ROWS=synthetic && make check-backing && make test`.
 
 **Phase 7a — findings marts: theme share** merged to `main` (PR #14,
 2026-09-05): `classify_all`'s output persisted to `stg_classified_reviews`, and

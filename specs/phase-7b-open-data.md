@@ -332,3 +332,27 @@ is the closed check, the "declared shape" kind.
 
 **Record.** DECISIONS.md — a 7b Gotcha: the DAMIR portal serves gzip; the slice
 reads it transparently by magic bytes. No BACKING / SPEC / tag change.
+
+## Delivered (2026-09-05)
+
+The `opendata/` package lands Open DAMIR as the sourced claim-cost anchor Phase 8
+consumes: `make fetch-damir` (network, developer-run, `confirm`-gated) downloads a
+month over stdlib `urllib` into the gitignored `data/cache/damir/`, `make
+sample-damir` draws a small systematic fixture, and `make fit-damir` fits a
+lognormal by log-moments and writes the tracked `data/damir/claim_cost_fit.csv`.
+The frozen `fixtures/damir/` is a systematic `N=5000` draw of the legal
+reimbursement column from **July 2025** (`A202507`); the fit is `mu = 3.809814`,
+`sigma = 2.187981`, `n = 5000` (sigma within 0.04 % of the full-population value),
+pinned in `tests/pins.py` and guarded by `_check("damir")`. No mart, no BACKING
+flip: B3.3/B4.3 stay Pending (marts are Phase 8). No new dependency.
+
+Two amendments landed against the official variable dictionary and the real file,
+both caught before the fixture was frozen (no re-freeze): **A1** filters the slice
+to the legal Assurance Maladie reimbursement (`PRS_REM_TYP ∈ {0,1}`; type ≥ 2 is a
+*part supplémentaire*, dropped) as a two-column declared shape, so the fit is the
+claim cost the study means, not a pool; **A2** reads a file by its gzip magic bytes
+so the portal's `.csv.gz` month and the plain fixture read through one path — proven
+byte-identical from the real gzip. DONE command green: `make fit-damir && make
+idempotency-check ROWS=synthetic && make check-backing && make test` — 759 passed,
+check-backing 19 rows / 7 marts, idempotency unchanged; green with no key (the fit
+is offline arithmetic, no model on this path).
