@@ -62,30 +62,39 @@ def test_partial_rename_is_a_failure(tmp_path: Path):
 
 def test_every_named_make_target_exists_today():
     files = check_docs.living_files(ROOT) + check_docs.command_files(ROOT)
-    # six agents, three commands, four skills
-    assert len(check_docs.tooling_files(ROOT)) == 13
-    assert len(check_docs.command_files(ROOT)) == 3
+    tooling = {p.relative_to(ROOT).parts[1] for p in check_docs.tooling_files(ROOT)}
+    assert tooling == {"agents", "commands", "skills"}
+    by_class = {
+        c: sum(
+            p.relative_to(ROOT).parts[1] == c for p in check_docs.tooling_files(ROOT)
+        )
+        for c in tooling
+    }
+    assert by_class == {"agents": 6, "commands": 3, "skills": 4}, by_class
+    assert len(check_docs.command_files(ROOT)) == 7  # commands + skills run today
     assert check_docs.check_make_targets(files, ROOT) == []
 
 
 def test_tooling_prose_is_checked(tmp_path: Path):
     """`.claude/**/*.md` is a document class: links are checked everywhere
-    under it, make targets in commands/; banned words never (an agent names
-    them to flag them)."""
+    under it, make targets in commands/ and skills/; banned words never (an
+    agent names them to flag them)."""
     agent = tmp_path / ".claude" / "agents" / "a.md"
     command = tmp_path / ".claude" / "commands" / "c.md"
-    for f in (agent, command):
+    skill = tmp_path / ".claude" / "skills" / "s" / "SKILL.md"
+    for f in (agent, command, skill):
         f.parent.mkdir(parents=True)
         f.write_text("Run `make nope`; see [x](../../missing.md). Flag 'robust'.\n")
     (tmp_path / "Makefile").write_text("test:\n\tx\n")
-    assert check_docs.tooling_files(tmp_path) == [agent, command]
-    assert check_docs.command_files(tmp_path) == [command]
+    assert check_docs.tooling_files(tmp_path) == [agent, command, skill]
+    assert check_docs.command_files(tmp_path) == [command, skill]
     assert check_docs.check_links([agent, command], tmp_path) == [
         ".claude/agents/a.md: broken link: ../../missing.md",
         ".claude/commands/c.md: broken link: ../../missing.md",
     ]
-    assert check_docs.check_make_targets([command], tmp_path) == [
-        ".claude/commands/c.md: names `make nope` — not in the Makefile"
+    assert check_docs.check_make_targets([command, skill], tmp_path) == [
+        ".claude/commands/c.md: names `make nope` — not in the Makefile",
+        ".claude/skills/s/SKILL.md: names `make nope` — not in the Makefile",
     ]
     (tmp_path / "study").mkdir()
     (tmp_path / "study" / "index.html").write_text("<p>a robust page</p>\n")
