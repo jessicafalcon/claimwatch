@@ -171,3 +171,56 @@ def test_no_review_dropped(tmp_path):
     assert total == pins.CLASSIFIED_REVIEWS_ROWS
     total_seg = _rows(db, "select sum(theme_rows) from theme_share_by_segment")[0][0]
     assert total_seg == pins.CLASSIFIED_REVIEWS_ROWS
+
+
+def test_marts_on_samples_count_each_review_once(tmp_path):
+    """Invariant 2 (A1) on the input where a source-slug join fails: `samples`
+    declares two segments per platform (real `digital-first` + the parser
+    `sample`), so grouping by a raw_source_pages join would count every review
+    twice. Grouping by the review's own `segment` counts it once, under
+    `sample`; `sum(theme_rows)` equals the classified rows, never double."""
+    db = _built(tmp_path, "samples")
+    classified = _rows(db, "select count(*) from stg_classified_reviews")[0][0]
+    assert classified > 0
+    assert _rows(db, "select distinct segment from theme_share_by_segment") == [
+        ("sample",)
+    ]
+    for mart in ("theme_share_by_month", "theme_share_by_segment"):
+        total = _rows(db, f"select sum(theme_rows) from {mart}")[0][0]
+        assert total == classified, mart  # not 2 * classified
+
+
+def test_distinct_denominator_counts_a_multi_theme_review_once(tmp_path):
+    """The pinned grain: a two-theme review is one review in `reviews` (distinct)
+    but a row in each theme bar, so shares can sum past 1. Exercises the
+    `distinct` in the denominator — dropping it would count the review twice.
+    (The synthetic corpus has no multi-theme review, so this crafts one.)"""
+    db = _built(tmp_path)
+    seg = pins.THEME_SHARE_SEGMENT
+    before_reviews = _rows(
+        db, f"select distinct reviews from theme_share_by_segment where segment='{seg}'"
+    )
+    before_total = _rows(db, "select sum(theme_rows) from theme_share_by_segment")[0][0]
+
+    conn = connect("duckdb", database=db)
+    try:
+        src, ext, theme = conn.execute(
+            "select source, external_id, theme from stg_classified_reviews "
+            "order by source, external_id limit 1"
+        ).fetchone()
+        other = "coverage-price" if theme != "coverage-price" else "second-payer"
+        conn.execute(
+            "insert into stg_classified_reviews (source, external_id, theme, run_id) "
+            "values (?, ?, ?, ?)",
+            [src, ext, other, "t"],
+        )
+        build_theme_share_marts(conn)
+    finally:
+        conn.close()
+
+    after_reviews = _rows(
+        db, f"select distinct reviews from theme_share_by_segment where segment='{seg}'"
+    )
+    after_total = _rows(db, "select sum(theme_rows) from theme_share_by_segment")[0][0]
+    assert after_reviews == before_reviews  # distinct: the review still counts once
+    assert after_total == before_total + 1  # but it contributes a second theme row
