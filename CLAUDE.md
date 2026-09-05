@@ -156,16 +156,33 @@ in the middle, and come out on the right as the numbers the study shows.
   (the gitignored, text-free decision cache under `data/classify/`, keyed
   `(review_id, prompt_version, model)`), `combined.py` (`classify_all`: rules +
   the model for what they left `unclassified` → one row per review × theme,
-  Python-only, no mart). *(Phase 8)* `models/` —
+  Python-only, no mart). *(Phase 7b)* `opendata/` — open-data ingest and the
+  claim-cost fit, its own package (DAMIR names no insurer, so no brand token; it
+  is not `ingest/`, the review scrapers, nor Phase 8's `models/`): `sources.py`
+  (the one Open DAMIR declaration — dataset URL, the `PRS_REM_MNT` column, the
+  `;` delimiter, the `YYYY-MM` shape, the cache dir derived from the one
+  `CACHE_ROOT` binding), `fetch.py` (the developer-run bulk download over stdlib
+  `urllib`, identifying header from `ingest/politeness.py::IDENTIFYING_HEADERS`),
+  `slice.py` (the guarded read of the reimbursed-amount column — positive
+  numbers only, drop-and-count — and the systematic fixture draw), `fit.py` (the
+  log-moments lognormal fit + goodness-of-fit deciles; writes the tracked fit
+  artifact). *(Phase 8)* `models/` —
   `cost_model.py` (`FORMULAS`), `guardrail_sim.py`. *(Phase 9)* `study/` —
   Metabase setup + the HTML export. *(Phase 10)* `dags/friction_ledger.py`.
+  `fixtures/damir/` — a small, real, brand-free slice of Open DAMIR's
+  `PRS_REM_MNT` column with its `MANIFEST.sha256`, drawn by `make sample-damir`,
+  read-only after Phase 7b; the fit CI reproduces offline.
 - `data/` — gitignored working output (corpus, captured pages, `*.duckdb`);
-  `data/snapshots/` is the one tracked subtree: `manual_snapshots.csv`, the
+  `data/snapshots/` is one tracked subtree: `manual_snapshots.csv`, the
   figures a person read off a page whose terms forbid a robot (a declared
   source name, a day, five numbers and the word `page`; it carries no address
   and no person's name), loaded as Measured; and `fetched_snapshots.csv`, the
   weekly cron's fetched figures (a source slug, the capture's instant and the
   five figures; origin `fetch`, also Measured, also no address and no body).
+  `data/damir/` (Phase 7b) is the other tracked subtree: `claim_cost_fit.csv`,
+  the numbers-only lognormal fit (`mu`, `sigma`, `n` and the goodness-of-fit
+  deciles) Phase 8 reads; the raw fetched month under `data/cache/damir/` stays
+  gitignored.
 
 ## Commands (macOS, uv)
 
@@ -259,12 +276,33 @@ in the middle, and come out on the right as the numbers the study shows.
   model). Offline, no variable, no `confirm` gate; it grades against the
   synthetic ground truth in `labels.csv` and never reads the held-out fold —
   that is Phase 6's gate. `make test` pins the numbers (Phase 5b).
+- `make fetch-damir [MONTH=YYYY-MM]` — NETWORK, developer-run, never by an
+  agent: download one month of Open DAMIR (France's public aggregated
+  reimbursements) into the gitignored `data/cache/damir/`. A plain bulk GET over
+  stdlib `urllib` (no key, no account; `ingest/fetch.py` stays the only `httpx`
+  import), identifying User-Agent, no proxy, no retry; a re-fetch overwrites the
+  same file. Needs `make confirm fetch-damir` in the same invocation, like
+  `scrape`. `MONTH` is a closed `YYYY-MM` shape validated in Python; a national
+  month is gigabytes, so this never runs in CI (Phase 7b).
+- `make sample-damir [MONTH=YYYY-MM] [N=1000]` — offline, developer-run: draw a
+  small, representative fixture from a cached month — every k-th valid
+  `PRS_REM_MNT` across the whole file (systematic, no RNG, so it is not a biased
+  corner) — into the tracked `fixtures/damir/` with its `MANIFEST.sha256`. No
+  `confirm` gate; it fetches nothing and deletes no data (Phase 7b).
+- `make fit-damir` — offline, deterministic: fit a lognormal to `fixtures/damir/`
+  by log-moments (`mu = mean(ln x)`, `sigma = population-std(ln x)` — closed-form,
+  no optimizer, no clock, no RNG) and write the tracked `data/damir/
+  claim_cost_fit.csv` (`mu`, `sigma`, `n` and the goodness-of-fit deciles Phase 8
+  reads). Prints the fit and the fit-vs-real table. A missing fixture is a clear
+  message and exit 1 (Phase 7b).
 - `make confirm` — arms the destructive or network target that follows it in
   the SAME invocation and nothing else: `make confirm reset`, `make confirm
-  scrape`. The recipe stamps its make process's id; the gated target passes
+  scrape`, `make confirm fetch-damir`. The recipe stamps its make process's id;
+  the gated target passes
   its own and runs only when the two are one process; the stamp is consumed
   either way, so an earlier `confirm` confirms nothing later. `confirm` arms
-  only when `reset` or `scrape` follows it — `make confirm help` refuses and
+  only when `reset`, `scrape` or `fetch-damir` follows it — `make confirm help`
+  refuses and
   leaves no stamp — and only from the goal list make itself built (a
   `MAKECMDGOALS` value from the environment, `MAKEFLAGS` or the command line
   has another origin and is refused). The stamp is written only when none is
@@ -567,29 +605,40 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 ## Current status
 
-**Phase 7a — findings marts: theme share** (`phase-7a-findings-marts`, spec
-`specs/phase-7a-findings-marts.md`, APPROVED 2026-09-04, amendment A1): built,
-rounds 1–2 reviewed and applied. Phase 7 cut to its deterministic half (7b is the DAMIR slice + fitted
-distributions). `classify_all`'s output is persisted to `stg_classified_reviews`
-(review × theme grain, Python-fed), and two portable `create … as select` marts
-count it: `theme_share_by_month` (B2.2) and `theme_share_by_segment` (B2.5), one
-row per (month/segment, label) with `reviews`, `theme_rows`, `share`, tagged
-Measured; `unclassified` is its own row — the gray band, largest with no key. The
-classify step fills the classification and runs the two marts (they read a
-Python-filled table, so they are excluded from the generic marts loop).
-**Amendment A1:** a review's `segment` is stamped onto the review at load
-(`raw_reviews.segment`), not joined at query time — the documented `source_url`
-join matches 0/39 on synthetic and the `source`/platform slug is two segments on
-`samples`, so no query-time key works everywhere; the marts group by
-`stg_reviews.segment`. B2.2/B2.5 flip Pending → Measured (upstream the review
-platforms); B1.1/B2.1 stay Pending (Documented, no mart, Phase 9). The corpus is
-all `digital-first`, so the "vs traditional" half is empty (BACKLOG; noted beside
-B2.5). DONE: `make rebuild ROWS=synthetic && make idempotency-check
-ROWS=synthetic && make check-backing && make test`, green with the key unset:
-731 tests, check-backing 19 rows / 7 marts. No new dependency. Round 1 found one
-BLOCKER (the marts still joined `raw_source_pages` instead of grouping by the
-load-time segment — double-counting on `samples`); fixed, and round 2 confirmed
-the fix under hand-mutation with no new code findings. Next: PR.
+**Phase 7b — open data: DAMIR slice + fitted claim-cost distribution**
+(`phase-7b-open-data`, spec `specs/phase-7b-open-data.md`, APPROVED 2026-09-04;
+amendments A1 + A2 2026-09-05): fixture fetched and frozen, fit pinned, awaiting
+the review round. The open-data half of the Phase 7 split (7a merged, PR #14). New
+`opendata/` package: `make fetch-damir` (network, developer-run, `confirm`-gated)
+downloads one Open DAMIR month over stdlib `urllib` into the gitignored
+`data/cache/damir/` (the portal serves `A<YYYYMM>.csv.gz`; the cache keeps that
+name); `make sample-damir` draws a small, representative systematic fixture of the
+`PRS_REM_MNT` column into `fixtures/damir/`; `make fit-damir` fits a lognormal by
+log-moments (`mu = mean(ln x)`, `sigma = std(ln x)` — closed-form, no optimizer,
+no clock, no RNG) and writes the tracked `data/damir/claim_cost_fit.csv` (`mu`,
+`sigma`, `n` + goodness-of-fit deciles) Phase 8 reads. `GATED` extends to
+`fetch-damir`; the identifying User-Agent header moved to
+`ingest/politeness.py::IDENTIFYING_HEADERS` so the urllib downloader and the httpx
+crawler identify us once. **Amendment A1:** the slice keeps only the legal
+reimbursement (`PRS_REM_TYP ∈ {0,1}`; type ≥ 2 is a *part supplémentaire*, dropped)
+— a two-column declared shape, the fixture carries both columns so the filter is
+reproducible offline. **Amendment A2:** `slice.py` reads a file by its gzip magic
+bytes, so the gzipped month and the plain fixture read through one path and
+`fetch-damir → sample-damir` needs no manual decompression. The frozen fixture is
+July 2025 (`A202507`), a systematic `N=5000` draw (mu 3.809814, sigma 2.187981;
+sigma within 0.04 % of the full-population value). **No mart, no BACKING flip:**
+B3.3 (`cost_model_params`) and B4.3 (`guardrail_sim`) stay Pending — their marts
+are Phase 8; 7b lands only the upstream fixture + fit they consume. No new
+dependency. The suite is green with no key (the fit is offline arithmetic, no model
+on this path). DONE command: `make fit-damir && make idempotency-check
+ROWS=synthetic && make check-backing && make test`.
+
+**Phase 7a — findings marts: theme share** merged to `main` (PR #14,
+2026-09-05): `classify_all`'s output persisted to `stg_classified_reviews`, and
+`theme_share_by_month` (B2.2) + `theme_share_by_segment` (B2.5) count it, grouped
+by the load-time `segment` (amendment A1), tagged Measured with `unclassified` as
+its own band. The corpus is all `digital-first`, so the "vs traditional" half is
+empty (BACKLOG).
 
 Phase 6b (held-out eval gate + `classifier_quality` mart, B2.4) merged to `main`
 (PR #13, 2026-09-04): `classify/eval/gate.py` scores precision + recall per label
@@ -609,6 +658,6 @@ sample + the labels wall) merged (PR #10, 2026-09-04). Phase 4 (the weekly cron)
 merged (PR #8, 2026-09-03); the docs hotfix merged (PR #9, 2026-09-04). (Earlier
 phase and amendment history is in each spec and DECISIONS.)
 
-Open BACKLOG rows: **27**.
+Open BACKLOG rows: **30**.
 
 (Update this section at the end of every working day.)

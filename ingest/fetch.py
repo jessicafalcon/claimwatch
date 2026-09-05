@@ -31,13 +31,13 @@ from ingest.captures import parser_module
 from ingest.parsed import PageShapeError
 from ingest.politeness import (
     ALLOWED_HOSTS,
+    IDENTIFYING_HEADERS,
     MAX_BYTES,
     MAX_CRAWL_DELAY_S,
     MAX_PAGES,
     MAX_RESPONSE_S,
     MIN_INTERVAL_S,
     TIMEOUT_S,
-    USER_AGENT,
 )
 from ingest.robots import Robots, reads_as_robots
 from ingest.sources import Source
@@ -57,7 +57,7 @@ def make_client(transport: httpx.BaseTransport | None = None) -> httpx.Client:
     """The one client shape: our User-Agent, our timeout, no proxy from the
     environment, no redirects followed silently."""
     return httpx.Client(
-        headers={"User-Agent": USER_AGENT},
+        headers=IDENTIFYING_HEADERS,
         timeout=TIMEOUT_S,
         trust_env=False,
         follow_redirects=False,

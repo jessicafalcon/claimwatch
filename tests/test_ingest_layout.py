@@ -66,10 +66,13 @@ def test_httpx_is_imported_only_by_the_fetcher():
 
 def test_politeness_knobs_live_in_one_module():
     """The knobs are assigned in politeness.py and nowhere else; the
-    User-Agent header is set in the fetcher only, from that constant."""
+    User-Agent header is built there too (`IDENTIFYING_HEADERS`), so both the
+    review crawler (httpx) and the open-data download (urllib) identify us from
+    one place (Phase 7b)."""
     knobs = (
         "MIN_INTERVAL_S",
         "USER_AGENT",
+        "IDENTIFYING_HEADERS",
         "TIMEOUT_S",
         "MAX_PAGES",
         "ALLOWED_HOSTS",
@@ -82,7 +85,7 @@ def test_politeness_knobs_live_in_one_module():
         hits = _lines_matching(rf"^{name}\s*=.*$")
         assert set(hits) == {"ingest/politeness.py"}, (name, hits)
     ua = _lines_matching(r'"User-Agent"')
-    assert set(ua) == {"ingest/fetch.py"}, ua
+    assert set(ua) == {"ingest/politeness.py"}, ua
     assert politeness.MIN_INTERVAL_S >= 2.0
     assert politeness.MAX_PAGES == 60  # Phase 3a, D6: the per-source ceiling
     assert politeness.TIMEOUT_S == 20.0

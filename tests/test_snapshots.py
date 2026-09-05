@@ -541,12 +541,15 @@ def test_reseeding_reentering_and_rebuilding_add_no_snapshot_row(tmp_path):
 
 
 def test_the_only_tracked_files_under_data_are_hand_read_snapshot_csvs():
-    """`data/` is gitignored but `data/snapshots/` is re-included whole, and
-    Phase 4's weekly commit `git add`s it: every tracked path under `data/`
-    must be a `data/snapshots/*.csv` that parses under one of the two declared
-    numbers-only shapes — the hand-read (`origin=manual`) or the fetched
-    (`origin=fetch`) — never a capture, a corpus extract or a file carrying
-    reviewer text (round 2, security-reviewer #5; Phase 4)."""
+    """`data/` is gitignored but two subtrees are re-included: `data/snapshots/`
+    (Phase 4's weekly commit `git add`s it) and `data/damir/` (Phase 7b's tracked
+    lognormal fit artifact). Every tracked path under `data/` must be either a
+    `data/snapshots/*.csv` that parses under one of the two declared numbers-only
+    snapshot shapes — the hand-read (`origin=manual`) or the fetched
+    (`origin=fetch`) — or the one `data/damir/claim_cost_fit.csv`, a numbers-only
+    `name,value` fit table: never a capture, a corpus extract or a file carrying
+    reviewer text (round 2, security-reviewer #5; Phase 4; extended Phase 7b)."""
+    import csv as _csv
     import subprocess
 
     root = Path(__file__).resolve().parents[1]
@@ -555,7 +558,31 @@ def test_the_only_tracked_files_under_data_are_hand_read_snapshot_csvs():
     ).stdout.decode("utf-8", errors="replace")
     paths = [p for p in tracked.split("\0") if p]
     assert paths, "the hand-read file is tracked"
+
+    # Phase 7b: the DAMIR fit artifact is the one tracked non-snapshot file. It is
+    # numbers-only — a `name,value` table of the lognormal fit (mu/sigma/n) and the
+    # goodness-of-fit deciles — so it carries no brand and no personal data. Names
+    # are pinned to the EXACT closed set write_fit emits (not a `emp_p*` prefix),
+    # so nothing arbitrary can ride in the name field either (round 1, sec #3).
+    from opendata.fit import DECILES
+
+    DAMIR_FIT = "data/damir/claim_cost_fit.csv"
+    fit_names = (
+        {"mu", "sigma", "n"}
+        | {f"emp_p{d}" for d in DECILES}
+        | {f"fit_p{d}" for d in DECILES}
+    )
     for rel in paths:
+        if rel == DAMIR_FIT:
+            with (root / rel).open(encoding="utf-8", newline="") as fh:
+                rows = list(_csv.reader(fh))
+            assert rows[0] == ["name", "value"], rel
+            for row in rows[1:]:
+                assert len(row) == 2, (rel, row)
+                name, value = row
+                assert name in fit_names, (rel, name)
+                float(value)  # every value is numeric — no free text, no brand
+            continue
         parts = Path(rel).parts
         assert parts[:2] == ("data", "snapshots") and len(parts) == 3, rel
         assert rel.endswith(".csv"), rel

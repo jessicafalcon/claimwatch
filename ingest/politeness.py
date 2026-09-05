@@ -19,6 +19,12 @@ USER_AGENT = (
     "+https://github.com/jessicafalcon/claimwatch)"
 )
 
+# The one identifying header every fetch carries — the review crawler
+# (ingest/fetch.py, httpx) and the open-data download (opendata/fetch.py,
+# urllib) both set it from here, so who-we-are-on-the-network is defined once
+# (Phase 7b: a second network module needed the same identity).
+IDENTIFYING_HEADERS = {"User-Agent": USER_AGENT}
+
 # One request's connect+read budget; a timeout is a refusal, not a retry.
 TIMEOUT_S = 20.0
 
