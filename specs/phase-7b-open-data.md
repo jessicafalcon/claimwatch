@@ -243,3 +243,56 @@ network or a key, so the no-key run is green by construction.
   source; not needed for the claim-cost fit. BACKLOG.
 - **Multiple distribution families / a chosen best-fit contest** — one lognormal,
   shown; alternatives are not part of the deterministic anchor.
+
+## Amendment A1 (2026-09-05) — filter `PRS_REM_TYP ∈ {0,1}`: fit legal reimbursement only
+
+**Trigger.** The "Review & stack risk" line requires confirming the amount column
+against the official portal *before* trimming the fixture. The official variable
+dictionary (`2024_descriptif-variables_open-damir-base-complete.xlsx`, sheet
+`OPEN DAMIR`) shows `PRS_REM_MNT` used **without** a `PRS_REM_TYP` filter pools two
+distinct things: type **0/1** = the legal Assurance Maladie reimbursement (the
+"claim cost" Beat 3/4 mean), type **≥ 2** = *parts supplémentaires*
+(complementary / top-up shares). The slice as built (`opendata/slice.py`,
+`PRS_REM_MNT` read unfiltered) mixed both, so the fit was not the legal-
+reimbursement distribution the brief §7 anchor requires. Caught before any fixture
+was frozen — **no re-freeze**, `fixtures/` read-only rule untouched.
+
+**Invariant restored.** *For all amounts reaching the fit, the value is a legal
+Assurance Maladie reimbursement (`PRS_REM_TYP ∈ {0,1}`) — the euro figure Beat 3/4
+mean — never a pool of legal + supplementary parts.* Falsified by a slice reader
+that keeps a `PRS_REM_TYP = 2` row (new domain-guard case).
+
+**Change (option (a)).** The DAMIR slice reads a **two-column declared shape** —
+`PRS_REM_MNT` and `PRS_REM_TYP` — and keeps a row only when the amount parses
+`> 0` **and** `PRS_REM_TYP` is in the closed set `{"0","1"}`; every other row is
+dropped and counted, as before. This is the "fix the class, not the case" kind: a
+closed set of accepted type codes, matching the repo's strict-set ethos, not a
+special-case skip. The frozen `fixtures/damir/` carries **both** columns (still
+numbers only — a `0`/`1` type code is no brand and no personal data), so the type
+filter is reproducible offline from the fixture alone and the central constraint
+holds literally.
+
+**Deltas to the pinned text above.**
+- Pinned decision "the amount column only" → **two columns** (`PRS_REM_MNT` +
+  `PRS_REM_TYP`); still numbers-only, brand-free, `MANIFEST.sha256`.
+- Done-when 5 and its invariant extend: "only a numeric amount `> 0` **with
+  `PRS_REM_TYP ∈ {0,1}`** reaches the fit; every other row is dropped and counted."
+- `opendata/sources.py` declares `TYPE_COLUMN = "PRS_REM_TYP"` and
+  `LEGAL_TYPES = frozenset({"0", "1"})`; `slice.py` reads both cells and refuses a
+  file missing **either** declared column.
+- Tests: the domain-guard test gains a `PRS_REM_TYP = 2` row (asserted dropped and
+  counted); the "refuses a file without the column" test covers the missing type
+  column. `mu`/`sigma`/`n` are pinned over the legal-only fixture (they do not
+  exist yet — no re-pin).
+
+**Rejected alternatives.** (b) Switch the sourced column to the pre-filtered
+sibling `FLT_REM_MNT` — changes the BACKING source column name for no gain over an
+explicit, visible filter. (c) Filter only at draw-time and freeze one
+`PRS_REM_MNT` column — the filter would then not be reproducible from the fixture,
+breaking "reproduces the fit from the frozen fixture alone." (d) Keep unfiltered
+and label it "all reimbursement types" — the study would then anchor the guardrail
+sim to a distribution that is not the claim cost it names.
+
+**Record deltas at exit.** DECISIONS.md — a 7b Gotcha: the dictionary's
+`PRS_REM_TYP` semantics and why the fit filters to 0/1. BACKING.md — the B3.3/B4.3
+`open-damir` note names the `PRS_REM_TYP ∈ {0,1}` filter. No SPEC.md/tag change.
