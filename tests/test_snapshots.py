@@ -561,8 +561,17 @@ def test_the_only_tracked_files_under_data_are_hand_read_snapshot_csvs():
 
     # Phase 7b: the DAMIR fit artifact is the one tracked non-snapshot file. It is
     # numbers-only — a `name,value` table of the lognormal fit (mu/sigma/n) and the
-    # goodness-of-fit deciles — so it carries no brand and no personal data.
+    # goodness-of-fit deciles — so it carries no brand and no personal data. Names
+    # are pinned to the EXACT closed set write_fit emits (not a `emp_p*` prefix),
+    # so nothing arbitrary can ride in the name field either (round 1, sec #3).
+    from opendata.fit import DECILES
+
     DAMIR_FIT = "data/damir/claim_cost_fit.csv"
+    fit_names = (
+        {"mu", "sigma", "n"}
+        | {f"emp_p{d}" for d in DECILES}
+        | {f"fit_p{d}" for d in DECILES}
+    )
     for rel in paths:
         if rel == DAMIR_FIT:
             with (root / rel).open(encoding="utf-8", newline="") as fh:
@@ -571,9 +580,7 @@ def test_the_only_tracked_files_under_data_are_hand_read_snapshot_csvs():
             for row in rows[1:]:
                 assert len(row) == 2, (rel, row)
                 name, value = row
-                assert name in ("mu", "sigma", "n") or name.startswith(
-                    ("emp_p", "fit_p")
-                ), (rel, name)
+                assert name in fit_names, (rel, name)
                 float(value)  # every value is numeric — no free text, no brand
             continue
         parts = Path(rel).parts

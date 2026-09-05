@@ -336,6 +336,25 @@ def test_confirm_arms_fetch_damir_and_the_armed_path_proceeds(capsys, monkeypatc
 # --- fit-damir target glue ---------------------------------------------------
 
 
+def test_sample_damir_no_cached_month_is_a_message(capsys, monkeypatch, tmp_path):
+    """sample-damir with no cached month: exit 1 with a clear message, and it
+    never writes the fixture (the guard branch, previously untested)."""
+    monkeypatch.setattr(cli, "cache_path", lambda m: tmp_path / "A202507.csv.gz")
+    assert main(["sample-damir", "--month=2025-07"]) == 1
+    assert "no cached month" in capsys.readouterr().out
+
+
+def test_sample_damir_no_positive_legal_amount_is_a_message(
+    capsys, monkeypatch, tmp_path
+):
+    """A cached month whose only rows are supplementary parts (type >= 2): nothing
+    legal to draw, so exit 1 and the fixture is not overwritten (guard branch)."""
+    src = _write_csv(tmp_path / "cached.csv", ["10", "20"], types=["2", "3"])
+    monkeypatch.setattr(cli, "cache_path", lambda m: src)
+    assert main(["sample-damir", "--month=2025-07"]) == 1
+    assert "no positive legal-type" in capsys.readouterr().out
+
+
 def test_fit_damir_missing_fixture_is_a_message(capsys, monkeypatch, tmp_path):
     monkeypatch.setattr(cli, "FIXTURE_CSV", tmp_path / "nope.csv")
     assert main(["fit-damir"]) == 1
