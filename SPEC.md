@@ -97,8 +97,8 @@ traction, and coverage-and-price frustration (PROJECT_BRIEF.md §5).
 - **B2.2 — Theme share over time, by segment.** The share of negative reviews in
   each theme, month by month, split digital-first versus traditional. Counts
   theme rows under the grain above. Tag: *Measured* via the gated classifier.
-  With no key the ambiguous reviews form a gray *not yet classified* band, shown,
-  never hidden.
+  When the language model is switched off, the reviews it would have sorted stay
+  in a gray *not yet classified* band — shown, never hidden.
 - **B2.3 — Peer context.** Public ratings across the market segment, so no one
   insurer is read in isolation. Tag: *Documented* for the anchors, *Measured*
   for our own points (see *How to read a panel*). *Placed points, stated
