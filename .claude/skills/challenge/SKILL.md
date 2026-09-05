@@ -2,7 +2,15 @@
 name: challenge
 description: Challenge a plan, phase spec, amendment, DECISIONS entry or design — steel-manned strengths first, then severity-tagged findings each with a concrete alternative, then a verdict. Use when the developer asks to challenge, critique, stress-test, pressure-test, red-team or poke holes in a plan, design, architecture decision or proposal, before it is implemented.
 argument-hint: [specs/phase-N-slug.md | DECISIONS.md#anchor | "the plan above"]
-allowed-tools: Read, Grep, Glob, Bash(git *), Bash(make review-gate*), Agent
+allowed-tools:
+  - Read
+  - Grep
+  - Glob
+  - Bash(git diff:*)
+  - Bash(git log:*)
+  - Bash(git status:*)
+  - Bash(git show:*)
+  - Agent
 effort: high
 ---
 

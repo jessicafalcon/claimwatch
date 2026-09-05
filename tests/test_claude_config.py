@@ -9,6 +9,8 @@ import re
 import subprocess
 from pathlib import Path
 
+import yaml
+
 ROOT = Path(__file__).resolve().parent.parent
 ALLOWED = re.compile(
     r"^\.claude/(agents|commands)/[a-z-]+\.md$"
@@ -26,6 +28,48 @@ AGENTS = (
 COMMANDS = ("review-round", "selfcheck", "phase-start")
 SKILLS = ("challenge", "code-craft", "secure-by-construction", "architecture-fit")
 HOOKS = ("run-tests", "challenge-gate")
+# Each agent's model and effort, pinned by id: `model: opus` is an alias that
+# drifts with the build (DECISIONS → Gotchas, 2026-09-05).
+AGENT_MODELS = {
+    "code-reviewer": ("claude-opus-4-8", "high"),
+    "security-reviewer": ("claude-opus-4-8", "high"),
+    "functionality-tester": ("claude-opus-4-8", "high"),
+    "study-editor": ("claude-opus-4-8", "high"),
+    "coherence-auditor": ("inherit", "high"),
+    "senior-architect": ("inherit", "high"),
+}
+# One standard, two readers: the skill an agent is preloaded with.
+AGENT_SKILLS = {
+    "code-reviewer": ["code-craft"],
+    "security-reviewer": ["secure-by-construction"],
+    "senior-architect": ["architecture-fit"],
+}
+STANDARDS = ("code-craft", "secure-by-construction", "architecture-fit")
+EDIT_TOOLS = {"Write", "Edit", "MultiEdit", "NotebookEdit"}
+# The only shell a skill may pre-approve: read-only git, prefix form.
+READ_ONLY_BASH = {
+    "Bash(git diff:*)",
+    "Bash(git log:*)",
+    "Bash(git status:*)",
+    "Bash(git show:*)",
+}
+
+
+def _frontmatter(path: Path) -> dict[str, object]:
+    text = path.read_text()
+    assert text.startswith("---\n"), path
+    block = text.split("---\n", 2)[1]
+    data = yaml.safe_load(block)
+    assert isinstance(data, dict), path
+    return data
+
+
+def _agent(name: str) -> Path:
+    return ROOT / ".claude" / "agents" / f"{name}.md"
+
+
+def _skill(name: str) -> Path:
+    return ROOT / ".claude" / "skills" / name / "SKILL.md"
 
 
 def _git(*args: str) -> subprocess.CompletedProcess[str]:
@@ -71,12 +115,45 @@ def test_settings_and_mcp_are_gitignored():
 def test_every_agent_is_report_only():
     """No agent carries Write or Edit (CLAUDE.md → Project tooling)."""
     for name in AGENTS:
-        text = (ROOT / ".claude" / "agents" / f"{name}.md").read_text()
+        text = _agent(name).read_text()
         tools = re.search(r"^tools:\s*(.*)$", text, re.M)
         assert tools, name
-        assert not {"Write", "Edit", "MultiEdit", "NotebookEdit"} & {
-            t.strip() for t in tools.group(1).split(",")
-        }, name
+        assert not EDIT_TOOLS & {t.strip() for t in tools.group(1).split(",")}, name
+
+
+def test_every_agent_pins_its_model_effort_and_preloaded_skill():
+    """The frontmatter is a closed table: an id, never the drifting alias."""
+    assert set(AGENT_MODELS) == set(AGENTS)
+    for name, (model, effort) in AGENT_MODELS.items():
+        fm = _frontmatter(_agent(name))
+        assert fm.get("model") == model, name
+        assert fm.get("effort") == effort, name
+        assert fm.get("skills") == AGENT_SKILLS.get(name), name
+    for name in AGENT_SKILLS:
+        for skill in AGENT_SKILLS[name]:
+            assert skill in SKILLS, (name, skill)
+
+
+def test_skills_grant_only_read_only_tools():
+    """A skill's pre-approved tools never include an editor, and its shell is
+    the read-only git set in prefix form (`Bash(git diff:*)`) — the one form
+    the permission syntax documents; `Bash(git *)` is either a no-op or every
+    subcommand. The three standards are background knowledge, not commands."""
+    for name in SKILLS:
+        fm = _frontmatter(_skill(name))
+        granted = fm.get("allowed-tools", [])
+        if isinstance(granted, str):
+            granted = [g.strip() for g in granted.split(",")]
+        assert isinstance(granted, list), name
+        assert not EDIT_TOOLS & set(granted), name
+        for tool in granted:
+            if tool.startswith("Bash"):
+                assert tool in READ_ONLY_BASH, (name, tool)
+        assert "disallowed-tools" not in fm or EDIT_TOOLS <= set(fm["disallowed-tools"])
+    for name in STANDARDS:
+        fm = _frontmatter(_skill(name))
+        assert fm.get("user-invocable") is False, name
+        assert isinstance(fm.get("paths"), list) and fm["paths"], name
 
 
 def test_ci_workflow_is_pinned_and_read_only():
