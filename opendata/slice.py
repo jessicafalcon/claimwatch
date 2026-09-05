@@ -23,6 +23,7 @@ from __future__ import annotations
 import csv
 import gzip
 import hashlib
+import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 from io import TextIOBase
@@ -73,26 +74,24 @@ class Sample:
         return [amount for amount, _ in self.rows]
 
 
+# A DAMIR amount is plain decimal digits with at most one separator — a `.` or a
+# French `,`. Pinning the shape here rejects the exotic forms `float()` would
+# otherwise accept (underscores `1_000`, scientific `1e5`, `inf`/`nan`), so the
+# guard over this foreign column stays a declared shape, not "whatever float()
+# parses" (round 1, code-reviewer #7).
+_AMOUNT = re.compile(r"-?\d+(?:[.,]\d+)?")
+
+
 def parse_amount(cell: str) -> float | None:
     """A DAMIR amount cell -> a positive float, or `None` if it is not one.
-    Accepts a `.` or a single `,` decimal separator (French CSVs use `,`); a
-    blank, text, a zero, a negative or a non-finite value returns `None`."""
+    Accepts plain decimal digits with at most one `.` or `,` separator (French
+    CSVs use `,`); a blank, text, an exotic numeric form (`1_000`, `1e5`), a
+    zero, a negative or a non-finite value returns `None`."""
     text = cell.strip()
-    if not text:
+    if not _AMOUNT.fullmatch(text):
         return None
-    try:
-        value = float(text)
-    except ValueError:
-        if text.count(",") == 1:
-            try:
-                value = float(text.replace(",", "."))
-            except ValueError:
-                return None
-        else:
-            return None
-    if value != value or value in (float("inf"), float("-inf")) or value <= 0:
-        return None
-    return value
+    value = float(text.replace(",", "."))  # shape-checked, so this cannot raise
+    return value if value > 0 else None
 
 
 def _open_text(path: Path) -> TextIOBase:

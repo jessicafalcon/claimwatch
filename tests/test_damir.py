@@ -122,8 +122,12 @@ def test_parse_amount_keeps_only_positive_numbers():
     assert parse_amount("12.50") == 12.5
     assert parse_amount("12,50") == 12.5  # French decimal comma
     assert parse_amount("  3 ") == 3.0
-    for junk in ("", "  ", "abc", "0", "0.0", "-5", "-0.01", "1,2,3", "nan", "inf"):
-        assert parse_amount(junk) is None, junk
+    junk = (
+        "", "  ", "abc", "0", "0.0", "-5", "-0.01", "1,2,3", "nan", "inf",
+        "1_000", "1e5", "1.5e3", "0x10", "+3",  # exotic float() forms, refused
+    )
+    for j in junk:
+        assert parse_amount(j) is None, j
 
 
 def test_amount_domain_guard_drops_and_counts(tmp_path):
