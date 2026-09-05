@@ -342,3 +342,23 @@ If this plan is approved as written: branch `phase-0a-machinery`, write
 `specs/phase-0a-machinery.md` from the template first, STOP for its approval,
 then build. If parts are struck, this file is amended and re-read before the
 spec is written. Nothing in `docs/` beyond this file is planned.
+
+---
+
+## 9. Amendment 2026-09-05 — the review stack (after Phase 7b)
+
+The §2 table is the approved history and is not rewritten. Three pieces the
+reference did not have, added on `tooling/review-stack` once the two
+platform prompting guides (Fable 5.1, Opus 4.8) were read against this repo:
+
+| Piece | Verdict | For this project | Lands in |
+|---|---|---|---|
+| Model-specific instructions | **New** | CLAUDE.md → "Working with the model": the six named STOPs, effort policy, batch reads, edit-not-regenerate, verify-not-recall, scope and test discipline, the `/compact` keep-list; per-model notes. The agents pin `model:` and `effort:` (the `opus` alias drifts with the build). | tooling |
+| `senior-architect` agent + `/challenge` skill + `challenge-gate` hook | **New** | A devil's-advocate round on a plan before it is built: steel-man, findings each with an alternative and its cost, advisory verdict, stamped on the spec. The hook reminds; it never denies. | tooling |
+| `code-craft`, `secure-by-construction`, `architecture-fit` skills | **New** | The three standards, path-scoped and `user-invocable: false`, preloaded into the agent that reviews the same surface ("one standard, two readers", DECISIONS → Process). The examples supplied (TypeScript/React/Supabase checklists) contributed vocabulary only; their web-security and scaling content contradicts brief §2.2 here. | tooling |
+| `code-reviewer`, `security-reviewer` | **Adapt again** | Coverage-first (the Opus 4.8 recall note), a confidence column, a craft pass (Class `craft` in the round table), the secure-coding classes this repo can exhibit. | tooling |
+
+CLAUDE.md → "How the tooling fires across a phase" is the one place the
+seven-step loop (plan → challenge → disposition → approve → build → review →
+fix) names what fires, on which trigger, reading what.
+

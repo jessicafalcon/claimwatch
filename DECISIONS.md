@@ -202,10 +202,53 @@ place and never deleted.
 - **Naming.** Package and project name `friction_ledger` / "The Friction
   Ledger"; the directory `claimwatch` is left alone (a rename buys nothing
   and breaks the remote).
+- **One standard, two readers (tooling, 2026-09-05).** The craft, security
+  and architecture standards are three skills under `.claude/skills/`
+  (`code-craft`, `secure-by-construction`, `architecture-fit`),
+  `user-invocable: false` and path-scoped, so they load while the matching
+  files are written; each is preloaded (`skills:`) into the agent that
+  reviews that surface (code-reviewer, security-reviewer, senior-architect).
+  The author and the reviewer read the same text, so the bar cannot drift
+  between "how it was written" and "what it is checked against". Rejected:
+  a fourth per-diff agent for craft (a second read of every diff and a
+  fourth verdict line for one more Class value — craft is code-reviewer's
+  third pass instead); copying the generic checklists the examples carried
+  (OWASP web classes, npm tooling, React patterns: none of that surface
+  exists here, and "skip nitpicks" is the instruction that lowers Opus 4.8's
+  review recall).
+- **Plans are challenged before they are built (tooling, 2026-09-05).**
+  `/challenge` spawns `senior-architect`, a report-only devil's-advocate:
+  steel-man first, then findings each with an alternative and its cost, then
+  an advisory verdict; the developer's disposition (amend / accept / reject)
+  is stamped on the spec as `Challenged: <date>, round <k> — <verdict>`. The
+  `challenge-gate` hook is a reminder, never a gate: it exits 2 with one
+  line after an unstamped PROPOSED spec edit and answers `ask` before
+  `ExitPlanMode`; a `deny` would block a plan the architect chose not to
+  challenge, and caps and dispositions are the architect's call. The agent
+  judges plans only and never runs inside a review round.
+- **Per-diff agents are pinned to a model id (tooling, 2026-09-05).**
+  `model: claude-opus-4-8`, `effort: high` for code-reviewer,
+  security-reviewer, functionality-tester and study-editor;
+  `model: inherit`, `effort: high` for senior-architect and
+  coherence-auditor (judgment over long reads, on the session's model). The
+  session runs Fable 5.1 at `high`; CLAUDE.md → "Working with the model"
+  carries what each guide changes here. `high`, not `xhigh`: the developer's
+  cost call.
 
 ## Gotchas (stack surprises found live)
 
 Each entry: the surprise, the official-docs check, what we did.
+
+- **Tooling — `model: opus` drifts with the build (2026-09-05).** Every agent
+  said `model: opus`; the subagent reference lists that alias as "the build's
+  current Opus", which in this build resolves to Opus 5, not the Opus 4.8 the
+  project means. Pinned the full id in the frontmatter. Same reference: the
+  agent `effort:` field overrides the session level, and skills accept
+  `paths:` (auto-load only under matching globs) and `user-invocable: false`.
+  Hooks reference: PostToolUse cannot block (exit 2 shows stderr to the
+  model, the edit stands); PreToolUse can answer `allow|deny|ask`; the
+  `ExitPlanMode` payload is not documented, so `challenge-gate.py` reads
+  `tool_input.plan` when it is a string and fails open otherwise.
 
 - **Phase 2 — the live feed, checked by the first run (2026-09-02).** An agent
   runs no fetch, so the build session could not check the feed; the developer's
@@ -1623,3 +1666,22 @@ month; a systematic `N=5000` draw (its `sigma` within 0.04 % of the full-
 population value, vs ~7 % for `N=500`) is the frozen `fixtures/damir/`; the fit
 (`mu`, `sigma`, `n` + deciles) is pinned in `tests/pins.py` and committed as
 `data/damir/claim_cost_fit.csv`; `_check("damir")` guards the frozen fixture.
+
+### Tooling — the review stack (2026-09-05, branch `tooling/review-stack`)
+
+Not a phase (no spec, no BACKING row): the working method after Phase 7b, from
+the two platform prompting guides (Fable 5.1, Opus 4.8; read 2026-09-05) and a
+review of the five reviewer/skill examples the developer supplied. Landed:
+CLAUDE.md → "Working with the model" and "How the tooling fires across a
+phase"; `senior-architect` + `/challenge` + `challenge-gate.py` (pinned by
+`tests/test_challenge_gate.py`); the three standards under `.claude/skills/`
+preloaded into their agents; code-reviewer rewritten with an Invariants pass
+kept, a craft pass added and coverage-first reporting; security-reviewer
+extended with the secure-coding classes this repo can exhibit (foreign input
+parsed to a shape, paths derived, no shell, decompression caps, safe YAML, the
+model prompt as a data boundary, log hygiene, the hooks surface);
+`tests/test_claude_config.py` admits `.claude/skills/*/SKILL.md` as tracked
+prose. The three Process entries above and the Gotcha record the choices.
+Verdict on the reviewers as they stood: strong on the project's rules and on
+conduct, thin on craft and on general secure-coding classes — both partial.
+
