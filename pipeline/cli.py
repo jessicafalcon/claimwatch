@@ -1,17 +1,18 @@
-"""The one process behind `make rebuild|idempotency-check|reset|scrape`. It
+"""The one process behind `make rebuild|idempotency-check|reset|scrape|
+fetch-damir|sample-damir|fit-damir` (and the other offline targets). It
 validates every user value against a closed set, derives nothing from it as a
 path, then acts — the settled shape in specs/TEMPLATE.md's Threat model. Make
 passes each value UNEXPANDED and single-quoted via `$(call _Q,$(value VAR))`;
 this process is the guard. A bad value is one line on stderr and exit 2, never a
 traceback.
 
-A destructive `reset` or a network `scrape` is confirmed by the `confirm` goal
-in the same make invocation (`make confirm reset`): the `confirm` recipe stamps
-its make process's id, the gated recipe passes its own, and `confirmed` says
-yes only when they are one process — a goal cannot arrive through MAKEFLAGS
-in the environment, where a variable's "command line" origin can (spec Phase
-3a, A4 (d)). The fetcher is imported only inside `scrape`, so a rebuild never
-loads `httpx`."""
+A destructive `reset` or a network `scrape`/`fetch-damir` is confirmed by the
+`confirm` goal in the same make invocation (`make confirm reset`): the `confirm`
+recipe stamps its make process's id, the gated recipe passes its own, and
+`confirmed` says yes only when they are one process — a goal cannot arrive
+through MAKEFLAGS in the environment, where a variable's "command line" origin
+can (spec Phase 3a, A4 (d)). The httpx fetcher is imported only inside `scrape`,
+so a rebuild never loads `httpx`; the DAMIR download uses stdlib `urllib`."""
 
 from __future__ import annotations
 
@@ -164,7 +165,8 @@ def _do_confirm(args: argparse.Namespace) -> int:
         after = f"`{following[0]}` follows" if following else "nothing follows"
         raise Refused(
             f"refusing: `confirm` arms {' or '.join(f'`{g}`' for g in GATED)} and "
-            f"nothing else; {after} (`make confirm reset`, `make confirm scrape`)"
+            f"nothing else; {after} "
+            "(`make confirm reset`, `make confirm scrape`, `make confirm fetch-damir`)"
         )
     try:
         CONFIRM_STAMP.parent.mkdir(parents=True, exist_ok=True)
