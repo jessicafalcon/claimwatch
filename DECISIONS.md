@@ -1538,3 +1538,69 @@ One prose reword: the B2.2 no-key note put in plain language (study-editor). Rou
 mutations now fail their guard — with no new code findings; it caught only record
 drift (this note's placement and stale counts), corrected here. `make test` is 731
 tests; the DONE command and `make review-gate SPEC=…` are green with no key.
+
+### Phase 7b
+
+`specs/phase-7b-open-data.md`, APPROVED 2026-09-04. The open-data half of the
+Phase 7 split: a frozen slice of Open DAMIR and the lognormal claim-cost fit that
+Phase 8's cost model and simulator consume (PROJECT_BRIEF.md §7). Four decisions,
+each surfaced and chosen before the spec:
+
+1. **The fit is a lognormal by log-moments** — `mu = mean(ln x)`,
+   `sigma = population-std(ln x)` over the positive reimbursed amounts
+   (`opendata/fit.py`). Closed-form, hand-checkable, and identical to the
+   lognormal maximum-likelihood fit: no optimizer, no fitted predictive model
+   (brief §2.1). Rejected: gamma method-of-moments (less standard for claim cost)
+   and empirical-deciles-only (no `mu`/`sigma` to show). Health costs are
+   lognormal because a few large claims sit far above many small ones.
+2. **The frozen fixture is the sourced sample** — `fixtures/damir/` holds a
+   small, real, brand-free slice (the `PRS_REM_MNT` column only), so CI
+   reproduces the sourced fit offline. Rejected: pinning over the gitignored real
+   month (not reproducible in CI). The fixture is drawn by *systematic* sampling
+   (every k-th valid amount across the whole month, `opendata/slice.py`), not the
+   first N rows: a DAMIR month is sorted by its aggregation axes, so the first N
+   would be one biased corner. Systematic sampling is deterministic (no RNG) and
+   spans the file.
+3. **The fit artifact is tracked, derived, numbers-only** —
+   `data/damir/claim_cost_fit.csv` (a new `!data/damir/` gitignore negation, the
+   `data/snapshots/` precedent) carries `mu`, `sigma`, `n` and the goodness-of-fit
+   deciles (empirical vs `exp(mu + sigma·z_p)`, "the fit shown"). A test recomputes
+   it from the fixture and pins every value; Phase 8 reads it. Rejected:
+   recompute-only with nothing committed.
+4. **The DAMIR fetch is a new confirm-gated network target** — `make confirm
+   fetch-damir [MONTH=YYYY-MM]`, developer-run, never by an agent; `GATED` in
+   `pipeline/cli.py` extends from `("reset", "scrape")` to add `"fetch-damir"`.
+   `MONTH` is a closed `YYYY-MM` shape validated in Python before any path is
+   built. Rejected: folding into `make scrape` (mixes review-platform robots and
+   per-source declarations with a plain bulk download).
+
+Also decided in this phase:
+
+- **A second network module, one identity.** The DAMIR download is a plain bulk
+  GET over stdlib `urllib` (`opendata/fetch.py`), so `ingest/fetch.py` stays the
+  only `httpx` import and no dependency is added. The identifying User-Agent
+  header moved from `ingest/fetch.py` to `ingest/politeness.py`
+  (`IDENTIFYING_HEADERS`), where the other politeness knobs live, so both the
+  httpx crawler and the urllib downloader identify us from one place;
+  `tests/test_ingest_layout.py` now pins the header literal in politeness.py.
+- **The cache root stays bound once.** `opendata/sources.py` derives its cache
+  directory from `ingest.sources.CACHE_ROOT`, not a second `data/cache` literal
+  (the single-binding invariant).
+- **No mart, no BACKING flip.** 7b lands upstream data + the fit only. B3.3
+  (`cost_model_params`) and B4.3 (`guardrail_sim`) stay Pending — their marts are
+  Phase 8. `make check-backing` is unchanged (19 rows, 7 marts).
+- **`opendata/` is its own package**, distinct from `ingest/` (review scrapers,
+  which carry the brand) and Phase 8's `models/` (the formulas that read the fit).
+  DAMIR names no insurer, so nothing under `opendata/` carries a brand token.
+
+Gotcha (stack): a national Open DAMIR month is ~5.7 GB uncompressed
+(2021 figure), an order larger than PLAN's "hundreds of MB". So the real fetch is
+firmly developer-run and its output stays under the gitignored
+`data/cache/damir/`; CI and the DONE command fit only the small frozen fixture.
+The reimbursed-amount column is `PRS_REM_MNT`, `;`-delimited, and French cells may
+use a `,` decimal separator (the slice guard accepts both).
+
+Finalization (developer step): `make confirm fetch-damir MONTH=<a real month>`
+then `make sample-damir MONTH=<same>` produces `fixtures/damir/`; then the fit
+artifact, the real-fixture pins (`tests/pins.py`), `_check("damir")` in the frozen
+test, and the Delivered paragraph land, and the review round runs.

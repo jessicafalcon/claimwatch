@@ -68,3 +68,11 @@ every rule below except the last sentence, which is editorial (PROJECT_BRIEF.md
 | B4.4 Fix 3 count the mistakes: a false-positive rate per flag rule (eventual Modeled) | — (outcome log) | — | — | Pending |
 | B5.1 Determinism facts: one model decision, formulas shown, no untagged number (eventual Measured) | — (repo facts) | — | — | Pending |
 | B5.2 Reproducibility: row counts per stage, eval scores, the one rebuild command (eventual Measured) | pipeline_row_counts | `sql/marts/pipeline_row_counts.sql` | — | Pending |
+
+**On the `open-damir` upstream (B3.3, B4.3).** Phase 7b landed that source: a
+small, real, brand-free slice of Open DAMIR's reimbursed-amount column
+(`fixtures/damir/`) and a lognormal fit computed from it, written to the tracked
+`data/damir/claim_cost_fit.csv` (`mu`, `sigma`, the goodness-of-fit deciles). Both
+rows stay **Pending** because their marts — `cost_model_params` and
+`guardrail_sim` — are built in Phase 8, which reads that fit; the fit is the
+sourced input, not yet a displayed number.

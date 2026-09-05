@@ -89,23 +89,23 @@ make fit-damir && make idempotency-check ROWS=synthetic && make check-backing &&
 
 | Done-when | Proof (test id / `make` target / output line) |
 |---|---|
-| 1 | `make fit-damir` prints `mu=… sigma=… n=…`; `tests/test_damir.py::test_fit_params_over_fixture` |
-| 2 | `tests/test_damir.py::test_fit_reproducible_by_hand` (recomputes `mu`/`sigma` from the fixture) |
-| 3 | `tests/test_damir.py::test_artifact_equals_recompute` and `::test_fit_idempotent` |
+| 1 | `make fit-damir` prints the fit; `tests/test_damir.py::test_fit_reproducible_by_hand`, `::test_fit_is_the_lognormal_mle`, `::test_fit_params_over_fixture` (skips until the fixture exists) |
+| 2 | `tests/test_damir.py::test_fit_reproducible_by_hand` (recomputes `mu`/`sigma` the hand way) |
+| 3 | `tests/test_damir.py::test_artifact_equals_recompute` (skips until fixture) and `::test_write_fit_is_byte_identical_on_rerun` |
 | 4 | `tests/test_damir.py::test_goodness_of_fit_deciles`; `make fit-damir` prints the decile table |
-| 5 | `tests/test_damir.py::test_amount_domain_guard` (non-numeric / `0` / negative dropped and counted) |
-| 6 | `tests/test_damir.py::test_fetch_damir_gate`, `::test_fetch_damir_month_validation` |
+| 5 | `tests/test_damir.py::test_amount_domain_guard_drops_and_counts`, `::test_parse_amount_keeps_only_positive_numbers`, `::test_read_amounts_refuses_a_file_without_the_column` |
+| 6 | `tests/test_damir.py::test_fetch_damir_refuses_without_the_confirm_goal`, `::test_confirm_arms_fetch_damir_and_the_armed_path_proceeds`, `::test_fetch_damir_month_validation_refuses_before_any_network` |
 
 ## Invariants (REQUIRED)
 
 | Invariant ("for all …, … holds") | Falsified by (scenario test) |
 |---|---|
-| For all runs of `fit-damir` on the same slice, the output numbers are identical (no clock, no RNG, closed-form). | `tests/test_damir.py::test_fit_idempotent` — run twice, diff the file. |
+| For all runs of `fit-damir` on the same slice, the output numbers are identical (no clock, no RNG, closed-form). | `tests/test_damir.py::test_fit_is_deterministic`, `::test_write_fit_is_byte_identical_on_rerun`. |
 | For all amounts fed to the fit, `mu`/`sigma` equal `mean`/`population-std` of their natural logs — the arithmetic anyone can redo. | `tests/test_damir.py::test_fit_reproducible_by_hand` — recompute independently. |
-| For all rows in the slice, only a numeric amount `> 0` reaches the fit; every other row is dropped and counted. | `tests/test_damir.py::test_amount_domain_guard` — a slice with blanks, text, `0`, `-5`. |
-| For all committed states, `data/damir/claim_cost_fit.csv` equals the fit recomputed from `fixtures/damir/`. | `tests/test_damir.py::test_artifact_equals_recompute` — mutate the file, assert the check fails. |
-| For all invocations, the DAMIR fetch runs only when `confirm` armed it in the same make process and `MONTH` matches `YYYY-MM`. | `tests/test_damir.py::test_fetch_damir_gate`, `::test_fetch_damir_month_validation`. |
-| For all of 7b, no `sql/marts/*.sql` is added and no BACKING tag flips (marts are Phase 8). | `make check-backing`; `tests/test_damir.py::test_no_new_mart_files`. |
+| For all rows in the slice, only a numeric amount `> 0` reaches the fit; every other row is dropped and counted. | `tests/test_damir.py::test_amount_domain_guard_drops_and_counts` — a slice with a blank, text, `0`, `-5`. |
+| For all committed states, `data/damir/claim_cost_fit.csv` equals the fit recomputed from `fixtures/damir/`. | `tests/test_damir.py::test_artifact_equals_recompute` (skips until the fixture exists). |
+| For all invocations, the DAMIR fetch runs only when `confirm` armed it in the same make process and `MONTH` matches `YYYY-MM`. | `tests/test_damir.py::test_fetch_damir_refuses_without_the_confirm_goal`, `::test_fetch_damir_month_validation_refuses_before_any_network`. |
+| For all of 7b, no `sql/marts/*.sql` is added and no BACKING tag flips (marts are Phase 8). | `make check-backing`; `tests/test_damir.py::test_no_new_mart_files_and_marts_are_phase_8`. |
 
 ## Pinned decisions (do not re-litigate)
 
@@ -185,8 +185,9 @@ Freeze: none
   Pending** (marts are Phase 8).
 - [ ] SPEC.md — none (no chart or beat changes; Beat 3/4 already describe the
   fit "with the fit shown").
-- [ ] `README.md` — the two new commands and one plain sentence on why the
-  boring closed-form fit.
+- [ ] README — none (no README.md exists yet; it lands in Phase 9). The
+  teaching sentence on why the boring closed-form fit lives in
+  `opendata/fit.py`'s module docstring until then.
 - [ ] this spec — the "Delivered" paragraph appended at exit.
 
 ## Threat model (REQUIRED)
@@ -201,7 +202,7 @@ nothing — no gate.
 
 | Target | empty | `../x` | `"; ` | env-exported | `$(origin)` | Pinned by |
 |---|---|---|---|---|---|---|
-| `fetch-damir` | refuse (no default month; exit 2) | refuse (`YYYY-MM` shape rejects `/`) | refuse (shape rejects `;` and space) | refuse (needs `confirm` goal in the same process; a `MONTH`/goal from the environment cannot arm it) | `confirm` trusts the goal list only when `origin == default` (make's own) | `test_fetch_damir_month_validation`, `test_fetch_damir_gate` |
+| `fetch-damir` | refuse (no default month; exit 2) | refuse (`YYYY-MM` shape rejects `/`) | refuse (shape rejects `;` and space) | refuse (needs `confirm` goal in the same process; a `MONTH`/goal from the environment cannot arm it) | `confirm` trusts the goal list only when `origin == default` (make's own) | `test_fetch_damir_month_validation_refuses_before_any_network`, `test_fetch_damir_refuses_without_the_confirm_goal`, `test_valid_month_refuses_bad_shapes` |
 
 Run twice: `fetch-damir` re-downloads the month into the cache, overwriting the
 same path (no duplicate rows anywhere; the cache is gitignored). No credentials
