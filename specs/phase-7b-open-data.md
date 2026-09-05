@@ -296,3 +296,39 @@ sim to a distribution that is not the claim cost it names.
 **Record deltas at exit.** DECISIONS.md — a 7b Gotcha: the dictionary's
 `PRS_REM_TYP` semantics and why the fit filters to 0/1. BACKING.md — the B3.3/B4.3
 `open-damir` note names the `PRS_REM_TYP ∈ {0,1}` filter. No SPEC.md/tag change.
+
+## Amendment A2 (2026-09-05) — read the real gzipped DAMIR format end-to-end
+
+**Trigger.** The real Open DAMIR monthly resource is `A<YYYYMM>.csv.gz` (gzip; the
+July 2025 file is ~950 MB compressed, ~5.7 GB raw). As built, `opendata/fetch.py`
+writes the downloaded bytes to a plain `A<YYYYMM>.csv` name and `opendata/slice.py`
+opens it as UTF-8 text, so `make confirm fetch-damir` → `make sample-damir` does
+**not** work against the distributed format — the developer must `gunzip` by hand
+first. Found when the developer fetched July 2025; 7b's fixture was drawn from a
+hand-decompressed copy.
+
+**Invariant restored.** *For all cached DAMIR months, `sample-damir` reads the file
+as the portal serves it (gzip), so the documented `fetch-damir → sample-damir` flow
+reproduces the fixture with no manual decompression step.*
+
+**Change.**
+- `cache_path` names the cached month `A<YYYYMM>.csv.gz` (the real extension);
+  `fetch_month` writes the downloaded bytes there unchanged.
+- `slice.py` opens the amount file transparently: a gzip file (detected by its
+  magic bytes `\x1f\x8b`, not its name) is read through `gzip.open(..., "rt")`, a
+  plain file through `open(...)`. One reader serves both the gzipped national month
+  and the plain, tracked fixture — the fixture stays a small, human-readable `.csv`,
+  `write_fixture` unchanged.
+
+**Deltas.** `cache_path` return value changes (`.csv` → `.csv.gz`); `slice.py`
+gains gzip-aware opening; new tests: `read_amounts` / `systematic_sample` over a
+gzip fixture equal the plain result, and `cache_path` ends in `.csv.gz`. No change
+to the fit, the pins, the fixture bytes, or the two-column shape (A1).
+
+**Rejected.** (a) Decompress in `fetch_month` and keep a plain `.csv` cache —
+doubles the on-disk footprint (~5.7 GB extra) and hides the real format. (b) Switch
+on the `.gz` suffix only — a mis-named file would be mis-read; magic-byte detection
+is the closed check, the "declared shape" kind.
+
+**Record.** DECISIONS.md — a 7b Gotcha: the DAMIR portal serves gzip; the slice
+reads it transparently by magic bytes. No BACKING / SPEC / tag change.
