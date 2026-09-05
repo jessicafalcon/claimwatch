@@ -313,3 +313,13 @@ THEME_SHARE_BY_SEGMENT_NOKEY = {
 # every month carries at least one document-loop row, and every month a review
 # the rules left unclassified carries an unclassified band row.
 THEME_SHARE_BY_MONTH_REVIEWS = {"2026-01": 36, "2026-02": 2, "2026-03": 1}
+
+# --- Phase 7b: the DAMIR lognormal claim-cost fit over fixtures/damir/ ---------
+# The fit computed by `make fit-damir` over the frozen fixture: a systematic
+# N=5000 draw of positive legal-type (PRS_REM_TYP in {0,1}, Amendment A1)
+# PRS_REM_MNT amounts from Open DAMIR July 2025 (A202507). mu = mean(ln x),
+# sigma = population-std(ln x), n = the kept amounts. Rounded to 6 decimals, the
+# grain fit_lognormal is pinned at. Byte-stable and reproducible from the fixture.
+DAMIR_MU = 3.809814
+DAMIR_SIGMA = 2.187981
+DAMIR_N = 5000
