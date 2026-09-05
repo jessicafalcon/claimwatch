@@ -136,9 +136,9 @@ def confirmed(make_pid: str) -> bool:
 
 
 def _do_confirm(args: argparse.Namespace) -> int:
-    """`make confirm`: stamp this invocation's make process id for the `reset`
-    or `scrape` goal that follows it in the same command. The goal after
-    `confirm` must be one of `GATED`, so `make confirm help` and a trailing
+    """`make confirm`: stamp this invocation's make process id for the `reset`,
+    `scrape` or `fetch-damir` goal that follows it in the same command. The goal
+    after `confirm` must be one of `GATED`, so `make confirm help` and a trailing
     `confirm` refuse and leave no stamp — no ordinary command leaves an armed
     stamp behind; the goal list is trusted only when its origin is make's own
     (`$(origin MAKECMDGOALS)` is `default`): a list from the environment,

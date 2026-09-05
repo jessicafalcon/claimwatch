@@ -8,6 +8,10 @@ and that pair is exactly the maximum-likelihood lognormal fit, arrived at by
 plain arithmetic rather than a solver. Health costs are lognormal because a few
 large claims sit far above many small ones.
 
+The amounts are DAMIR's aggregated per-cell reimbursement totals, not single
+claims, so the curve approximates the claim-cost distribution rather than
+measuring it claim by claim — the honest label for the anchor Phase 8 draws from.
+
 "The fit shown" (brief §7): a goodness-of-fit table puts each decile of the
 real amounts next to what the fitted curve predicts for that decile,
 `exp(mu + sigma·z_p)`, with the standard-normal quantile `z_p` printed beside

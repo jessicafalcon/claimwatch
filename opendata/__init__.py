@@ -1,5 +1,5 @@
 """Open-data ingest and the claim-cost fit (Phase 7b). Distinct from `ingest/`
-(the review scrapers, which carry the studied insurer's brand) and from Phase
+(the review scrapers, which carry the studied insurers' brands) and from Phase
 8's `models/` (the cost model and simulator that consume this fit). Open DAMIR
 is France's public dataset of aggregated health-insurance reimbursements — no
 individuals, no insurer named — so nothing here carries a brand token.

@@ -16,14 +16,15 @@
 # `$(origin VAR)` reports `command line` for a definition that arrived through
 # MAKEFLAGS in the environment. A GOAL can — MAKEFLAGS carries flags and
 # definitions, never goals — so the destructive `reset` and the network
-# `scrape` are confirmed by the `confirm` goal in the SAME invocation:
-# `make confirm reset`. The `confirm` recipe stamps its make process's id
-# (`$$PPID`, the recipe shell's parent); `reset`/`scrape` pass their own and
+# `scrape`/`fetch-damir` are confirmed by the `confirm` goal in the SAME
+# invocation: `make confirm reset`. The `confirm` recipe stamps its make
+# process's id (`$$PPID`, the recipe shell's parent); the gated goal passes its
+# own and
 # Python confirms only when the two are one process, consuming the stamp
 # (spec Phase 3a, A4 (d); pinned by tests/test_makefile.py). The stamp is
 # created exclusively, so a planted file makes `confirm` itself refuse
-# (A8 (d)); `confirm` arms only when the goal after it is `reset` or
-# `scrape`, and only from a goal list whose origin is make's own
+# (A8 (d)); `confirm` arms only when the goal after it is `reset`, `scrape` or
+# `fetch-damir`, and only from a goal list whose origin is make's own
 # (`$(origin MAKECMDGOALS)` is `default` — a definition from the environment,
 # MAKEFLAGS or the command line is refused), so no ordinary command leaves an
 # armed stamp behind (A9 (a); goals run in order under -j, .NOTPARALLEL
@@ -66,7 +67,7 @@ rebuild: ## build the warehouse from raw [TARGET=duckdb] [ROWS=captured|none|syn
 idempotency-check: ## rebuild twice, diff per-table row counts (run-twice property) [ROWS=synthetic]
 	uv run python -m pipeline idempotency-check --target=$(call _Q,$(value TARGET)) --rows=$(call _Q,$(value ROWS))
 
-confirm: ## arm reset or scrape for THIS invocation only: `make confirm reset`, `make confirm scrape`
+confirm: ## arm reset, scrape or fetch-damir for THIS invocation only: `make confirm reset`, `make confirm scrape`, `make confirm fetch-damir`
 	@uv run python -m pipeline confirm --make-pid=$$PPID --goals=$(call _Q,$(MAKECMDGOALS)) --goals-origin=$(call _Q,$(origin MAKECMDGOALS))
 
 reset: ## DESTRUCTIVE drop every DuckDB file this repo built (the corpus and one per rebuild input, past or present) — needs `make confirm reset`

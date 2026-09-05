@@ -76,7 +76,10 @@ to the tracked `data/damir/claim_cost_fit.csv` (`mu`, `sigma`, the goodness-of-f
 deciles). The slice keeps only the legal Assurance Maladie reimbursement —
 `PRS_REM_TYP ∈ {0,1}` (Amendment A1); rows carrying a *part supplémentaire*
 (type ≥ 2) are dropped, so the fitted distribution is the claim cost the study
-means, not a pool of legal + supplementary parts. Both rows stay **Pending**
+means, not a pool of legal + supplementary parts. Each DAMIR row is an
+aggregated per-cell reimbursement total, not a single claim, so the lognormal
+approximates the claim-cost distribution rather than measuring it claim by claim
+— the honest label Phase 8 carries beside the fit. Both rows stay **Pending**
 because their marts — `cost_model_params` and `guardrail_sim` — are built in
 Phase 8, which reads that fit; the fit is the sourced input, not yet a displayed
 number.

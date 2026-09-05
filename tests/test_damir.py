@@ -123,8 +123,21 @@ def test_parse_amount_keeps_only_positive_numbers():
     assert parse_amount("12,50") == 12.5  # French decimal comma
     assert parse_amount("  3 ") == 3.0
     junk = (
-        "", "  ", "abc", "0", "0.0", "-5", "-0.01", "1,2,3", "nan", "inf",
-        "1_000", "1e5", "1.5e3", "0x10", "+3",  # exotic float() forms, refused
+        "",
+        "  ",
+        "abc",
+        "0",
+        "0.0",
+        "-5",
+        "-0.01",
+        "1,2,3",
+        "nan",
+        "inf",
+        "1_000",
+        "1e5",
+        "1.5e3",
+        "0x10",
+        "+3",  # exotic float() forms, refused
     )
     for j in junk:
         assert parse_amount(j) is None, j

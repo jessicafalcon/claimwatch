@@ -7,7 +7,10 @@ Open DAMIR ("base complète sur les dépenses d'assurance maladie interrégimes"
 is published on data.gouv.fr as one monthly CSV per period: files prefixed `A`
 from 2015 (`A202401` = January 2024), `;`-delimited, 55 variables per service
 line. We read exactly one column — `PRS_REM_MNT`, the reimbursed amount
-(montant remboursé) — and fit a lognormal to its distribution. The monthly
+(montant remboursé) — and fit a lognormal to its distribution. Each row is an
+aggregated per-cell total (a combination of the dataset's dimensions), not a
+single claim, so the fit approximates the claim-cost distribution rather than
+measuring it claim by claim. The monthly
 files are resolved from the dataset's data.gouv resource list by their
 `A<YYYYMM>` title; each is large (a national month is gigabytes), so a fetch is
 developer-run and its output stays under the gitignored cache."""
