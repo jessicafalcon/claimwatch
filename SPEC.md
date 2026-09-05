@@ -96,8 +96,9 @@ traction, and coverage-and-price frustration (PROJECT_BRIEF.md §5).
   the examples are curated with links).
 - **B2.2 — Theme share over time, by segment.** The share of negative reviews in
   each theme, month by month, split digital-first versus traditional. Counts
-  theme rows under the grain above. Tag: *Measured* via the gated classifier
-  (Pending until its mart lands — never faked).
+  theme rows under the grain above. Tag: *Measured* via the gated classifier.
+  When the language model is switched off, the reviews it would have sorted stay
+  in a gray *not yet classified* band — shown, never hidden.
 - **B2.3 — Peer context.** Public ratings across the market segment, so no one
   insurer is read in isolation. Tag: *Documented* for the anchors, *Measured*
   for our own points (see *How to read a panel*). *Placed points, stated
@@ -113,7 +114,9 @@ traction, and coverage-and-price frustration (PROJECT_BRIEF.md §5).
   of document-loop complaints at digital-first insurers next to the same share
   at traditional mutuelles. This is the study's hypothesis, not its verdict: if
   the data shows no gap, the chart says so and is published as-is. Tag:
-  *Measured* (Pending).
+  *Measured*. *Placed beside the chart:* the corpus is digital-first only for
+  now, so the traditional column awaits a traditional-mutuelle source (BACKLOG);
+  the chart shows the segments the data has.
 
 ## Beat 3 — What a wrongly held claim costs
 

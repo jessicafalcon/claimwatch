@@ -27,9 +27,9 @@ from pipeline.build import (  # noqa: E402
 from pipeline.warehouse import connect, database_for, default_schema  # noqa: E402
 
 _INSERT_RAW = (
-    "insert into raw_reviews (source, external_id, source_url, captured_at, "
-    "run_id, review_date, rating, title, body, content_hash) "
-    "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    "insert into raw_reviews (source, external_id, source_url, segment, "
+    "captured_at, run_id, review_date, rating, title, body, content_hash) "
+    "values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
 )
 
 
@@ -87,6 +87,7 @@ def test_staging_tiebreak_is_deterministic_on_equal_captured_at():
                         "oa",
                         "DUP",
                         "https://x/",
+                        "digital-first",
                         "2026-05-01T00:00:00",
                         "t",
                         "2026-05-01",
@@ -111,6 +112,7 @@ def _review(rating) -> dict:
         "source": "oa",
         "external_id": "R1",
         "source_url": "https://x/",
+        "segment": "digital-first",
         "captured_at": "2026-05-01T00:00:00",
         "review_date": "2026-05-01",
         "rating": rating,
@@ -263,7 +265,7 @@ def test_columns_in_another_order_refuse_naming_the_position():
         with pytest.raises(PageShapeError) as exc:
             create_raw(conn)
         message = str(exc.value)
-        assert "column 9 is 'content_hash'" in message and "'body'" in message
+        assert "column 10 is 'content_hash'" in message and "'body'" in message
     finally:
         conn.close()
 
@@ -383,10 +385,10 @@ def test_a_same_named_table_in_another_schema_is_not_this_one():
         conn.execute("create schema elsewhere")
         conn.execute("create table elsewhere.raw_reviews (a integer)")
         create_raw(conn)  # exists only elsewhere: created in the default schema
-        assert len(_columns(conn, "raw_reviews")) == 10
+        assert len(_columns(conn, "raw_reviews")) == 11
         conn.execute("create table elsewhere.declared_raw_reviews (a integer)")
-        create_raw(conn)  # the filtered read sees ten columns and no scratch
-        assert len(_columns(conn, "raw_reviews")) == 10
+        create_raw(conn)  # the filtered read sees eleven columns and no scratch
+        assert len(_columns(conn, "raw_reviews")) == 11
         assert conn.execute(
             "select count(*) from elsewhere.declared_raw_reviews"
         ).fetchone() == (0,)

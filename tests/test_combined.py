@@ -118,12 +118,20 @@ def test_no_key_synthetic_outcome_matches_pins(synthetic_conn):
 
 def test_combined_writes_no_mart():
     # combined.py stays Python-only: the combined classification is a value, not
-    # a table. 6b's classifier_quality is written by the CLI gate step (DDL fed by
-    # Python), never by the combiner; Phase 7's theme-share marts do not exist yet.
+    # a table. The marts fed from it (classifier_quality in 6b, the theme-share
+    # marts in 7a) are written by the CLI classify step, never by the combiner —
+    # classify_all does no database write at all.
+    import inspect
+
+    import classify.combined as combined
+
+    assert "execute(" not in inspect.getsource(combined)
     marts = {p.name for p in (ROOT / "sql" / "marts").glob("*.sql")}
-    assert "classifier_quality.sql" in marts  # 6b landed it
-    assert "theme_share_by_month.sql" not in marts  # Phase 7
-    assert "theme_share_by_segment.sql" not in marts  # Phase 7
+    assert {
+        "classifier_quality.sql",
+        "theme_share_by_month.sql",
+        "theme_share_by_segment.sql",
+    } <= marts
 
 
 def test_unresolved_ids_are_exactly_the_all_unclassified_reviews():

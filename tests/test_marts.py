@@ -327,6 +327,7 @@ def test_review_tables_have_no_personal_columns(anchors_db):
         "source",
         "external_id",
         "source_url",
+        "segment",  # the source's market segment (Phase 7a, A1) — not personal
         "captured_at",
         "run_id",
         "review_date",

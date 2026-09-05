@@ -744,10 +744,50 @@ def create_raw(conn) -> None:
         warehouse.run_sql_file(conn, path)
 
 
+# The marts that count the classifier's output: they read stg_classified_reviews,
+# which Python fills in the classify step (pipeline/cli.py) after staging. The
+# generic pass runs before classify, so it would build them empty — the classify
+# step runs them instead (build_theme_share_marts), after the table is filled.
+POST_CLASSIFY_MARTS = frozenset(
+    {"theme_share_by_month.sql", "theme_share_by_segment.sql"}
+)
+
+
 def build_derived(conn) -> None:
     for stage in ("staging", "marts"):
         for path in _sql_files(stage):
+            if stage == "marts" and path.name in POST_CLASSIFY_MARTS:
+                continue  # the classify step runs it, once its input is filled
             warehouse.run_sql_file(conn, path)
+
+
+def write_classified_reviews(conn, rows, run_id: str) -> None:
+    """Fill `stg_classified_reviews` from the combined classifier's output: one
+    row per `(source, external_id, theme)`. `rows` is at the review x theme grain
+    classify_all returns (already sorted, so a re-run is byte-identical). The
+    table is cleared first, so a re-populate is idempotent; no clock and no
+    address is invented — a classification carries only its run_id."""
+    conn.execute("begin transaction")
+    try:
+        conn.execute("delete from stg_classified_reviews")
+        for source, external_id, theme in rows:
+            conn.execute(
+                "insert into stg_classified_reviews "
+                "(source, external_id, theme, run_id) values (?, ?, ?, ?)",
+                [source, external_id, theme, run_id],
+            )
+    except BaseException:
+        conn.execute("rollback")
+        raise
+    conn.execute("commit")
+
+
+def build_theme_share_marts(conn) -> None:
+    """Run the two theme-share marts (B2.2, B2.5) after stg_classified_reviews is
+    filled. Segment is a review column (Phase 7a, A1), so the marts group by it
+    with no join — a review is counted under exactly one segment, on any input."""
+    for name in sorted(POST_CLASSIFY_MARTS):
+        warehouse.run_sql_file(conn, ROOT / "sql" / "marts" / name)
 
 
 def write_classifier_quality(
@@ -800,6 +840,48 @@ def read_fixture(name: str) -> list[dict[str, str]]:
         return list(csv.DictReader(fh))
 
 
+def segment_by_platform(sources: tuple[Source, ...] = SOURCES) -> dict[str, str]:
+    """platform -> segment, from the real declarations — how a review loaded from
+    the synthetic fixture (which carries no segment of its own) is stamped with
+    its segment. Every declaration of one platform shares that platform's
+    segment; a platform declared under two segments is a declaration bug and
+    refuses here rather than stamping a review at random (Phase 7a, A1)."""
+    out: dict[str, str] = {}
+    for s in sources:
+        if out.setdefault(s.platform, s.segment) != s.segment:
+            raise ValueError(
+                f"platform {s.platform!r} is declared under two segments "
+                f"({out[s.platform]!r} and {s.segment!r})"
+            )
+    return out
+
+
+def _reviews_with_segment(
+    rows: list[dict[str, str]], segment: str
+) -> list[dict[str, str]]:
+    """The review rows with `segment` stamped on each — attribution from the
+    source they were loaded from (Phase 7a, A1)."""
+    return [{**r, "segment": segment} for r in rows]
+
+
+def _fixture_reviews_with_segment(rows: list[dict[str, str]]) -> list[dict[str, str]]:
+    """The synthetic fixture reviews, each stamped with its platform's segment.
+    A fixture review from a platform no source declares refuses the rebuild —
+    it could not be attributed (Phase 7a, A1)."""
+    seg = segment_by_platform()
+    out: list[dict[str, str]] = []
+    for r in rows:
+        platform = r["source"]
+        if platform not in seg:
+            raise PageShapeError(
+                f"synthetic review {platform}/{r.get('external_id', '?')}: "
+                f"platform {platform!r} is not a declared source, so it has no "
+                "segment"
+            )
+        out.append({**r, "segment": seg[platform]})
+    return out
+
+
 def load_reviews(conn, rows: list[dict[str, str]], run_id: str) -> None:
     """Append each review not already present under its natural key + content
     hash. ANSI `insert ... select ... where not exists (...)`, parameterized — no
@@ -829,15 +911,16 @@ def _load_reviews(conn, rows: list[dict[str, str]], run_id: str) -> None:
         h = content_hash(r)
         conn.execute(
             "insert into raw_reviews "
-            "(source, external_id, source_url, captured_at, run_id, "
+            "(source, external_id, source_url, segment, captured_at, run_id, "
             " review_date, rating, title, body, content_hash) "
-            "select ?, ?, ?, ?, ?, ?, ?, ?, ?, ? "
+            "select ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? "
             "where not exists (select 1 from raw_reviews "
             "where source = ? and external_id = ? and content_hash = ?)",
             [
                 r["source"],
                 r["external_id"],
                 r["source_url"],
+                r["segment"],
                 r["captured_at"],
                 run_id,
                 r["review_date"],
@@ -986,7 +1069,11 @@ def rebuild(
             write_source_pages(conn, run_id or "declared", declared)
             load_snapshots(conn, read_anchors(), run_id or "anchors", rows)
         if rows == "synthetic":
-            load_reviews(conn, read_fixture("synthetic"), run_id or "synthetic")
+            load_reviews(
+                conn,
+                _fixture_reviews_with_segment(read_fixture("synthetic")),
+                run_id or "synthetic",
+            )
         if rows == "captured":
             path = Path(manual_file) if manual_file is not None else MANUAL_SNAPSHOTS
             load_snapshots(conn, read_manual_snapshots(path), run_id or "manual", rows)
@@ -999,7 +1086,11 @@ def rebuild(
         for source, capture_dir, prefix in captures_for(rows, cache_dir):
             for capture_id, parsed in read_captures(capture_dir, source):
                 stamp = prefix if rows == "samples" else f"{prefix}/{capture_id}"
-                load_reviews(conn, parsed.reviews, run_id or stamp)
+                load_reviews(
+                    conn,
+                    _reviews_with_segment(parsed.reviews, source.segment),
+                    run_id or stamp,
+                )
                 load_snapshots(conn, parsed.snapshots, run_id or stamp, rows)
         build_derived(conn)
         return table_counts(conn)
