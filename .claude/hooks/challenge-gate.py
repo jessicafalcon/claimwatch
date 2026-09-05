@@ -1,69 +1,99 @@
 #!/usr/bin/env python3
-# .claude/hooks/challenge-gate.py  (DRAFT — not wired, not tested)
+# .claude/hooks/challenge-gate.py — tracked; wired in the gitignored
+# .claude/settings.local.json (CLAUDE.md → Project tooling); pinned by
+# tests/test_challenge_gate.py. A reminder, never a gate: the only decision it
+# ever emits is `ask`.
 #
-# Two hook events, one file, chosen by the event name on stdin:
+#   PostToolUse (matcher: Write|Edit|MultiEdit|NotebookEdit) — after an edit to
+#   a file directly under specs/ named phase-*.md whose status line does not say
+#   DELIVERED and which carries no full stamp (`Challenged: YYYY-MM-DD, round
+#   <k> — <verdict>`, unbolded, at line start), exit 2 with one line naming
+#   /challenge. PostToolUse cannot block: the line reaches the model, the edit
+#   stands. It fires on every such edit — there is no "once".
 #
-#   PostToolUse (matcher: Write|Edit|MultiEdit)  — after a `specs/phase-*.md`
-#   edit: if the spec's status line still says PROPOSED and the file carries
-#   no `Challenged:` line, print a one-line reminder to run /challenge. It
-#   cannot block (PostToolUse never does); exit 2 puts the line in front of
-#   the model, exit 0 keeps quiet.
+#   PreToolUse (matcher: ExitPlanMode) — answers `ask` on EVERY plan
+#   presentation, with the plan's own claim in the reason: stamped, not
+#   stamped, or not readable. The plan text is the model's own, so the hook
+#   shows the claim rather than trusting it; the developer decides. The
+#   payload shape is undocumented — a missing or non-string `plan` still asks.
 #
-#   PreToolUse (matcher: ExitPlanMode) — before a plan is presented: if the
-#   plan text carries no `Challenged:` line, answer `permissionDecision:
-#   "ask"` with a reason, so the developer sees "not challenged — present
-#   anyway?" once and decides. Never `deny`: skipping the challenge is the
-#   architect's call.
-#
-# Fails OPEN — exit 0, no output — on: a malformed event, an event it does not
-# handle, a file outside this project, a path that is not a phase spec, a
-# plan payload whose shape it does not recognise. It is a reminder, not a
-# security control. Wiring is LOCAL-ONLY (gitignored .claude/settings.local.json),
-# for the same reason as run-tests.py.
-#
-# TO VERIFY BEFORE WIRING (Gotchas): the installed build's ExitPlanMode
-# tool_input — whether the plan text arrives as `tool_input["plan"]`. The
-# hooks reference does not document it; if absent, the PreToolUse half fails
-# open by design and only the PostToolUse half is live.
+# Fails OPEN — exit 0, no output — on: a malformed or oversized event, an event
+# it does not handle, no CLAUDE_PROJECT_DIR, a path that does not resolve to a
+# phase spec directly under <project>/specs (symlinks resolved), a spec it
+# cannot read or decode. It is a reminder, not a security control. Reads are
+# capped: the event at MAX_EVENT_BYTES (the harness is the producer; a bigger
+# event is not one we recognise) and the spec at HEAD_BYTES (the status line
+# and the stamp live in the first lines).
+from __future__ import annotations
+
+import datetime as dt
 import json
 import os
 import re
 import sys
+from pathlib import Path
+from typing import NoReturn
 
-STATUS_PROPOSED = re.compile(r"^\*\*Status: PROPOSED", re.M)
-CHALLENGED = re.compile(r"^Challenged: \d{4}-\d{2}-\d{2}", re.M)
+MAX_EVENT_BYTES = 4 * 1024 * 1024
+HEAD_BYTES = 16 * 1024
+EDIT_TOOLS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit"})
 SPEC_NAME = re.compile(r"^phase-[0-9]+[a-z]?-[a-z0-9-]+\.md$")
+STATUS = re.compile(r"^\*\*Status: (?P<rest>[^\n]*)$", re.M)
+STAMP = re.compile(r"^Challenged: (?P<date>\d{4}-\d{2}-\d{2}), round \d+ — ", re.M)
 
 
-def _spec_reminder(fp: str, root: str) -> None:
+def _stamped(text: str) -> bool:
+    """A full stamp with a real calendar date, at line start."""
+    m = STAMP.search(text)
+    if m is None:
+        return False
     try:
-        text = open(fp, encoding="utf-8").read()
-    except OSError:
+        dt.date.fromisoformat(m.group("date"))
+    except ValueError:
+        return False
+    return True
+
+
+def _delivered(text: str) -> bool:
+    m = STATUS.search(text)
+    return m is not None and "DELIVERED" in m.group("rest")
+
+
+def _spec_head(path: Path) -> str | None:
+    try:
+        with path.open("rb") as fh:
+            return fh.read(HEAD_BYTES).decode("utf-8", errors="strict")
+    except (OSError, UnicodeDecodeError):
+        return None
+
+
+def _spec_reminder(path: Path, root: Path) -> NoReturn:
+    head = _spec_head(path)
+    if head is None or _delivered(head) or _stamped(head):
         sys.exit(0)
-    if STATUS_PROPOSED.search(text) and not CHALLENGED.search(text):
-        rel = os.path.relpath(fp, root)
-        print(
-            f"[challenge-gate] {rel} is PROPOSED and not yet challenged — "
-            f"run `/challenge {rel}` before asking for approval.",
-            file=sys.stderr,
-        )
-        sys.exit(2)  # PostToolUse: shows the line to the model; blocks nothing
-    sys.exit(0)
+    rel = path.relative_to(root)
+    print(
+        f"[challenge-gate] {rel} is not yet challenged — run `/challenge {rel}` "
+        "before asking for approval.",
+        file=sys.stderr,
+    )
+    sys.exit(2)
 
 
-def _plan_gate(tool_input: dict) -> None:
+def _plan_gate(tool_input: dict[str, object]) -> NoReturn:
     plan = tool_input.get("plan")
-    if not isinstance(plan, str):  # shape unknown on this build: fail open
-        sys.exit(0)
-    if CHALLENGED.search(plan):
-        sys.exit(0)
+    if not isinstance(plan, str):
+        claim = "the hook cannot read this plan's text"
+    elif _stamped(plan):
+        claim = "the plan text says it was challenged — check the stamp is real"
+    else:
+        claim = "the plan carries no `Challenged:` stamp"
     out = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
             "permissionDecision": "ask",
             "permissionDecisionReason": (
-                "This plan has not been through /challenge (no `Challenged:` "
-                "line). Present it anyway, or run /challenge first."
+                f"challenge-gate: {claim}. Present it anyway, or run /challenge first."
             ),
         }
     }
@@ -71,35 +101,55 @@ def _plan_gate(tool_input: dict) -> None:
     sys.exit(0)
 
 
-def main() -> None:
+def _event() -> dict[str, object] | None:
+    """The event is an input this repo does not own: one shape, else None."""
     try:
-        data = json.load(sys.stdin)
+        raw = sys.stdin.buffer.read(MAX_EVENT_BYTES + 1)
+        if len(raw) > MAX_EVENT_BYTES:
+            return None
+        data = json.loads(raw.decode("utf-8"))
     except (json.JSONDecodeError, UnicodeDecodeError, OSError):
-        sys.exit(0)
-    if not isinstance(data, dict):
-        sys.exit(0)
-    event = data.get("hook_event_name")
-    tool = data.get("tool_name")
-    ti = data.get("tool_input")
-    if not isinstance(ti, dict):
-        sys.exit(0)
+        return None
+    if not isinstance(data, dict) or not isinstance(data.get("tool_input"), dict):
+        return None
+    return data
 
-    root = os.environ.get("CLAUDE_PROJECT_DIR", "")
-    if not root:
+
+def _spec_path(tool_input: dict[str, object], root: Path) -> Path | None:
+    """The edited file, only when it resolves to <root>/specs/phase-*.md."""
+    fp = tool_input.get("file_path")
+    if not isinstance(fp, str) or not fp:
+        return None
+    try:
+        path = Path(fp).resolve(strict=True)
+        specs = (root / "specs").resolve(strict=True)
+    except OSError:
+        return None
+    if path.parent != specs or not SPEC_NAME.match(path.name):
+        return None
+    return path
+
+
+def main() -> NoReturn:
+    data = _event()
+    if data is None:
         sys.exit(0)
+    event, tool = data.get("hook_event_name"), data.get("tool_name")
+    ti = data["tool_input"]
+    assert isinstance(ti, dict)  # _event checked it; this keeps the type narrow
 
     if event == "PreToolUse" and tool == "ExitPlanMode":
         _plan_gate(ti)
 
-    if event == "PostToolUse" and tool in ("Write", "Edit", "MultiEdit"):
-        fp = ti.get("file_path")
-        if not isinstance(fp, str):
+    root_env = os.environ.get("CLAUDE_PROJECT_DIR", "")
+    if event == "PostToolUse" and tool in EDIT_TOOLS and root_env:
+        try:
+            root = Path(root_env).resolve(strict=True)
+        except OSError:
             sys.exit(0)
-        ap = os.path.abspath(fp)
-        specs = os.path.join(os.path.abspath(root), "specs") + os.sep
-        if not ap.startswith(specs) or not SPEC_NAME.match(os.path.basename(ap)):
-            sys.exit(0)
-        _spec_reminder(ap, os.path.abspath(root))
+        path = _spec_path(ti, root)
+        if path is not None:
+            _spec_reminder(path, root)
 
     sys.exit(0)
 
