@@ -109,54 +109,16 @@ When invoked:
       explicit approval. No scraping frameworks, no proxy clients. `uv.lock`
       changes only with an approved package; CI installs `--locked`.
 
-## Secure-coding classes that apply here (check every changed file)
+## Secure-coding classes (the preloaded `secure-by-construction` standard)
 
-These are the general classes this repo can actually exhibit. Web classes it
-cannot (XSS, CSRF, session and auth handling, payments) are not checked; a
-change that ADDS such a surface is a scope finding first.
-
-- **Foreign input parsed to a shape.** A scraped page, a robots file, the
-  model's reply, a DAMIR row, a CLI variable (`ROWS`, `SOURCE`, `MONTH`, `N`,
-  `SPEC`, `BASE`), a hook's stdin, an env var, a file name under
-  `data/cache/`: each is accepted only as a closed set or a declared shape
-  (a regex anchored at both ends, a typed parse), with a size cap, and
-  refused by NAME otherwise. FLAG a `.get(…, default)`, a `try/except` that
-  coerces, or a "nearest label" fallback.
-- **Paths derived, never joined.** A path built from a variable is a
-  finding unless the variable was reduced to a slug from a closed set first;
-  `..`, an absolute path, a quote or `;` in a value must be refused; the
-  final path resolves inside the cache root or `data/`.
-- **No shell.** `subprocess` with a list, never `shell=True`; no f-string into
-  a command; the Makefile passes values through `_Q` and never interpolates
-  a variable into a recipe's shell text.
-- **SQL built in Python.** An identifier interpolated into SQL (`from {n}`,
-  `create table {scratch}`) is acceptable only when its source is the repo's
-  own file list or a closed set — cite that source; a value is always a
-  parameter.
-- **Decompression and size.** A gzip stream is read with a decompressed-byte
-  cap or the reason for no cap is written beside it (`opendata/slice.py` reads
-  a gzip member with no cap today: a developer-run path on a known portal,
-  but say so in code). A capture has a page cap; a download has a size
-  ceiling or a stated reason.
-- **YAML and serialisation.** `yaml.safe_load` only (it is, in
-  `classify/rules.py`); no `pickle`, no `eval`, no `literal_eval` on foreign
-  text.
-- **The model prompt is a data boundary.** Review text is untrusted input to
-  `classify/llm.py`: it sits in the user turn, the system prompt fixes the
-  closed set, the reply is parsed strictly, no tool is offered to the model,
-  and a directive inside a review can change nothing but that review's
-  label. FLAG review text concatenated into the system prompt, a tool
-  definition on that call, or a parse that accepts free text.
-- **Log and error hygiene.** A log line or exception message carries the
-  NAME of a variable and at most the length or shape of a foreign value —
-  never a review body, a key, a person. A traceback on the paid path is a
-  finding (one line naming the model and the cause).
-- **Time-of-check / time-of-use.** The `confirm` stamp and any "exists then
-  write" pair: the spec's Threat model names what the gate does not hold
-  against (a same-user process writing `data/`); a NEW gate must say the
-  same.
-- **Test isolation.** Tests write under `tmp_path`, never `data/`; no test
-  reads the environment's key; no test fetches.
+The `secure-by-construction` skill preloaded into you is the standard the
+author wrote against, and the only copy of these bars — they are not restated
+here so the two cannot drift. Apply EVERY section of it — What we do not own,
+Running things, Fetching, The model call is a data boundary, Keeping and
+holding, Writing to the repo from a machine, Hooks and settings, Dependencies
+— to EVERY changed file; for each, name the input that reaches the site. Web
+classes this repo cannot exhibit (XSS, CSRF, sessions, payments) are not
+checked; a change that ADDS such a surface is a scope finding first.
 
 ## Report format
 

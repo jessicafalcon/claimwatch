@@ -12,8 +12,9 @@ registers and removes for hand-mutation.
 ## 1. Locate the spec and the range
 
 - Scope: phase branches only. If the branch is not `phase-*` (a `fix/*`,
-  `docs/*` branch) print ONE line and STOP:
-  `no phase spec for <branch> — fix/docs branches run the agents directly`.
+  `docs/*` or `tooling/*` branch) print ONE line and STOP:
+  `no phase spec for <branch> — fix/docs/tooling branches run the agents
+  directly, by the surface table`.
 - Spec: the one `specs/phase-*.md` whose slug matches the branch name
   (`phase-0a-machinery` → `specs/phase-0a-machinery.md`). If none matches,
   ask for `SPEC=` and stop.
@@ -63,10 +64,12 @@ Agents:  <list>
 - **Code touched** (`*.py`, `sql/**`, `classify/**` incl. `rules.yaml`,
   `models/**`, `Makefile`, `scripts/`, `tests/`, `dags/**`, `study/*.py`):
   spawn **code-reviewer** and **functionality-tester** (that order).
-- **Sensitive touched** (`.github/`, `ingest/**`, `classify/llm.py`,
-  `pipeline/warehouse.py`, `.env*`, `.claude/hooks/`,
+- **Sensitive touched** (`.github/`, `ingest/**`, `opendata/**`,
+  `classify/llm.py`, `classify/cache.py`, `pipeline/warehouse.py`,
+  `pipeline/cli.py`, `scripts/`, `dags/**`, `.env*`, `.claude/hooks/`,
   `.claude/settings*.json`, a target that deletes, calls a paid API or
-  fetches): also **security-reviewer**.
+  fetches — the `secure-by-construction` skill's `paths:`): also
+  **security-reviewer**.
 - **Prose touched** (`README.md`, `SPEC.md`, `BACKING.md`, `study/**/*.md`,
   `study/**/*.html`, `CLAUDE.md`): also **study-editor**.
 - **Docs-only** (every changed path is `*.md`): spawn **coherence-auditor**
@@ -106,8 +109,13 @@ Wait for EVERY agent spawned in step 4 to finish before printing anything from
 any of them — no per-agent relay as results arrive. Then print one table over
 every finding from every agent:
 
-| # | Finding (one sentence) | Raised by | file:line | Class | In range / missed in round N−1 |
-|---|---|---|---|---|---|
+| # | Severity | Confidence | Finding (one sentence) | Raised by | file:line | Class | In range / missed in round N−1 |
+|---|---|---|---|---|---|---|---|
+
+Severity is the agent's (BLOCKER / should-fix / suggestion; CRITICAL /
+should-fix / note for security) and Confidence is the agent's (high / medium
+/ low): the reviewers report for coverage and this table is where the
+developer filters.
 
 Below the table, one verdict line per agent that ran (`code-reviewer: pass |
 N findings`, `functionality-tester: works | partially | doesn't`,

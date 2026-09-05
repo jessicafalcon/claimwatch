@@ -107,53 +107,17 @@ When the prompt names a review round (`/review-round N`) and pastes the
 previous round's table: a finding on code the earlier round already reviewed
 is still reported, labelled **"missed in round N−1"**.
 
-## Pass 3 — senior craft (the `code-craft` standard, applied to every changed file)
+## Pass 3 — senior craft (the preloaded `code-craft` standard)
 
-The bars below are signals, not verdicts: a signal plus a reason is a finding;
-a signal alone is a suggestion with low confidence. Every craft finding names
-the rewrite.
-
-- **Naming by meaning** (brief §2.3). An identifier that says what a thing
-  is (`df2`, `tmp`, `col3`, `helper`) instead of what it means; a function
-  name with no verb; a test name that does not state the behaviour; an
-  abbreviation that is not one of the study's own (`B2.4`, `stg_`, `raw_`).
-- **Function shape.** Does more than one job (reads AND decides AND writes);
-  longer than ~40 lines; more than 4 parameters; a boolean flag parameter
-  (two functions, or a closed-set enum); nesting deeper than 3 (early
-  returns); a return that means two things (`None` for "unclassified" and
-  "not run").
-- **Error policy.** `except Exception`/bare `except`; an exception swallowed
-  or downgraded to a print; an error message with no NAME of the input that
-  failed (file, column, variable) or WITH the value of a secret; an error
-  code returned where the process boundary is not the caller; fail-open
-  where the spec says refuse (or refuse where the spec says fail-open — the
-  hook is the one documented fail-open).
-- **Data shape across a boundary.** A `dict[str, Any]` or a tuple with
-  positional meaning crossing a module boundary where a frozen dataclass or
-  `TypedDict` exists or should (primitive obsession, data clumps — the four
-  provenance columns travel together); a caller reaching into another
-  module's dict layout (feature envy); `a.b().c().d()` chains.
-- **Duplication and speculation.** The same SQL fragment in two marts (a
-  staging table); the same guard in two CLIs (one function in the shared
-  module); a parameter, branch or abstraction for a case that does not exist
-  (brief §2.2 — YAGNI is a project rule here, not a preference); a label set,
-  a column list or a threshold written in two places (shotgun surgery).
-- **Constants.** A bare number or string that a reader cannot source: name
-  it, and either cite the source in the comment or pin it in `tests/pins.py`.
-- **Comments and docstrings.** A comment that restates the code; commented-out
-  code; a docstring longer than one line where the behaviour is obvious; a
-  missing SQL header (grain, provenance columns, BACKING rows) — the one
-  comment that is required.
-- **Types and mutation.** A public function without hints; a declaration or a
-  row that is a mutable dict/list where a frozen dataclass is the convention;
-  an input mutated in place.
-- **SQL craft.** `select *` in a mart; a CTE named by position; an
-  `order by` in a table definition; uppercase keywords; an implicit cast.
-- **Test quality.** A test that re-implements the code under test; two
-  behaviours in one test; a name that says "works"; a pinned number not in
-  `tests/pins.py`; a test writing under `data/` instead of `tmp_path`; a
-  scratch check promoted to a permanent test; a missing test for a stated
-  behaviour (name the test that should exist).
+The `code-craft` skill preloaded into you is the standard the author wrote
+against, and the only copy of the bars — they are not restated here so the
+two cannot drift. Apply EVERY section of it — Naming by meaning, Function
+shape, Guards at inputs the repo does not own, Error policy, Data shapes
+across a boundary, Duplication versus speculation, Constants, Comments and
+docstrings, Types, SQL, Makefile, Tests — to EVERY changed file, one finding
+per site. Its bars are signals, not verdicts: a signal plus a reason is a
+finding; a signal alone is a suggestion with low confidence. Every craft
+finding names the rewrite or the closed set that replaces the case.
 
 ## Report format
 

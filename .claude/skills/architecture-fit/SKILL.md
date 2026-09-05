@@ -9,6 +9,8 @@ paths:
   - "models/**"
   - "study/**"
   - "dags/**"
+  - "Makefile"
+  - "pyproject.toml"
   - "BACKING.md"
   - "SPEC.md"
   - "DECISIONS.md"
@@ -23,8 +25,10 @@ raise.
 1. **Which layer.** `ingest/` (captures, parsers), `sql/raw` (as-scraped,
    provenance), `sql/staging` (clean, deduped), `sql/marts` (study-ready),
    `classify/` (rules, one model call, eval), `opendata/` (public data, the
-   fit), `models/` (formulas as data, the simulator), `study/` (render only),
-   `dags/` (no logic), `scripts/` (guards), `tests/`. A piece that fits two
+   fit), `pipeline/` (the one warehouse seam, the build, the validating CLI,
+   the SQL lint), `models/` (formulas as data, the simulator), `study/`
+   (render only), `dags/` (no logic), `scripts/` (guards), `tests/`. A piece
+   that fits two
    layers is two pieces; a piece that fits none is out of scope.
 2. **Which part of the study.** Name the beat and the chart it surfaces in
    (SPEC.md). A feature that surfaces in none of the five parts is not built

@@ -51,9 +51,9 @@ row, a CLI variable, hook stdin, an env var, a file name under `data/cache/`.
   to the nearest valid value.
 - No `.get(…, default)` on foreign JSON; no `try: int(x) except: 0`.
 - Refuse loudly at the process boundary: exit 2 with one line naming the
-  input, or `ValueError` naming the field. The one documented fail-open is
-  `.claude/hooks/run-tests.py`; a new fail-open needs its reason in the
-  file header.
+  input, or `ValueError` naming the field. The two hooks under
+  `.claude/hooks/` are the documented fail-opens, each listing its cases in
+  its header; a new fail-open needs the same.
 - Fix the class, not the case: a denylist, a regex of bad cases or a
   special-case branch is refused; the mechanism's KIND changes (closed set,
   strict parse, derived value).
