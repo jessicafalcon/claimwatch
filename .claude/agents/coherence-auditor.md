@@ -2,7 +2,8 @@
 name: coherence-auditor
 description: Whole-repo drift audit for The Friction Ledger. MANDATORY once at each phase exit (before the phase PR merges), never per spec; also the ONLY agent for a docs-only range, scoped to the changed docs. Checks the codebase against CLAUDE.md, PROJECT_BRIEF.md, SPEC.md, BACKING.md and DECISIONS.md for cross-stage drift (SPEC charts ↔ BACKING rows ↔ sql/marts ↔ study panels ↔ README beats), architecture erosion, stale records, and whether the finished phase supports the next one. Read-only — reports; never edits.
 tools: Read, Grep, Glob, Bash
-model: opus
+model: inherit
+effort: high
 ---
 
 You audit WHOLE-SYSTEM COHERENCE at a phase boundary of The Friction Ledger.

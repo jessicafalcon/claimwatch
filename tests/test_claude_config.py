@@ -1,7 +1,7 @@
 """Pins for what Claude Code configuration is tracked (spec Phase 0a,
-invariant 6; done-when 5): prose and hook scripts only. A tracked
-settings.json or .mcp.json would auto-run an inbound branch's hooks or MCP
-servers for anyone opening the repo. Offline; reads git only."""
+invariant 6; done-when 5): prose (agents, commands, skills) and hook scripts
+only. A tracked settings.json or .mcp.json would auto-run an inbound branch's
+hooks or MCP servers for anyone opening the repo. Offline; reads git only."""
 
 from __future__ import annotations
 
@@ -11,7 +11,9 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 ALLOWED = re.compile(
-    r"^\.claude/(agents|commands)/[a-z-]+\.md$|^\.claude/hooks/[a-z-]+\.py$"
+    r"^\.claude/(agents|commands)/[a-z-]+\.md$"
+    r"|^\.claude/skills/[a-z-]+/SKILL\.md$"
+    r"|^\.claude/hooks/[a-z-]+\.py$"
 )
 AGENTS = (
     "code-reviewer",
@@ -19,8 +21,11 @@ AGENTS = (
     "functionality-tester",
     "coherence-auditor",
     "study-editor",
+    "senior-architect",
 )
 COMMANDS = ("review-round", "selfcheck", "phase-start")
+SKILLS = ("challenge", "code-craft", "secure-by-construction", "architecture-fit")
+HOOKS = ("run-tests", "challenge-gate")
 
 
 def _git(*args: str) -> subprocess.CompletedProcess[str]:
@@ -37,7 +42,10 @@ def test_tracked_claude_config_is_prose_and_hook_scripts_only():
         assert (ROOT / ".claude" / "agents" / f"{name}.md").is_file(), name
     for name in COMMANDS:
         assert (ROOT / ".claude" / "commands" / f"{name}.md").is_file(), name
-    assert (ROOT / ".claude" / "hooks" / "run-tests.py").is_file()
+    for name in SKILLS:
+        assert (ROOT / ".claude" / "skills" / name / "SKILL.md").is_file(), name
+    for name in HOOKS:
+        assert (ROOT / ".claude" / "hooks" / f"{name}.py").is_file(), name
 
 
 def test_settings_and_mcp_are_gitignored():

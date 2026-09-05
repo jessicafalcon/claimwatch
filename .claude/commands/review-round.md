@@ -22,6 +22,10 @@ registers and removes for hand-mutation.
   consolidated table if it is not already in the conversation; it becomes part
   of every agent prompt in step 4.
 
+If the spec carries no `Challenged:` line under its status, print
+`spec was not challenged — /challenge <SPEC> is available` and continue; a
+review round never refuses on it.
+
 Print first:
 
 ```
@@ -75,6 +79,11 @@ Agents:  <list>
   says this round is the exit review): also **coherence-auditor** over the
   whole repo, whatever the surface (CLAUDE.md's table, last row).
 
+Spawn every agent of the round in the SAME turn — one Agent call per agent,
+one message. The list above is the exact set, not a suggestion (Opus 4.8
+spawns fewer subagents by default). `senior-architect` never runs here: it
+judges plans, not diffs.
+
 All agents are report-only — no Write/Edit, do not grant more. Each prompt
 contains:
 
@@ -88,7 +97,8 @@ contains:
   never run a target that fetches, calls the model API or touches Snowflake";
 - for the code-reviewer: "the Invariants check is mandatory; flag every
   mechanism whose value comes from the caller or the clock rather than the
-  data; a SQL file and `rules.yaml` are code — read them".
+  data; a SQL file and `rules.yaml` are code — read them; coverage first:
+  every finding with a severity and a confidence, the table filters".
 
 ## 5. Consolidate, STOP
 
@@ -105,8 +115,10 @@ N findings`, `functionality-tester: works | partially | doesn't`,
 `coherence-auditor: pass | N findings`) and one line naming the agents NOT
 run and the surface reason. Class is exactly one of **correctness** (wrong
 output, an invariant with no pin, a caller/clock-sourced mechanism, an
-untagged number), **security**, **voice** (a §2.3/§2.5 finding), **record**
-(a stale or missing record sentence), **wording** (names, comments).
+untagged number), **security**, **craft** (the code-reviewer's third pass:
+naming, function shape, guard kind, error policy, duplication, test quality),
+**voice** (a §2.3/§2.5 finding), **record** (a stale or missing record
+sentence), **wording** (names, comments).
 
 Then print, verbatim:
 
@@ -121,7 +133,9 @@ strict parse), never a longer list; correctness fixes land one per commit.
 
 Close with the one line the developer decides on per finding: **fix
 (wording/test-only)**, **fix amendment (design change → spec paragraph first,
-stop for approval)**, or **accept (BACKLOG row with a trigger)**. Then STOP.
+stop for approval)**, or **accept (BACKLOG row with a trigger)**. A **craft**
+finding is a plain fix unless it changes a data structure or a write path —
+then it is a fix amendment like any other design change. Then STOP.
 
 This is an explicit, on-request review. Do not treat its presence as a cue to
 run it automatically — it runs only when invoked.

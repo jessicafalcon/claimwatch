@@ -62,7 +62,8 @@ def test_partial_rename_is_a_failure(tmp_path: Path):
 
 def test_every_named_make_target_exists_today():
     files = check_docs.living_files(ROOT) + check_docs.command_files(ROOT)
-    assert len(check_docs.tooling_files(ROOT)) == 8  # five agents, three commands
+    # six agents, three commands, four skills
+    assert len(check_docs.tooling_files(ROOT)) == 13
     assert len(check_docs.command_files(ROOT)) == 3
     assert check_docs.check_make_targets(files, ROOT) == []
 
