@@ -2,11 +2,15 @@
 repo does not own, so its shape is declared and anything off it is dropped and
 counted, never silently absorbed (CLAUDE.md "Before reporting DONE" #8).
 
-The declared shape: a `;`-delimited CSV with a header row that includes
-`PRS_REM_MNT`; a kept amount is that cell parsed as a number strictly greater
-than zero. A blank, a non-numeric cell, a zero or a negative is dropped and
-tallied. The same reader serves the real fetched month and the frozen fixture —
-the fixture is written in exactly this shape (one `PRS_REM_MNT` column).
+The declared shape: a `;`-delimited CSV with a header row that includes both
+`PRS_REM_MNT` and `PRS_REM_TYP`. A kept amount is a `PRS_REM_MNT` cell parsed as
+a number strictly greater than zero whose row's `PRS_REM_TYP` is a legal part
+(`0`/`1` — Amendment A1: type >= 2 is a *part supplémentaire*, not the claim
+cost, so it is dropped). A blank, a non-numeric cell, a zero, a negative, or a
+non-legal type is dropped and tallied. The same reader serves the real fetched
+month and the frozen fixture — the fixture is written in exactly this shape
+(the `PRS_REM_MNT` and `PRS_REM_TYP` columns), so the type filter is
+reproducible offline from the fixture alone.
 
 Reads stream, so a gigabyte national month never lands in memory at once. The
 fixture is drawn by *systematic* sampling — every k-th valid amount across the
@@ -22,7 +26,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
-from opendata.sources import AMOUNT_COLUMN, DELIMITER
+from opendata.sources import AMOUNT_COLUMN, DELIMITER, LEGAL_TYPES, TYPE_COLUMN
 
 # The frozen fixture: a small, real, brand-free slice CI fits offline.
 FIXTURE_DIR = Path(__file__).resolve().parent.parent / "fixtures" / "damir"
@@ -48,12 +52,17 @@ class Amounts:
 
 @dataclass(frozen=True)
 class Sample:
-    """A systematic draw: the sampled amounts, plus what the whole pass saw."""
+    """A systematic draw: the sampled rows (amount + legal type), plus what the
+    whole pass saw. `values` is the amounts alone, for the fit and the print."""
 
-    values: list[float]
+    rows: list[tuple[float, str]]
     total_valid: int
     dropped: int
     stride: int
+
+    @property
+    def values(self) -> list[float]:
+        return [amount for amount, _ in self.rows]
 
 
 def parse_amount(cell: str) -> float | None:
@@ -78,29 +87,41 @@ def parse_amount(cell: str) -> float | None:
     return value
 
 
-def _iter_cells(path: Path) -> Iterator[str]:
-    """Yield the `PRS_REM_MNT` cell of every data row, streaming. Raises
-    `ValueError` if the file has no such column — a file that is not the
-    declared shape refuses; it does not read as an empty slice."""
+def _iter_rows(path: Path) -> Iterator[tuple[str, str]]:
+    """Yield the `(PRS_REM_MNT, PRS_REM_TYP)` cells of every data row, streaming.
+    Raises `ValueError` if the file is missing either declared column — a file
+    that is not the declared shape refuses; it does not read as an empty slice."""
     with path.open(encoding="utf-8", newline="") as fh:
         reader = csv.DictReader(fh, delimiter=DELIMITER)
-        if reader.fieldnames is None or AMOUNT_COLUMN not in reader.fieldnames:
+        fields = reader.fieldnames or []
+        missing = [c for c in (AMOUNT_COLUMN, TYPE_COLUMN) if c not in fields]
+        if missing:
             raise ValueError(
-                f"{path.name}: no {AMOUNT_COLUMN!r} column "
+                f"{path.name}: missing column(s) {missing} "
                 f"(found {reader.fieldnames}); not a DAMIR slice"
             )
         for row in reader:
-            yield row.get(AMOUNT_COLUMN, "")
+            yield row.get(AMOUNT_COLUMN, ""), row.get(TYPE_COLUMN, "")
+
+
+def legal_amount(amount_cell: str, type_cell: str) -> float | None:
+    """A DAMIR row's kept amount: a positive `PRS_REM_MNT` whose `PRS_REM_TYP`
+    is a legal part (`0`/`1`). A non-legal type (a *part supplémentaire*, `>= 2`),
+    a blank type, or a non-positive/non-numeric amount returns `None` — dropped
+    and counted by the caller (Amendment A1)."""
+    if type_cell.strip() not in LEGAL_TYPES:
+        return None
+    return parse_amount(amount_cell)
 
 
 def read_amounts(path: Path) -> Amounts:
-    """Read `PRS_REM_MNT`, keeping only positive numbers, dropping and counting
-    the rest. Holds the kept amounts in memory — use it on the fixture, not a
-    national month (use `systematic_sample` for that)."""
+    """Read `PRS_REM_MNT`, keeping only positive legal-type (`0`/`1`) amounts,
+    dropping and counting the rest. Holds the kept amounts in memory — use it on
+    the fixture, not a national month (use `systematic_sample` for that)."""
     kept: list[float] = []
     dropped = 0
-    for cell in _iter_cells(path):
-        amount = parse_amount(cell)
+    for amount_cell, type_cell in _iter_rows(path):
+        amount = legal_amount(amount_cell, type_cell)
         if amount is None:
             dropped += 1
         else:
@@ -109,44 +130,48 @@ def read_amounts(path: Path) -> Amounts:
 
 
 def systematic_sample(path: Path, n: int) -> Sample:
-    """Draw N amounts spread across the whole file: two streaming passes, no
-    RNG. Pass one counts the valid amounts; pass two keeps every k-th, where
-    k = total // N (at least 1). Memory holds only the N kept, never the month.
-    A file with N or fewer valid amounts returns them all (stride 1)."""
+    """Draw N rows spread across the whole file: two streaming passes, no RNG.
+    Pass one counts the valid (positive, legal-type) amounts; pass two keeps
+    every k-th, where k = total // N (at least 1). Each kept row carries its
+    amount and its legal type, so the fixture is written in the declared two-
+    column shape. Memory holds only the N kept, never the month. A file with N
+    or fewer valid amounts returns them all (stride 1)."""
     if n <= 0:
         raise ValueError(f"sample size must be positive, got {n}")
     total_valid = 0
     dropped = 0
-    for cell in _iter_cells(path):
-        if parse_amount(cell) is None:
+    for amount_cell, type_cell in _iter_rows(path):
+        if legal_amount(amount_cell, type_cell) is None:
             dropped += 1
         else:
             total_valid += 1
     if total_valid == 0:
-        return Sample(values=[], total_valid=0, dropped=dropped, stride=1)
+        return Sample(rows=[], total_valid=0, dropped=dropped, stride=1)
     stride = max(1, total_valid // n)
-    kept: list[float] = []
+    kept: list[tuple[float, str]] = []
     index = 0
-    for cell in _iter_cells(path):
-        amount = parse_amount(cell)
+    for amount_cell, type_cell in _iter_rows(path):
+        amount = legal_amount(amount_cell, type_cell)
         if amount is None:
             continue
         if index % stride == 0 and len(kept) < n:
-            kept.append(amount)
+            kept.append((amount, type_cell.strip()))
         index += 1
-    return Sample(values=kept, total_valid=total_valid, dropped=dropped, stride=stride)
+    return Sample(rows=kept, total_valid=total_valid, dropped=dropped, stride=stride)
 
 
-def write_fixture(amounts: list[float], path: Path = FIXTURE_CSV) -> None:
-    """Write a one-column `PRS_REM_MNT` CSV — the frozen fixture's shape, the
-    same shape `read_amounts` reads. Amounts are written at two decimals for a
-    byte-stable file. Numbers only: no address, no attribution, no brand."""
+def write_fixture(rows: list[tuple[float, str]], path: Path = FIXTURE_CSV) -> None:
+    """Write a two-column `PRS_REM_MNT;PRS_REM_TYP` CSV — the frozen fixture's
+    shape, the same shape `read_amounts` reads, so the legal-type filter is
+    reproducible offline from the fixture. Amounts are written at two decimals
+    for a byte-stable file. Numbers only (a `0`/`1` type code is no brand and no
+    personal data): no address, no attribution, no review body."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as fh:
         writer = csv.writer(fh, delimiter=DELIMITER)
-        writer.writerow([AMOUNT_COLUMN])
-        for value in amounts:
-            writer.writerow([f"{value:.2f}"])
+        writer.writerow([AMOUNT_COLUMN, TYPE_COLUMN])
+        for value, type_code in rows:
+            writer.writerow([f"{value:.2f}", type_code])
 
 
 def freeze_manifest(directory: Path = FIXTURE_DIR) -> None:

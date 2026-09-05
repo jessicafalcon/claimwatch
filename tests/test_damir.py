@@ -41,9 +41,19 @@ def _stamp_in_tmp(tmp_path, monkeypatch):
     monkeypatch.setattr(cli, "CONFIRM_STAMP", tmp_path / ".confirm")
 
 
-def _write_csv(path: Path, rows: list[str], header: str = "PRS_REM_MNT") -> Path:
-    """A DAMIR-shaped `;`-CSV: a header row then one cell per line."""
-    path.write_text(header + "\n" + "\n".join(rows) + "\n", encoding="utf-8")
+def _write_csv(
+    path: Path,
+    amounts: list[str],
+    types: list[str] | None = None,
+    header: str = "PRS_REM_MNT;PRS_REM_TYP",
+) -> Path:
+    """A DAMIR-shaped `;`-CSV: a header row then `amount;type` per line. `types`
+    defaults to the legal `0` for every row, so an amounts-only caller writes a
+    valid legal slice (every row kept)."""
+    if types is None:
+        types = ["0"] * len(amounts)
+    body = "\n".join(f"{a};{t}" for a, t in zip(amounts, types, strict=True))
+    path.write_text(header + "\n" + body + "\n", encoding="utf-8")
     return path
 
 
@@ -117,27 +127,41 @@ def test_parse_amount_keeps_only_positive_numbers():
 
 
 def test_amount_domain_guard_drops_and_counts(tmp_path):
-    """A slice with a blank amount, text, zero and a negative keeps only the
-    positives and tallies the rest — never silently absorbed. A real (multi-
-    column) DAMIR row with an empty PRS_REM_MNT is a row, so it counts as
-    dropped (unlike a wholly empty line, which the CSV reader skips)."""
+    """A slice with a blank amount, text, zero, a negative, a supplementary-part
+    type (>= 2) and a blank type keeps only the positive legal-type rows and
+    tallies the rest — never silently absorbed. A real (multi-column) DAMIR row
+    with an empty PRS_REM_MNT is a row, so it counts as dropped (unlike a wholly
+    empty line, which the CSV reader skips)."""
     path = tmp_path / "s.csv"
     path.write_text(
-        "PRS_REM_MNT;OTHER\n10.0;a\n;b\nabc;c\n0;d\n-5;e\n20,5;f\n",
+        "PRS_REM_MNT;PRS_REM_TYP\n"
+        "10.0;0\n"  # kept: positive, legal type 0
+        "20,5;1\n"  # kept: French decimal comma, legal type 1
+        ";0\n"  # dropped: blank amount
+        "abc;0\n"  # dropped: non-numeric
+        "0;0\n"  # dropped: zero
+        "-5;1\n"  # dropped: negative
+        "30.0;2\n"  # dropped: supplementary part (type 2), positive amount
+        "40.0;\n",  # dropped: blank type
         encoding="utf-8",
     )
     amounts = read_amounts(path)
     assert amounts.values == [10.0, 20.5]
-    assert amounts.dropped == 4
-    assert amounts.read == 6
+    assert amounts.dropped == 6
+    assert amounts.read == 8
 
 
-def test_read_amounts_refuses_a_file_without_the_column(tmp_path):
-    """A CSV that is not the declared shape refuses; it does not read as an
+def test_read_amounts_refuses_a_file_missing_either_column(tmp_path):
+    """A CSV missing either declared column refuses; it does not read as an
     empty slice as if it were valid data."""
-    bad = _write_csv(tmp_path / "b.csv", ["1", "2"], header="FOO")
+    no_amount = tmp_path / "no_amount.csv"
+    no_amount.write_text("FOO;PRS_REM_TYP\n1;0\n2;0\n", encoding="utf-8")
     with pytest.raises(ValueError, match="PRS_REM_MNT"):
-        read_amounts(bad)
+        read_amounts(no_amount)
+    no_type = tmp_path / "no_type.csv"
+    no_type.write_text("PRS_REM_MNT;OTHER\n1;x\n2;y\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="PRS_REM_TYP"):
+        read_amounts(no_type)
 
 
 # --- systematic sampling spans the file, deterministically -------------------
@@ -161,6 +185,22 @@ def test_systematic_sample_returns_all_when_fewer_than_n(tmp_path):
 def test_systematic_sample_is_deterministic(tmp_path):
     src = _write_csv(tmp_path / "m.csv", [str(x) for x in range(1, 51)])
     assert systematic_sample(src, 7).values == systematic_sample(src, 7).values
+
+
+def test_systematic_sample_drops_supplementary_types(tmp_path):
+    """A supplementary-part row (PRS_REM_TYP >= 2) is dropped and counted even
+    when its amount is positive — only legal types 0/1 reach the draw, and the
+    kept rows carry their type so the fixture is the declared two-column shape."""
+    src = _write_csv(
+        tmp_path / "m.csv",
+        ["10", "20", "30", "40"],
+        types=["0", "2", "1", "3"],
+    )
+    sample = systematic_sample(src, 10)
+    assert sample.values == [10.0, 30.0]
+    assert sample.rows == [(10.0, "0"), (30.0, "1")]
+    assert sample.total_valid == 2
+    assert sample.dropped == 2
 
 
 # --- the tracked artifact: written, idempotent, hand-checkable ---------------
@@ -189,10 +229,12 @@ def test_artifact_carries_mu_sigma_n_and_deciles(tmp_path):
 
 
 def test_fixture_round_trips_through_the_same_reader(tmp_path):
-    """write_fixture writes the exact shape read_amounts reads — one path."""
+    """write_fixture writes the exact two-column shape read_amounts reads — one
+    path, so the legal-type filter is reproducible from the fixture alone."""
     out = tmp_path / "damir-sample.csv"
-    write_fixture([1.5, 2.5, 300.0], out)
+    write_fixture([(1.5, "0"), (2.5, "1"), (300.0, "0")], out)
     assert read_amounts(out).values == [1.5, 2.5, 300.0]
+    assert out.read_text(encoding="utf-8").startswith("PRS_REM_MNT;PRS_REM_TYP\n")
 
 
 def test_freeze_manifest_matches_sha256(tmp_path):

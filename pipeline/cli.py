@@ -481,10 +481,11 @@ def _do_fetch_damir(args: argparse.Namespace) -> int:
 
 def _do_sample_damir(args: argparse.Namespace) -> int:
     """Offline, developer-run: draw a small, representative fixture from a
-    cached month — every k-th valid amount across the whole file (no RNG). N is
-    a positive integer (default DEFAULT_SAMPLE_N); MONTH names which cached
-    month. Writes the one-column fixture and re-freezes its MANIFEST. No
-    `confirm` gate — it fetches nothing and deletes no data."""
+    cached month — every k-th valid legal-type amount across the whole file (no
+    RNG). N is a positive integer (default DEFAULT_SAMPLE_N); MONTH names which
+    cached month. Writes the two-column (`PRS_REM_MNT;PRS_REM_TYP`) fixture and
+    re-freezes its MANIFEST. No `confirm` gate — it fetches nothing and deletes
+    no data."""
     try:
         valid_month(args.month)
     except ValueError as exc:
@@ -498,16 +499,16 @@ def _do_sample_damir(args: argparse.Namespace) -> int:
         )
         return 1
     sample = systematic_sample(src, n)
-    if not sample.values:
+    if not sample.rows:
         print(
-            f"sample-damir: no positive PRS_REM_MNT in {src.name} "
+            f"sample-damir: no positive legal-type (0/1) PRS_REM_MNT in {src.name} "
             f"({sample.dropped} row(s) dropped) — nothing written"
         )
         return 1
-    write_fixture(sample.values)
+    write_fixture(sample.rows)
     freeze_manifest()
     print(
-        f"sample-damir: {len(sample.values)} of {sample.total_valid} amounts "
+        f"sample-damir: {len(sample.rows)} of {sample.total_valid} amounts "
         f"(every {sample.stride}th; {sample.dropped} dropped) -> "
         f"{_rel(FIXTURE_CSV)} + MANIFEST.sha256"
     )

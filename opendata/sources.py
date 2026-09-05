@@ -31,11 +31,21 @@ DATASET_API = (
     "open-damir-base-complete-sur-les-depenses-dassurance-maladie-interregimes/"
 )
 
-# The column we read and its file's delimiter — declared once, read by the
+# The columns we read and their file's delimiter — declared once, read by the
 # slice. `PRS_REM_MNT` is the reimbursed amount; French open-data CSVs are
 # `;`-delimited (a `,` may be the decimal separator, which the slice handles).
 AMOUNT_COLUMN = "PRS_REM_MNT"
 DELIMITER = ";"
+
+# The reimbursement-type column and the codes that are the legal Assurance
+# Maladie part. The official variable dictionary (Amendment A1) says
+# `PRS_REM_MNT` read without a `PRS_REM_TYP` filter pools two distinct things:
+# type 0/1 = the legal reimbursement (the "claim cost" the study means), type
+# >= 2 = *parts supplémentaires* (complementary / top-up shares). The slice
+# keeps only the legal part so the fit is the claim cost, not a pool — a closed
+# set of accepted codes, not a special-case skip.
+TYPE_COLUMN = "PRS_REM_TYP"
+LEGAL_TYPES = frozenset({"0", "1"})
 
 # A fetched month lands here, gitignored (data/*), under the one cache-root
 # binding. One file per month, named by the period so a re-fetch overwrites
