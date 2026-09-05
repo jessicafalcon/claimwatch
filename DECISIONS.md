@@ -220,12 +220,20 @@ place and never deleted.
   `/challenge` spawns `senior-architect`, a report-only devil's-advocate:
   steel-man first, then findings each with an alternative and its cost, then
   an advisory verdict; the developer's disposition (amend / accept / reject)
-  is stamped on the spec as `Challenged: <date>, round <k> — <verdict>`. The
-  `challenge-gate` hook is a reminder, never a gate: it exits 2 with one
-  line after an unstamped PROPOSED spec edit and answers `ask` before
-  `ExitPlanMode`; a `deny` would block a plan the architect chose not to
-  challenge, and caps and dispositions are the architect's call. The agent
-  judges plans only and never runs inside a review round.
+  is stamped on the spec as `Challenged: <date>, round <k> — <verdict>`
+  (one closed shape, unbolded, at line start; `specs/TEMPLATE.md` carries
+  the slot). The `challenge-gate` hook is a reminder, never a gate: it exits
+  2 with one line after an edit to an unstamped phase spec whose status is
+  not DELIVERED (the phase's state, not the author's word PROPOSED — five
+  earlier specs were first committed already APPROVED), and before
+  `ExitPlanMode` it answers `ask` on every plan with the plan's own claim in
+  the reason. The stamp is text the model itself can write, so the hook
+  shows the claim instead of trusting it (round 1 of the tooling review,
+  code-reviewer #3 / security-reviewer #2); a `deny` would block a plan the
+  architect chose not to challenge, and caps and dispositions are the
+  architect's call. A stamp goes stale when the spec is amended after the
+  round; accepted, BACKLOG. The agent judges plans only and never runs
+  inside a review round.
 - **Per-diff agents are pinned to a model id (tooling, 2026-09-05).**
   `model: claude-opus-4-8`, `effort: high` for code-reviewer,
   security-reviewer, functionality-tester and study-editor;
@@ -238,17 +246,6 @@ place and never deleted.
 ## Gotchas (stack surprises found live)
 
 Each entry: the surprise, the official-docs check, what we did.
-
-- **Tooling — `model: opus` drifts with the build (2026-09-05).** Every agent
-  said `model: opus`; the subagent reference lists that alias as "the build's
-  current Opus", which in this build resolves to Opus 5, not the Opus 4.8 the
-  project means. Pinned the full id in the frontmatter. Same reference: the
-  agent `effort:` field overrides the session level, and skills accept
-  `paths:` (auto-load only under matching globs) and `user-invocable: false`.
-  Hooks reference: PostToolUse cannot block (exit 2 shows stderr to the
-  model, the edit stands); PreToolUse can answer `allow|deny|ask`; the
-  `ExitPlanMode` payload is not documented, so `challenge-gate.py` reads
-  `tool_input.plan` when it is a string and fails open otherwise.
 
 - **Phase 2 — the live feed, checked by the first run (2026-09-02).** An agent
   runs no fetch, so the build session could not check the feed; the developer's
@@ -353,6 +350,21 @@ Each entry: the surprise, the official-docs check, what we did.
   ruleset) that scopes the bot identity to `data/snapshots/`, and this becomes
   enforced rather than self-imposed. Corrected in
   `fix/weekly-branch-protection-wording`.
+- **Tooling — `model: opus` drifts with the build (2026-09-05).** Every agent
+  said `model: opus`; the subagent reference lists that alias as "the build's
+  current Opus", which in this build resolves to Opus 5, not the Opus 4.8 the
+  project means. Pinned the full id in the frontmatter. Same reference: the
+  agent `effort:` field overrides the session level, and skills accept
+  `paths:` (auto-load only under matching globs) and `user-invocable: false`.
+  Hooks reference: PostToolUse cannot block (exit 2 shows stderr to the
+  model, the edit stands); PreToolUse can answer `allow|deny|ask`; the
+  `ExitPlanMode` payload is not documented, so `challenge-gate.py` reads
+  `tool_input.plan` when it is a string and otherwise says so in its `ask`
+  reason — it asks either way. The permission-rule syntax for a shell
+  prefix is `Bash(git diff:*)` (colon); `Bash(git *)` is not documented and
+  is either a no-op or every subcommand, so `/challenge` grants the four
+  read-only git prefixes by name.
+
 
 ## Appendix — by phase
 
@@ -1683,5 +1695,7 @@ model prompt as a data boundary, log hygiene, the hooks surface);
 `tests/test_claude_config.py` admits `.claude/skills/*/SKILL.md` as tracked
 prose. The three Process entries above and the Gotcha record the choices.
 Verdict on the reviewers as they stood: strong on the project's rules and on
-conduct, thin on craft and on general secure-coding classes — both partial.
+conduct, thin on craft and on general secure-coding classes; code-reviewer and
+security-reviewer were each partial, and this branch closes both gaps. Its own
+round 1 (five agents, 30 consolidated rows, 0 code blockers) was fixed in full.
 

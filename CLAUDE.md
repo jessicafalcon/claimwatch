@@ -461,7 +461,7 @@ one, and write one sentence in the README about why.
   DECISIONS.md → Gotchas.
 - Do not add a feature that surfaces in none of the five parts.
 - Destructive commands (dropping a DuckDB file, truncating a table): only via
-  a `make` target that prompts unless the `confirm` goal precedes it in the
+  a `make` target that refuses unless the `confirm` goal precedes it in the
   same invocation (`make confirm reset`) — a goal, never a variable, since
   `$(origin)` cannot tell a `MAKEFLAGS` definition from the command line;
   tested against the installed make.
@@ -518,18 +518,22 @@ one, and write one sentence in the README about why.
 
 ## Working with the model (Fable 5.1 or Opus 4.8)
 
-The session model is chosen with `/model`; each review agent pins its own in
-`.claude/agents/*.md` (`model:` and `effort:`), so a session switch never
-changes what a review runs on. The classifier's model (`classify/llm.py`,
-Haiku 4.5) is a data-path setting and is not what this section is about.
+The session model is chosen with `/model`. The four diff reviewers pin
+`model: claude-opus-4-8`; `senior-architect` and `coherence-auditor` run on
+the session's model (`model: inherit`); all six pin `effort: high` in
+`.claude/agents/*.md`, so a session switch changes only the two that follow
+it. The classifier's model (`classify/llm.py`, Haiku 4.5) is a data-path
+setting, not this section's subject. Source for the behaviours below: the
+Fable 5.1 and Opus 4.8 prompting guides, read 2026-09-05 (DECISIONS →
+Gotchas).
 
-**Either model**
+**What the session does, on either model**
 
-- Effort. The session runs at `high` (`effortLevel` in the user settings).
-  Reviewers run at `high` from their frontmatter. A long deliverable — a
-  spec, the study export, this file — is written at `high`, never
-  `xhigh`/`max`: at those levels the draft is written twice, once as
-  reasoning and once as output.
+- Effort. The session runs at `high` (`effortLevel` in the user settings);
+  the developer drops to `medium` for wording sweeps and record updates. A
+  long deliverable — a spec, the study export, this file — is written at
+  `high`, never `xhigh`/`max`, where the draft is written twice (as
+  reasoning, then as output).
 - Batch the reads. Before a tool call, list what the step needs, then request
   every item that does not depend on another's result in one response.
 - Edit, do not regenerate. CLAUDE.md, SPEC.md, BACKING.md and the specs are
@@ -537,17 +541,24 @@ Haiku 4.5) is a data-path setting and is not what this section is about.
 - Verify, do not recall. For `make`, `uv`, DuckDB, GitHub Actions and Claude
   Code hooks, run the thing or read the official page; knowing a tool's name
   is not knowing its current behaviour (Workflow rules → Stack surprises).
-- The named STOPs — these and only these — wait for the developer's word:
-  (1) implementing, once a spec or amendment is written; (2) fixing, once a
+- Name the scope in full: "every changed file", "every Done-when row",
+  "every mart" — an instruction is applied to the whole set only when the
+  set is stated.
+- Prove by running. A claim about behaviour is a command and its pasted
+  output; the functionality-tester's rule holds for the main session too.
+- The STOPs that wait for the developer's word before work continues: (1)
+  implementing, once a spec or amendment is written; (2) fixing, once a
   review round reports findings; (3) `git push` or `gh pr create`; (4) a
   paid, network or destructive target; (5) re-freezing a fixture; (6) a fix
-  amendment. Everything else that follows from the approved spec proceeds
-  without asking; a step decided on is run, not announced.
-- Scope. A pre-existing bug, a nearby improvement or an unasked cleanup found
-  mid-phase is a BACKLOG candidate in the report, not a change in this diff
-  (one phase, one diff). Tests: one focused test per stated behaviour, sized
-  like the neighbours, every number in `tests/pins.py`; scratch checks are
-  not committed.
+  amendment. The other STOPs in this file still hold — a new dependency
+  (Conventions), a spec, fixture, BACKING row or brief that looks wrong, a
+  change belonging to an earlier phase, a skipped agent surface, the review
+  cap. Everything else that follows from the approved spec proceeds without
+  asking; a step decided on is run, not announced.
+- Scope: Workflow rules → "one phase, one diff" (a finding outside the phase
+  is a BACKLOG candidate). Tests: one focused test per stated behaviour,
+  sized like the neighbours, every number in `tests/pins.py`; scratch checks
+  are not committed.
 - Progress text. One line before a step saying what it will produce (not a
   restatement of the task, not "I will now…"); a short note between steps
   only when something was found; the report format under Communication
@@ -557,43 +568,40 @@ Haiku 4.5) is a data-path setting and is not what this section is about.
   short marked phrase, always the public source (brief §2.5; study-editor
   checks). Both models reproduce source wording more readily than the study
   allows.
+- Reviews are coverage-first: the agents report every finding with a
+  severity and a confidence; `/review-round`'s table and the developer are
+  the filter. `/review-round` spawns every agent of the round in one turn.
+- Charts and the Phase 9 page: the spec names the palette and type before
+  anything is built, or asks for four directions first; the harness's
+  bundled `dataviz` skill (not a repo file) is loaded for every chart.
 - `/compact`. The summary keeps, exactly: the active spec path and its status
   line; the DONE command; each Done-when item's state; the latest
   review-round table verbatim; decisions the spec did not cover; the STOP
   currently pending; files touched. Everything else may be condensed.
 
-**When the session runs Fable 5.1**
+**What differs on Fable 5.1**
 
-- Thinking is always on; effort is the only depth control. `medium` matches
-  Fable 5 at lower cost and is enough for wording sweeps and record updates;
-  `high` for building and reviewing.
-- It goes quiet in long tool chains. The progress rule above is the remedy,
+- Thinking is always on; effort is the only depth control, and `medium`
+  matches Fable 5 at lower cost.
+- It goes quiet in long tool chains: the progress rule above is the remedy,
   not extra commands run to "show" output the terminal never displays.
-- It rewrites whole files for small changes. Edit, with the smallest anchor.
-- Its safeguards can refuse a benign security task. Ask "where are the bugs
-  and weak spots in our code", never "how would this be exploited"; keep
-  base64 and raw captured pages out of tool output (grep a capture, never
-  cat it).
+- It rewrites whole files for small changes: edit, with the smallest anchor.
+- Its safeguards can refuse a benign security task. Developer and session
+  alike ask "where are the bugs and weak spots in our code", never "how
+  would this be exploited", and keep base64 and raw captured pages out of
+  tool output (grep a capture, never cat it).
 - Mannered prose ("a dial worth turning" for "a parameter worth varying") is
   a Writing-rules finding: say the literal thing.
 
-**When the session runs Opus 4.8**
+**What differs on Opus 4.8**
 
-- Run it at `high` (the reviewers' frontmatter says so). At `low`/`medium` it does exactly
-  what was asked and no more, so name the scope in full: "every changed
-  file", "every Done-when row", "every mart".
-- It reasons where it should run. A claim about behaviour is proved by a
-  command and its pasted output; the functionality-tester's rule holds for
-  the main session too.
-- It spawns fewer subagents. `/review-round` spawns every agent of the round
-  in one turn — one agent per surface, never one per file.
-- Its review recall drops under "only report serious issues". The agents
-  report every finding with a severity and a confidence; the round table and
-  the developer are the filter.
+- At `low`/`medium` it does exactly what was asked and no more, which is why
+  the scope rule above is stated; it reasons where it should run, which is
+  why the prove-by-running rule is; it spawns fewer subagents and filters
+  its own review findings under "only report serious issues", which is why
+  the review rules are.
 - Its design default (cream background, serif display type, terracotta
-  accent) is wrong for a data study. The Phase 9 spec names the page's
-  palette and type, or asks for four directions before building; the
-  `dataviz` skill applies to every chart.
+  accent) is wrong for a data study, which is why the Phase 9 rule is.
 
 ## Git workflow (one branch + one PR per phase)
 
@@ -624,6 +632,9 @@ Haiku 4.5) is a data-path setting and is not what this section is about.
   when CI is green and the surface's agents have run.
 - The developer merges (squash), never Claude. After merge: `git checkout
   main && git pull`.
+- Tooling changes (agents, skills, hooks, this file's rules) on
+  `tooling/<slug>` from main: no spec, the gate plus the surface's agents,
+  never mixed with a phase.
 - Hotfixes on `fix/<slug>` from main, same rules. Never mix two phases in a
   PR; a needed change in an earlier phase is a STOP and its own fix PR.
 
@@ -636,7 +647,7 @@ only when the range touches their surface — derived from
 | Surface touched in the range | Agents |
 |---|---|
 | Code: `*.py`, `sql/**`, `classify/**` (incl. `rules.yaml`), `models/**`, `Makefile`, `scripts/`, `tests/`, `dags/**`, `study/*.py` | code-reviewer, then functionality-tester |
-| Sensitive: `.github/`, `ingest/**`, `classify/llm.py`, `pipeline/warehouse.py`, `.env*`, `.claude/hooks/`, `.claude/settings*.json`, any target that deletes, calls a paid API or fetches | + security-reviewer |
+| Sensitive: `.github/`, `ingest/**`, `opendata/**`, `classify/llm.py`, `classify/cache.py`, `pipeline/warehouse.py`, `pipeline/cli.py`, `scripts/`, `dags/**`, `.env*`, `.claude/hooks/`, `.claude/settings*.json`, any target that deletes, calls a paid API or fetches | + security-reviewer |
 | Prose: `README.md`, `SPEC.md`, `BACKING.md`, `study/**/*.md`, `study/**/*.html`, `CLAUDE.md` | + study-editor |
 | Docs and records only: every changed path is `*.md` | coherence-auditor only, scoped to the changed docs (+ study-editor if a prose file above is in the range) |
 | Any of the above at a phase exit | + coherence-auditor over the whole repo (mandatory) |
@@ -650,31 +661,54 @@ never inside a review round.
 ## How the tooling fires across a phase
 
 One loop per phase. Each step names what fires and how: **auto** — the
-harness loads a skill from its description or its `paths:` while matching
-files are written; **on request** — the developer types the command;
+harness loads a skill from its description or its `paths:` while a matching
+file is being written; **on request** — the developer types the command;
 **hook** — the harness runs a script, deterministically, with no judgment.
 
 | Step | What fires | Trigger | What it reads |
 |---|---|---|---|
-| 1. Plan — the spec, from `specs/TEMPLATE.md` | `architecture-fit` skill (the ten questions, the shapes this repo keeps) | auto, by path: `specs/**`, `sql/marts/**`, `sql/staging/**`, `models/**`, `study/**`, `dags/**`, `BACKING.md`, `SPEC.md`, `DECISIONS.md` | the spec being written |
-| 2. Challenge | `/challenge <spec>` → `senior-architect` agent: steel-man, findings with an alternative and its cost, verdict | on request. The `challenge-gate` hook reminds after an edit to a PROPOSED spec with no `Challenged:` line, and asks once before `ExitPlanMode` on an unstamped plan | the plan + the standard: brief §2/§8/§9, the five contracts, the BACKING rows named, the predecessor's Delivered paragraph, `docs/PLAN.md` §2, DECISIONS, BACKLOG |
-| 3. Disposition | the developer, per finding: amend (a fix amendment, STOP for approval) / accept (BACKLOG row + trigger) / reject (one line, DECISIONS if it was a real option); then the main session stamps `Challenged: <date>, round <k> — <verdict>` under the status line | on request | the report |
+| 1. Plan — the spec, from `specs/TEMPLATE.md` | `architecture-fit` (the ten questions, the shapes this repo keeps) | auto, by path (list below) | the spec being written |
+| 2. Challenge | `/challenge <spec>` → `senior-architect`: steel-man, findings with an alternative and its cost, verdict | on request; hook-reminded | the plan + the standard (list below) |
+| 3. Disposition | the developer, per finding: amend / accept / reject; then the main session stamps the spec | the developer, offline | the report |
 | 4. Approve → `/phase-start <slug>` | restates the contract, warns if the spec is unstamped, runs the gate, STOPs for "build" | on request | the spec |
-| 5. Build | `code-craft` (`**/*.py`, `sql/**`, `classify/rules.yaml`, `Makefile`, `tests/**`); `secure-by-construction` (`ingest/**`, `opendata/**`, `classify/llm.py`, `classify/cache.py`, `pipeline/warehouse.py`, `pipeline/cli.py`, `Makefile`, `.github/**`, `.claude/hooks/**`, `scripts/**`, `dags/**`); `architecture-fit` before a new mart, module, target or dependency | auto, by path. `run-tests` hook after every `.py`, `.sql`, `.yaml`, `.yml` edit (blocks on red) | the same text the reviewers are preloaded with |
-| 6. Review → `/review-round N` | gate; then by surface (table above): code-reviewer (preloads `code-craft`) → functionality-tester; + security-reviewer (preloads `secure-by-construction`); + study-editor; coherence-auditor at the exit | on request; every agent of the round spawned in one turn; one table; STOP-on-findings | `main...HEAD`, the spec's Invariants, round N−1's table |
+| 5. Build | `code-craft`, `secure-by-construction`, `architecture-fit` (paths below); `run-tests` hook after every `.py`, `.sql`, `.yaml`, `.yml` edit (blocks on red) | auto, by path; hook | the same text the reviewers are preloaded with |
+| 6. Review → `/review-round N` | gate; then by surface (table above): code-reviewer (preloads `code-craft`) → functionality-tester; + security-reviewer (preloads `secure-by-construction`); + study-editor; coherence-auditor at the exit | on request; every agent of the round in one turn; one table; STOP-on-findings | `main...HEAD`, the spec's Invariants, round N−1's table |
 | 7. Fix → commit → `/selfcheck` → "push" → PR | fixes one per commit; records batched; the developer merges | on request | the table |
+
+The paths (each skill's `paths:` frontmatter is the source; this list is a
+copy the coherence-auditor checks):
+
+- `code-craft`: `**/*.py`, `sql/**`, `classify/rules.yaml`, `Makefile`,
+  `tests/**`.
+- `secure-by-construction`: `ingest/**`, `opendata/**`, `classify/llm.py`,
+  `classify/cache.py`, `pipeline/warehouse.py`, `pipeline/cli.py`,
+  `Makefile`, `.github/**`, `.claude/hooks/**`, `scripts/**`, `dags/**` —
+  the same paths as the Sensitive row above, so what loads the standard
+  while writing also runs the security-reviewer.
+- `architecture-fit`: `specs/**`, `sql/marts/**`, `sql/staging/**`,
+  `models/**`, `study/**`, `dags/**`, `Makefile` (a new target),
+  `pyproject.toml` (a new dependency), `BACKING.md`, `SPEC.md`,
+  `DECISIONS.md`. A new module under a code package has no path of its own:
+  the session loads the skill by name before creating one.
+
+The standard `/challenge` hands `senior-architect`: brief §2/§8/§9, the five
+contracts, the BACKING rows the plan names, the predecessor spec's Delivered
+paragraph, `docs/PLAN.md` §2, DECISIONS, BACKLOG. The stamp the main session
+writes after the developer's disposition: `Challenged: <YYYY-MM-DD>, round
+<k> — <verdict>`, unbolded, at line start, under the spec's status line.
 
 Rules that hold across the loop:
 
 - A skill and its agent read the same text (`skills:` preload): the bar the
-  code was written to is the bar it is reviewed against. Change a standard
-  in the skill, never in the agent.
+  code was written to is the bar it is reviewed against. The skill is the
+  only copy of a standard; the agent names its sections and how to report.
 - `senior-architect` judges plans and never runs inside a review round; the
   reviewers judge diffs and never re-judge the plan.
-- Nothing fires twice for one reason: the hook reminds, the skill instructs,
-  the agent judges, the developer decides.
+- One reminder per reason at each entry point — the `challenge-gate` hook
+  while the spec is edited, `/phase-start` and `/review-round` when a round
+  begins — and none of them blocks; the developer decides.
 - The three standards are `user-invocable: false`: standing instructions
-  while the matching files are open, not commands.
+  while a matching file is being written, not commands.
 
 ## Project tooling
 
@@ -697,14 +731,18 @@ fixed in the main session or explicitly accepted — never auto-fixed.
   `{"hooks": {"PostToolUse": [{"matcher": "Write|Edit|MultiEdit|NotebookEdit",
   "hooks": [{"type": "command", "command": "python3
   \"$CLAUDE_PROJECT_DIR/.claude/hooks/run-tests.py\""}]}]}}`.
-- `challenge-gate` hook — `.claude/hooks/challenge-gate.py` (tracked; wired
-  locally like `run-tests`, as a second entry in the same PostToolUse group
-  plus a PreToolUse group with `"matcher": "ExitPlanMode"`): after an edit to
-  a `specs/phase-*.md` whose status is PROPOSED and which carries no
-  `Challenged:` line, prints a one-line reminder to run `/challenge`; before
-  `ExitPlanMode`, answers `ask` once when the plan is unstamped. Fail-open,
-  never `deny`; `tests/test_challenge_gate.py` pins it. The `ExitPlanMode`
-  payload shape is undocumented, so that half fails open if it differs.
+- `challenge-gate` hook — reminds you to run `/challenge` on a spec that has
+  not been challenged, and never blocks. After an edit to a `specs/phase-*.md`
+  whose status is not DELIVERED and which carries no full `Challenged:` stamp,
+  it prints one line (on every such edit); before `ExitPlanMode` it answers
+  `ask` on every plan, with the plan's own claim in the reason, so the
+  developer sees the claim rather than the hook trusting it. Fail-open, and
+  `ask` is the only decision it ever emits; `tests/test_challenge_gate.py`
+  pins it. How it is wired: `.claude/hooks/challenge-gate.py` (tracked), a
+  second entry in the same local PostToolUse group as `run-tests` plus a
+  PreToolUse group with `"matcher": "ExitPlanMode"`; whether that matcher
+  fires on this build is unverified until the first plan-mode exit
+  (BACKLOG).
 - `block-secrets` hook — `~/.claude/hooks/block-secrets.py` (user-level,
   already wired); blocks writes containing secret-looking values.
 - `senior-architect` — devil's-advocate review of a plan, spec, amendment or
@@ -752,8 +790,10 @@ the `challenge-gate` hook as the reminder); three path-scoped standards
 (`code-craft`, `secure-by-construction`, `architecture-fit`) preloaded into the
 agent that reviews the same surface; code-reviewer and security-reviewer
 rewritten coverage-first with a craft pass and the secure-coding classes this
-repo can exhibit; the per-diff agents pinned to `claude-opus-4-8` at `high`.
-Pilot: `/challenge` on the Phase 8 spec before it is approved.
+repo can exhibit; the four diff reviewers pinned to `claude-opus-4-8` at
+`high`, `senior-architect` and `coherence-auditor` on `inherit`, also at
+`high`. Round 1 of its own review (5 agents, 30 rows) fixed in full. Pilot:
+`/challenge` on the Phase 8 spec before it is approved.
 
 **Phase 7b — open data: DAMIR slice + fitted claim-cost distribution** merged to
 `main` (PR #15, 2026-09-05; spec `specs/phase-7b-open-data.md`, APPROVED
@@ -808,6 +848,6 @@ sample + the labels wall) merged (PR #10, 2026-09-04). Phase 4 (the weekly cron)
 merged (PR #8, 2026-09-03); the docs hotfix merged (PR #9, 2026-09-04). (Earlier
 phase and amendment history is in each spec and DECISIONS.)
 
-Open BACKLOG rows: **33**.
+Open BACKLOG rows: **34**.
 
 (Update this section at the end of every working day.)
