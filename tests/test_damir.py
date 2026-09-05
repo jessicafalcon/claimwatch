@@ -123,8 +123,7 @@ def test_amount_domain_guard_drops_and_counts(tmp_path):
     dropped (unlike a wholly empty line, which the CSV reader skips)."""
     path = tmp_path / "s.csv"
     path.write_text(
-        "PRS_REM_MNT;OTHER\n"
-        "10.0;a\n;b\nabc;c\n0;d\n-5;e\n20,5;f\n",
+        "PRS_REM_MNT;OTHER\n10.0;a\n;b\nabc;c\n0;d\n-5;e\n20,5;f\n",
         encoding="utf-8",
     )
     amounts = read_amounts(path)
@@ -253,9 +252,7 @@ def test_confirm_arms_fetch_damir_and_the_armed_path_proceeds(capsys, monkeypatc
         return cache_path(month), 123
 
     monkeypatch.setattr(cli, "fetch_month", _stub)
-    assert (
-        main(["confirm", "--make-pid=1", ORIGIN, "--goals=confirm fetch-damir"]) == 0
-    )
+    assert main(["confirm", "--make-pid=1", ORIGIN, "--goals=confirm fetch-damir"]) == 0
     assert cli.CONFIRM_STAMP.exists()
     assert main(["fetch-damir", "--month=2024-01", "--make-pid=1"]) == 0
     assert calls == ["2024-01"]
