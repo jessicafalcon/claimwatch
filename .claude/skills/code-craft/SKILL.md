@@ -1,6 +1,6 @@
 ---
 name: code-craft
-description: The senior craft standard for this repo's Python, SQL, Makefile and tests — naming by meaning, function shape, guards at foreign inputs, error policy, data shapes across boundaries, duplication versus speculation, constants, comments, types, SQL and test quality. Loads while code is being written; the code-reviewer is preloaded with the same text.
+description: The senior craft standard for this repo's Python, SQL, Makefile and tests — the ladder (spec, reuse, stdlib, the engine, an installed dependency, one line, the minimum), naming by meaning, function shape, guards at foreign inputs, error policy, data shapes across boundaries, duplication versus speculation, constants, comments, types, SQL and test quality. Loads while code is being written; the code-reviewer is preloaded with the same text.
 user-invocable: false
 paths:
   - "**/*.py"
@@ -14,6 +14,44 @@ Standing instructions while writing code here. CLAUDE.md's rules come first
 (deterministic first, the five contracts, the allowlist); this is the craft
 under them. Where a bar below conflicts with a spec's pinned decision, the
 spec wins and the conflict is reported.
+
+## Before writing: the ladder
+
+The best code is the code never written. Understand the change first (read
+the task, the spec item, every file it touches, the real flow), then stop at
+the first rung that holds:
+
+1. **Does the spec ask for it?** Not in a Done-when item → not built. If a
+   Done-when item itself looks unnecessary, that is a STOP-and-report
+   (Workflow rules), never a silent skip: the spec is the contract.
+2. **Already here?** A helper, a guard, a dataclass, a make target, a fixture
+   a few files over → reuse it. Re-implementing what exists is the most
+   common finding.
+3. **Stdlib does it?** `csv`, `json`, `hashlib`, `dataclasses`, `pathlib`,
+   `statistics`, `functools`, `itertools`.
+4. **The engine does it?** A SQL constraint, a `distinct`, a `group by`
+   over a Python loop; a DuckDB catalog query over a hand-parsed file.
+5. **An installed dependency does it?** `duckdb`, `pyyaml`, `httpx`,
+   `anthropic`, nothing else (Conventions: a new package is a STOP).
+6. **One line?** Then one line.
+7. **Only then** the minimum that passes the test.
+
+Two rungs work → take the higher one. Two stdlib forms, same size → the one
+that is right on the edge case; lazy means less code, not the flimsier
+algorithm.
+
+A bug fix is a root cause: grep every caller of the function before editing
+and fix the shared function once (one guard there is a smaller diff than one
+per caller, and it does not leave a sibling caller broken).
+
+A deliberate simplification with a known ceiling (a linear scan, a single
+lock, a naive heuristic) is a BACKLOG row with its trigger, not a comment:
+the row is where deferrals are counted and reviewed at each phase exit.
+
+Not lazy about: understanding the problem; guards at inputs the repo does not
+own; the error policy; the pinning test (one focused test per behaviour, no
+more); anything the spec names. Explanation is code too: after the code, at
+most three lines — what was skipped and when to add it.
 
 ## Naming by meaning (brief §2.3)
 
