@@ -695,7 +695,9 @@ The standard `/challenge` hands `senior-architect`: brief §2/§8/§9, the five
 contracts, the BACKING rows the plan names, the predecessor spec's Delivered
 paragraph, `docs/PLAN.md` §2, DECISIONS, BACKLOG. The stamp the main session
 writes after the developer's disposition: `Challenged: <YYYY-MM-DD>, round
-<k> — <verdict>`, unbolded, at line start, under the spec's status line.
+<k>, spec <8 hex> — <verdict>`, unbolded, at line start, under the spec's
+status line; the hex is the hook's `--spec-hash` of the spec's Invariants and
+Done-when sections, so an amendment to either makes the stamp stale.
 
 Rules that hold across the loop:
 
@@ -732,9 +734,10 @@ fixed in the main session or explicitly accepted — never auto-fixed.
   "hooks": [{"type": "command", "command": "python3
   \"$CLAUDE_PROJECT_DIR/.claude/hooks/run-tests.py\""}]}]}}`.
 - `challenge-gate` hook — reminds you to run `/challenge` on a spec that has
-  not been challenged, and never blocks. After an edit to a `specs/phase-*.md`
-  whose status is not DELIVERED and which carries no full `Challenged:` stamp,
-  it prints one line (on every such edit); before `ExitPlanMode` it answers
+  not been challenged, or whose stamp predates its Invariants or Done-when,
+  and never blocks. After an edit to a `specs/phase-*.md` whose status is not
+  DELIVERED and which carries no current `Challenged:` stamp, it prints one
+  line (on every such edit); before `ExitPlanMode` it answers
   `ask` on every plan, with the plan's own claim in the reason, so the
   developer sees the claim rather than the hook trusting it. Fail-open, and
   `ask` is the only decision it ever emits; `tests/test_challenge_gate.py`

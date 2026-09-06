@@ -6,10 +6,16 @@
 #
 #   PostToolUse (matcher: Write|Edit|MultiEdit|NotebookEdit) — after an edit to
 #   a file directly under specs/ named phase-*.md whose status line does not say
-#   DELIVERED and which carries no full stamp (`Challenged: YYYY-MM-DD, round
-#   <k> — <verdict>`, unbolded, at line start), exit 2 with one line naming
-#   /challenge. PostToolUse cannot block: the line reaches the model, the edit
-#   stands. It fires on every such edit — there is no "once".
+#   DELIVERED and which carries no CURRENT stamp (`Challenged: YYYY-MM-DD, round
+#   <k>, spec <8 hex> — <verdict>`, unbolded, at line start, the hex being the
+#   spec hash of its Invariants and Done-when sections), exit 2 with one line:
+#   naming /challenge when there is no stamp, naming the two hashes when the
+#   stamp predates those sections. PostToolUse cannot block: the line reaches
+#   the model, the edit stands. It fires on every such edit — there is no "once".
+#
+#   CLI: `python3 .claude/hooks/challenge-gate.py --spec-hash specs/phase-N-x.md`
+#   prints the spec hash the main session writes into the stamp. The path is
+#   foreign input: it must resolve to a phase spec under ./specs, else exit 2.
 #
 #   PreToolUse (matcher: ExitPlanMode) — answers `ask` on EVERY plan
 #   presentation, with the plan's own claim in the reason: stamped, not
@@ -22,36 +28,70 @@
 # phase spec directly under <project>/specs (symlinks resolved), a spec it
 # cannot read or decode. It is a reminder, not a security control. Reads are
 # capped: the event at MAX_EVENT_BYTES (the harness is the producer; a bigger
-# event is not one we recognise) and the spec at HEAD_BYTES (the status line
-# and the stamp live in the first lines).
+# event is not one we recognise) and the spec at MAX_SPEC_BYTES (the hashed
+# sections can sit anywhere in it).
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import json
 import os
 import re
 import sys
 from pathlib import Path
-from typing import NoReturn
+from typing import Literal, NoReturn
 
 MAX_EVENT_BYTES = 4 * 1024 * 1024
-HEAD_BYTES = 16 * 1024
+MAX_SPEC_BYTES = 1024 * 1024
 EDIT_TOOLS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit"})
 SPEC_NAME = re.compile(r"^phase-[0-9]+[a-z]?-[a-z0-9-]+\.md$")
 STATUS = re.compile(r"^\*\*Status: (?P<rest>[^\n]*)$", re.M)
-STAMP = re.compile(r"^Challenged: (?P<date>\d{4}-\d{2}-\d{2}), round \d+ — ", re.M)
+STAMP = re.compile(
+    r"^Challenged: (?P<date>\d{4}-\d{2}-\d{2}), round \d+, "
+    r"spec (?P<hash>[0-9a-f]{8}) — ",
+    re.M,
+)
+# The sections a challenge judges: a change to either is a new plan.
+HASHED_SECTIONS = ("## Invariants", "## Done-when")
+_SECTION = re.compile(r"^## .*$", re.M)
 
 
-def _stamped(text: str) -> bool:
-    """A full stamp with a real calendar date, at line start."""
+def _section(text: str, title: str) -> str:
+    """The section from its `## <title>` heading line up to the next `## `
+    heading, trailing whitespace stripped per line; "" when absent."""
+    starts = [m for m in _SECTION.finditer(text) if m.group(0).startswith(title)]
+    if not starts:
+        return ""
+    start = starts[0].start()
+    nxt = _SECTION.search(text, starts[0].end())
+    body = text[start : nxt.start() if nxt else len(text)]
+    return "\n".join(line.rstrip() for line in body.splitlines())
+
+
+def spec_hash(text: str) -> str:
+    """Eight hex of sha256 over the Invariants and Done-when sections."""
+    joined = "\n\x00\n".join(_section(text, t) for t in HASHED_SECTIONS)
+    return hashlib.sha256(joined.encode("utf-8")).hexdigest()[:8]
+
+
+def _stamp_hash(text: str) -> str | None:
+    """The stamp's hash when a full stamp with a real calendar date sits at
+    line start; None otherwise."""
     m = STAMP.search(text)
     if m is None:
-        return False
+        return None
     try:
         dt.date.fromisoformat(m.group("date"))
     except ValueError:
-        return False
-    return True
+        return None
+    return m.group("hash")
+
+
+def stamp_state(text: str) -> Literal["none", "stale", "current"]:
+    stamped = _stamp_hash(text)
+    if stamped is None:
+        return "none"
+    return "current" if stamped == spec_hash(text) else "stale"
 
 
 def _delivered(text: str) -> bool:
@@ -59,24 +99,38 @@ def _delivered(text: str) -> bool:
     return m is not None and "DELIVERED" in m.group("rest")
 
 
-def _spec_head(path: Path) -> str | None:
+def _spec_text(path: Path) -> str | None:
+    """The whole spec, or None when unreadable, not UTF-8, or over the cap."""
     try:
         with path.open("rb") as fh:
-            return fh.read(HEAD_BYTES).decode("utf-8", errors="strict")
+            raw = fh.read(MAX_SPEC_BYTES + 1)
+        if len(raw) > MAX_SPEC_BYTES:
+            return None
+        return raw.decode("utf-8", errors="strict")
     except (OSError, UnicodeDecodeError):
         return None
 
 
 def _spec_reminder(path: Path, root: Path) -> NoReturn:
-    head = _spec_head(path)
-    if head is None or _delivered(head) or _stamped(head):
+    text = _spec_text(path)
+    if text is None or _delivered(text):
+        sys.exit(0)
+    state = stamp_state(text)
+    if state == "current":
         sys.exit(0)
     rel = path.relative_to(root)
-    print(
-        f"[challenge-gate] {rel} is not yet challenged — run `/challenge {rel}` "
-        "before asking for approval.",
-        file=sys.stderr,
-    )
+    if state == "none":
+        line = (
+            f"[challenge-gate] {rel} is not yet challenged — run `/challenge {rel}` "
+            "before asking for approval."
+        )
+    else:
+        line = (
+            f"[challenge-gate] {rel}: the Challenged stamp (spec "
+            f"{_stamp_hash(text)}) predates its Invariants or Done-when (spec "
+            f"{spec_hash(text)}) — run `/challenge {rel}` again, or restamp."
+        )
+    print(line, file=sys.stderr)
     sys.exit(2)
 
 
@@ -84,7 +138,7 @@ def _plan_gate(tool_input: dict[str, object]) -> NoReturn:
     plan = tool_input.get("plan")
     if not isinstance(plan, str):
         claim = "the hook cannot read this plan's text"
-    elif _stamped(plan):
+    elif _stamp_hash(plan) is not None:
         claim = "the plan text says it was challenged — check the stamp is real"
     else:
         claim = "the plan carries no `Challenged:` stamp"
@@ -130,7 +184,30 @@ def _spec_path(tool_input: dict[str, object], root: Path) -> Path | None:
     return path
 
 
+def _print_spec_hash(arg: str) -> NoReturn:
+    """`--spec-hash <path>`: the path must resolve to a phase spec under
+    ./specs; the hash is printed alone so a stamp can be written from it."""
+    path = _spec_path({"file_path": arg}, Path.cwd())
+    text = _spec_text(path) if path is not None else None
+    if text is None:
+        print(
+            "challenge-gate: --spec-hash takes a phase spec under ./specs",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    print(spec_hash(text))
+    sys.exit(0)
+
+
 def main() -> NoReturn:
+    if len(sys.argv) == 3 and sys.argv[1] == "--spec-hash":
+        _print_spec_hash(sys.argv[2])
+    if len(sys.argv) != 1:
+        print(
+            "challenge-gate: usage: --spec-hash <specs/phase-N-slug.md>",
+            file=sys.stderr,
+        )
+        sys.exit(2)
     data = _event()
     if data is None:
         sys.exit(0)

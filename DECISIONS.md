@@ -220,7 +220,7 @@ place and never deleted.
   `/challenge` spawns `senior-architect`, a report-only devil's-advocate:
   steel-man first, then findings each with an alternative and its cost, then
   an advisory verdict; the developer's disposition (amend / accept / reject)
-  is stamped on the spec as `Challenged: <date>, round <k> — <verdict>`
+  is stamped on the spec as `Challenged: <date>, round <k>, spec <hash> — <verdict>`
   (one closed shape, unbolded, at line start; `specs/TEMPLATE.md` carries
   the slot). The `challenge-gate` hook is a reminder, never a gate: it exits
   2 with one line after an edit to an unstamped phase spec whose status is

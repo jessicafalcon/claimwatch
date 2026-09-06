@@ -1,8 +1,10 @@
 """Pins for .claude/hooks/challenge-gate.py: a reminder after an edit to an
-unstamped, undelivered phase spec; an `ask` — and only ever an `ask` — before
-ExitPlanMode; the documented fail-open cases. Spawned the way Claude Code
-spawns it (the event as JSON on stdin, CLAUDE_PROJECT_DIR in the env) against
-a tmp project. Offline; the hook reads one file head and writes nothing."""
+unstamped or stale-stamped, undelivered phase spec (the stamp carries the hash
+of the Invariants and Done-when sections); an `ask` — and only ever an `ask` —
+before ExitPlanMode; the `--spec-hash` CLI; the documented fail-open cases.
+Spawned the way Claude Code spawns it (the event as JSON on stdin,
+CLAUDE_PROJECT_DIR in the env) against a tmp project. Offline; the hook reads
+one file and writes nothing."""
 
 from __future__ import annotations
 
@@ -20,14 +22,19 @@ DELIVERED = (
     "# Phase 9 — study\n\n"
     "**Status: APPROVED 2026-09-06 — DELIVERED 2026-09-20, PR open.**\n"
 )
-STAMP = "Challenged: 2026-09-05, round 1 — approve with amendments\n"
+# A stamp of the right shape; its hash is right only for a spec whose
+# Invariants and Done-when hash to 00000000 — the plan gate checks shape alone.
+STAMP = "Challenged: 2026-09-05, round 1, spec 00000000 — approve with amendments\n"
 NOT_STAMPS = (
     "Challenged by a reviewer, informally.\n",
     "Challenged: 2026-09-05\n",  # date only, no round and verdict
-    "Challenged: 9999-99-99, round 1 — approve\n",  # not a calendar date
-    "**Challenged: 2026-09-05, round 1 — approve**\n",  # bolded
-    "  Challenged: 2026-09-05, round 1 — approve\n",  # not at line start
+    "Challenged: 2026-09-05, round 1 — approve\n",  # the pre-hash shape
+    "Challenged: 9999-99-99, round 1, spec 00000000 — approve\n",  # not a date
+    "**Challenged: 2026-09-05, round 1, spec 00000000 — approve**\n",  # bolded
+    "  Challenged: 2026-09-05, round 1, spec 00000000 — approve\n",  # indented
 )
+INVARIANTS = "\n## Invariants (REQUIRED)\n\n- for every review, one row\n"
+DONE_WHEN = "\n## Done-when\n\n1. the mart exists\n"
 
 
 def _hook(
@@ -46,6 +53,25 @@ def _spec(tmp_path: Path, body: str | bytes, name: str = "phase-9-study.md") -> 
     (tmp_path / "specs").mkdir(exist_ok=True)
     path = tmp_path / "specs" / name
     path.write_bytes(body.encode() if isinstance(body, str) else body)
+    return path
+
+
+def _spec_hash(tmp_path: Path, arg: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, str(HOOK), "--spec-hash", arg],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+    )
+
+
+def _stamped(tmp_path: Path, body: str, name: str = "phase-9-study.md") -> Path:
+    """The spec written with a stamp carrying its own current hash."""
+    path = _spec(tmp_path, body, name)
+    h = _spec_hash(tmp_path, f"specs/{name}").stdout.strip()
+    stamp = f"Challenged: 2026-09-05, round 1, spec {h} — approve\n"
+    head, sep, rest = body.partition("\n\n")
+    path.write_text(head + sep + stamp + rest if sep else body + stamp)
     return path
 
 
@@ -83,10 +109,48 @@ def test_unstamped_undelivered_spec_edit_reminds_whatever_its_status(tmp_path: P
         _reminds(_hook(_edit(_spec(tmp_path, PROPOSED), tool=tool), tmp_path))
 
 
-def test_a_full_stamp_or_a_delivered_status_is_quiet(tmp_path: Path):
-    _quiet(_hook(_edit(_spec(tmp_path, PROPOSED + STAMP)), tmp_path))
-    _quiet(_hook(_edit(_spec(tmp_path, APPROVED + STAMP)), tmp_path))
+def test_a_current_stamp_or_a_delivered_status_is_quiet(tmp_path: Path):
+    _quiet(_hook(_edit(_stamped(tmp_path, PROPOSED + INVARIANTS)), tmp_path))
+    _quiet(_hook(_edit(_stamped(tmp_path, APPROVED + INVARIANTS)), tmp_path))
     _quiet(_hook(_edit(_spec(tmp_path, DELIVERED)), tmp_path))
+
+
+def test_a_stamp_goes_stale_when_invariants_or_done_when_change(tmp_path: Path):
+    """The stamp is keyed to the two sections a challenge judges: editing
+    either reminds, naming both hashes; editing anything else stays quiet."""
+    body = PROPOSED + "\n## Why\n\nbecause\n" + INVARIANTS + DONE_WHEN
+    path = _stamped(tmp_path, body)
+    stamped = path.read_text()
+    _quiet(_hook(_edit(path), tmp_path))
+    path.write_text(stamped.replace("because", "therefore"))
+    _quiet(_hook(_edit(path), tmp_path))
+    path.write_text(stamped.replace("- for every review, one row", "- one row  "))
+    res = _hook(_edit(path), tmp_path)
+    assert res.returncode == 2 and b"predates" in res.stderr, res
+    assert b"/challenge specs/phase-9-study.md" in res.stderr
+    path.write_text(stamped.replace("1. the mart exists", "1. the mart is empty"))
+    assert _hook(_edit(path), tmp_path).returncode == 2
+    # Trailing whitespace inside a hashed section is not a change.
+    path.write_text(stamped.replace("one row\n", "one row   \n"))
+    _quiet(_hook(_edit(path), tmp_path))
+
+
+def test_spec_hash_cli_prints_eight_hex_and_refuses_foreign_paths(tmp_path: Path):
+    _spec(tmp_path, PROPOSED + INVARIANTS)
+    res = _spec_hash(tmp_path, "specs/phase-9-study.md")
+    assert res.returncode == 0 and res.stderr == ""
+    assert len(res.stdout.strip()) == 8 and int(res.stdout.strip(), 16) >= 0
+    assert res.stdout == _spec_hash(tmp_path, "specs/phase-9-study.md").stdout
+    (tmp_path / "specs" / "TEMPLATE.md").write_text(PROPOSED)
+    (tmp_path / "outside.md").write_text(PROPOSED)
+    for arg in ("specs/TEMPLATE.md", "outside.md", "../x", "", "specs/phase-9-gone.md"):
+        res = _spec_hash(tmp_path, arg)
+        assert res.returncode == 2 and res.stdout == "", arg
+        assert res.stderr.count("\n") == 1 and "Traceback" not in res.stderr, arg
+    res = subprocess.run(
+        [sys.executable, str(HOOK), "--other"], capture_output=True, text=True
+    )
+    assert res.returncode == 2 and "usage" in res.stderr
 
 
 def test_only_the_declared_stamp_shape_counts(tmp_path: Path):

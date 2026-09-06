@@ -66,8 +66,10 @@ should-fix for the developer to answer:
   alternative was a real option.
 
 When the developer has answered, the main session stamps the spec under its
-status line — `Challenged: <date>, round <k> — <verdict>` — so the
-`challenge-gate` hook and `/phase-start` can see it. Not before.
+status line — `Challenged: <date>, round <k>, spec <hash> — <verdict>`, the
+hash from `python3 .claude/hooks/challenge-gate.py --spec-hash <SPEC>`, run
+after any amendment the disposition added — so the `challenge-gate` hook and
+`/phase-start` can see it. Not before.
 
 ## 5. STOP
 

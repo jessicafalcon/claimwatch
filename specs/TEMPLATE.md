@@ -6,10 +6,13 @@ Contract for the `phase-N-<slug>` branch. Source: PROJECT_BRIEF.md §9 Phase N
 
 **Status: PROPOSED — do not start until approved.** <"No new dependencies", or
 the package and why — the allowlist is in CLAUDE.md → Conventions.>
-Challenged: <YYYY-MM-DD>, round <k> — <verdict> <— written by the main session
-after the developer's disposition of a `/challenge` round; unbolded, at line
-start, exactly this shape (`challenge-gate` and `/phase-start` read it);
-delete this line until then>
+Challenged: <YYYY-MM-DD>, round <k>, spec <8 hex> — <verdict> <— written by the
+main session after the developer's disposition of a `/challenge` round;
+unbolded, at line start, exactly this shape (`challenge-gate` and
+`/phase-start` read it); the hex is `python3 .claude/hooks/challenge-gate.py
+--spec-hash specs/<this file>` — the hash of the Invariants and Done-when
+sections, so an amendment to either makes the stamp stale; delete this line
+until then>
 
 Four sections marked REQUIRED are mandatory; a spec without them is not
 approvable (CLAUDE.md → Workflow rules). The status line moves `PROPOSED` →
