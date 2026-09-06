@@ -465,6 +465,19 @@ def test_read_fit_refuses_duplicate_oversized_and_bad_n(tmp_path):
         read_fit(oversized)
 
 
+def test_read_fit_refuses_a_negative_sigma(tmp_path):
+    """sigma is a standard deviation: a negative value is domain-invalid and
+    refuses, rather than flowing into exp(mu + sigma²/2) as a wrong number."""
+    lines = _valid_fit_file(tmp_path).read_text(encoding="utf-8").splitlines()
+    neg = tmp_path / "neg_sigma.csv"
+    neg.write_text(
+        "\n".join("sigma,-1.5" if x.startswith("sigma,") else x for x in lines) + "\n",
+        "utf-8",
+    )
+    with pytest.raises(ValueError, match="sigma"):
+        read_fit(neg)
+
+
 # --- 7b lands no mart; 8a lands the cost-model marts, 8b the simulator's ------
 
 

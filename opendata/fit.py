@@ -182,9 +182,14 @@ def read_fit(path: Path = ARTIFACT) -> tuple[Fit, list[Decile]]:
         raise ValueError(
             f"{where}: name(s) the fit artifact must carry are missing: {missing}"
         )
+    sigma = _finite_float(raw, "sigma", where)
+    if sigma < 0:
+        raise ValueError(
+            f"{where}: 'sigma' is a standard deviation and must be >= 0: {sigma!r}"
+        )
     fit = Fit(
         mu=_finite_float(raw, "mu", where),
-        sigma=_finite_float(raw, "sigma", where),
+        sigma=sigma,
         n=_positive_int(raw, "n", where),
     )
     normal = statistics.NormalDist()
