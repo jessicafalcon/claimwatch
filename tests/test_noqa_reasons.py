@@ -29,6 +29,8 @@ def test_every_shape_rule_noqa_carries_its_reason():
     missing: list[str] = []
     seen = 0
     for path in _tracked_python():
+        if path == Path(__file__).resolve():
+            continue  # this file spells the pattern it looks for
         for n, line in enumerate(path.read_text().splitlines(), 1):
             m = SHAPE_RULES.search(line)
             if m is None:
