@@ -51,6 +51,36 @@ def test_outputs_mart_equals_formulas_at_defaults(tmp_path):
     assert got == expected
 
 
+def test_curves_mart_equals_curves_at_defaults(tmp_path):
+    """Every cost_curves grid row equals curves() over the defaults for its
+    scenario — the B3.2 chart's fraud/friction/net/marker columns cannot drift
+    from the callable (invariant 1, the curve half)."""
+    fit = read_model_fit()
+    values = cost_model.defaults(fit)
+    expected: dict[tuple[str, float], tuple] = {}
+    for scenario in cost_model.SCENARIOS:
+        grid, _ = cost_model.curves(values, scenario)
+        for row in grid:
+            expected[(scenario, row["flag_rate"])] = (
+                row["fraud_saved"],
+                row["friction_cost"],
+                row["net"],
+                row["is_default"],
+            )
+    conn = _built(tmp_path)
+    try:
+        got = {
+            (scenario, flag_rate): (fraud, friction, net, is_default)
+            for scenario, flag_rate, fraud, friction, net, is_default in conn.execute(
+                "select scenario, flag_rate, fraud_saved, friction_cost, net, "
+                "is_default from cost_curves"
+            ).fetchall()
+        }
+    finally:
+        conn.close()
+    assert got == expected
+
+
 def test_params_mart_has_one_row_per_parameter(tmp_path):
     """cost_model_params holds one row per parameter, each cell equal to the
     Parameter it came from."""

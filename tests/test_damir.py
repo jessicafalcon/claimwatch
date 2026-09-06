@@ -437,6 +437,34 @@ def test_read_fit_refuses_unknown_missing_or_non_numeric_names(tmp_path):
         read_fit(nonnum)
 
 
+def test_read_fit_refuses_duplicate_oversized_and_bad_n(tmp_path):
+    """The remaining guards refuse too: a duplicate name, a file over the size
+    cap, and a non-positive-integer `n` — each with the reason, never a silent
+    default."""
+    lines = _valid_fit_file(tmp_path).read_text(encoding="utf-8").splitlines()
+
+    dup = tmp_path / "dup.csv"
+    dup.write_text("\n".join(lines) + "\nmu,3.5\n", "utf-8")  # mu twice
+    with pytest.raises(ValueError, match="duplicate"):
+        read_fit(dup)
+
+    for bad_n in ("0", "-1", "x"):
+        p = tmp_path / f"n_{bad_n}.csv"
+        p.write_text(
+            "\n".join(f"n,{bad_n}" if x.startswith("n,") else x for x in lines) + "\n",
+            "utf-8",
+        )
+        with pytest.raises(ValueError, match="positive integer"):
+            read_fit(p)
+
+    oversized = tmp_path / "big.csv"
+    oversized.write_text(
+        "name,value\n" + "\n".join(f"junk{i},1" for i in range(20000)) + "\n", "utf-8"
+    )
+    with pytest.raises(ValueError, match="over the"):
+        read_fit(oversized)
+
+
 # --- 7b lands no mart; 8a lands the cost-model marts, 8b the simulator's ------
 
 

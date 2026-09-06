@@ -156,6 +156,16 @@ def test_marginal_crossover_is_first_grid_point_below_the_previous():
     )
 
 
+def test_marginal_crossover_needs_a_strict_drop_not_a_plateau():
+    """A flat plateau then a decline: the marginal crossover is the decline point,
+    not the plateau — the rule is strictly below the previous point, so `<=` would
+    wrongly fire on the plateau (invariant 6)."""
+    rows = [
+        {"flag_rate": 0.01 * i, "net": n} for i, n in enumerate([1.0, 2.0, 2.0, 1.5])
+    ]
+    assert _marginal_crossover(rows) == 0.03
+
+
 def test_curves_mark_exactly_one_default_per_scenario():
     """Exactly one grid row per scenario is the default flag rate (0.05), the
     'you are here' marker, and 41 rows span the grid."""
