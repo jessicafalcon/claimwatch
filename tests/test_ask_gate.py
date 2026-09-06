@@ -60,6 +60,21 @@ def test_a_stop_inside_a_compound_command_still_asks():
         assert _asks(_hook(_bash(cmd))), cmd
 
 
+def test_a_wrapped_stop_still_asks():
+    """A leading subshell opener, env assignment or wrapper word is not a
+    way past the prompt: the closed set in the hook's WRAPPERS."""
+    for cmd in (
+        "FOO=1 git push",
+        "(git push)",
+        "{ git push; }",
+        "sudo make confirm reset",
+        "env GIT_TRACE=1 git push origin x",
+        "time nohup gh pr create",
+        "A=1 B=2 exec git push",
+    ):
+        assert _asks(_hook(_bash(cmd))), cmd
+
+
 def test_everything_else_is_silent():
     for cmd in (
         "git status",
@@ -69,6 +84,8 @@ def test_everything_else_is_silent():
         "make reset",  # unarmed: the Makefile's own gate refuses it
         "echo 'git push'",  # the words inside an argument, not a segment head
         "grep -n 'make confirm' CLAUDE.md",
+        "FOO=1",  # an assignment alone
+        "sudo",  # a wrapper alone
         "",
     ):
         _quiet(_hook(_bash(cmd)))
