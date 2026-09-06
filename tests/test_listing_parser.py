@@ -46,7 +46,7 @@ def test_sample_maps_to_one_snapshot_row_matching_pins():
     for k, v in pins.LISTING_SAMPLE_ROW.items():
         assert shown[k] == v, k
     assert (
-        SAMPLE_DIR == Path(__file__).resolve().parent.parent / "fixtures" / "listings"
+        Path(__file__).resolve().parent.parent / "fixtures" / "listings" == SAMPLE_DIR
     )
 
 

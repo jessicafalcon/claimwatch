@@ -130,11 +130,14 @@ def check_links(files: list[Path], root: Path) -> list[str]:
             if not dest.exists():
                 errors.append(f"{f.relative_to(root)}: broken link: {target}")
                 continue
-            if anchor and dest.is_file():
-                if anchor not in anchors(dest.read_text(encoding="utf-8")):
-                    errors.append(
-                        f"{f.relative_to(root)}: missing anchor #{anchor} in {shown}"
-                    )
+            if (
+                anchor
+                and dest.is_file()
+                and anchor not in anchors(dest.read_text(encoding="utf-8"))
+            ):
+                errors.append(
+                    f"{f.relative_to(root)}: missing anchor #{anchor} in {shown}"
+                )
     return errors
 
 

@@ -175,7 +175,7 @@ def _write_page(
     )
 
 
-def scrape(
+def scrape(  # noqa: C901, PLR0912, PLR0915 -- one page loop, every refusal named in order
     source: Source,
     cache_root: Path,
     *,

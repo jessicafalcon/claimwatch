@@ -149,7 +149,7 @@ def test_skills_grant_only_read_only_tools():
         for tool in granted:
             if tool.startswith("Bash"):
                 assert tool in READ_ONLY_BASH, (name, tool)
-        assert "disallowed-tools" not in fm or EDIT_TOOLS <= set(fm["disallowed-tools"])
+        assert "disallowed-tools" not in fm or set(fm["disallowed-tools"]) >= EDIT_TOOLS
     for name in STANDARDS:
         fm = _frontmatter(_skill(name))
         assert fm.get("user-invocable") is False, name

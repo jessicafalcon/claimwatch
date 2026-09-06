@@ -17,7 +17,7 @@ def test_theme_set_is_the_seven():
     assert len(LABELS) == pins.LABEL_COUNT
     assert len(THEMES) == pins.THEME_COUNT
     assert LABELS == THEMES + (POSITIVE, UNCLASSIFIED)
-    assert LABEL_SET == frozenset(LABELS)
+    assert frozenset(LABELS) == LABEL_SET
     assert len(LABEL_SET) == pins.LABEL_COUNT  # no duplicate slug
     assert POSITIVE not in THEMES and UNCLASSIFIED not in THEMES
 

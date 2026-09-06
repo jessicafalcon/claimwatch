@@ -68,16 +68,18 @@ def _download(url: str, dest: Path, expected: int | None) -> int:
     request = Request(url, headers=IDENTIFYING_HEADERS)  # noqa: S310 (https checked)
     ceiling = expected + _SLACK if expected else None
     written = 0
-    with _OPENER.open(request, timeout=TIMEOUT_S) as response:  # noqa: S310
-        with dest.open("wb") as fh:
-            while chunk := response.read(_CHUNK):
-                written += len(chunk)
-                if ceiling is not None and written > ceiling:
-                    raise FetchError(
-                        f"refusing: {dest.name} ran past its declared size "
-                        f"({expected} bytes) — stopped at {written}"
-                    )
-                fh.write(chunk)
+    with (
+        _OPENER.open(request, timeout=TIMEOUT_S) as response,  # noqa: S310
+        dest.open("wb") as fh,
+    ):
+        while chunk := response.read(_CHUNK):
+            written += len(chunk)
+            if ceiling is not None and written > ceiling:
+                raise FetchError(
+                    f"refusing: {dest.name} ran past its declared size "
+                    f"({expected} bytes) — stopped at {written}"
+                )
+            fh.write(chunk)
     return written
 
 

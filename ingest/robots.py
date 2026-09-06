@@ -59,9 +59,7 @@ def reads_as_robots(text: str) -> bool:
     if keys and "user-agent" not in keys and any(k != "sitemap" for k in keys):
         return False
     first_group = keys.index("user-agent") if "user-agent" in keys else len(keys)
-    if any(k in RULE_KEYS for k in keys[:first_group]):
-        return False
-    return True
+    return not any(k in RULE_KEYS for k in keys[:first_group])
 
 
 @dataclass
@@ -71,7 +69,7 @@ class _Group:
     crawl_delay: float | None = None
 
 
-def _parse_groups(text: str) -> list[_Group]:
+def _parse_groups(text: str) -> list[_Group]:  # noqa: C901 -- the RFC 9309 line kinds, one branch each
     groups: list[_Group] = []
     current: _Group | None = None
     naming = False  # inside a run of consecutive User-agent lines

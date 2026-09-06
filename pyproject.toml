@@ -30,4 +30,24 @@ target-version = "py312"
 line-length = 88
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
+select = [
+  "E", "F", "I", "UP", "B",
+  # The mechanical half of .claude/skills/code-craft: function shape
+  # (complexity, branches, statements, positional arguments), no boolean flag
+  # parameter, simplifiable forms, commented-out code, unused arguments.
+  "C90", "PLR0912", "PLR0915", "PLR0917",
+  "FBT", "SIM", "RET", "PIE", "ERA", "ARG",
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pylint]
+max-branches = 12
+max-statements = 50
+max-positional-args = 5
+
+[tool.ruff.lint.per-file-ignores]
+# Fixtures, callbacks and lambdas take the signature pytest or the caller
+# hands them; a boolean parametrize value is the case under test.
+"tests/**" = ["ARG", "FBT"]

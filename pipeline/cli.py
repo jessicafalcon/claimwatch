@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from contextlib import suppress
 
 from classify.cache import read_decisions, write_decisions
 from classify.combined import classify_all
@@ -129,10 +130,8 @@ def confirmed(make_pid: str) -> bool:
         stamped = CONFIRM_STAMP.read_text(encoding="utf-8").strip()
     except OSError:
         stamped = None  # absent, unreadable, or a link to nowhere
-    try:
+    with suppress(OSError):
         CONFIRM_STAMP.unlink()  # consumed whatever its state (exit pass)
-    except OSError:
-        pass
     return stamped is not None and make_pid.isdigit() and stamped == make_pid
 
 
@@ -357,7 +356,7 @@ def _do_scrape(args: argparse.Namespace) -> int:
     return 2 if refused else 0
 
 
-def _do_record_snapshots(args: argparse.Namespace) -> int:
+def _do_record_snapshots(_args: argparse.Namespace) -> int:
     """Non-network, non-destructive: read the captures already on disk under
     data/cache and append this week's fetched snapshot figures to the tracked
     `data/snapshots/fetched_snapshots.csv`, numbers only. No `confirm` gate —
@@ -437,7 +436,7 @@ def _review_identities(db) -> dict[str, tuple[str, str]]:
     }
 
 
-def _do_classify_eval(args: argparse.Namespace) -> int:
+def _do_classify_eval(_args: argparse.Namespace) -> int:
     """Non-network, non-destructive: run the rules over the synthetic corpus's
     `stg_reviews` and print per-theme precision on the tuning folds. No user
     variable — the corpus is the fixed synthetic input for 5b (real rows are
@@ -517,7 +516,7 @@ def _do_sample_damir(args: argparse.Namespace) -> int:
     return 0
 
 
-def _do_fit_damir(args: argparse.Namespace) -> int:
+def _do_fit_damir(_args: argparse.Namespace) -> int:
     """Offline, deterministic: fit a lognormal to the frozen DAMIR fixture and
     write the tracked fit artifact (mu, sigma, n + the goodness-of-fit deciles)
     Phase 8 reads. Closed-form arithmetic, no key, no clock, no RNG — the same
