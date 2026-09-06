@@ -323,3 +323,88 @@ THEME_SHARE_BY_MONTH_REVIEWS = {"2026-01": 36, "2026-02": 2, "2026-03": 1}
 DAMIR_MU = 3.809814
 DAMIR_SIGMA = 2.187981
 DAMIR_N = 5000
+# The median DAMIR cell (emp_p50), read back by opendata.fit.read_fit and the
+# contrast printed beside mean_claim in the cost model.
+DAMIR_EMP_P50 = 49.76
+
+# --- Phase 8a: the cost model (Beat 3) ---------------------------------------
+# Every number below is typed from the built output of models/cost_model.py over
+# the tracked fit (mu/sigma/emp_p50 above), never guessed: the defaults are not
+# tuned to tell a story. The formulas themselves live in one place,
+# models/cost_model.py::FORMULAS (the study prints them). Euros round to 2
+# places, counts to whole (the one rounding site). Only friction_cost and net
+# move with a scenario; every other point output is scenario-invariant.
+COST_MODELED_TAG = "Modeled"
+COST_PARAM_ROWS = 13  # 4 scale anchors + 3 fit rows (mu, sigma, emp_p50) + 6 knobs
+COST_SCENARIOS = ("baseline", "contacts_once", "churn_halved", "both")
+FLAG_RATE_GRID_POINTS = 41  # 0.000..0.200 step 0.005
+COST_OUTPUT_ROWS = len(COST_SCENARIOS) * 11  # 9 point + 2 curve per scenario = 44
+COST_CURVE_ROWS = len(COST_SCENARIOS) * FLAG_RATE_GRID_POINTS  # 164
+
+# mu/sigma sliders: the fit ± 2 standard errors (se_mu = sigma/√n, se_sigma =
+# sigma/√(2n)) over n = 5000, rounded to 6 places.
+DAMIR_MU_RANGE = (3.747929, 3.871699)
+DAMIR_SIGMA_RANGE = (2.144221, 2.231741)
+
+COST_OUTPUTS = {
+    "baseline": {
+        "customer_value": 800.0,
+        "mean_claim": 494.45,
+        "median_cell": 49.76,
+        "claims": 707858,
+        "flagged": 35393,
+        "false_pos": 17696,
+        "fraud_saved": 1318719.82,
+        "friction_cost": 1132573.36,
+        "net": 186146.45,
+    },
+    "contacts_once": {
+        "customer_value": 800.0,
+        "mean_claim": 494.45,
+        "median_cell": 49.76,
+        "claims": 707858,
+        "flagged": 35393,
+        "false_pos": 17696,
+        "fraud_saved": 1318719.82,
+        "friction_cost": 849430.02,
+        "net": 469289.79,
+    },
+    "churn_halved": {
+        "customer_value": 800.0,
+        "mean_claim": 494.45,
+        "median_cell": 49.76,
+        "claims": 707858,
+        "flagged": 35393,
+        "false_pos": 17696,
+        "fraud_saved": 1318719.82,
+        "friction_cost": 778644.19,
+        "net": 540075.63,
+    },
+    "both": {
+        "customer_value": 800.0,
+        "mean_claim": 494.45,
+        "median_cell": 49.76,
+        "claims": 707858,
+        "flagged": 35393,
+        "false_pos": 17696,
+        "fraud_saved": 1318719.82,
+        "friction_cost": 495500.85,
+        "net": 823218.97,
+    },
+}
+# (crossover_flag_rate, marginal_crossover_flag_rate) per scenario. A fix that
+# lifts net above zero across the whole grid has no crossover (None); the
+# marginal crossover always exists here. The baseline crosses at 0.095 with the
+# 0.05 "you are here" marker left of it.
+COST_CROSSOVERS = {
+    "baseline": {"crossover_flag_rate": 0.095, "marginal_crossover_flag_rate": 0.05},
+    "contacts_once": {
+        "crossover_flag_rate": 0.18,
+        "marginal_crossover_flag_rate": 0.085,
+    },
+    "churn_halved": {
+        "crossover_flag_rate": None,
+        "marginal_crossover_flag_rate": 0.095,
+    },
+    "both": {"crossover_flag_rate": None, "marginal_crossover_flag_rate": 0.15},
+}

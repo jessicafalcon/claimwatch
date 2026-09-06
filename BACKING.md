@@ -58,10 +58,10 @@ every rule below except the last sentence, which is editorial (PROJECT_BRIEF.md
 | B2.3 Peer context: public ratings across the market segment (three kinds of point, each carrying its own tag — see the note above the table) | peer_ratings | `sql/marts/peer_ratings.sql` | `fixtures/anchors/platform_snapshots_seed.csv`; https://www.trustpilot.com/; https://www.opinion-assurances.fr/ | Documented |
 | B2.4 Classifier quality: per-theme precision and recall vs hand labels, graded on the held-out fold | classifier_quality | `sql/marts/classifier_quality.sql` | `classify/eval/labels.csv` | Measured |
 | B2.5 Held-claim complaint share, digital-first vs traditional mutuelles | theme_share_by_segment | `sql/marts/theme_share_by_segment.sql` | https://apps.apple.com/; https://play.google.com/; https://www.opinion-assurances.fr/; https://www.trustpilot.com/ | Measured |
-| B3.1 Cost-model formulas printed next to their output (eventual Modeled) | cost_model_outputs | `sql/marts/cost_model_outputs.sql` | — | Pending |
-| B3.2 Fraud saved vs friction cost curves over the flag rate, with the crossover (eventual Modeled) | cost_curves | `sql/marts/cost_curves.sql` | — | Pending |
-| B3.3 Sourced defaults: revenue per member, fraud pool, claim volume (eventual Modeled) | cost_model_params | `sql/marts/cost_model_params.sql` | `open-damir` | Pending |
-| B3.4 Declared-unsourced parameters as explore-the-range sliders (eventual Modeled) | cost_model_params | `sql/marts/cost_model_params.sql` | — | Pending |
+| B3.1 Cost-model formulas printed next to their output | cost_model_outputs | `sql/marts/cost_model_outputs.sql` | — | Modeled |
+| B3.2 Fraud saved vs friction cost curves over the flag rate, with the crossover | cost_curves | `sql/marts/cost_curves.sql` | — | Modeled |
+| B3.3 Sourced defaults: revenue per member, fraud pool, claim volume | cost_model_params | `sql/marts/cost_model_params.sql` | `open-damir` | Modeled |
+| B3.4 Declared-unsourced parameters as explore-the-range sliders | cost_model_params | `sql/marts/cost_model_params.sql` | — | Modeled |
 | B4.1 Fix 1 ask once: contacts per stuck claim drop to one, the curves move (eventual Modeled) | guardrail_sim | `sql/marts/guardrail_sim.sql` | — | Pending |
 | B4.2 Fix 2 a clock on every hold: the computed SLA threshold (eventual Modeled) | sla_threshold | `sql/marts/sla_threshold.sql` | — | Pending |
 | B4.3 Before and after hold durations from the simulator on calibrated synthetic claims (eventual Modeled) | guardrail_sim | `sql/marts/guardrail_sim.sql` | `open-damir` | Pending |
@@ -79,7 +79,13 @@ deciles). The slice keeps only the legal Assurance Maladie reimbursement —
 means, not a pool of legal + supplementary parts. Each DAMIR row is an
 aggregated per-cell reimbursement total, not a single claim, so the lognormal
 approximates the claim-cost distribution rather than measuring it claim by claim
-— the honest label Phase 8 carries beside the fit. Both rows stay **Pending**
-because their marts — `cost_model_params` and `guardrail_sim` — are built in
-Phase 8, which reads that fit; the fit is the sourced input, not yet a displayed
-number.
+— the honest label Phase 8 carries beside the fit. **B3.3 flipped to Modeled in
+Phase 8a**: `cost_model_params` displays the fit through the `mean_claim` formula
+(with the median cell `emp_p50` printed beside it as the contrast). **B4.3 stays
+Pending** on `guardrail_sim`, built in Phase 8b.
+
+**On B4.1's eventual mapping (decided in Phase 8a).** The `contacts_once` rows of
+`cost_curves` are the "the curves move" half of B4.1, but Beat 4 flips as one
+beat in Phase 8b; so B4.1 stays **Pending** on `guardrail_sim` now, and 8b's spec
+re-points its mart cell to `cost_curves` (scenario `contacts_once`) beside the
+simulator's hold durations when it lands Beat 4.

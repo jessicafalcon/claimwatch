@@ -34,6 +34,7 @@ from ingest.captures import has_pages, parser_module
 from ingest.parsed import PageShapeError
 from ingest.politeness import MAX_PAGES
 from ingest.sources import SOURCES
+from models.cost_model import format_model
 from opendata.fetch import FetchError, fetch_month
 from opendata.fit import (
     ARTIFACT,
@@ -57,6 +58,7 @@ from pipeline.build import (
     build_theme_share_marts,
     captures_for,
     idempotency_check,
+    read_model_fit,
     rebuild,
     record_snapshots,
     reset,
@@ -540,6 +542,23 @@ def _do_fit_damir(_args: argparse.Namespace) -> int:
     return 0
 
 
+def _do_model(_args: argparse.Namespace) -> int:
+    """Offline, no variable, no warehouse: read the tracked lognormal fit and
+    print the parameter table (each row with its range; a sourced one with its
+    citation), the formula table (each expression beside its value at the
+    defaults, per scenario) and the two crossovers. Writes nothing. Run twice:
+    identical text — nothing on this path reads a clock or a key. A missing fit
+    artifact is a clear message and exit 1, not a traceback."""
+    if not ARTIFACT.is_file():
+        print(
+            f"model: no fit artifact at {_rel(ARTIFACT)} — run `make fit-damir` "
+            "first (developer-run)"
+        )
+        return 1
+    print(format_model(read_model_fit()))
+    return 0
+
+
 def _do_idempotency(args: argparse.Namespace) -> int:
     target = resolve_choice(args.target, TARGETS, "duckdb")
     rows = resolve_choice(args.rows, INPUTS, "synthetic")
@@ -604,6 +623,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--month", default="")
     p.add_argument("--n", default="")
     sub.add_parser("fit-damir", add_help=False)  # no user variable
+    sub.add_parser("model", add_help=False)  # no user variable
 
     args = ap.parse_args(argv)
     dispatch = {
@@ -618,6 +638,7 @@ def main(argv: list[str] | None = None) -> int:
         "fetch-damir": _do_fetch_damir,
         "sample-damir": _do_sample_damir,
         "fit-damir": _do_fit_damir,
+        "model": _do_model,
     }
     try:
         return dispatch[args.command](args)

@@ -17,6 +17,7 @@ import pipeline.cli as cli
 from opendata.fit import (
     fit_lognormal,
     goodness_of_fit,
+    read_fit,
     write_fit,
 )
 from opendata.slice import (
@@ -386,13 +387,71 @@ def test_fit_damir_writes_and_prints(capsys, monkeypatch, tmp_path):
     assert "lognormal fit" in out and "mu" in out and "the fit shown" in out
 
 
-# --- 7b lands no mart; the cost-model/simulator marts are Phase 8 ------------
+# --- the strict fit reader: the mirror of write_fit --------------------------
 
 
-def test_no_new_mart_files_and_marts_are_phase_8():
+def _valid_fit_file(tmp_path: Path) -> Path:
+    """A byte-valid fit artifact written by write_fit — the base each broken
+    variant mutates."""
+    amounts = [float(x) for x in range(1, 201)]
+    fit = fit_lognormal(amounts)
+    write_fit(fit, goodness_of_fit(amounts, fit), tmp_path / "fit.csv")
+    return tmp_path / "fit.csv"
+
+
+def test_read_fit_returns_the_pinned_fit():
+    """The tracked artifact reads back to the pinned fit and the median cell —
+    read_fit is the mirror of write_fit."""
+    from tests import pins
+
+    fit, gof = read_fit()
+    assert round(fit.mu, 6) == pins.DAMIR_MU
+    assert round(fit.sigma, 6) == pins.DAMIR_SIGMA
+    assert fit.n == pins.DAMIR_N
+    assert next(d.empirical for d in gof if d.decile == 50) == pins.DAMIR_EMP_P50
+
+
+def test_read_fit_refuses_unknown_missing_or_non_numeric_names(tmp_path):
+    """A file with a name missing, an extra name, or a non-numeric value refuses
+    with the name — never a silent default."""
+    lines = _valid_fit_file(tmp_path).read_text(encoding="utf-8").splitlines()
+
+    missing = tmp_path / "missing.csv"
+    missing.write_text(
+        "\n".join(x for x in lines if not x.startswith("mu,")) + "\n", "utf-8"
+    )
+    with pytest.raises(ValueError, match="mu"):
+        read_fit(missing)
+
+    added = tmp_path / "added.csv"
+    added.write_text("\n".join(lines) + "\nmean,42.0\n", "utf-8")
+    with pytest.raises(ValueError, match="mean"):
+        read_fit(added)
+
+    nonnum = tmp_path / "nonnum.csv"
+    nonnum.write_text(
+        "\n".join("sigma,abc" if x.startswith("sigma,") else x for x in lines) + "\n",
+        "utf-8",
+    )
+    with pytest.raises(ValueError, match="sigma"):
+        read_fit(nonnum)
+
+
+# --- 7b lands no mart; 8a lands the cost-model marts, 8b the simulator's ------
+
+
+def test_cost_model_marts_exist_and_8b_marts_do_not():
+    """8a lands the three cost-model marts (Beat 3); 8b's simulator marts, and
+    any damir-named mart, do not exist yet."""
     marts = ROOT / "sql" / "marts"
-    assert not (marts / "cost_model_params.sql").exists()
-    assert not (marts / "guardrail_sim.sql").exists()
+    for landed in (
+        "cost_model_params.sql",
+        "cost_model_outputs.sql",
+        "cost_curves.sql",
+    ):
+        assert (marts / landed).exists()
+    for pending in ("guardrail_sim.sql", "sla_threshold.sql"):
+        assert not (marts / pending).exists()
     assert not any("damir" in p.name for p in marts.glob("*.sql"))
 
 

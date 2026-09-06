@@ -1,4 +1,4 @@
-# Phase 8a — Cost model: formulas as data, sourced defaults, the crossover (PROPOSED)
+# Phase 8a — Cost model: formulas as data, sourced defaults, the crossover
 
 Contract for the `phase-8a-cost-model` branch. Source: PROJECT_BRIEF.md §7 (the
 deterministic cost model) and §9 Phase 8 ("Cost model + guardrail simulator"),
@@ -6,7 +6,7 @@ the cost-model half of a Phase 8 split: 8a lands Beat 3 (B3.1–B3.4); 8b lands
 the guardrail simulator and the hold timer (B4.1–B4.3). Depends on Phase 7b
 merged (PR #15, the fit `data/damir/claim_cost_fit.csv` this phase reads).
 
-**Status: PROPOSED — do not start until approved.** No new dependency: the
+**Status: APPROVED — 2026-09-06.** No new dependency: the
 arithmetic is stdlib `math`; the marts are filled through the existing DuckDB
 seam. Amended 2026-09-06 after challenge round 1 (the dispositions are the
 last section); every amendment is folded into the sections it changes.
@@ -517,3 +517,35 @@ what each became.
   row).
 - **#11 does B4.1 flip in 8a?** — answered: no; Beat 4 flips as one beat in
   8b, which re-points B4.1's mart cell to `cost_curves` (Record updates).
+
+## Delivered (2026-09-06)
+
+The cost model landed as formulas-as-data. `models/cost_model.py` holds the
+ordered `FORMULAS` (nine `point` entries and two `curve` crossovers, each with
+its expression text and callable), `PARAMETERS` (the four sourced scale anchors
+and six declared-unsourced knobs) plus `fit_parameters`/`parameters(fit)` for the
+three DAMIR-fit rows (`mu`, `sigma`, `emp_p50`), `SCENARIOS` (the four §7 toggles,
+`both` composing the two singles), the 41-point `FLAG_RATE_GRID`, `evaluate`,
+`curves`, `check_parameter`, the one `rounded` site and `format_model`; it imports
+only stdlib `math`, `dataclasses`, `collections.abc` (pinned). `opendata/fit.py`
+gained `read_fit`, the strict mirror of `write_fit` (every declared name present,
+numeric, finite; unknown/missing/duplicate/non-numeric refused with the name; a
+64 KB cap). Three DDL-only marts — `cost_model_params`, `cost_model_outputs`,
+`cost_curves` — are filled by `pipeline/build.py::write_model_marts` inside
+`rebuild()` after `build_derived`, on every `ROWS` input, byte-stable across two
+runs, each row carrying `run_id` and the `Modeled` tag. `make model` prints the
+tables and both crossovers, identical on a rerun, and writes nothing.
+
+At the defaults the baseline curves cross at flag rate 0.095 with the 0.05 "you
+are here" marker to its left, and each fix pushes the crossover out (`churn_halved`
+and `both` never turn net-negative in the grid) — the story holds without tuning a
+default; every pin in `tests/pins.py` was typed from the built output. B3.1–B3.4
+are now Modeled with existing marts; B4.1–B4.3 stay Pending for 8b, and B4.1's
+`cost_curves` (scenario `contacts_once`) mapping is recorded for 8b to re-point.
+`cost_per_contact` stayed `unsourced` (no benchmark handed over). Three BACKLOG
+rows opened (the contact-cost benchmark, the anchors' disclosure addresses, the
+fixture's arithmetic mean); the data.ameli row was re-deferred. DONE command
+green; 807 tests. Decisions the spec did not cover: the model's own `Fit`
+dataclass carries `emp_p50` (lifted from `read_fit`'s deciles by the caller) so
+`models/` imports no `opendata` type; `check_parameter` also refuses an unsourced
+parameter that carries a citation ("nothing in between", tightening invariant 2).

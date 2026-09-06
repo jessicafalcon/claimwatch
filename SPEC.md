@@ -133,19 +133,21 @@ climbs; friction cost rises with the false positives that same rate creates.
 
 - **B3.1 — The formulas, next to their output.** Flagged claims, false
   positives, fraud saved, friction cost, and the net — each formula shown beside
-  the value it produces. Tag: *Modeled* (Pending until the model mart lands).
+  the value it produces. Tag: *Modeled*.
 - **B3.2 — The crossover chart.** Fraud euros saved and friction euros cost, both
   as curves over the flag rate, with a "you are here" marker. Where the curves
-  cross, each extra flag destroys more value than it recovers. Tag: *Modeled*
-  (Pending).
+  cross, the flags as a whole cost more than they recover; the earlier point
+  where each extra flag starts to cost more than it recovers is printed beside
+  it. Tag: *Modeled*.
 - **B3.3 — The sourced defaults.** The parameters anchored to public figures —
   revenue per member (~€800/year), the fraud pool (a published savings figure as
   a lower bound), and claim volume derived from published refund totals and open
-  reimbursement distributions. Tag: *Modeled*, each default cited (Pending).
+  reimbursement distributions. Tag: *Modeled*, each default cited.
 - **B3.4 — The declared-unsourced sliders.** The parameters with no public
-  source — the false-positive share, the churn probability, and contacts per
-  stuck claim — shown as differently-styled "explore the range" sliders, never
-  as settled facts. Tag: *Modeled* (Pending).
+  source — the false-positive share, the churn probability, contacts per stuck
+  claim, the flag rate, the diminishing-returns constant and the cost per
+  contact — shown as differently-styled "explore the range" sliders, never as
+  settled facts. Tag: *Modeled*.
 
 ## Beat 4 — Three small fixes, no rebuild required
 
