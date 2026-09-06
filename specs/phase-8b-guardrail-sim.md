@@ -9,9 +9,13 @@ simulator"), the simulator half of the Phase 8 split: 8a landed Beat 3
 `cost_model_outputs` and `cost_curves`, `models/cost_model.py::FORMULAS`,
 `PARAMETERS`, `rounded`, and `pipeline/build.py::read_model_fit`).
 
-**Status: PROPOSED — do not start until approved.** No new dependency: the
-normal quantile is stdlib `statistics.NormalDist` (already used by
-`opendata/fit.py`); the marts are filled through the existing DuckDB seam.
+**Status: APPROVED — 2026-09-06.** No new dependency: the normal quantile is
+stdlib `statistics.NormalDist` (already used by `opendata/fit.py`); the marts
+are filled through the existing DuckDB seam. Amended 2026-09-06 after
+challenge round 1 (the dispositions are the last section); every amendment is
+folded into the sections it changes.
+
+Challenged: 2026-09-06, round 1, spec 7501f9a3 — approve with amendments (all amended, questions answered)
 
 ## Why
 
@@ -96,8 +100,9 @@ make simulate && make idempotency-check ROWS=synthetic && make check-backing && 
    hold that long is net-negative in expectation, and the share of the
    synthetic claims under it — with exactly one row marked as the default
    timer; a test recomputes the amount by hand at three grid days, checks it
-   is linear in the day with the printed coefficient, and checks the share is
-   non-decreasing in the day. *Evidence: row 2.*
+   is linear in the day with the printed coefficient up to the loop's length
+   and constant after it (friction stops accruing when the loop ends), and
+   checks the share is non-decreasing in the day. *Evidence: row 2.*
 3. **The hold rule is closed: two possible hold lengths, three possible
    outcomes, every branch a hand case.** For every (scenario, claim): the
    loop is `contacts × days_per_round` days; with the timer off, or on but
@@ -146,20 +151,20 @@ make simulate && make idempotency-check ROWS=synthetic && make check-backing && 
 | 3 | `tests/test_guardrail_sim.py::test_hold_rule_every_branch_by_hand`, `tests/test_sim_marts.py::test_outcomes_are_the_closed_set_and_hold_is_loop_or_timer` |
 | 4 | `tests/test_guardrail_sim.py::test_sim_scenarios_map_onto_cost_model_scenarios`, `::test_unknown_scenario_refused`, `::test_timer_amount_is_the_baseline_one` |
 | 5 | `tests/test_sim_marts.py::test_two_marts_filled_on_every_input`, `::test_two_rebuilds_identical_sim_mart_rows`, `::test_rows_carry_run_id_and_modeled_tag`, `::test_make_simulate_is_byte_identical_on_rerun`; `tests/test_no_key.py::test_no_key_sim_marts_are_filled` |
-| 6 | `tests/test_guardrail_sim.py::test_a_fix_never_lengthens_a_hold`, `tests/test_sim_marts.py::test_summary_recomputed_from_the_mart_rows` |
+| 6 | `tests/test_guardrail_sim.py::test_a_fix_never_lengthens_a_hold`, `tests/test_sim_marts.py::test_summary_recomputed_from_the_mart_rows`, `::test_default_day_share_equals_timer_released_share` |
 
 ## Invariants (REQUIRED)
 
 | Invariant ("for all …, … holds") | Falsified by (scenario test) |
 |---|---|
 | For all ranks `i` and all scenarios, the synthetic amount at rank `i` is the fitted lognormal evaluated at the fixed quantile `(i − ½) / n` over the `mu`/`sigma` parameters — the same amount in every scenario and every run, non-decreasing in `i`, never a random draw. | `tests/test_guardrail_sim.py::test_synthetic_amounts_recomputed_by_hand` — the first, middle and last amount recomputed with `math` and `statistics` from `tests/pins.py`; `::test_amounts_non_decreasing_and_scenario_invariant` — one amount changed in one scenario. |
-| For all parameter sets, the threshold amount is `fp_share × friction_per_day × timer_days / (1 − fp_share)` — linear in the timer day with that coefficient — and the share of synthetic claims under it is non-decreasing in the day. | `tests/test_guardrail_sim.py::test_threshold_linear_in_days_and_share_monotone` — a share that falls between two grid days; an amount at day 2d that is not twice the amount at day d. |
+| For all parameter sets, the threshold amount is `fp_share × friction_per_day × min(timer_days, loop_days) / (1 − fp_share)` — linear in the timer day with that coefficient up to the loop's length, constant after it — and the share of synthetic claims under it is non-decreasing in the day. | `tests/test_guardrail_sim.py::test_threshold_linear_in_days_and_share_monotone` — a share that falls between two grid days; an amount at day 2d ≤ loop that is not twice the amount at day d; an amount past the loop that differs from the amount at the loop. |
 | For all (scenario, claim), `hold_days` is the loop or the timer, `outcome` is one of three names, and the outcome and the hold agree with the rule's four branches. | `tests/test_guardrail_sim.py::test_hold_rule_every_branch_by_hand` — four hand cases (timer off; timer on and loop ≤ timer; timer on, loop > timer, amount under; amount not under); `tests/test_sim_marts.py::test_outcomes_are_the_closed_set_and_hold_is_loop_or_timer`. |
 | For all claims, applying a fix never lengthens the hold, and both fixes never lengthen it past either single fix. | `tests/test_guardrail_sim.py::test_a_fix_never_lengthens_a_hold` — row-by-row over the built grid; a rule change that lets an escalated claim outlast the loop fails it. |
 | For all simulator scenarios, the paired cost-curve scenario is a member of `cost_model.SCENARIOS`, the timer amount is the baseline evaluation's, and a name outside the set is refused. | `tests/test_guardrail_sim.py::test_sim_scenarios_map_onto_cost_model_scenarios`, `::test_timer_amount_is_the_baseline_one` — `hold_timer`'s releases counted against `churn_halved`'s amount differ; `::test_unknown_scenario_refused`. |
 | For all runs — any `ROWS` input, key set or unset, first or second rebuild — the two simulator marts' rows are identical and `make simulate`'s text is identical. | `tests/test_sim_marts.py::test_two_rebuilds_identical_sim_mart_rows`, `::test_make_simulate_is_byte_identical_on_rerun`, `tests/test_no_key.py::test_no_key_sim_marts_are_filled`. |
 | For all parameters, the 8a rule still holds — `sourcing` is one of two words, a range contains its default, an unsourced one carries no citation — and the default timer day lies on the day grid (exactly one grid row is the default). | `tests/test_cost_model.py::test_sourced_needs_a_citation_every_range_holds_its_default` (two more rows); `tests/test_guardrail_sim.py::test_threshold_marks_exactly_one_default_day`. |
-| For all modules under `models/`, only the import allowlist is used — stdlib that reads no clock and draws no random number, plus the package's own modules — never `random`, `time`, `datetime`, `secrets`, a file, a warehouse, the network or a model client. | `tests/test_model_marts.py::test_models_imports_only_stdlib_math` — the allowlist is `math`, `statistics`, `dataclasses`, `typing`, `collections`, `__future__`, `models`; the source scanned for the forbidden names. |
+| For all modules under `models/`, only the import allowlist is used — stdlib that reads no clock and draws no random number, plus the package's own modules — never `random`, `time`, `datetime`, `secrets`, a file, a warehouse, the network or a model client, and never `NormalDist.samples` (the one random method `statistics` carries). | `tests/test_model_marts.py::test_models_imports_only_stdlib_math` — the allowlist is `math`, `statistics`, `dataclasses`, `typing`, `collections`, `__future__`, `models`; the source scanned for the forbidden names, `samples` among them. |
 
 ## Pinned decisions (do not re-litigate)
 
@@ -192,17 +197,39 @@ make simulate && make idempotency-check ROWS=synthetic && make check-backing && 
   `friction_per_day = (contacts * cost_per_contact + churn_prob *
   customer_value) / loop_days` (the cost model's friction per false positive
   spread evenly over the loop — a stated linear-accrual assumption, printed in
-  the text); `timer_amount_eur = fp_share * friction_per_day * timer_days /
-  (1 - fp_share)`. The arithmetic in words: a held claim of amount `A` is
-  fraud with probability `1 − fp_share`, and the most a hold can recover from
-  it is `A`; it is legitimate with probability `fp_share` and then costs
-  `friction_per_day` for every day held. Holding `N` days is net-negative in
-  expectation when `fp_share × friction_per_day × N > (1 − fp_share) × A`,
-  which solves to `A < timer_amount_eur`. Using `A` as the recovery ceiling
-  overstates what a hold recovers, so the threshold errs toward holding — the
-  conservative direction, said beside it. The units: `loop_days` and the two
-  new parameters whole (`count`), `friction_per_day` and `timer_amount_eur`
-  euros. Rejected: the cost model's average fraud saved per flagged claim as
+  the text); `timer_amount_eur = fp_share * friction_per_day *
+  min(timer_days, loop_days) / (1 - fp_share)` (the text says "friction stops
+  accruing when the loop ends" and "a hold planned to run `timer_days`"). The
+  arithmetic in words: a held claim of amount `A` is fraud with probability
+  `1 − fp_share`, and the most a hold can recover from it is `A`; it is
+  legitimate with probability `fp_share` and then costs `friction_per_day`
+  for every day held, until the loop ends and the model's friction for that
+  claim is fully paid. A hold planned to run `N` days is net-negative in
+  expectation when `fp_share × friction_per_day × min(N, loop_days) > (1 −
+  fp_share) × A`, which solves to `A < timer_amount_eur`. It prices the
+  decision made at day 0 — how long a hold may run — not the choice at day
+  `N` to keep holding (the challenge's question 5; the ex-ante reading is the
+  one the study's sentence makes, and the amount rises with `N` up to the
+  loop, then holds). Using `A` as the recovery ceiling overstates what a hold
+  recovers, so the threshold errs toward holding — the conservative
+  direction, said beside it, and true on every grid row because the cap
+  keeps the friction charged at or under the model's total for that claim.
+  The units: `loop_days` and the two new parameters whole (`count`),
+  `friction_per_day` and `timer_amount_eur` euros. The reader rule for these
+  rows in `cost_model_outputs`: B3.1 prints every `point` row, the three
+  timer rows included and labeled "used by Beat 4 at `baseline`"; B4.2 prints
+  the three at `baseline` only — the rows at the other scenarios are the same
+  formulas over that scenario's parameters, printed for completeness like
+  every formula, never read as a recommendation (the `cost_model_outputs.sql`
+  header and SPEC B3.1's sentence say so — Record updates). Rejected: an
+  unbounded linear threshold (the pre-challenge proposal: past the loop it
+  charged friction the model never incurs, so rows past `loop_days` erred
+  toward releasing, the opposite of the stated direction, and printed a
+  higher amount under `contacts_once` than under `baseline`); the marginal
+  reading, the choice at day `N` with only the remaining loop at stake (the
+  amount would fall with `N`, the chart's slope reverses, and the sentence
+  "holds beyond N days on claims under €X" would describe a threshold that
+  loosens as the clock runs); the cost model's average fraud saved per flagged claim as
   the per-claim recovery (the fraud pool is an aggregate floor; a per-claim
   timer needs a per-claim ceiling, and the average would make the threshold
   independent of the claim's size, which is the whole point of "claims under
@@ -252,16 +279,29 @@ make simulate && make idempotency-check ROWS=synthetic && make check-backing && 
   churn-versus-days relationship no source gives; brief §7 keeps the halving
   illustrative); the timer amount evaluated at the mapped scenario (the
   recommendation is "at these parameters" — the world before the fix).
-  Satisfies invariant 5.
+  Expected at the defaults, not a STOP: once the loop is one round it ends
+  before the default timer, so under `both_fixes` the clock never fires and
+  its rows equal `ask_once`'s row for row — two identical bars the study
+  labels as such ("with one round, the clock has nothing left to cut"); the
+  timer's own effect is read under `hold_timer`. 8a freed the cost-model
+  marts' `scenario` column for a simulated timer; 8b does not use it, because
+  the simulator computes holds, not churn (the challenge's question 6; a
+  DECISIONS sentence). Satisfies invariant 5.
 - **Two DDL-only Python-fed marts, one writer, filled inside `rebuild()`
   after the model marts; `make simulate` prints and writes nothing.**
   `sql/marts/guardrail_sim.sql` — grain one row per (scenario, claim rank),
-  4 × 1,000 rows: `scenario`, `curves_scenario`, `claim_rank`, `quantile`,
-  `amount_eur`, `loop_days`, `hold_days`, `outcome`, `run_id`, `tag`.
-  `sql/marts/sla_threshold.sql` — grain one row per timer day of the fixed
-  grid 1..60 (60 rows) at the baseline parameters: `timer_days`,
-  `timer_amount_eur`, `share_under`, `is_default`, `run_id`, `tag`; no
-  scenario column (the recommendation is made once, before any fix).
+  4 × 1,000 rows: `scenario varchar`, `curves_scenario varchar`, `claim_rank
+  integer`, `quantile double`, `amount_eur double`, `loop_days integer`,
+  `hold_days integer`, `outcome varchar`, `run_id`, `tag`; the header says
+  the per-claim grain exists for the timer's per-claim decision (which
+  claims it releases, and at what amount), not for a hold distribution — a
+  hold takes two values per scenario. `sql/marts/sla_threshold.sql` — grain
+  one row per timer day of the fixed grid 1..60 (60 rows) at the baseline
+  parameters: `timer_days integer`, `timer_amount_eur double`, `share_under
+  double`, `is_default boolean`, `run_id`, `tag`; no scenario column (the
+  recommendation is made once, before any fix). Integer and boolean columns
+  are named as such in the DDL so `rebuild`'s catalog check and Snowflake see
+  one type (the `cost_curves.is_default` precedent).
   `pipeline/build.py::write_sim_marts(conn, fit, run_id)` clears and inserts
   both in one transaction, rows in scenario / rank and day order, and
   `rebuild()` calls it right after `write_model_marts` on every input, so
@@ -276,16 +316,22 @@ make simulate && make idempotency-check ROWS=synthetic && make check-backing && 
   invariant 6.
 - **Rounding through 8a's one site; one aggregation site for the summary.**
   Every written or printed number passes `cost_model.rounded`: amounts and
-  the threshold `eur`, quantiles and shares `rate`, days `count` — no second
-  rounding site. `summarize(rows)` returns, per simulator scenario, the mean
-  hold in days and the share of claims the timer released, computed with
-  plain `fmean` and a count over the rows; `make simulate` prints it and a
-  test recomputes it from the built mart. The study's Beat 4 headline reads
-  the mart through SQL `avg`/`count` in Phase 9 and must reproduce
-  `summarize` — a Phase 9 test, named here so 9 inherits the guard. Rejected:
-  a summary mart (an aggregate of a mart the study can aggregate; a third
-  grain to keep in step); rounding the mean at the printer (a second site).
-  Satisfies invariant 6.
+  the threshold `eur`, quantiles and shares `rate`, a hold or a loop `count`
+  (whole days), and a mean hold `days` — a new `_ROUNDING` row at two places,
+  the one cell `cost_model.py`'s rounding table gains — so no second rounding
+  site. `summarize(rows)` returns, per simulator scenario, the mean hold in
+  days (`days`) and the share of claims the timer released (`rate`), computed
+  with plain `fmean` and a count over the rows; `make simulate` prints it and
+  a test recomputes it from the built mart. The share the timer released
+  under `hold_timer` and `sla_threshold`'s `share_under` at the default day
+  are the same count by construction; a test pins the equality across the two
+  marts. The study's Beat 4 headline reads the mart through SQL `avg`/`count`
+  in Phase 9, rounded to the same units, and must reproduce `summarize` — a
+  Phase 9 test, named here so 9 inherits the guard. Rejected: a summary mart
+  (an aggregate of a mart the study can aggregate; a third grain to keep in
+  step); rounding the mean at the printer (a second site); the mean as
+  `count` (a headline that loses a day of resolution — the pre-challenge
+  gap). Satisfies invariant 6.
 
 ### The parameters this phase adds (defaults; every one is a guess to explore, never a fact; every row has a range)
 
@@ -297,10 +343,11 @@ make simulate && make idempotency-check ROWS=synthetic && make check-backing && 
 The formulas added to `FORMULAS`, in order after `net` (all `point`):
 `loop_days = contacts × days_per_round`; `friction_per_day = (contacts ×
 cost_per_contact + churn_prob × customer_value) / loop_days` (friction assumed
-to accrue evenly over the loop); `timer_amount_eur = fp_share ×
-friction_per_day × timer_days / (1 − fp_share)` (holding a claim under this
-amount beyond `timer_days` is net-negative in expectation; the claim itself is
-the ceiling on what a hold can recover, so this errs toward holding). The
+to accrue evenly over the loop and to stop when it ends); `timer_amount_eur =
+fp_share × friction_per_day × min(timer_days, loop_days) / (1 − fp_share)` (a
+hold planned to run `timer_days` on a claim under this amount is net-negative
+in expectation; the claim itself is the ceiling on what a hold can recover, so
+this errs toward holding). The
 rules in `RULES`: `synthetic_amount = exp(mu + sigma × z((rank − ½) / n))`;
 `hold` as the four branches above; `share_under = count(amount_eur < amount) /
 n`. Their values at the defaults are computed at build and pinned in
@@ -323,11 +370,15 @@ tell a story; a change to one is a `PARAMETERS` cell with its range, recorded.
   `summarize`, `format_simulation`; the teaching docstring; imports `math`,
   `statistics`, `dataclasses`, `collections.abc` and `models.cost_model`.
 - `models/cost_model.py` — two `KNOB_PARAMETERS` rows, three `POINT_FORMULAS`
-  entries and their `_OUTPUT_UNIT` rows; nothing else moves.
-  `models/__init__.py` — the docstring names both modules as landed.
+  entries and their `_OUTPUT_UNIT` rows, one `_ROUNDING` row (`days`, two
+  places); nothing else moves. `models/__init__.py` — the docstring names
+  both modules as landed.
 - `sql/marts/guardrail_sim.sql`, `sql/marts/sla_threshold.sql` — DDL only;
-  headers name grain, provenance (`run_id`, `tag`) and the rows fed (B4.1 and
-  B4.3; B4.2).
+  headers name grain (and why the per-claim grain exists), provenance
+  (`run_id`, `tag`) and the rows fed (B4.1 and B4.3; B4.2).
+  `sql/marts/cost_model_outputs.sql` — header only: 4 × 14 rows, and the
+  reader rule for the three timer rows (B3.1 prints every `point` row; B4.2
+  reads the three at `baseline`).
 - `pipeline/build.py` — `write_sim_marts(conn, fit, run_id)`, called by
   `rebuild()` after `write_model_marts`; `table_counts` unchanged (it reads
   the catalog).
@@ -338,7 +389,8 @@ tell a story; a change to one is a `PARAMETERS` cell with its range, recorded.
 - `tests/test_guardrail_sim.py`, `tests/test_sim_marts.py` — new;
   `tests/test_cost_model.py` (the timer formulas by hand; the pins gain three
   names per scenario), `tests/test_model_marts.py` (the allowlist gains
-  `statistics` and `models`; `COST_PARAM_ROWS`/`COST_OUTPUT_ROWS` move),
+  `statistics` and `models`, the forbidden-name scan gains `samples`;
+  `COST_PARAM_ROWS`/`COST_OUTPUT_ROWS` move),
   `tests/test_no_key.py` (the simulator marts under a no-key rebuild),
   `tests/test_damir.py` (`test_cost_model_marts_exist_and_8b_marts_do_not`
   becomes the assertion that all five Python-fed marts exist and no
@@ -355,9 +407,17 @@ Freeze: none
 ## Record updates (REQUIRED)
 
 - [ ] `DECISIONS.md` — Phase 8b entry: the six pinned decisions with their
-  rejected alternatives; the "no `escalation_days`" and "timer set at
-  baseline" choices as such; the widening of the `models/` import allowlist
-  (`statistics`, `models`) with the property it keeps; Gotchas if any
+  rejected alternatives (the challenge round's four amendments named as
+  such: the threshold capped at the loop, a `days` rounding unit, the
+  `both_fixes` bars expected, the reader rule for the timer rows); the "no
+  `escalation_days`" and "timer set at baseline" choices as such; one
+  sentence on the `scenario` column 8a freed — 8b did not use it, because the
+  simulator computes holds, not churn; the "Formulas are data" bullet in
+  "still in force" restated as the property (a printed expression and its
+  callable are one entry in the module that owns the quantity, and the
+  printer prints from the entry) with the two tuples as its instances; the
+  widening of the `models/` import allowlist (`statistics`, `models`) with
+  the property it keeps; Gotchas if any
   (`NormalDist.inv_cdf` stability across CPython's C and Python paths; DuckDB
   binding of Python `int` into `integer` columns for the day and rank cells).
 - [ ] `BACKLOG.md` — rows opened: a person's turnaround on an escalated hold
@@ -367,8 +427,9 @@ Freeze: none
   "a formula is one entry in `models/cost_model.py::FORMULAS`" widens to name
   `guardrail_sim.py::RULES` on the next tooling branch (a skill is tooling,
   never mixed with a phase); the Phase 9 test that SQL `avg`/`count` over
-  `guardrail_sim` reproduces `summarize` (trigger: the Beat 4 panel is
-  rendered). The "data.ameli practitioner-fee distributions" row's trigger
+  `guardrail_sim`, rounded to the same units (`days`, `rate`), reproduces
+  `summarize` (trigger: the Beat 4 panel is rendered). The "data.ameli
+  practitioner-fee distributions" row's trigger
   re-checked (8b draws from the DAMIR amount fit alone; re-deferred to the
   study). Count updated.
 - [ ] `CLAUDE.md` — Current status; Commands (`simulate`: offline, no
@@ -376,9 +437,11 @@ Freeze: none
   marts after the model marts); Repo map (`models/` names
   `guardrail_sim.py::RULES` as landed, no "(Phase 8b)"; the `sql/marts/`
   line counts five Python-fed marts); Deterministic first — "Formulas are
-  data" names both tuples: `cost_model.py::FORMULAS` (the model and the timer
-  threshold) and `guardrail_sim.py::RULES` (the draw and the hold), each the
-  one place for its kind; BACKLOG count.
+  data" restated as the property, not a list of places: a printed expression
+  and its callable are one entry in the module that owns the quantity, and
+  the printer prints from the entry — `cost_model.py::FORMULAS` (the model
+  and the timer threshold) and `guardrail_sim.py::RULES` (the draw and the
+  hold) are its two instances; BACKLOG count.
 - [ ] `BACKING.md` — B4.1 Pending → Modeled, its mart cell re-pointed to
   `cost_curves` (scenario `contacts_once`) and its SQL cell to
   `sql/marts/cost_curves.sql`, as 8a recorded; B4.2 → Modeled on
@@ -393,11 +456,16 @@ Freeze: none
 - [ ] `SPEC.md` — Beat 4 panels B4.1–B4.3: the "(Pending)" / "(Pending until
   the simulator mart lands)" markers removed, tag stays *Modeled* (the tag
   state moving as planned, not a chart change — the Beat 3 precedent after
-  8a); B4.4 unchanged. One deliberate wording change, and no other: Beat 4's
-  *Under the hood* sentence says the claims are the fitted distribution read
-  at fixed quantiles, not a random draw ("… synthetic claims — the
+  8a); B4.4 unchanged. Three deliberate wording changes, and no other: Beat
+  4's *Under the hood* sentence says the claims are the fitted distribution
+  read at fixed quantiles, not a random draw ("… synthetic claims — the
   distribution fitted to real public reimbursement data, read at a thousand
-  evenly spaced points, with the fit shown — …"). No panel added.
+  evenly spaced points, with the fit shown — …"); B4.3's sentence names what
+  the side-by-side shows — the mean hold in days and the share of claims the
+  clock released, per fix, with the Beat 3 curves beside them (two hold
+  lengths per fix, not a distribution; with one round the clock has nothing
+  left to cut); B3.1's sentence adds that the hold timer's three formulas
+  print in the same list, used by Beat 4 at the defaults. No panel added.
 - [ ] README — none (no README.md exists yet; it lands in Phase 9; the
   "real distribution, synthetic claims" teaching sentence lives in
   `models/guardrail_sim.py`'s docstring until then).
@@ -465,8 +533,11 @@ read is the tracked fit, through `read_fit`'s declared shape (8a).
   `claim_rank`, `loop_days`, `hold_days`, `timer_days`, and of `bool` for
   `is_default`, through the existing parameterised insert path. Compute the
   defaults' outputs before any pin is typed; if the timer never fires at the
-  defaults or the threshold lands in a tail, STOP and report — do not tune a
-  default to make the story hold. Findings go to DECISIONS.md → Gotchas.
+  defaults under `hold_timer`, or the threshold lands in a tail, STOP and
+  report — do not tune a default to make the story hold. (Under `both_fixes`
+  the clock cannot fire at the defaults — a one-round loop ends first — and
+  that is expected, decision 4, not a STOP.) Findings go to DECISIONS.md →
+  Gotchas.
 
 ## Out of scope (deferred, recorded)
 
@@ -491,3 +562,42 @@ read is the tracked fit, through `read_fit`'s declared shape (8a).
   fit alone.
 - **The `architecture-fit` skill's shape sentence** — widened on the next
   tooling branch (BACKLOG row), never in a phase diff.
+
+## Challenge round 1 — dispositions (2026-09-06)
+
+`/challenge` on the spec as first committed (9a267b0): 0 BLOCKER, 4
+should-fix, 5 suggestions, 2 questions; verdict "approve with amendments".
+The developer approved every recommendation as suggested; every finding is
+folded into the sections above, and this block is the record of what each
+became.
+
+- **#1 the threshold unbounded past the loop** — amend: `timer_amount_eur`
+  charges friction for `min(timer_days, loop_days)` days; the expression
+  text says friction stops accruing when the loop ends; invariant 2 is
+  "linear up to the loop, constant after"; the "errs toward holding"
+  sentence now holds on every grid row. Restores invariant 2.
+- **#2 no rounding unit for the mean hold** — amend: a `days` row (two
+  places) in `_ROUNDING`, named in Scope, applied in `summarize`; the Phase 9
+  BACKLOG row says "the same units". Restores invariant 6.
+- **#3 the STOP fires by construction for `both_fixes`** — amend: the STOP
+  is scoped to `hold_timer`; decision 4 says the identical bars are expected
+  and labeled; SPEC B4.3's sentence names what the side-by-side shows
+  (Record updates).
+- **#4 no reader rule for the timer rows in `cost_model_outputs`** — amend:
+  the rule under decision 2; the mart's header and SPEC B3.1's sentence
+  (Scope, Record updates).
+- **Q5 which decision the threshold prices** — answered: the hold planned
+  at day 0 to run `N` days (ex-ante), the reading the study's sentence
+  makes; the expression text says so; the marginal reading is a recorded
+  rejection.
+- **Q6 the simulator's names stay out of the cost-model marts** — answered:
+  yes; the `scenario` column 8a freed is not used, because the simulator
+  computes holds, not churn (a DECISIONS sentence).
+- **#7 the rule restated as a property** — folded: CLAUDE.md and the
+  DECISIONS "still in force" bullet (Record updates).
+- **#8 `NormalDist.samples`** — folded: `samples` in the forbidden-name
+  scan (invariant 8, Scope).
+- **#9 pin `share_under` at the default day against the timer-released
+  share** — folded: decision 6, Evidence row 6.
+- **#10 the per-claim grain's reason in the header** — folded: decision 5.
+- **#11 integer and boolean column types named** — folded: decision 5.
