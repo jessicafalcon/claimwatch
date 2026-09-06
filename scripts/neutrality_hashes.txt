@@ -1,0 +1,11 @@
+# Neutrality (CLAUDE.md → The five contracts): the study names no insurer as
+# its subject. Each line below is the sha256 hex of one lowercased token that
+# must not appear as a word in tracked prose, code, comments or commit
+# messages — `make check-docs`, check "naming the target". Hashes, never
+# names, so the repo stays brand-free (a short dictionary would invert them;
+# the point is the text, not secrecy). Excluded: ingest/sources.py (the one
+# declared place a brand-carrying address may sit), fixtures/, data/, and
+# this file; URLs are stripped before tokenising everywhere else.
+# Add one: printf '%s' '<token>' | shasum -a 256
+c787ba99880c6913b2d5745156fc1827c19c9e7ab88f670a2a4854a9ec972a88
+db42328112177c2d6f2f6ca7f33c8e81084b8ff3e14202254137e22673bce2c8

@@ -4,6 +4,7 @@ is green today. Offline, no services."""
 
 from __future__ import annotations
 
+import hashlib
 import re
 import sys
 from pathlib import Path
@@ -173,6 +174,59 @@ def test_check_backlog_count_reports_a_mismatch(tmp_path: Path):
         "nope.md: record file is missing",
         "BACKLOG.md: record file is missing",
     ]
+
+
+def test_check_neutrality_reports_a_token_never_a_url_and_never_the_name(
+    tmp_path: Path,
+):
+    """A listed token as a word is reported by file:line and digest prefix; the
+    same token inside a URL is not; the report never carries the token."""
+    digest = hashlib.sha256(b"zzbrand").hexdigest()
+    hashes = tmp_path / "scripts" / "neutrality_hashes.txt"
+    hashes.parent.mkdir()
+    hashes.write_text(f"# a comment\n\n{digest}\nnot-a-digest\n")
+    digests, errors = check_docs.neutrality_hashes(hashes)
+    assert digests == {digest}
+    assert errors == ["neutrality_hashes.txt:4: not a sha256 hex digest"]
+    readme = tmp_path / "README.md"
+    readme.write_text(
+        "ZZBrand held the refund.\n"
+        "See https://zzbrand.example/page and zzbrand-mobile.\n"
+        "A rebranding is not a hit.\n"
+    )
+    out = check_docs.check_neutrality([readme], digests, tmp_path)
+    assert out == [
+        f"README.md:1: names the study's target (sha256 {digest[:8]}…)",
+        f"README.md:2: names the study's target (sha256 {digest[:8]}…)",
+    ]
+    assert "zzbrand" not in "\n".join(out)
+    assert check_docs.check_neutrality([readme], set(), tmp_path) == []
+    _, missing = check_docs.neutrality_hashes(tmp_path / "gone.txt")
+    assert missing == ["gone.txt: hash file is missing"]
+
+
+def test_neutrality_files_are_the_tracked_code_and_prose_minus_the_declarations():
+    paths = [
+        "README.md",
+        "pipeline/build.py",
+        "Makefile",
+        ".github/workflows/ci.yml",
+        "sql/marts/x.sql",
+        "ingest/sources.py",
+        "fixtures/anchors/a.csv",
+        "data/snapshots/m.csv",
+        "scripts/neutrality_hashes.txt",
+        "study/index.png",
+    ]
+    kept = check_docs.neutrality_files(ROOT, paths)
+    assert [p.relative_to(ROOT).as_posix() for p in kept] == [
+        "README.md",
+        "pipeline/build.py",
+        "Makefile",
+        ".github/workflows/ci.yml",
+        "sql/marts/x.sql",
+    ]
+    assert "CLAUDE.md" in check_docs.tracked_paths(ROOT)
 
 
 def test_backlog_count_matches_today():

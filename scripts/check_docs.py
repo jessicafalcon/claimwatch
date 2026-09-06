@@ -24,11 +24,19 @@ Five checks. Four document classes:
      (top-level `- **term**` bullets). Absent → OK.
   5. BACKLOG count — CLAUDE.md's "Open BACKLOG rows: **N**" equals the
      un-struck rows of BACKLOG.md's table.
+  6. naming the target — no tracked prose, code or comment, and no recent
+     commit message, carries a token whose sha256 is listed in
+     scripts/neutrality_hashes.txt (the names never enter the repo). URLs are
+     stripped first; ingest/sources.py, fixtures/ and data/ are excluded —
+     insurers appear there only as sourced data points.
 """
 
 from __future__ import annotations
 
+import functools
+import hashlib
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -45,6 +53,10 @@ PLAN_GLOBS = ("PROJECT_BRIEF.md", "docs/*.md", "specs/*.md")
 TOOLING_GLOB = ".claude/**/*.md"
 COMMAND_GLOBS = (".claude/skills/*/SKILL.md",)
 STUDY_GLOBS = ("study/**/*.md", "study/**/*.html")
+NEUTRALITY_HASHES = "scripts/neutrality_hashes.txt"
+NEUTRALITY_SUFFIXES = (".py", ".sql", ".yaml", ".yml", ".md", ".toml", ".txt", ".html")
+NEUTRALITY_EXCLUDED = ("ingest/sources.py", "fixtures/", "data/", NEUTRALITY_HASHES)
+COMMIT_MESSAGES = 50  # the recent history a check-docs run reads
 
 BANNED = (
     "orchestration",
@@ -67,6 +79,9 @@ _FENCE = re.compile(r"```.*?```", re.S)
 _HEADING = re.compile(r"^#{1,6}\s+(.*?)\s*$", re.M)
 _BACKLOG_COUNT = re.compile(r"Open BACKLOG rows: \*\*(\d+)\*\*")
 _TERM = re.compile(r"^- \*\*", re.M)
+_URL = re.compile(r"https?://\S+")
+_TOKEN = re.compile(r"[a-z0-9]+")
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
 # `## Glossary`, `## 11. Glossary (…)`, `### Glossary` — the brief numbers its headings.
 _GLOSSARY = re.compile(r"^##+ (?:\d+\.\s*)?Glossary.*?$(.*?)(?=^## |\Z)", re.M | re.S)
 
@@ -222,6 +237,90 @@ def open_backlog_rows(text: str) -> int:
     return n
 
 
+def tracked_paths(root: Path) -> list[str]:
+    """Every path git tracks under root, "" entries dropped; [] outside git."""
+    res = subprocess.run(
+        ["git", "ls-files", "-z"], cwd=root, capture_output=True, text=True
+    )
+    if res.returncode != 0:
+        return []
+    return [p for p in res.stdout.split("\0") if p]
+
+
+def neutrality_files(root: Path, paths: list[str]) -> list[Path]:
+    """The tracked paths the naming check reads: code, prose and workflow
+    files, minus the declared exclusions."""
+    keep: list[Path] = []
+    for p in paths:
+        if p.startswith(NEUTRALITY_EXCLUDED):
+            continue
+        if (
+            p.endswith(NEUTRALITY_SUFFIXES)
+            or p == "Makefile"
+            or p.startswith(".github/")
+        ):
+            keep.append(root / p)
+    return keep
+
+
+def neutrality_hashes(path: Path) -> tuple[set[str], list[str]]:
+    """The listed digests and the lines that are not one (a name, a typo)."""
+    if not path.is_file():
+        return set(), [f"{path.name}: hash file is missing"]
+    digests: set[str] = set()
+    errors: list[str] = []
+    for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if _SHA256.match(line):
+            digests.add(line)
+        else:
+            errors.append(f"{path.name}:{n}: not a sha256 hex digest")
+    return digests, errors
+
+
+@functools.cache
+def _digest(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def named_tokens(text: str, digests: set[str]) -> list[tuple[int, str]]:
+    """(line number, digest prefix) for every line carrying a listed token,
+    URLs stripped first. The token itself is never returned."""
+    hits: list[tuple[int, str]] = []
+    for n, line in enumerate(text.splitlines(), 1):
+        words = set(_TOKEN.findall(_URL.sub(" ", line.lower())))
+        for d in sorted(_digest(w) for w in words):
+            if d in digests:
+                hits.append((n, d[:8]))
+    return hits
+
+
+def commit_messages(root: Path) -> str:
+    res = subprocess.run(
+        ["git", "log", f"-{COMMIT_MESSAGES}", "--format=%B"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+    )
+    return res.stdout if res.returncode == 0 else ""
+
+
+def check_neutrality(files: list[Path], digests: set[str], root: Path) -> list[str]:
+    errors: list[str] = []
+    for f in files:
+        for n, prefix in named_tokens(f.read_text(encoding="utf-8"), digests):
+            rel = f.relative_to(root)
+            errors.append(f"{rel}:{n}: names the study's target (sha256 {prefix}…)")
+    for n, prefix in named_tokens(commit_messages(root), digests):
+        errors.append(
+            f"git log (last {COMMIT_MESSAGES} commits), line {n}: names the "
+            f"study's target (sha256 {prefix}…)"
+        )
+    return errors
+
+
 def check_backlog_count(claude: Path, backlog: Path) -> list[str]:
     missing = [p.name for p in (claude, backlog) if not p.is_file()]
     if missing:
@@ -235,6 +334,12 @@ def check_backlog_count(claude: Path, backlog: Path) -> list[str]:
     return []
 
 
+def _naming_errors(root: Path) -> list[str]:
+    digests, errors = neutrality_hashes(root / NEUTRALITY_HASHES)
+    files = neutrality_files(root, tracked_paths(root))
+    return errors + check_neutrality(files, digests, root)
+
+
 def main(root: Path = ROOT) -> int:
     living = living_files(root)
     tooling = tooling_files(root)
@@ -245,6 +350,7 @@ def main(root: Path = ROOT) -> int:
         ("banned words", check_banned_words(living + study_files(root), root)),
         ("glossary", check_glossary(living, root)),
         ("BACKLOG count", check_backlog_count(root / "CLAUDE.md", root / "BACKLOG.md")),
+        ("naming the target", _naming_errors(root)),
     ]
     failed = 0
     for name, errors in checks:
