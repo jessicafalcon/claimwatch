@@ -35,7 +35,7 @@ SKILLS = (
     "secure-by-construction",
     "architecture-fit",
 )
-HOOKS = ("run-tests", "challenge-gate")
+HOOKS = ("run-tests", "challenge-gate", "ask-gate")
 # Each agent's model and effort, pinned by id: `model: opus` is an alias that
 # drifts with the build (DECISIONS → Gotchas, 2026-09-05).
 AGENT_MODELS = {
