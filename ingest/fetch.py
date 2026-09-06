@@ -175,22 +175,8 @@ def _write_page(
     )
 
 
-def scrape(  # noqa: C901, PLR0912, PLR0915 -- one page loop, every refusal named in order
-    source: Source,
-    cache_root: Path,
-    *,
-    client: PoliteClient | None = None,
-    stamp: Callable[[], str] = utc_stamp,
-) -> tuple[Path, int]:
-    """Fetch one source's pages into a new capture directory under
-    `cache_root / platform / name`. Returns the directory and the number of
-    pages written. Everything — host, robots address, page addresses, cap,
-    parser — is read from the declaration (Phase 3a, pinned decision 3).
-    Refuses (one line) on a source declared not fetchable, an unfilled source,
-    a robots disallow, any non-200, or a page that is not the declared shape;
-    pages already written stay — each is a complete, honest capture of what the
-    site served — and a refused page is kept under a name a rebuild never
-    loads."""
+def _refuse_unless_declared(source: Source) -> None:
+    """A source is fetched only when its declaration says so and is filled in."""
     if not source.fetchable:  # the recorded terms position, declared in code
         raise FetchRefused(
             f"refusing: source {source.name!r} is declared not fetchable — "
@@ -201,25 +187,12 @@ def scrape(  # noqa: C901, PLR0912, PLR0915 -- one page loop, every refusal name
             f"refusing: source {source.name!r} has no page address — "
             "fill it in ingest/sources.py"
         )
-    parser = parser_module(source.parser)
-    if client is None:
-        own = polite_client()
-        try:
-            return scrape(source, cache_root, client=own, stamp=stamp)
-        finally:
-            own.close()
-    polite = client
-    captured_at = stamp()
-    capture_dir = (
-        cache_root / source.platform / source.name / captured_at.replace(":", "-")
-    )
-    if capture_dir.exists():
-        raise FetchRefused(
-            f"refusing: capture {capture_dir} already exists (same second?)"
-        )
 
-    # Nothing is written until the site has answered: a run refused at the
-    # robots request leaves no directory behind.
+
+def _capture_robots(polite: PoliteClient, source: Source, capture_dir: Path) -> Robots:
+    """Fetch robots.txt, save it with why the run proceeded, and return the
+    rules — or refuse. Nothing is written until the site has answered: a run
+    refused at the robots request leaves no directory behind."""
     robots = polite.get(source.robots_url)
     try:
         capture_dir.mkdir(parents=True, exist_ok=False)
@@ -259,6 +232,44 @@ def scrape(  # noqa: C901, PLR0912, PLR0915 -- one page loop, every refusal name
             )
         polite.raise_interval(source.host, rules.crawl_delay)
 
+    return rules
+
+
+def scrape(
+    source: Source,
+    cache_root: Path,
+    *,
+    client: PoliteClient | None = None,
+    stamp: Callable[[], str] = utc_stamp,
+) -> tuple[Path, int]:
+    """Fetch one source's pages into a new capture directory under
+    `cache_root / platform / name`. Returns the directory and the number of
+    pages written. Everything — host, robots address, page addresses, cap,
+    parser — is read from the declaration (Phase 3a, pinned decision 3).
+    Refuses (one line) on a source declared not fetchable, an unfilled source,
+    a robots disallow, any non-200, or a page that is not the declared shape;
+    pages already written stay — each is a complete, honest capture of what the
+    site served — and a refused page is kept under a name a rebuild never
+    loads."""
+    _refuse_unless_declared(source)
+    parser = parser_module(source.parser)
+    if client is None:
+        own = polite_client()
+        try:
+            return scrape(source, cache_root, client=own, stamp=stamp)
+        finally:
+            own.close()
+    polite = client
+    captured_at = stamp()
+    capture_dir = (
+        cache_root / source.platform / source.name / captured_at.replace(":", "-")
+    )
+    if capture_dir.exists():
+        raise FetchRefused(
+            f"refusing: capture {capture_dir} already exists (same second?)"
+        )
+
+    rules = _capture_robots(polite, source, capture_dir)
     written = 0
     for page, url in enumerate(source.pages[:MAX_PAGES], 1):
         if not rules.allows(url):  # every page's own address, before its request
