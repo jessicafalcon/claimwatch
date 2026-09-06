@@ -1,5 +1,5 @@
 """Pins for what Claude Code configuration is tracked (spec Phase 0a,
-invariant 6; done-when 5): prose (agents, commands, skills) and hook scripts
+invariant 6; done-when 5): prose (agents, skills) and hook scripts
 only. A tracked settings.json or .mcp.json would auto-run an inbound branch's
 hooks or MCP servers for anyone opening the repo. Offline; reads git only."""
 
@@ -13,7 +13,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 ALLOWED = re.compile(
-    r"^\.claude/(agents|commands)/[a-z-]+\.md$"
+    r"^\.claude/agents/[a-z-]+\.md$"
     r"|^\.claude/skills/[a-z-]+/SKILL\.md$"
     r"|^\.claude/hooks/[a-z-]+\.py$"
 )
@@ -25,8 +25,16 @@ AGENTS = (
     "study-editor",
     "senior-architect",
 )
-COMMANDS = ("review-round", "selfcheck", "phase-start")
-SKILLS = ("challenge", "code-craft", "secure-by-construction", "architecture-fit")
+# The developer types these; `disable-model-invocation` keeps them out of the
+# model's hands and its listing (one flag, not a trailing sentence).
+ON_REQUEST = ("review-round", "selfcheck", "phase-start")
+SKILLS = (
+    *ON_REQUEST,
+    "challenge",
+    "code-craft",
+    "secure-by-construction",
+    "architecture-fit",
+)
 HOOKS = ("run-tests", "challenge-gate")
 # Each agent's model and effort, pinned by id: `model: opus` is an alias that
 # drifts with the build (DECISIONS → Gotchas, 2026-09-05).
@@ -84,8 +92,6 @@ def test_tracked_claude_config_is_prose_and_hook_scripts_only():
     assert offenders == [], offenders
     for name in AGENTS:
         assert (ROOT / ".claude" / "agents" / f"{name}.md").is_file(), name
-    for name in COMMANDS:
-        assert (ROOT / ".claude" / "commands" / f"{name}.md").is_file(), name
     for name in SKILLS:
         assert (ROOT / ".claude" / "skills" / name / "SKILL.md").is_file(), name
     for name in HOOKS:
@@ -154,6 +160,15 @@ def test_skills_grant_only_read_only_tools():
         fm = _frontmatter(_skill(name))
         assert fm.get("user-invocable") is False, name
         assert isinstance(fm.get("paths"), list) and fm["paths"], name
+
+
+def test_on_request_skills_are_closed_to_the_model():
+    """A loop step the developer starts (/review-round, /phase-start, /selfcheck)
+    is not one the model may start: the flag, deterministically, not prose."""
+    for name in ON_REQUEST:
+        fm = _frontmatter(_skill(name))
+        assert fm.get("disable-model-invocation") is True, name
+        assert fm.get("user-invocable", True) is True, name
 
 
 def test_ci_workflow_is_pinned_and_read_only():

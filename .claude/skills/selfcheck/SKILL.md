@@ -1,5 +1,8 @@
 ---
+name: selfcheck
 description: Post-commit self-check — verify the last commit against its spec and this repo's rules (deterministic first, tags, fixtures, divergence), then STOP.
+# On request only: the developer types /selfcheck; the model never invokes it.
+disable-model-invocation: true
 ---
 
 Verify the current branch's most recent commit. Execute the checks, report,
@@ -31,6 +34,3 @@ file:line):
   adapted.
 - **(f) Eyeball** — the ONE file you'd most want a human to read
   line-by-line, and why.
-
-This is an explicit, on-request verification. Do not treat its presence as a
-cue to run it automatically — it runs only when invoked.

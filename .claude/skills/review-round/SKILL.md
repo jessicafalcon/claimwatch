@@ -1,5 +1,9 @@
 ---
+name: review-round
+argument-hint: <N>
 description: Review round N on a phase branch. Step 1 finds the spec and the range (always main...HEAD; N is a label — for N > 1 the previous round's table is pasted into every agent prompt so findings on already-reviewed code carry "missed in round N−1"); step 2 runs make review-gate (red → no agents); step 3 prints the spec's Invariants; step 4 classifies the diff surface and spawns code-reviewer + functionality-tester (+ security-reviewer, + study-editor, or coherence-auditor alone for docs-only) scoped to the range; step 5 prints the consolidated table and STOPs. Read-only, report-only.
+# On request only: the developer types /review-round; the model never invokes it.
+disable-model-invocation: true
 ---
 
 Run review round **$ARGUMENTS** (an integer N ≥ 1) on the current phase branch.
@@ -144,6 +148,3 @@ Close with the one line the developer decides on per finding: **fix
 stop for approval)**, or **accept (BACKLOG row with a trigger)**. A **craft**
 finding is a plain fix unless it changes a data structure or a write path —
 then it is a fix amendment like any other design change. Then STOP.
-
-This is an explicit, on-request review. Do not treat its presence as a cue to
-run it automatically — it runs only when invoked.

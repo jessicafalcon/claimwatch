@@ -8,7 +8,7 @@ Five checks. Four document classes:
   RECORDS — DECISIONS.md, BACKLOG.md: history; may name targets not built.
   PLANS   — PROJECT_BRIEF.md, docs/*.md, specs/*.md: describe what will exist.
   TOOLING — .claude/**/*.md: links checked like any class; `make` targets
-            checked in commands/ and skills/ (run today) but not agents/
+            checked in skills/ (run today) but not agents/
             (they describe the whole project's lifecycle, future targets
             included); banned words never (an agent names one to flag it).
 
@@ -43,7 +43,7 @@ from review_common import (  # noqa: E402
 
 PLAN_GLOBS = ("PROJECT_BRIEF.md", "docs/*.md", "specs/*.md")
 TOOLING_GLOB = ".claude/**/*.md"
-COMMAND_GLOBS = (".claude/commands/*.md", ".claude/skills/*/SKILL.md")
+COMMAND_GLOBS = (".claude/skills/*/SKILL.md",)
 STUDY_GLOBS = ("study/**/*.md", "study/**/*.html")
 
 BANNED = (
@@ -91,7 +91,7 @@ def tooling_files(root: Path) -> list[Path]:
 
 
 def command_files(root: Path) -> list[Path]:
-    """Commands and skills: the tooling prose that runs today."""
+    """Skills: the tooling prose that runs today (commands moved there)."""
     return sorted(p for g in COMMAND_GLOBS for p in root.glob(g) if p.is_file())
 
 

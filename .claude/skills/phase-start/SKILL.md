@@ -1,5 +1,9 @@
 ---
+name: phase-start
+argument-hint: <slug>
 description: Start a phase — checkout main, pull, create phase-<slug>, print the spec's Done-when, DONE command and the BACKING rows in scope; refuse if the spec is missing or not approved. Then STOP for the developer to say "build".
+# On request only: the developer types /phase-start; the model never invokes it.
+disable-model-invocation: true
 ---
 
 Start phase **$ARGUMENTS** (a slug such as `0a-machinery`, `1-schema`).
@@ -26,5 +30,3 @@ Start phase **$ARGUMENTS** (a slug such as `0a-machinery`, `1-schema`).
    lines — the branch starts green or the previous phase left a problem.
 7. Print one line: `Phase $ARGUMENTS ready — say "build" to start.` Then
    STOP. Do not write code until told.
-
-This is an explicit, on-request command. It runs only when invoked.
