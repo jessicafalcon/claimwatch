@@ -242,6 +242,72 @@ place and never deleted.
   session runs Fable 5.1 at `high`; CLAUDE.md → "Working with the model"
   carries what each guide changes here. `high`, not `xhigh`: the developer's
   cost call.
+- **The ladder is a section of `code-craft`, not a skill or an agent (tooling,
+  2026-09-05).** The lean-mode reference the developer supplied (a ladder:
+  YAGNI → reuse → stdlib → native → installed dependency → one line → the
+  minimum; five review tags; marker comments as a debt ledger; intensity
+  levels) is adapted as the first section of the one craft standard, so the
+  writer and the code-reviewer read the same text. Not taken: a standalone
+  skill (a fourth standard that drifts from `code-craft`, one more listing
+  entry per turn); a new agent (a fifth Opus run per round for a pass the
+  code-reviewer's Pass 3 already makes). Dropped: levels, a gain card, a help
+  card, marker comments (a BACKLOG row with a trigger is the ledger here),
+  "ship the lazy version and question the spec" (the spec is the contract:
+  doubting a Done-when item is a STOP-and-report).
+- **The mechanical craft bars are ruff rules (tooling, 2026-09-05).**
+  Complexity (`C901`, 10), branches (`PLR0912`, 12), statements (`PLR0915`,
+  50), positional arguments (`PLR0917`, 5 — not `PLR0913`, which counts
+  keyword-only options and declaration fields, the self-documenting shape
+  this repo uses), boolean flag parameters (`FBT`), simplifiable forms
+  (`SIM`, `RET`, `PIE`), commented-out code (`ERA`), unused arguments (`ARG`).
+  No new dependency. The six functions over the complexity bar (a scraper's
+  refusal chain, three parsers, a declaration's validator, a hook) carry a
+  `# noqa: … -- <reason>` rather than a refactor: the standard asks for the
+  split or the one-line reason, and a refactor of `ingest/` is a phase's
+  work, not a lint's. Tests ignore `ARG` and `FBT` (fixtures and lambdas take
+  the signature pytest hands them).
+- **On-request loop steps are `disable-model-invocation: true` skills
+  (tooling, 2026-09-05).** `/review-round`, `/phase-start` and `/selfcheck`
+  each ended with a sentence asking the model not to run them; the flag does
+  it deterministically and drops them from the model's listing. One layout
+  for every piece of tooling prose. Not taken: keeping commands (two
+  layouts, prose doing a flag's job).
+- **The `Challenged:` stamp is keyed to the spec's Invariants and Done-when
+  (tooling, 2026-09-05).** `spec <8 hex>` = sha256 of the two sections,
+  trailing whitespace stripped per line; the hook reminds with both hashes
+  when they differ. Not taken: restamping per amendment by convention (the
+  hook cannot see a convention); hashing the whole spec (a wording edit to
+  Why or Scope would stale a stamp the challenge still covers).
+- **Naming the target is a hashed `check-docs` check (tooling, 2026-09-05).**
+  `scripts/neutrality_hashes.txt` holds sha256 hex of lowercased tokens; the
+  check tokenises tracked code, prose and workflow files and the last 50
+  commit messages (URLs stripped) and reports file:line and a digest prefix,
+  never the word. `ingest/sources.py`, `fixtures/` and `data/` are excluded
+  (the D1 record). Not taken: deriving the tokens from the declared page
+  addresses at check time (a heuristic over URL paths, the denylist shape
+  this repo refuses); a plain denylist (the name in the repo). The hashes are
+  the text's guard, not a secret: a short dictionary inverts them.
+- **The developer-word STOPs are a hook (tooling, 2026-09-05).**
+  `ask-gate.py` answers `ask` before `git push`, `gh pr create`, `gh pr
+  merge` and `make … confirm`; never `allow`/`deny`. Not taken: the hooks
+  reference's `if: Bash(git push *)` field on a settings entry (documented,
+  not verified on this build — a field the build ignores would prompt on
+  every Bash call, or never); the user-level `autoMode.soft_deny` list (per
+  user, not per repo, and invisible to a test).
+- **`run-tests` runs failures-first and stops at the first (tooling,
+  2026-09-05).** `-x --ff`: a red suite shows in seconds instead of the full
+  56 s; green costs the same. Not taken: `PostToolBatch` (one run per batch
+  of edits — listed in the hooks reference, payload unread; a Gotcha to read
+  before use); a test-impact plugin (a dependency).
+- **CLAUDE.md is cut to what is recorded nowhere else (tooling,
+  2026-09-05).** Repo map, Commands and Current status carried the per-phase
+  history that the specs' Delivered paragraphs, DECISIONS' appendix and `make
+  help` already hold; at 855 lines (55 KB) the file cost roughly 14k tokens
+  on every turn and inside every custom subagent (which receive CLAUDE.md —
+  sub-agents reference, read 2026-09-05). Now 690 lines (43 KB): the three
+  sections keep only the semantics `make help` cannot state (the `confirm`
+  gate, `ROWS`, the raw-table shape check, the no-key classify step). The
+  rules sections are untouched; the next cut is theirs to earn.
 
 ## Gotchas (stack surprises found live)
 
@@ -1693,7 +1759,21 @@ extended with the secure-coding classes this repo can exhibit (foreign input
 parsed to a shape, paths derived, no shell, decompression caps, safe YAML, the
 model prompt as a data boundary, log hygiene, the hooks surface);
 `tests/test_claude_config.py` admits `.claude/skills/*/SKILL.md` as tracked
-prose. The three Process entries above and the Gotcha record the choices.
+prose. The Process entries above and the Gotcha record the choices.
+
+Round two, the lean pass (same branch, same day), after the developer asked
+what a lean-mode reference should contribute and what the workflow itself
+should lose: the ladder in `code-craft`; the mechanical craft bars as ruff
+rules; the three commands as on-request skills; the stamp keyed to the
+spec's hashed sections; naming-the-target as a hashed check; the `ask-gate`
+hook; the fast-red `run-tests` hook; CLAUDE.md cut from 855 to 690 lines. Each
+choice and its alternatives is a Process entry above; BACKLOG rows 14, 55,
+57 and 58 close. Verified against the official references that day: a
+skill's `paths:` auto-loads it while matching files are worked on; an agent's
+`skills:` preloads the full text at start; custom subagents receive
+CLAUDE.md (Explore and Plan skip it); a PreToolUse matcher is the tool's
+name; hooks accept an `if:` permission-rule filter (not used, see the
+`ask-gate` entry).
 Verdict on the reviewers as they stood: strong on the project's rules and on
 conduct, thin on craft and on general secure-coding classes; code-reviewer and
 security-reviewer were each partial, and this branch closes both gaps. Its own
