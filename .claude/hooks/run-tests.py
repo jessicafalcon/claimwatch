@@ -3,6 +3,7 @@
 # PostToolUse hook (matcher: Write|Edit|MultiEdit|NotebookEdit) — runs pytest
 # after a .py, .sql, .yaml or .yml file in this project changes. SQL files
 # and rules.yaml are code here. Makes a broken test VISIBLE the instant it breaks.
+# Runs failures-first and stops at the first (FAST_RED), so red is fast.
 #
 # This gate deliberately fails OPEN — exit 0, no run — in exactly four cases:
 # a malformed event, no CLAUDE_PROJECT_DIR in the environment, a project dir
@@ -22,6 +23,10 @@ import sys
 
 CODE_SUFFIXES = (".py", ".sql", ".yaml", ".yml")
 DEFAULT_TIMEOUT = 120
+# Failures first, stop at the first: a red suite shows in seconds instead of
+# the full run; a green suite still runs every test. The gate and CI run the
+# suite plain — this is the edit loop's visibility aid, not their check.
+FAST_RED = ("-x", "--ff")
 
 
 def timeout_seconds() -> int:
@@ -62,12 +67,12 @@ def main() -> None:
 
     venv_pytest = os.path.join(".venv", "bin", "pytest")
     if os.path.exists(venv_pytest):
-        cmd = [venv_pytest]  # pyproject already sets addopts="-q"
+        cmd = [venv_pytest, *FAST_RED]  # pyproject already sets addopts="-q"
     else:
         from shutil import which
 
         if which("pytest"):
-            cmd = ["pytest"]
+            cmd = ["pytest", *FAST_RED]
         else:
             print(
                 "[run-tests] pytest not found yet — run `make setup`.", file=sys.stderr
