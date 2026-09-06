@@ -155,8 +155,9 @@ def _plan_gate(tool_input: dict[str, object]) -> NoReturn:
     sys.exit(0)
 
 
-def _event() -> dict[str, object] | None:
-    """The event is an input this repo does not own: one shape, else None."""
+def _event() -> tuple[dict[str, object], dict[str, object]] | None:
+    """The event is an input this repo does not own: (event, tool_input) when
+    it is the one shape we act on, else None."""
     try:
         raw = sys.stdin.buffer.read(MAX_EVENT_BYTES + 1)
         if len(raw) > MAX_EVENT_BYTES:
@@ -164,9 +165,12 @@ def _event() -> dict[str, object] | None:
         data = json.loads(raw.decode("utf-8"))
     except (json.JSONDecodeError, UnicodeDecodeError, OSError):
         return None
-    if not isinstance(data, dict) or not isinstance(data.get("tool_input"), dict):
+    if not isinstance(data, dict):
         return None
-    return data
+    tool_input = data.get("tool_input")
+    if not isinstance(tool_input, dict):
+        return None
+    return data, tool_input
 
 
 def _spec_path(tool_input: dict[str, object], root: Path) -> Path | None:
@@ -208,12 +212,11 @@ def main() -> NoReturn:
             file=sys.stderr,
         )
         sys.exit(2)
-    data = _event()
-    if data is None:
+    parsed = _event()
+    if parsed is None:
         sys.exit(0)
+    data, ti = parsed
     event, tool = data.get("hook_event_name"), data.get("tool_name")
-    ti = data["tool_input"]
-    assert isinstance(ti, dict)  # _event checked it; this keeps the type narrow
 
     if event == "PreToolUse" and tool == "ExitPlanMode":
         _plan_gate(ti)
