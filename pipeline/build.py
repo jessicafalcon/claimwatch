@@ -865,12 +865,13 @@ def write_model_marts(conn, fit: cost_model.Fit, run_id: str) -> None:
     `run_id` is provenance (in no key or sort) and the Modeled tag is stamped.
     `rebuild()` calls this after `build_derived` on every input, so every caller
     sees filled marts."""
-    values = cost_model.defaults(fit)
+    params = cost_model.parameters(fit)
+    values = {p.name: p.default for p in params}
     conn.execute("begin transaction")
     try:
         for table in ("cost_model_params", "cost_model_outputs", "cost_curves"):
             conn.execute(f"delete from {table}")
-        for p in cost_model.parameters(fit):
+        for p in params:
             conn.execute(
                 "insert into cost_model_params (name, default_value, unit, sourcing, "
                 " citation, low, high, run_id, tag) values (?, ?, ?, ?, ?, ?, ?, ?, ?)",

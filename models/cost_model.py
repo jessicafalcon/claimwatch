@@ -73,28 +73,34 @@ class Parameter:
     high: float
 
 
+# A point formula reads a mapping of the parameters and the results before it;
+# a curve formula reads the whole flag-rate grid's rows and returns a flag rate
+# (or None when its crossover never happens).
+PointFn = Callable[[Mapping[str, float]], float]
+CurveFn = Callable[[Sequence[Mapping[str, float]]], float | None]
+
+
 @dataclass(frozen=True)
 class Formula:
     """One entry of the model: its name, the expression written out as text
     (what the study prints), its `kind` (`point` — one number per parameter set,
     or `curve` — a point read off the whole flag-rate grid), and the callable
-    that computes it. A `point` fn reads a mapping of the parameters and the
-    results before it; a `curve` fn reads the grid's rows."""
+    that computes it."""
 
     name: str
     expression: str
     kind: str
-    fn: Callable
+    fn: PointFn | CurveFn
 
 
 SOURCING = ("sourced", "unsourced")
 KIND = ("point", "curve")
 
-# The §6 second-hand citation the four scale anchors share: the brief records
-# them as public disclosures with no address, each a floor, and the study says
-# so beside them (DECISIONS → Phase 3a D1; an address, when handed over, becomes
-# a brand-free declaration in ingest/sources.py — a BACKLOG row).
-_SIX = "PROJECT_BRIEF.md §6 (public disclosure, second-hand; a floor)"
+# The second-hand citation the four scale anchors share: the brief records them
+# as public disclosures with no address, each a floor, and the study says so
+# beside them (DECISIONS → Phase 3a D1; an address, when handed over, becomes a
+# brand-free declaration in ingest/sources.py — a BACKLOG row).
+_DISCLOSURE_FLOOR_CITE = "PROJECT_BRIEF.md §6 (public disclosure, second-hand; a floor)"
 # The fit artifact the caller reads and hands in as a Fit.
 _FIT_CITE = "data/damir/claim_cost_fit.csv ← open-damir"
 
@@ -106,19 +112,25 @@ SCALE_PARAMETERS = (
         800_000_000.0,
         "€ / year",
         "sourced",
-        _SIX,
+        _DISCLOSURE_FLOOR_CITE,
         800_000_000.0,
         1_600_000_000.0,
     ),
     Parameter(
-        "members", 1_000_000.0, "members", "sourced", _SIX, 1_000_000.0, 2_000_000.0
+        "members",
+        1_000_000.0,
+        "members",
+        "sourced",
+        _DISCLOSURE_FLOOR_CITE,
+        1_000_000.0,
+        2_000_000.0,
     ),
     Parameter(
         "fraud_pool_eur",
         4_000_000.0,
         "€ / year",
         "sourced",
-        _SIX,
+        _DISCLOSURE_FLOOR_CITE,
         4_000_000.0,
         8_000_000.0,
     ),
@@ -127,7 +139,7 @@ SCALE_PARAMETERS = (
         350_000_000.0,
         "€ / year",
         "sourced",
-        _SIX,
+        _DISCLOSURE_FLOOR_CITE,
         350_000_000.0,
         700_000_000.0,
     ),
@@ -436,7 +448,7 @@ def format_model(fit: Fit) -> str:
     expression beside its value at the defaults, per scenario) and the two
     crossovers. No clock, no key — the same fit always prints the same text."""
     params = parameters(fit)
-    values = defaults(fit)
+    values = {p.name: p.default for p in params}
     lines = [
         "cost model — the formulas, their defaults, and where the curves cross",
         "",
