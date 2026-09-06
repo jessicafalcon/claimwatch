@@ -38,6 +38,7 @@ import hashlib
 import re
 import subprocess
 import sys
+import unicodedata
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -81,6 +82,17 @@ _BACKLOG_COUNT = re.compile(r"Open BACKLOG rows: \*\*(\d+)\*\*")
 _TERM = re.compile(r"^- \*\*", re.M)
 _URL = re.compile(r"https?://\S+")
 _TOKEN = re.compile(r"[a-z0-9]+")
+
+
+def plain_tokens(line: str) -> set[str]:
+    """The line's words as the hash file spells them: URLs removed, then
+    case-folded and de-accented (NFKD, combining marks dropped), so an
+    accented spelling of a listed token still matches its digest."""
+    folded = unicodedata.normalize("NFKD", _URL.sub(" ", line).casefold())
+    ascii_only = "".join(ch for ch in folded if not unicodedata.combining(ch))
+    return set(_TOKEN.findall(ascii_only))
+
+
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 # `## Glossary`, `## 11. Glossary (…)`, `### Glossary` — the brief numbers its headings.
 _GLOSSARY = re.compile(r"^##+ (?:\d+\.\s*)?Glossary.*?$(.*?)(?=^## |\Z)", re.M | re.S)
@@ -290,8 +302,7 @@ def named_tokens(text: str, digests: set[str]) -> list[tuple[int, str]]:
     URLs stripped first. The token itself is never returned."""
     hits: list[tuple[int, str]] = []
     for n, line in enumerate(text.splitlines(), 1):
-        words = set(_TOKEN.findall(_URL.sub(" ", line.lower())))
-        for d in sorted(_digest(w) for w in words):
+        for d in sorted(_digest(w) for w in plain_tokens(line)):
             if d in digests:
                 hits.append((n, d[:8]))
     return hits

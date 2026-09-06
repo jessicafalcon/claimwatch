@@ -200,6 +200,15 @@ def test_check_neutrality_reports_a_token_never_a_url_and_never_the_name(
         f"README.md:2: names the study's target (sha256 {digest[:8]}…)",
     ]
     assert "zzbrand" not in "\n".join(out)
+    accented = tmp_path / "notes.md"
+    accented.write_text("ZZBRÄND held it; zzbránd too.\n")
+    assert check_docs.check_neutrality([accented], digests, tmp_path) == [
+        f"notes.md:1: names the study's target (sha256 {digest[:8]}…)"
+    ]
+    assert check_docs.plain_tokens("Générali, café https://x.y/z") == {
+        "generali",
+        "cafe",
+    }
     assert check_docs.check_neutrality([readme], set(), tmp_path) == []
     _, missing = check_docs.neutrality_hashes(tmp_path / "gone.txt")
     assert missing == ["gone.txt: hash file is missing"]
