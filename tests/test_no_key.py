@@ -201,6 +201,25 @@ def test_no_key_model_marts_are_filled(monkeypatch, tmp_path):
         conn.close()
 
 
+def test_no_key_sim_marts_are_filled(monkeypatch, tmp_path):
+    # The two simulator marts (Beat 4) compute over the tracked lognormal fit,
+    # not the model API — with no key they fill exactly the same. Durable no-key
+    # guard from Phase 8b on.
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    rebuild("duckdb", "synthetic", root=tmp_path, run_id="synthetic")
+    conn = connect("duckdb", database=database_for("synthetic", tmp_path))
+    try:
+        for mart, expected in (
+            ("guardrail_sim", pins.GUARDRAIL_SIM_ROWS),
+            ("sla_threshold", pins.SLA_THRESHOLD_ROWS),
+        ):
+            assert (
+                conn.execute(f"select count(*) from {mart}").fetchone()[0] == expected
+            )
+    finally:
+        conn.close()
+
+
 def test_no_key_scores_call_no_model(monkeypatch, tmp_path):
     # Grading is offline: even with the SDK importable, scoring and writing the
     # mart never touch it — the gate compares stored predictions to the key.

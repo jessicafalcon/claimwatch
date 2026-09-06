@@ -1,11 +1,12 @@
 # The Friction Ledger — one command per stage. `make help` lists them.
 # Pipeline targets land with their phases (CLAUDE.md → Commands):
 # rebuild, idempotency-check, reset (Phase 1); scrape (Phase 2); label-sample,
-# classify-eval (5); model (8); study (9).
+# classify-eval (5); model, simulate (8); study (9).
 
 .PHONY: help setup test lint check-docs check-backing review-gate \
         rebuild idempotency-check confirm reset scrape record-snapshots \
-        label-sample classify-eval fetch-damir sample-damir fit-damir model
+        label-sample classify-eval fetch-damir sample-damir fit-damir model \
+        simulate
 
 # User variables reach recipes ONLY as make values via `$(call _Q,$(value VAR))`
 # — UNEXPANDED and single-quoted — so a value like `SPEC='$(shell …)'` or
@@ -97,3 +98,6 @@ fit-damir: ## fit the lognormal to fixtures/damir and write data/damir/claim_cos
 
 model: ## print the cost model — parameters, formulas beside their values, the two crossovers (offline, no variable, writes nothing)
 	uv run python -m pipeline model
+
+simulate: ## print the guardrail simulator — the three rules, the SLA threshold table, the hold days per fix (offline, no variable, writes nothing)
+	uv run python -m pipeline simulate

@@ -166,4 +166,7 @@ def test_no_new_mart():
         "cost_model_params.sql",
         "cost_model_outputs.sql",
         "cost_curves.sql",
+        # the simulator marts land in 8b (DDL fed by models/guardrail_sim.py).
+        "guardrail_sim.sql",
+        "sla_threshold.sql",
     }

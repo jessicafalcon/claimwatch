@@ -109,6 +109,31 @@ def test_sourced_defaults_recomputed_by_hand():
     )
 
 
+def test_timer_formulas_recomputed_by_hand():
+    """The three hold-timer point formulas (8b), redone with math from the record:
+    the loop is contacts x days_per_round; friction per day is the model's
+    friction for one false positive spread over the loop; the threshold is
+    fp_share x friction_per_day x min(timer_days, loop_days) / (1 - fp_share) —
+    the claim amount below which a hold that long is net-negative in expectation."""
+    values = defaults(FIT)
+    for scenario in SCENARIOS:
+        p = _apply_scenario(values, scenario)
+        out = evaluate(values, scenario)
+        loop_days = p["contacts"] * p["days_per_round"]
+        assert out["loop_days"] == round(loop_days)
+        friction_per_day = (
+            p["contacts"] * p["cost_per_contact"]
+            + p["churn_prob"] * (p["arr_eur"] / p["members"])
+        ) / loop_days
+        assert out["friction_per_day"] == round(friction_per_day, 2)
+        held = min(p["timer_days"], loop_days)
+        timer_amount = p["fp_share"] * friction_per_day * held / (1 - p["fp_share"])
+        assert out["timer_amount_eur"] == round(timer_amount, 2)
+        assert (
+            out["timer_amount_eur"] == pins.COST_OUTPUTS[scenario]["timer_amount_eur"]
+        )
+
+
 def test_mean_claim_prints_its_bias_and_the_median_cell():
     """mean_claim's expression carries the bias direction (a DAMIR cell sums >= 1
     claims, so the mean overstates a claim and understates claims/friction), and
