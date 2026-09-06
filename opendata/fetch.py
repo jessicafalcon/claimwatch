@@ -53,8 +53,8 @@ def _get(url: str) -> bytes:
     https only, no proxy, no retry."""
     if not url.startswith("https://"):
         raise FetchError(f"refusing a non-https URL: {url!r}")
-    request = Request(url, headers=IDENTIFYING_HEADERS)  # noqa: S310 (https checked)
-    with _OPENER.open(request, timeout=TIMEOUT_S) as response:  # noqa: S310
+    request = Request(url, headers=IDENTIFYING_HEADERS)  # https checked above
+    with _OPENER.open(request, timeout=TIMEOUT_S) as response:
         return response.read()
 
 
@@ -65,11 +65,11 @@ def _download(url: str, dest: Path, expected: int | None) -> int:
     partial file removed, rather than filling the disk. Returns the bytes written."""
     if not url.startswith("https://"):
         raise FetchError(f"refusing a non-https URL: {url!r}")
-    request = Request(url, headers=IDENTIFYING_HEADERS)  # noqa: S310 (https checked)
+    request = Request(url, headers=IDENTIFYING_HEADERS)  # https checked above
     ceiling = expected + _SLACK if expected else None
     written = 0
     with (
-        _OPENER.open(request, timeout=TIMEOUT_S) as response,  # noqa: S310
+        _OPENER.open(request, timeout=TIMEOUT_S) as response,
         dest.open("wb") as fh,
     ):
         while chunk := response.read(_CHUNK):

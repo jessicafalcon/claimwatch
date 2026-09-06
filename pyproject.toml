@@ -37,6 +37,7 @@ select = [
   # parameter, simplifiable forms, commented-out code, unused arguments.
   "C90", "PLR0912", "PLR0915", "PLR0917",
   "FBT", "SIM", "RET", "PIE", "ERA", "ARG",
+  "RUF100",  # a noqa that suppresses nothing is deleted, not kept
 ]
 
 [tool.ruff.lint.mccabe]

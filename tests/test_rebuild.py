@@ -7,13 +7,13 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from decimal import Decimal  # noqa: E402
+from decimal import Decimal
 
-import pins  # noqa: E402
-import pytest  # noqa: E402
+import pins
+import pytest
 
-from ingest.parsed import PageShapeError  # noqa: E402
-from pipeline.build import (  # noqa: E402
+from ingest.parsed import PageShapeError
+from pipeline.build import (
     _columns,
     _table_exists,
     build_derived,
@@ -24,7 +24,7 @@ from pipeline.build import (  # noqa: E402
     rebuild,
     table_counts,
 )
-from pipeline.warehouse import connect, database_for, default_schema  # noqa: E402
+from pipeline.warehouse import connect, database_for, default_schema
 
 _INSERT_RAW = (
     "insert into raw_reviews (source, external_id, source_url, segment, "

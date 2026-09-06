@@ -42,7 +42,7 @@ import unicodedata
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from review_common import (  # noqa: E402
+from review_common import (
     LIVING_DOCS,
     MAKE_TICK,
     RECORD_DOCS,
