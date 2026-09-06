@@ -1,0 +1,205 @@
+"""Phase 8a — the cost model (Beat 3). Offline, no key, no clock: the formulas
+are data in models/cost_model.py, evaluated over parameters that are either
+sourced (recomputed from the record here by hand) or declared guesses with a
+range. Every pinned number is typed from the built output, never guessed."""
+
+from __future__ import annotations
+
+import math
+
+import pytest
+
+from models.cost_model import (
+    CURVE_FORMULAS,
+    FLAG_RATE_GRID,
+    POINT_FORMULAS,
+    SCENARIOS,
+    Fit,
+    Parameter,
+    _apply_scenario,
+    _crossover,
+    _marginal_crossover,
+    check_parameter,
+    curves,
+    defaults,
+    evaluate,
+    format_model,
+    parameters,
+)
+from tests import pins
+
+FIT = Fit(
+    mu=pins.DAMIR_MU, sigma=pins.DAMIR_SIGMA, n=pins.DAMIR_N, emp_p50=pins.DAMIR_EMP_P50
+)
+
+
+# --- the formulas are data, evaluated to the pins -----------------------------
+
+
+def test_formulas_evaluate_to_the_pins():
+    """Every point output and both crossovers, per scenario, equal the built
+    output pinned in tests/pins.py — the defaults are not tuned to a story."""
+    values = defaults(FIT)
+    for scenario in SCENARIOS:
+        assert evaluate(values, scenario) == pins.COST_OUTPUTS[scenario], scenario
+        _, crossovers = curves(values, scenario)
+        assert crossovers == pins.COST_CROSSOVERS[scenario], scenario
+
+
+def test_make_model_prints_each_expression_beside_its_value():
+    """format_model prints every formula's expression text and, for the baseline,
+    the value it produces — the printed formula and the number are one entry."""
+    out = format_model(FIT)
+    baseline = pins.COST_OUTPUTS["baseline"]
+    for f in POINT_FORMULAS:
+        assert f.expression in out
+        assert f"-> {baseline[f.name]}" in out
+    for f in CURVE_FORMULAS:
+        assert f.expression in out
+    assert "-> 0.095" in out  # the baseline crossover
+    assert "-> 0.05" in out  # the marginal crossover / the default marker
+
+
+# --- every parameter: a closed sourcing set, a citation when sourced, a range -
+
+
+def test_parameters_sourcing_is_a_closed_set():
+    """Each parameter's sourcing is one of the two words; a third word refuses."""
+    for p in parameters(FIT):
+        assert p.sourcing in ("sourced", "unsourced")
+    with pytest.raises(ValueError, match="sourcing"):
+        check_parameter(Parameter("x", 1.0, "u", "estimated", "", 0.0, 2.0))
+
+
+def test_sourced_needs_a_citation_every_range_holds_its_default():
+    """A sourced parameter with no citation, an unsourced one that carries one,
+    and a default outside its range each refuse; every real parameter passes."""
+    with pytest.raises(ValueError, match="no citation"):
+        check_parameter(Parameter("x", 1.0, "u", "sourced", "", 0.0, 2.0))
+    with pytest.raises(ValueError, match="carries a citation"):
+        check_parameter(Parameter("x", 1.0, "u", "unsourced", "a", 0.0, 2.0))
+    with pytest.raises(ValueError, match="outside range"):
+        check_parameter(Parameter("x", 5.0, "u", "unsourced", "", 0.0, 2.0))
+    for p in parameters(FIT):
+        assert p.low <= p.default <= p.high
+
+
+def test_sourced_defaults_recomputed_by_hand():
+    """Revenue per member, the mean claim, claim volume and the mu/sigma ranges,
+    each redone with math from the record — the value the model uses equals the
+    hand recomputation."""
+    values = defaults(FIT)
+    baseline = pins.COST_OUTPUTS["baseline"]
+    assert values["arr_eur"] / values["members"] == baseline["customer_value"]
+    mean_full = math.exp(pins.DAMIR_MU + pins.DAMIR_SIGMA**2 / 2)
+    assert round(mean_full, 2) == baseline["mean_claim"]
+    assert round(values["refunded_eur"] / mean_full) == baseline["claims"]
+    se_mu = pins.DAMIR_SIGMA / math.sqrt(pins.DAMIR_N)
+    se_sigma = pins.DAMIR_SIGMA / math.sqrt(2 * pins.DAMIR_N)
+    mu = next(p for p in parameters(FIT) if p.name == "mu")
+    sigma = next(p for p in parameters(FIT) if p.name == "sigma")
+    assert (mu.low, mu.high) == pins.DAMIR_MU_RANGE
+    assert (mu.low, mu.high) == (
+        round(pins.DAMIR_MU - 2 * se_mu, 6),
+        round(pins.DAMIR_MU + 2 * se_mu, 6),
+    )
+    assert (sigma.low, sigma.high) == (
+        round(pins.DAMIR_SIGMA - 2 * se_sigma, 6),
+        round(pins.DAMIR_SIGMA + 2 * se_sigma, 6),
+    )
+
+
+def test_mean_claim_prints_its_bias_and_the_median_cell():
+    """mean_claim's expression carries the bias direction (a DAMIR cell sums >= 1
+    claims, so the mean overstates a claim and understates claims/friction), and
+    median_cell (emp_p50) prints beside it as the contrast."""
+    mean = next(f for f in POINT_FORMULAS if f.name == "mean_claim")
+    assert "overstates" in mean.expression and "understates" in mean.expression
+    median = next(f for f in POINT_FORMULAS if f.name == "median_cell")
+    assert "emp_p50" in median.expression
+    assert evaluate(defaults(FIT))["median_cell"] == pins.DAMIR_EMP_P50
+
+
+# --- the curves cross; both grid rules; one default marker --------------------
+
+
+def test_crossover_is_first_grid_point_with_negative_net():
+    """The crossover is the first grid flag_rate whose net is negative; a grid
+    whose net never turns negative yields None (each checked by hand)."""
+    rows = [
+        {"flag_rate": 0.01 * i, "net": n} for i, n in enumerate([9.0, 5.0, -1.0, -8.0])
+    ]
+    assert _crossover(rows) == 0.02
+    assert _crossover([{"flag_rate": 0.01 * i, "net": 3.0} for i in range(4)]) is None
+    # the built baseline crosses where the net column first goes below zero
+    grid, crossovers = curves(defaults(FIT), "baseline")
+    first_negative = next(r["flag_rate"] for r in grid if r["net"] < 0)
+    assert (
+        crossovers["crossover_flag_rate"]
+        == first_negative
+        == pins.COST_CROSSOVERS["baseline"]["crossover_flag_rate"]
+    )
+
+
+def test_marginal_crossover_is_first_grid_point_below_the_previous():
+    """The marginal crossover is the first grid flag_rate whose net is below the
+    previous point's; a net that only rises yields None."""
+    rising_then_fall = [
+        {"flag_rate": 0.01 * i, "net": n} for i, n in enumerate([1.0, 2.0, 3.0, 2.5])
+    ]
+    assert _marginal_crossover(rising_then_fall) == 0.03
+    assert (
+        _marginal_crossover(
+            [{"flag_rate": 0.01 * i, "net": float(i)} for i in range(5)]
+        )
+        is None
+    )
+
+
+def test_marginal_crossover_needs_a_strict_drop_not_a_plateau():
+    """A flat plateau then a decline: the marginal crossover is the decline point,
+    not the plateau — the rule is strictly below the previous point, so `<=` would
+    wrongly fire on the plateau (invariant 6)."""
+    rows = [
+        {"flag_rate": 0.01 * i, "net": n} for i, n in enumerate([1.0, 2.0, 2.0, 1.5])
+    ]
+    assert _marginal_crossover(rows) == 0.03
+
+
+def test_curves_mark_exactly_one_default_per_scenario():
+    """Exactly one grid row per scenario is the default flag rate (0.05), the
+    'you are here' marker, and 41 rows span the grid."""
+    values = defaults(FIT)
+    for scenario in SCENARIOS:
+        grid, _ = curves(values, scenario)
+        assert len(grid) == pins.FLAG_RATE_GRID_POINTS
+        marked = [r for r in grid if r["is_default"]]
+        assert len(marked) == 1, scenario
+        assert marked[0]["flag_rate"] == values["flag_rate"] == 0.05
+    assert len(FLAG_RATE_GRID) == pins.FLAG_RATE_GRID_POINTS
+
+
+# --- scenarios are a closed set of parameter overrides -----------------------
+
+
+def test_scenarios_are_a_closed_set():
+    """The scenario names are exactly the four; an unknown name refuses."""
+    assert set(SCENARIOS) == set(pins.COST_SCENARIOS)
+    with pytest.raises(ValueError, match="unknown scenario"):
+        evaluate(defaults(FIT), "fix_4")
+
+
+def test_each_scenario_changes_only_its_toggled_parameters():
+    """Each scenario differs from the defaults in exactly its toggled parameters:
+    contacts_once sets contacts to 1, churn_halved halves churn_prob, both does
+    both; baseline changes nothing."""
+    base = defaults(FIT)
+
+    def _changed(scenario: str) -> dict[str, tuple[float, float]]:
+        after = _apply_scenario(base, scenario)
+        return {k: (base[k], after[k]) for k in base if base[k] != after[k]}
+
+    assert _changed("baseline") == {}
+    assert _changed("contacts_once") == {"contacts": (3.0, 1.0)}
+    assert _changed("churn_halved") == {"churn_prob": (0.05, 0.025)}
+    assert set(_changed("both")) == {"contacts", "churn_prob"}

@@ -162,4 +162,8 @@ def test_no_new_mart():
         # the theme-share marts land in 7a (SQL over stg_classified_reviews).
         "theme_share_by_month.sql",
         "theme_share_by_segment.sql",
+        # the cost-model marts land in 8a (DDL fed by models/cost_model.py).
+        "cost_model_params.sql",
+        "cost_model_outputs.sql",
+        "cost_curves.sql",
     }

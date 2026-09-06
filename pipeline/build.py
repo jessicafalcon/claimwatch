@@ -49,6 +49,8 @@ from ingest.sources import (
     by_name,
     sample_source,
 )
+from models import cost_model
+from opendata.fit import read_fit
 from pipeline import warehouse
 from pipeline.warehouse import ROOT, connect
 
@@ -835,6 +837,95 @@ def write_classifier_quality(
     conn.execute("commit")
 
 
+_MODEL_TAG = "Modeled"
+
+
+def read_model_fit(path: Path | None = None) -> cost_model.Fit:
+    """Read the tracked lognormal fit and shape it into the cost model's `Fit`:
+    the two log-moments, the sample size behind them, and the median cell
+    (`emp_p50`). This is the one place the artifact is read for the model — the
+    caller hands the result to `write_model_marts`, so `models/` reads no file.
+    A malformed or unreadable artifact (a hand-corrupted tracked file) is refused
+    as a `PageShapeError`, so the `model` and `rebuild` CLI paths print one line
+    and exit 2 rather than a traceback; `path` lets a test exercise that."""
+    try:
+        fit, gof = read_fit() if path is None else read_fit(path)
+    except (ValueError, OSError) as exc:
+        raise PageShapeError(f"the fit artifact is unreadable: {exc}") from exc
+    emp_p50 = next(d.empirical for d in gof if d.decile == 50)
+    return cost_model.Fit(mu=fit.mu, sigma=fit.sigma, n=fit.n, emp_p50=emp_p50)
+
+
+def write_model_marts(conn, fit: cost_model.Fit, run_id: str) -> None:
+    """Fill the three cost-model marts (B3.1–B3.4) from `models/cost_model.py` —
+    the one place the formulas and parameters are written. Every number is a
+    `FORMULAS` callable evaluated over the parameters or a `PARAMETERS` cell; no
+    literal is typed here. Cleared and inserted in one transaction, rows in
+    parameter / scenario / FORMULAS / grid order, so a re-run is byte-identical;
+    `run_id` is provenance (in no key or sort) and the Modeled tag is stamped.
+    `rebuild()` calls this after `build_derived` on every input, so every caller
+    sees filled marts."""
+    params = cost_model.parameters(fit)
+    values = {p.name: p.default for p in params}
+    conn.execute("begin transaction")
+    try:
+        for table in ("cost_model_params", "cost_model_outputs", "cost_curves"):
+            conn.execute(f"delete from {table}")
+        for p in params:
+            conn.execute(
+                "insert into cost_model_params (name, default_value, unit, sourcing, "
+                " citation, low, high, run_id, tag) values (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [
+                    p.name,
+                    p.default,
+                    p.unit,
+                    p.sourcing,
+                    p.citation,
+                    p.low,
+                    p.high,
+                    run_id,
+                    _MODEL_TAG,
+                ],
+            )
+        for scenario in cost_model.SCENARIOS:
+            outputs = cost_model.evaluate(values, scenario)
+            grid, crossovers = cost_model.curves(values, scenario)
+            for f in cost_model.POINT_FORMULAS:
+                _insert_output(conn, scenario, f, outputs[f.name], run_id)
+            for f in cost_model.CURVE_FORMULAS:
+                _insert_output(conn, scenario, f, crossovers[f.name], run_id)
+            for row in grid:
+                conn.execute(
+                    "insert into cost_curves (scenario, flag_rate, fraud_saved, "
+                    " friction_cost, net, is_default, run_id, tag) "
+                    "values (?, ?, ?, ?, ?, ?, ?, ?)",
+                    [
+                        scenario,
+                        row["flag_rate"],
+                        row["fraud_saved"],
+                        row["friction_cost"],
+                        row["net"],
+                        row["is_default"],
+                        run_id,
+                        _MODEL_TAG,
+                    ],
+                )
+    except BaseException:
+        conn.execute("rollback")
+        raise
+    conn.execute("commit")
+
+
+def _insert_output(conn, scenario: str, formula, value, run_id: str) -> None:
+    """One (scenario, formula) row of cost_model_outputs — the expression beside
+    its value. A curve whose crossover never happens inserts NULL."""
+    conn.execute(
+        "insert into cost_model_outputs "
+        "(scenario, name, expression, value, run_id, tag) values (?, ?, ?, ?, ?, ?)",
+        [scenario, formula.name, formula.expression, value, run_id, _MODEL_TAG],
+    )
+
+
 def read_fixture(name: str) -> list[dict[str, str]]:
     with (ROOT / "fixtures" / name / "reviews.csv").open(encoding="utf-8") as fh:
         return list(csv.DictReader(fh))
@@ -1093,6 +1184,10 @@ def rebuild(
                 )
                 load_snapshots(conn, parsed.snapshots, run_id or stamp, rows)
         build_derived(conn)
+        # the model marts need no key, no reviews and no classify step — they
+        # compute over the tracked fit, so they fill inside rebuild() on every
+        # input, and idempotency-check (which calls rebuild() only) sees them.
+        write_model_marts(conn, read_model_fit(), run_id or "model")
         return table_counts(conn)
     finally:
         conn.close()

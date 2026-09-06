@@ -27,6 +27,7 @@ reproduces the sourced fit offline."""
 from __future__ import annotations
 
 import csv
+import math
 import statistics
 from dataclasses import dataclass
 from math import exp, log
@@ -112,6 +113,96 @@ def write_fit(fit: Fit, gof: list[Decile], path: Path = ARTIFACT) -> None:
         for row in gof:
             writer.writerow([f"emp_p{row.decile}", f"{row.empirical:.{_AMOUNT_DP}f}"])
             writer.writerow([f"fit_p{row.decile}", f"{row.predicted:.{_AMOUNT_DP}f}"])
+
+
+# The fit artifact is tiny (three parameters + two figures per decile); a file
+# larger than this is not the shape we wrote, so refuse before reading it.
+_MAX_FIT_BYTES = 64 * 1024
+
+
+def _fit_field_names() -> tuple[str, ...]:
+    """Every name the artifact must carry, in write order: the three parameters
+    then `emp_p<d>`/`fit_p<d>` for each decile — the mirror of `write_fit`."""
+    names = ["mu", "sigma", "n"]
+    for decile in DECILES:
+        names += [f"emp_p{decile}", f"fit_p{decile}"]
+    return tuple(names)
+
+
+def _finite_float(raw: dict[str, str], name: str, where: str) -> float:
+    value = raw[name]
+    try:
+        number = float(value)
+    except ValueError as exc:
+        raise ValueError(f"{where}: {name!r} is not a number: {value!r}") from exc
+    if not math.isfinite(number):
+        raise ValueError(f"{where}: {name!r} is not a finite number: {value!r}")
+    return number
+
+
+def _positive_int(raw: dict[str, str], name: str, where: str) -> int:
+    value = raw[name]
+    if not (value.isascii() and value.isdigit()) or int(value) <= 0:
+        raise ValueError(f"{where}: {name!r} is not a positive integer: {value!r}")
+    return int(value)
+
+
+def read_fit(path: Path = ARTIFACT) -> tuple[Fit, list[Decile]]:
+    """Read the tracked fit artifact back into the Fit and its goodness-of-fit
+    deciles — the strict mirror of `write_fit`, the one place besides the writer
+    that knows the artifact's shape. Every declared name must be present, numeric
+    and finite (`n` a positive integer); an unknown, missing, duplicate or
+    non-numeric name refuses with the name, never a silent default. `z` is the
+    standard-normal quantile recomputed per decile (the writer stores none), the
+    same value `goodness_of_fit` used, so the returned deciles carry it."""
+    where = path.name
+    size = path.stat().st_size
+    if size > _MAX_FIT_BYTES:
+        raise ValueError(
+            f"{where}: fit artifact is {size} bytes, over the {_MAX_FIT_BYTES} cap"
+        )
+    raw: dict[str, str] = {}
+    with path.open(encoding="utf-8", newline="") as fh:
+        reader = csv.reader(fh)
+        if next(reader, None) != ["name", "value"]:
+            raise ValueError(f"{where}: header must be exactly 'name,value'")
+        for lineno, row in enumerate(reader, 2):
+            if len(row) != 2:
+                raise ValueError(
+                    f"{where}: line {lineno}: wrong number of cells: {row!r}"
+                )
+            name = row[0]
+            if name in raw:
+                raise ValueError(f"{where}: line {lineno}: duplicate name {name!r}")
+            raw[name] = row[1]
+    expected = set(_fit_field_names())
+    if unknown := sorted(set(raw) - expected):
+        raise ValueError(f"{where}: name(s) not in the fit artifact's shape: {unknown}")
+    if missing := sorted(expected - set(raw)):
+        raise ValueError(
+            f"{where}: name(s) the fit artifact must carry are missing: {missing}"
+        )
+    sigma = _finite_float(raw, "sigma", where)
+    if sigma < 0:
+        raise ValueError(
+            f"{where}: 'sigma' is a standard deviation and must be >= 0: {sigma!r}"
+        )
+    fit = Fit(
+        mu=_finite_float(raw, "mu", where),
+        sigma=sigma,
+        n=_positive_int(raw, "n", where),
+    )
+    normal = statistics.NormalDist()
+    gof = [
+        Decile(
+            decile=decile,
+            z=normal.inv_cdf(decile / 100),
+            empirical=_finite_float(raw, f"emp_p{decile}", where),
+            predicted=_finite_float(raw, f"fit_p{decile}", where),
+        )
+        for decile in DECILES
+    ]
+    return fit, gof
 
 
 def format_fit(fit: Fit, gof: list[Decile]) -> str:

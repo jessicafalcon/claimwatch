@@ -34,11 +34,17 @@ _INSERT_RAW = (
 
 
 def test_zero_row_rebuild(tmp_path):
-    """`none`: every table exists and every count is zero — the anchors seed
-    every other input, not this one."""
+    """`none`: every input-driven table exists and is empty — the anchors seed
+    every other input, not this one. The three cost-model marts fill by
+    construction (they compute over the tracked fit, not the input), so they are
+    the one exception and carry their constant counts."""
     counts = rebuild("duckdb", "none", root=tmp_path)
     assert set(counts) >= {"raw_reviews", "stg_reviews", "raw_platform_snapshots"}
-    assert all(n == 0 for n in counts.values()), counts
+    model_marts = {"cost_model_params", "cost_model_outputs", "cost_curves"}
+    assert all(n == 0 for name, n in counts.items() if name not in model_marts), counts
+    assert counts["cost_model_params"] == pins.COST_PARAM_ROWS
+    assert counts["cost_model_outputs"] == pins.COST_OUTPUT_ROWS
+    assert counts["cost_curves"] == pins.COST_CURVE_ROWS
 
 
 def test_synthetic_stage_counts_match_pins(tmp_path):

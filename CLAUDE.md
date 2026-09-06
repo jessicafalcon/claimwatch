@@ -102,9 +102,10 @@ Delivered paragraph and `make help`, not here.
 - `opendata/` — Open DAMIR (no insurer, no brand token): `sources.py`,
   `fetch.py` (stdlib `urllib`), `slice.py` (the guarded read), `fit.py` (the
   log-moments lognormal fit that writes the tracked fit artifact).
-- `models/` *(Phase 8)* — `cost_model.py::FORMULAS`, `guardrail_sim.py`;
-  `study/` *(Phase 9)* — Metabase setup + the HTML export; `dags/` *(Phase
-  10)* — `friction_ledger.py`.
+- `models/` — `cost_model.py::FORMULAS` (Phase 8a: the formulas and parameters
+  as data, filled into the three Beat 3 marts inside `rebuild()`),
+  `guardrail_sim.py` *(Phase 8b)*; `study/` *(Phase 9)* — Metabase setup + the
+  HTML export; `dags/` *(Phase 10)* — `friction_ledger.py`.
 - `fixtures/` — read-only after Phase 1, each set with a `MANIFEST.sha256`:
   `synthetic/` (hand-written fake reviews), `anchors/` (brief §6 figures with
   source URLs, seeded as Documented in every rebuild but `ROWS=none`),
@@ -142,7 +143,10 @@ its targets there and here in the same PR. What `make help` cannot say:
   the gitignored `data/label_sample.csv`), `classify-eval` (the rules'
   per-theme precision on the tuning folds, never the held-out fold),
   `sample-damir [MONTH=] [N=1000]` (a systematic draw into `fixtures/damir/`),
-  `fit-damir` (the closed-form lognormal fit → `data/damir/claim_cost_fit.csv`).
+  `fit-damir` (the closed-form lognormal fit → `data/damir/claim_cost_fit.csv`),
+  `model` (no variable: reads the tracked fit and prints the cost model — the
+  parameter table, each formula beside its value at the defaults per scenario,
+  the two crossovers; writes nothing; identical text on a rerun).
 - **`make rebuild [TARGET=duckdb] [ROWS=captured|none|synthetic|samples]`** —
   raw → staging → marts, reviews per month, then the classify step: the rules
   plus, only when `ANTHROPIC_API_KEY` is set and only for the reviews the
@@ -151,7 +155,10 @@ its targets there and here in the same PR. What `make help` cannot say:
   `unclassified` and the run is green. Then the held-out gate fills
   `classifier_quality` (B2.4), the classification is persisted and the two
   theme-share marts (B2.2, B2.5) are built, all honest to whatever classifier
-  ran. Each `ROWS` input builds its own file, `friction_ledger[.<input>].duckdb`
+  ran. After the marts loop, `rebuild()` fills the three cost-model marts
+  (B3.1–B3.4) from `models/cost_model.py` over the tracked fit — no key, no
+  reviews, no classify step, so they fill on every `ROWS` input, `none`
+  included. Each `ROWS` input builds its own file, `friction_ledger[.<input>].duckdb`
   under `data/`, so a sample never lands in the corpus: `captured` (default:
   the anchors, both snapshot CSVs, every capture under `data/cache/`), `none`,
   `synthetic`, `samples` (every frozen sample through its real parser; CI). A
@@ -660,32 +667,26 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 ## Current status
 
-**Active: `tooling/review-stack`** (no spec: not a phase; 2026-09-05), two
-rounds of work. Round one — the review stack: CLAUDE.md → "Working with the
-model" and "How the tooling fires across a phase"; `senior-architect` +
-`/challenge` + the `challenge-gate` hook; the three path-scoped standards
-preloaded into the agent that reviews the same surface; code-reviewer and
-security-reviewer rewritten coverage-first; models and effort pinned. Its own
-round 1 (5 agents, 30 rows) fixed in full. Round two — the lean pass: the
-ladder as the first section of `code-craft` and tagged craft findings; the
-mechanical craft bars as ruff rules; the three loop commands as on-request
-skills; the `Challenged:` stamp keyed to the spec's Invariants and Done-when;
-naming-the-target as a hashed `check-docs` check; the `ask-gate` hook for the
-push/PR/merge/`confirm` STOPs; a fast-red `run-tests` hook; this file cut to
-what is recorded nowhere else. Round 2 (5 agents, 21 rows, 0 blockers) fixed
-in full. Pilot: `/challenge` on the Phase 8 spec before
-it is approved.
+**Active: `phase-8a-cost-model`** (spec APPROVED 2026-09-06, challenged round 1,
+stamp `f52519a7`). The cost-model half of the Phase 8 split (Beat 3): the
+formulas and parameters as data in `models/cost_model.py`, the strict fit reader
+`opendata/fit.py::read_fit`, three DDL-only Python-fed marts
+(`cost_model_params`, `cost_model_outputs`, `cost_curves`) filled inside
+`rebuild()` from the tracked fit, the `make model` target, and B3.1–B3.4 flipped
+Pending → Modeled. The DONE command (`make model && make idempotency-check
+ROWS=synthetic && make check-backing && make test`) passes; 807 tests. Review
+round not yet run.
 
 **Merged:** Phases 0a–7b in order, each with its spec under `specs/` (the
-Delivered paragraph) and its DECISIONS appendix. The latest, Phase 7b — open
-data: DAMIR slice + fitted claim-cost distribution (PR #15, 2026-09-05) — lands
-`opendata/`, `fixtures/damir/` and the tracked fit `data/damir/
-claim_cost_fit.csv` that Phase 8 reads; B3.3 and B4.3 stay Pending until
-their marts land.
+Delivered paragraph) and its DECISIONS appendix. Phase 7b — open data: DAMIR
+slice + fitted claim-cost distribution (PR #15, 2026-09-05) — landed
+`opendata/`, `fixtures/damir/` and the tracked fit
+`data/damir/claim_cost_fit.csv` that Phase 8a reads. The tooling round
+(`tooling/review-stack`, PR #16) landed the review stack and the lean pass.
 
-**Next:** Phase 8 — cost model + guardrail simulator (`models/`), spec first,
-challenged before approval.
+**Next:** Phase 8b — the guardrail simulator and the hold timer (B4.1–B4.3),
+spec first, challenged before approval.
 
-Open BACKLOG rows: **31**.
+Open BACKLOG rows: **35**.
 
 (Update this section at the end of every working day.)

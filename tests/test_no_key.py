@@ -177,6 +177,26 @@ def test_theme_share_shows_unclassified_band(monkeypatch, tmp_path):
         conn.close()
 
 
+def test_no_key_model_marts_are_filled(monkeypatch, tmp_path):
+    # The three cost-model marts (Beat 3) compute over the tracked lognormal fit,
+    # not the model API — with no key they fill exactly the same. Durable no-key
+    # guard from Phase 8a on.
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    rebuild("duckdb", "synthetic", root=tmp_path, run_id="synthetic")
+    conn = connect("duckdb", database=database_for("synthetic", tmp_path))
+    try:
+        for mart, expected in (
+            ("cost_model_params", pins.COST_PARAM_ROWS),
+            ("cost_model_outputs", pins.COST_OUTPUT_ROWS),
+            ("cost_curves", pins.COST_CURVE_ROWS),
+        ):
+            assert (
+                conn.execute(f"select count(*) from {mart}").fetchone()[0] == expected
+            )
+    finally:
+        conn.close()
+
+
 def test_no_key_scores_call_no_model(monkeypatch, tmp_path):
     # Grading is offline: even with the SDK importable, scoring and writing the
     # mart never touch it — the gate compares stored predictions to the key.

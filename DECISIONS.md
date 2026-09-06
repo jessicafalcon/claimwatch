@@ -1790,3 +1790,105 @@ conduct, thin on craft and on general secure-coding classes; code-reviewer and
 security-reviewer were each partial, and this branch closes both gaps. Its own
 round 1 (five agents, 30 consolidated rows, 0 code blockers) was fixed in full.
 
+### Phase 8a
+
+`specs/phase-8a-cost-model.md`, APPROVED 2026-09-06 (challenged round 1, stamp
+`f52519a7`). The cost-model half of a Phase 8 split (PROJECT_BRIEF.md §7, Beat 3):
+8a lands B3.1–B3.4; 8b lands the guardrail simulator and the hold timer
+(B4.1–B4.3). The split follows the seam the brief draws — §7's formulas and
+guardrail toggles are the cost model, the synthetic claims and the day/euro
+threshold are the simulator — and keeps each spec under the ~6-decision cap (the
+7a/7b precedent). 8a leaves 8b a `scenario` column on every output and curve row,
+so Beat 4's "the curves move" panels read the same marts.
+
+Six pinned decisions:
+
+1. **Formulas and parameters are data in `models/cost_model.py`; the layer is
+   handed the fit and computes.** `FORMULAS` is an ordered tuple of
+   `Formula(name, expression, kind, fn)`, `kind ∈ {point, curve}`; `PARAMETERS`
+   is a tuple of `Parameter(name, default, unit, sourcing, citation, low, high)`.
+   `defaults(fit)` builds the value set from the static table plus the `mu`,
+   `sigma`, `emp_p50` rows the caller's `Fit` supplies, so `models/` reads no
+   file, no clock, no key (invariant 8, an import allowlist: `math`,
+   `dataclasses`, `collections.abc`). Rejected: formulas in a YAML the code
+   evaluates from text (a string that can drift, and evaluating text is the wrong
+   guard); a formula in SQL (a second copy, and `exp` is a dialect risk); the
+   crossover as a `point` entry re-running the grid at every grid point.
+2. **Every parameter carries a range; sourced defaults cite the record the way
+   the anchors do.** The four scale anchors are `sourced` with citation
+   `PROJECT_BRIEF.md §6`, said to be second-hand floors (the anchors' precedent,
+   since a disclosure address carries the brand — Phase 3a D1); range = the floor
+   to twice it (the study's exploration bound, printed as such). `mu`/`sigma`
+   range = the fit ± 2 standard errors (`se_mu = σ/√n`, `se_sigma = σ/√2n`),
+   arithmetic printed; `emp_p50`'s range is itself. `mean_claim`'s expression
+   text carries the bias direction (a DAMIR cell sums ≥ 1 claims, so the mean
+   overstates a claim and understates `claims`/`friction_cost`), and
+   `median_cell` prints beside it as the contrast. Rejected: a second anchors CSV
+   under read-only `fixtures/`; the fit reader in `models/`; a range only on
+   unsourced parameters; the fixture's arithmetic mean as a third sibling (needs
+   a new 7b artifact row — a BACKLOG row).
+3. **Three DDL-only Python-fed marts, one writer, filled inside `rebuild()`.**
+   `cost_model_params`, `cost_model_outputs`, `cost_curves` are `create or
+   replace table (…)` shapes run by the generic marts loop (the
+   `classifier_quality` precedent); `pipeline/build.py::write_model_marts` clears
+   and inserts the three in one transaction, and `rebuild()` calls it after
+   `build_derived` on every input — so `idempotency-check` (which calls
+   `rebuild()` only) and every caller see filled marts. Rejected: `create … as
+   select` (arithmetic in SQL); a model step in `pipeline/cli.py` after the
+   classify step (the pre-challenge proposal: `idempotency_check` would have
+   diffed three empty tables).
+4. **A fixed 41-point flag-rate grid; two crossovers, both grid rules; the
+   default is marked.** The grid is 0.000–0.200 step 0.005 per scenario;
+   `crossover_flag_rate` is the first grid point with net < 0 (the curves cross),
+   `marginal_crossover_flag_rate` the first grid point whose net is below the
+   previous point's (each extra flag costs more than it recovers), each null when
+   none. Net is concave in the flag rate, so each rule fires at most once.
+   Rejected: a bisection or analytic root (the grid *is* the arithmetic a reader
+   redoes); one crossover only (the chart sentence and the drawn point would
+   disagree).
+5. **Scenarios are a closed set of parameter overrides, named by their effect.**
+   `SCENARIOS = {baseline, contacts_once, churn_halved, both}` — the §7 effects,
+   `both` composing the two atomic toggles so the halving rule is written once.
+   Naming by effect (not `ask_once`/`hold_timer`) frees the `scenario` column for
+   8b's simulated hold timer with no collision. Rejected: one mart per scenario;
+   free-text names.
+6. **Written numbers are rounded to fixed places at one site.** Euros to 2, rates
+   and log-euros to 6, counts whole, all through `rounded(unit, value)` — the
+   writer, `make model`'s printer and the tests call it, so mart rows and printed
+   text are byte-identical. Rejected: `Decimal` end to end (the exponential forces
+   float anyway); rounding in the writer and again in the printer.
+
+The four amendments folded in after challenge round 1 (recorded in the spec's
+disposition block): marts filled inside `rebuild()` (not a CLI step); two
+crossovers (not one); scenarios by effect (not `hold_timer`, which would collide
+with 8b); a range on every parameter (not only unsourced). Two questions
+answered: `PROJECT_BRIEF.md §6` is a second-hand citation the study labels as a
+floor (not a followable address); B4.1 flips as one beat in 8b (not in 8a).
+
+Also decided in this phase:
+
+- **`cost_per_contact` stays `unsourced`.** No citable public customer-contact
+  cost benchmark was handed over before build; brief §7 allows either. A BACKLOG
+  row carries the trigger (one found → a one-cell flip to `sourced`).
+- **`opendata/fit.py::read_fit` is the strict mirror of `write_fit`.** It reads
+  the tracked numbers-only artifact back to the `Fit` and its deciles — every
+  declared name present, numeric and finite, `n` a positive integer, nothing
+  else; an unknown, missing, duplicate or non-numeric name refuses with the name.
+  A 64 KB size cap refuses a file that is not the shape we wrote. The caller
+  (`read_model_fit`) hands the result to the model layer, so `models/` reads no
+  file.
+- **The `emp_p50` contrast.** The cost model's `Fit` carries `emp_p50` (the
+  median DAMIR cell), which the caller lifts from `read_fit`'s deciles — the
+  spec's `defaults(fit)` "the caller's `Fit` supplies mu/sigma/emp_p50" made
+  concrete as a small `models`-local dataclass, so the layer imports no
+  `opendata` type.
+- **Gotchas.** DuckDB binds Python `None` into a `double` column as SQL NULL with
+  no cast surprise, so a scenario whose net never turns negative stores a null
+  crossover (`churn_halved`, `both`); confirmed under `idempotency-check`. The
+  `create or replace table` in the generic marts loop followed by delete/insert
+  in `write_model_marts` on the same connection is byte-stable across two
+  rebuilds (the `classifier_quality` order holds). The defaults' outputs were
+  computed before any pin was typed: the baseline curves cross at flag rate 0.095
+  with the 0.05 "you are here" marker to its left — the story holds without
+  tuning a default.
+

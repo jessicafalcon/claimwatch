@@ -5,7 +5,7 @@
 
 .PHONY: help setup test lint check-docs check-backing review-gate \
         rebuild idempotency-check confirm reset scrape record-snapshots \
-        label-sample classify-eval fetch-damir sample-damir fit-damir
+        label-sample classify-eval fetch-damir sample-damir fit-damir model
 
 # User variables reach recipes ONLY as make values via `$(call _Q,$(value VAR))`
 # — UNEXPANDED and single-quoted — so a value like `SPEC='$(shell …)'` or
@@ -94,3 +94,6 @@ sample-damir: ## draw a representative fixture from a cached DAMIR month into fi
 
 fit-damir: ## fit the lognormal to fixtures/damir and write data/damir/claim_cost_fit.csv (offline, deterministic)
 	uv run python -m pipeline fit-damir
+
+model: ## print the cost model — parameters, formulas beside their values, the two crossovers (offline, no variable, writes nothing)
+	uv run python -m pipeline model
