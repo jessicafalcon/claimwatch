@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-import check_backing  # noqa: E402
+import check_backing
 
 ROOT = Path(__file__).resolve().parent.parent
 

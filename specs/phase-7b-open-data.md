@@ -5,7 +5,7 @@ Contract for the `phase-7b-open-data` branch. Source: PROJECT_BRIEF.md §7 and
 the Phase 7 split (7a, the theme-share marts, merged as PR #14). Depends on
 Phase 7a merged.
 
-**Status: APPROVED 2026-09-04 — in progress.** No new dependency: the
+**Status: APPROVED 2026-09-04 — DELIVERED 2026-09-05, PR #15 merged.** No new dependency: the
 DAMIR fetch is a plain bulk file download over stdlib `urllib.request` (so
 `ingest/fetch.py` stays the only `httpx` import); the fit is stdlib `statistics`
 + `math`.

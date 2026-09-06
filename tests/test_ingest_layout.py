@@ -302,11 +302,38 @@ def test_brand_carrying_strings_appear_only_in_the_declarations():
 # declared token, so a new form that shares no letter with today's tokens is
 # caught the day it is declared (round 3, code-reviewer #10).
 ADDRESS_WORDS = frozenset(
-    "https www com fr html json id hl gl "
-    "apple apps app itunes rss customerreviews sortby mostrecent "
-    "google play store details "
-    "opinion assurances assureur page "
-    "trustpilot review ca languages all".split()
+    [
+        "https",
+        "www",
+        "com",
+        "fr",
+        "html",
+        "json",
+        "id",
+        "hl",
+        "gl",
+        "apple",
+        "apps",
+        "app",
+        "itunes",
+        "rss",
+        "customerreviews",
+        "sortby",
+        "mostrecent",
+        "google",
+        "play",
+        "store",
+        "details",
+        "opinion",
+        "assurances",
+        "assureur",
+        "page",
+        "trustpilot",
+        "review",
+        "ca",
+        "languages",
+        "all",
+    ]
 )
 
 

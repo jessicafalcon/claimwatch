@@ -465,7 +465,7 @@ def test_the_set_admits_exactly_the_scale_the_site_declares():
     best = set(re.findall(r'itemprop="bestRating" content="([^"]*)"', _page(1)))
     assert worst == {"1", "0"} and best == {"5"}  # reviews 1..5; the aggregate 0..5
     assert (min(REVIEW_RATINGS), max(REVIEW_RATINGS)) == (Decimal(1), Decimal(5))
-    assert REVIEW_SCALE == (Decimal(1), Decimal(5))
+    assert (Decimal(1), Decimal(5)) == REVIEW_SCALE
 
 
 def test_the_same_scale_spelled_with_a_fraction_is_the_same_scale():

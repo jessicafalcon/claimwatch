@@ -74,7 +74,7 @@ class Source:
     # literal `sample` exists only in the samples database.
     sample: bool = False
 
-    def __post_init__(self) -> None:
+    def __post_init__(self) -> None:  # noqa: C901 -- one refusal per declared field
         if not _SLUG.fullmatch(self.name) or not _SLUG.fullmatch(self.platform):
             raise ValueError(f"source {self.name!r}: name and platform are slugs")
         if self.parser is not None and self.parser not in PARSERS:
@@ -143,9 +143,9 @@ def app_store_source(
     app_id: int,
     country: str,
     listing: str,
-    fetchable: bool,
     terms: str = "",
     *,
+    fetchable: bool,
     declared_on: str,
     profile: str = "fr-digital-first",
     segment: str = "digital-first",

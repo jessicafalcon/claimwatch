@@ -40,7 +40,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from review_common import ROOT  # noqa: E402
+from review_common import ROOT
 
 COLUMNS = ("Study claim", "Mart table", "SQL file", "Upstream source", "Tag")
 TAGS = frozenset({"Measured", "Documented", "Modeled", "Pending"})

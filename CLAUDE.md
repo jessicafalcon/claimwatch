@@ -51,271 +51,135 @@ in the middle, and come out on the right as the numbers the study shows.
 
 ## Repo map
 
-- `PROJECT_BRIEF.md` — the master document. `SPEC.md` — the five
-  parts of the study (called *beats* in the row ids `B<beat>.<n>`) and the
-  exact chart list, each with its tag and BACKING row.
-  `BACKING.md` — the evidence contract (§8 of the brief); `make check-backing`
-  enforces it. `DECISIONS.md`, `BACKLOG.md` — the records.
-- `docs/PLAN.md` — the design of this workflow: adopt/adapt/drop verdicts on
-  the reference project, the phase re-cut, the decisions taken.
+One line per place. The detail lives in each module's docstring, each spec's
+Delivered paragraph and `make help`, not here.
+
+- `PROJECT_BRIEF.md` (the master document), `SPEC.md` (the five parts —
+  *beats* in the row ids `B<beat>.<n>` — and every chart with its tag and
+  BACKING row), `BACKING.md` (the evidence contract, enforced by `make
+  check-backing`), `DECISIONS.md` and `BACKLOG.md` (the records),
+  `docs/PLAN.md` (how this workflow was designed).
 - `specs/` — one spec per phase from `specs/TEMPLATE.md`, ONE DONE command
-  each. The "Delivered" paragraph is appended to the spec at exit.
+  each; the "Delivered" paragraph is appended at exit.
 - `scripts/` — the offline guards, none a pytest file: `review_gate.py`,
-  `check_docs.py`, `check_backing.py`, `review_common.py` (shared).
-- `tests/` — pytest; no services, no network, no API key. `tests/pins.py`
-  holds every pinned number.
-- `.claude/` — agents (report-only), commands, the run-tests hook. Settings
+  `check_docs.py`, `check_backing.py`, `review_common.py`;
+  `neutrality_hashes.txt` (the hashed tokens the naming check reads).
+- `tests/` — pytest; no services, no network, no key. `tests/pins.py` holds
+  every pinned number.
+- `.claude/` — agents (report-only), skills (the three standards,
+  `/challenge`, the three on-request loop steps), the three hooks. Settings
   are local-only and gitignored.
 - `.github/workflows/ci.yml` — lint, check-docs, check-backing, test, then
-  rebuild + idempotency-check twice: once on the synthetic reviews, once on
-  every frozen sample through its real parser. `weekly.yml` — the scheduled
-  scrape (`schedule`/`workflow_dispatch`, `contents: write`): `make confirm
-  scrape` then `make record-snapshots`, then a fixed brand-free commit of
-  `data/snapshots/` only (the one workflow that writes to the repo).
-  `.github/pull_request_template.md` — the PR body.
+  rebuild + idempotency-check on the synthetic reviews and on every frozen
+  sample. `weekly.yml` — the scheduled scrape; the one workflow that writes
+  to the repo, `data/snapshots/` only. `.github/pull_request_template.md`.
 - `pyproject.toml`, `uv.lock`, `.python-version`, `.pre-commit-config.yaml` —
   the toolchain (uv, ruff, pytest, pre-commit), versions pinned in lockstep.
-- `sql/raw/`, `sql/staging/`, `sql/marts/` — plain SQL, one file per table:
-  reviews (`raw_reviews` carrying each review's `segment`, stamped at load;
-  `stg_reviews`), platform snapshots
-  (`raw_platform_snapshots`, `stg_platform_snapshots` with each row's tag),
-  the declared page addresses with their attribution (`raw_source_pages`, the
-  declared-page registry captures are checked against — NOT how a review gets
-  its segment, since Phase 7a A1), and the four Beat 1–2 marts they feed
-  (`rating_trend`, `channel_gap`, `platform_stats`, `peer_ratings`); plus
-  `classifier_quality` (B2.4, Beat 2), the first Python-fed mart — its `.sql` is
-  DDL only (the shape), the CLI classify step scores the held-out fold and
-  inserts (Phase 6b); plus `stg_classified_reviews` (the persisted review × theme
-  classification, Python-fed) and the two theme-share marts over it,
-  `theme_share_by_month` (B2.2) and `theme_share_by_segment` (B2.5), grouped by
-  the review's `segment` (Phase 7a);
-  `pipeline/` —
-  `warehouse.py` (the one place that knows DuckDB from Snowflake), `build.py`
-  (raw→staging→marts; the review load stamps `segment`;
-  `write_classifier_quality` fills the B2.4 mart; `write_classified_reviews` +
-  `build_theme_share_marts` fill B2.2/B2.5, run by the classify step and
-  excluded from the generic marts loop), `cli.py`/`__main__.py` (the validating
-  `make` entry),
-  `sql_lint.py` (the portability/clock denylist the tests use),
-  `metrics.py` (reviews per month — a pinned query, not a mart; folds into
-  B5.2 in Beat 5), `label_sample.py` (the `make label-sample` draw — reads
-  `stg_reviews`, writes the gitignored labeling sheet; Phase 5a).
-  `fixtures/synthetic/` — hand-written fake reviews, read-only after Phase 1;
-  `fixtures/anchors/` — the brief's §6 public figures with source URLs, one
-  row per snapshot with its profile, segment, channel and the stat-row
-  figures (frozen in Phase 1, re-frozen in Phase 3a; seeded into
-  `platform_snapshots` in every rebuild but `ROWS=none`, tagged Documented);
-  `fixtures/app-store/` — a hand-written capture of the App Store feed in its
-  exact shape: three pages, their meta files and the host's real robots rule
-  (frozen in Phase 2, robots re-frozen in 3a); `fixtures/listings/` — a
-  hand-written store listing page with its machine-readable rating block
-  (frozen in Phase 3a);
-  `fixtures/opinion-assurances/` — a hand-written review profile in the page's
-  microdata shape, three pages of a fake, nameless profile (frozen in Phase
-  3a); `fixtures/trustpilot/` — a hand-written authorized export in
-  webscraper.io's column shape, four reviews of a fake, nameless profile
-  (frozen in Phase 3c). Every set carries a `MANIFEST.sha256`; `ROWS=samples`
-  runs each through its real parser.
-- `ingest/` — the scrapers. A *capture* is one run's saved copy of the pages
-  exactly as they arrived, with each page's address and time beside it and the
-  robots file they were checked against. `politeness.py` (the good manners of
-  a fetch in one place: read robots.txt first, say who we are, wait between
-  requests, the hosts we may contact), `robots.py` (the robots.txt matcher,
-  RFC 9309: `*`, `$`, longest match wins, Crawl-delay; matched directly, in
-  linear time), `sources.py` (every source as one declaration: platform,
-  host, parser, page addresses, cache directory, profile / segment / channel,
-  and whether its site lets us fetch it — the one place a brand-carrying
-  address may appear; the one binding of the cache root), `parsed.py` (what
-  every parser hands back and how it refuses; the one place the snapshot
-  measures and the review ratings — half-steps 1 to 5 — are declared with
-  their bounds), `captures.py` (reads captures
-  back for any parser; the meta checked against the source's declared host),
-  the parsers — `app_store.py` (the review feed), `listing.py` (a store or
-  platform page's rating block, one snapshot row), `opinion_assurances.py`
-  (a profile page's schema.org microdata: review rows and one snapshot row),
-  `trustpilot.py` (a profile's reviews from an authorized export in
-  webscraper.io's column shape: review rows, no snapshot) — and `fetch.py` (the
-  only `httpx` import; writes captures under `data/cache/<platform>/<source>/`).
-  Trustpilot has TWO sources in `ingest/sources.py`, the App Store feed/listing
-  split: `fr-digital-first-trustpilot` *(Phase 3b)* is the hand-read snapshot
-  (not fetchable — robots disallows our crawler; its 3.9/1,072 rating and count
-  are read into `manual_snapshots.csv`), and `fr-digital-first-trustpilot-
-  reviews` *(Phase 3c)* is the review corpus, read from a written-authorized
-  OFFLINE export (`parser=trustpilot`, `fetchable=False` — the crawler still
-  never runs; the export is saved as a capture and read from disk). A live
-  fetch and a scheduled refresh stay deferred (BACKLOG). *(Phase 5a)*
-  `classify/` — `labels.py` (the closed seven-label set + `review_id`),
-  `split.py` (the `sha256(review_id) % 5` held-out split), `eval/` (the ONLY
-  reader of the hand-labeled answer key: `labels_io.py`, `precision.py` — the
-  tuning-fold scorer — `gate.py` — the held-out precision+recall scorer (Phase
-  6b) — and `labels.csv`, carrying the synthetic corpus's ground
-  truth since Phase 5b). *(Phase 5b)* `rules.yaml` (the patterns, one group per
-  emitting label), `rules.py` (load + word-start match → `(review_id, theme)`
-  rows); *(Phase 6a)* `llm.py` (the ONE model call site: lazy `anthropic` import,
-  strict closed-set parse of the reply, `None` decider when no key), `cache.py`
-  (the gitignored, text-free decision cache under `data/classify/`, keyed
-  `(review_id, prompt_version, model)`), `combined.py` (`classify_all`: rules +
-  the model for what they left `unclassified` → one row per review × theme,
-  Python-only, no mart). *(Phase 7b)* `opendata/` — open-data ingest and the
-  claim-cost fit, its own package (DAMIR names no insurer, so no brand token; it
-  is not `ingest/`, the review scrapers, nor Phase 8's `models/`): `sources.py`
-  (the one Open DAMIR declaration — dataset URL, the `PRS_REM_MNT` column, the
-  `;` delimiter, the `YYYY-MM` shape, the cache dir derived from the one
-  `CACHE_ROOT` binding), `fetch.py` (the developer-run bulk download over stdlib
-  `urllib`, identifying header from `ingest/politeness.py::IDENTIFYING_HEADERS`),
-  `slice.py` (the guarded read of the reimbursed-amount column — positive
-  numbers only, drop-and-count — and the systematic fixture draw), `fit.py` (the
-  log-moments lognormal fit + goodness-of-fit deciles; writes the tracked fit
-  artifact). *(Phase 8)* `models/` —
-  `cost_model.py` (`FORMULAS`), `guardrail_sim.py`. *(Phase 9)* `study/` —
-  Metabase setup + the HTML export. *(Phase 10)* `dags/friction_ledger.py`.
-  `fixtures/damir/` — a small, real, brand-free slice of Open DAMIR's
-  `PRS_REM_MNT` column with its `MANIFEST.sha256`, drawn by `make sample-damir`,
-  read-only after Phase 7b; the fit CI reproduces offline.
-- `data/` — gitignored working output (corpus, captured pages, `*.duckdb`);
-  `data/snapshots/` is one tracked subtree: `manual_snapshots.csv`, the
-  figures a person read off a page whose terms forbid a robot (a declared
-  source name, a day, five numbers and the word `page`; it carries no address
-  and no person's name), loaded as Measured; and `fetched_snapshots.csv`, the
-  weekly cron's fetched figures (a source slug, the capture's instant and the
-  five figures; origin `fetch`, also Measured, also no address and no body).
-  `data/damir/` (Phase 7b) is the other tracked subtree: `claim_cost_fit.csv`,
-  the numbers-only lognormal fit (`mu`, `sigma`, `n` and the goodness-of-fit
-  deciles) Phase 8 reads; the raw fetched month under `data/cache/damir/` stays
-  gitignored.
+- `sql/raw/`, `sql/staging/`, `sql/marts/` — plain SQL, one file per table;
+  the header names the grain, the provenance columns and the BACKING rows
+  fed. A Python-fed mart (`classifier_quality`, `stg_classified_reviews`, the
+  two theme-share marts) has a DDL-only `.sql` and one writer in
+  `pipeline/build.py`, excluded from the generic marts loop.
+- `pipeline/` — `warehouse.py` (the one place that knows DuckDB from
+  Snowflake), `build.py` (raw → staging → marts; the review load stamps
+  `segment`), `cli.py` (the validating `make` entry), `sql_lint.py` (the
+  portability/clock denylist), `metrics.py`, `label_sample.py`.
+- `ingest/` — the scrapers: `politeness.py`, `robots.py` (RFC 9309),
+  `sources.py` (every source as one declaration; the one place a
+  brand-carrying address may appear; the one binding of the cache root),
+  `parsed.py` (what every parser hands back and the declared bounds),
+  `captures.py`, the parsers (`app_store.py`, `listing.py`,
+  `opinion_assurances.py`, `trustpilot.py` — the last reads an authorized
+  OFFLINE export; the crawler never runs there), `fetch.py` (the only `httpx`
+  import). A *capture* is one run's saved copy of the pages exactly as they
+  arrived, with each page's address and time and the robots file beside it.
+- `classify/` — `labels.py` (the closed seven-label set), `split.py`
+  (`sha256(review_id) % 5`), `rules.yaml` + `rules.py` (the rules layer),
+  `llm.py` (the ONE model call site), `cache.py` (the text-free decision
+  cache under `data/classify/`), `combined.py` (`classify_all`), `eval/` (the
+  ONLY reader of the hand-labeled answer key `labels.csv`: the tuning-fold
+  scorer and the held-out gate).
+- `opendata/` — Open DAMIR (no insurer, no brand token): `sources.py`,
+  `fetch.py` (stdlib `urllib`), `slice.py` (the guarded read), `fit.py` (the
+  log-moments lognormal fit that writes the tracked fit artifact).
+- `models/` *(Phase 8)* — `cost_model.py::FORMULAS`, `guardrail_sim.py`;
+  `study/` *(Phase 9)* — Metabase setup + the HTML export; `dags/` *(Phase
+  10)* — `friction_ledger.py`.
+- `fixtures/` — read-only after Phase 1, each set with a `MANIFEST.sha256`:
+  `synthetic/` (hand-written fake reviews), `anchors/` (brief §6 figures with
+  source URLs, seeded as Documented in every rebuild but `ROWS=none`),
+  `app-store/`, `listings/`, `opinion-assurances/`, `trustpilot/` (hand-written
+  captures in each source's exact shape; `ROWS=samples` runs each through its
+  real parser), `damir/` (a small, real, brand-free slice of `PRS_REM_MNT`).
+  Re-freezing is a `Freeze:` line in the spec plus a DECISIONS entry.
+- `data/` — gitignored working output (corpus, captures, `*.duckdb`) with two
+  tracked subtrees: `data/snapshots/` (`manual_snapshots.csv`, figures a
+  person read off a page whose terms forbid a robot; `fetched_snapshots.csv`,
+  the weekly cron's figures — numbers only, no address, no body, no name;
+  both loaded as Measured) and `data/damir/claim_cost_fit.csv` (the
+  numbers-only fit Phase 8 reads).
 
 ## Commands (macOS, uv)
 
-`make help` lists them. Each later phase adds its targets here in the same PR.
+`make help` lists every target with its one-line meaning; a later phase adds
+its targets there and here in the same PR. What `make help` cannot say:
 
-- `make setup` — `uv sync`, `pre-commit install`
-- `make test` — pytest; offline, no services, no key
-- `make lint` — ruff via pre-commit (rewrites files; never inside a gate)
-- `make check-docs` — links/anchors, named make targets, banned words,
-  glossary size, BACKLOG count (`scripts/check_docs.py`)
-- `make check-backing` — BACKING rows ↔ `sql/marts` files ↔ tags ↔ sources ↔
-  `SPEC.md` citations (`B<beat>.<n>` both ways)
-- `make review-gate [SPEC=specs/<f>.md] [BASE=main]` — test + ruff (read-only)
-  + check-docs + check-backing + fixtures; with SPEC, Evidence ids and
-  Record-updates files. One line per check, exit 1 on FAIL, 2 on a refused
-  SPEC/BASE. `/review-round N` runs it first.
-- `make rebuild [TARGET=duckdb] [ROWS=captured|none|synthetic|samples]` —
-  build the warehouse from raw (DuckDB; Snowflake defers to Phase 10), print
-  reviews per month, then classify `stg_reviews` and print the outcome (reviews
-  / theme rows / positive / `unclassified` — the "not yet classified" band). The
-  classifier is the rules plus, only when `ANTHROPIC_API_KEY` is set and only for
-  the reviews the rules left `unclassified`, one model call each (cached in the
-  gitignored `data/classify/decisions.csv`); with no key those reviews stay
-  `unclassified` and the run is still green (Phase 6a). It then grades the
-  classifier on the held-out fold (fold 4) and writes the `classifier_quality`
-  mart (B2.4, precision + recall per label, Measured), printing a one-line gate
-  summary; the mart reflects whatever classifier ran, so with no key it is
-  rules-only and honest (Phase 6b). It also persists the classification to
-  `stg_classified_reviews` and builds the two theme-share marts —
-  `theme_share_by_month` (B2.2) and `theme_share_by_segment` (B2.5), the share of
-  each theme by segment, `unclassified` shown as its own band; the marts group by
-  the review's `segment` (stamped at load) and reflect whatever classifier ran,
-  so the no-key run populates them rules-only and honest (Phase 7a). `ROWS` names
-  what is
-  loaded; each input builds its own database file, so a sample never lands in the
-  corpus. The default,
-  `captured`, loads the anchors, the hand-read rows in
-  `data/snapshots/manual_snapshots.csv`, the fetched series in
-  `data/snapshots/fetched_snapshots.csv` and every capture under `data/cache/`
-  (with no capture it says so); `none` runs it end to end with zero rows;
-  `synthetic` loads the review fixture and the anchors; `samples` runs every
-  frozen sample through its real parser (CI does). A raw table already in the
-  file must be the one its `sql/raw/` file declares — name, type and
-  nullability, column by column in the file's order, read from the engine's
-  own catalog; otherwise the rebuild refuses naming the column and both sides,
-  since `create table if not exists` would keep the old column and the engine
-  would cast into it silently (`make confirm reset` first). Each `sql/raw/`
-  file holds exactly one table definition, so nothing else in the file can run
-  while that check happens. The file a rebuild writes is always the input's
-  own, `friction_ledger[.<input>].duckdb` under `data/`. The Phase 3a DONE
-  command is `make rebuild && make idempotency-check ROWS=captured`.
-- `make idempotency-check [TARGET=] [ROWS=synthetic]` — rebuild twice, diff
-  per-table row counts (the run-twice property as a command); same `ROWS`
-  values as `rebuild`, but this one defaults to `synthetic`; pass
-  `ROWS=captured` to prove it on real rows.
-- `make scrape [SOURCE=<declared name>]` — NETWORK, developer-run, never by an
-  agent: fetch each declared source's pages (a review feed, a review profile,
-  a store listing) into a new capture under `data/cache/<platform>/<source>/`,
-  robots.txt first and every page checked against it, ≥ 2 s apart per host
-  (more if the site asks), identifying User-Agent, no proxy, no retry, at most
-  60 pages per source. Needs the `confirm` goal before it in the same
-  invocation, `make confirm scrape`, as `reset` does (a goal cannot come from
-  the environment; a variable's "command line" origin can, through
-  `MAKEFLAGS`). A plain run skips, with one line, any source we have
-  recorded as one not to fetch (its robots file or its terms say no; the
-  reason and date sit beside the source in code and in DECISIONS). It refuses
-  — exit 2 — a source named by `SOURCE=` that we do not fetch, one with no
-  page address filled in, and one whose page robots.txt disallows.
-- `make record-snapshots` — read the captures already on disk under
-  `data/cache/` and append each fetchable source's fresh snapshot figures to
-  the tracked `data/snapshots/fetched_snapshots.csv` (numbers only: a source
-  slug, the capture's instant and the five figures — the address and
-  attribution come from the declaration, so no brand and no review body enters
-  the file). Offline and non-destructive, so no `confirm` gate; idempotent
-  (recording the same capture twice writes no new row). The weekly workflow
-  runs it after `make confirm scrape`; `rebuild ROWS=captured` reads the file.
-- `make label-sample N=<n>` — draw N reviews for a person to hand-label. The
-  draw is written to the gitignored `data/label_sample.csv` (`review_id,
-  source_url, text`), read from the built corpus's `stg_reviews`; the reviews
-  are taken in `sha256(review_id)` order, so the draw is deterministic and a
-  larger N is a superset. N is a positive ASCII integer (validated in Python;
-  the output path is fixed, not built from N).
-  Offline and non-destructive, so no `confirm` gate; a warehouse with no
-  `stg_reviews` writes a header-only sheet and says so. The person appends
-  `(review_id, theme)` rows to the tracked, text-free `classify/eval/labels.csv`
-  offline — the answer key, read only by `classify/eval/` (Phase 5a).
-- `make classify-eval` — the rules classifier's report: rebuild the synthetic
-  corpus, run the `rules.yaml` patterns over its `stg_reviews`, and print
-  per-theme precision on the four tuning folds (`sha256(review_id) % 5 != 4`)
-  plus the share of reviews the rules decided (vs left `unclassified` for the
-  model). Offline, no variable, no `confirm` gate; it grades against the
-  synthetic ground truth in `labels.csv` and never reads the held-out fold —
-  that is Phase 6's gate. `make test` pins the numbers (Phase 5b).
-- `make fetch-damir [MONTH=YYYY-MM]` — NETWORK, developer-run, never by an
-  agent: download one month of Open DAMIR (France's public aggregated
-  reimbursements) into the gitignored `data/cache/damir/`. A plain bulk GET over
-  stdlib `urllib` (no key, no account; `ingest/fetch.py` stays the only `httpx`
-  import), identifying User-Agent, no proxy, no retry; a re-fetch overwrites the
-  same file. Needs `make confirm fetch-damir` in the same invocation, like
-  `scrape`. `MONTH` is a closed `YYYY-MM` shape validated in Python; a national
-  month is gigabytes, so this never runs in CI (Phase 7b).
-- `make sample-damir [MONTH=YYYY-MM] [N=1000]` — offline, developer-run: draw a
-  small, representative fixture from a cached month — every k-th valid
-  `PRS_REM_MNT` across the whole file (systematic, no RNG, so it is not a biased
-  corner) — into the tracked `fixtures/damir/` with its `MANIFEST.sha256`. No
-  `confirm` gate; it fetches nothing and deletes no data (Phase 7b).
-- `make fit-damir` — offline, deterministic: fit a lognormal to `fixtures/damir/`
-  by log-moments (`mu = mean(ln x)`, `sigma = population-std(ln x)` — closed-form,
-  no optimizer, no clock, no RNG) and write the tracked `data/damir/
-  claim_cost_fit.csv` (`mu`, `sigma`, `n` and the goodness-of-fit deciles Phase 8
-  reads). Prints the fit and the fit-vs-real table. A missing fixture is a clear
-  message and exit 1 (Phase 7b).
-- `make confirm` — arms the destructive or network target that follows it in
-  the SAME invocation and nothing else: `make confirm reset`, `make confirm
-  scrape`, `make confirm fetch-damir`. The recipe stamps its make process's id;
-  the gated target passes
-  its own and runs only when the two are one process; the stamp is consumed
-  either way, so an earlier `confirm` confirms nothing later. `confirm` arms
-  only when `reset`, `scrape` or `fetch-damir` follows it — `make confirm help`
-  refuses and
-  leaves no stamp — and only from the goal list make itself built (a
-  `MAKECMDGOALS` value from the environment, `MAKEFLAGS` or the command line
-  has another origin and is refused). The stamp is written only when none is
-  there, so a file already sitting in `data/` makes `confirm` refuse rather
-  than overwrite it. The gate holds against a variable definition, an
-  environment value, `MAKEFLAGS`, a stale invocation and a typo. It does not
-  hold against an environment that chooses what make reads or runs
-  (`MAKEFILES`, `PATH`), or against a same-user process writing `data/` while
-  make runs (the spec's Threat model says so); goals run in order even under
-  `make -j`.
-- `make reset [TARGET=duckdb]` — DESTRUCTIVE: drop every DuckDB file this repo
-  built, the corpus and one per rebuild input; needs `make confirm reset` (no
-  variable and no environment value counts).
+- **Offline, no key, no services, no `confirm` gate:** `setup`, `test`,
+  `lint` (ruff via pre-commit — REWRITES files, never inside a gate; the rule
+  set is the mechanical half of `code-craft`: complexity, branches,
+  statements, positional arguments, boolean flag parameters, simplifiable
+  forms, commented-out code, unused arguments — a function that stays whole
+  carries a one-line `# noqa: <rule> -- <reason>`), `check-docs` (links,
+  named targets, banned words, glossary size, BACKLOG count, naming the
+  target against `scripts/neutrality_hashes.txt`), `check-backing`,
+  `review-gate [SPEC=specs/<f>.md] [BASE=main]` (test + ruff read-only +
+  both checks + fixtures; with SPEC, Evidence ids and Record-updates files;
+  one line per check, exit 1 on FAIL, 2 on a refused SPEC/BASE;
+  `/review-round` runs it first), `idempotency-check [ROWS=synthetic]`
+  (rebuild twice, diff per-table row counts), `record-snapshots` (captures on
+  disk → `data/snapshots/fetched_snapshots.csv`, numbers only, idempotent),
+  `label-sample N=<n>` (a deterministic `sha256(review_id)`-ordered draw into
+  the gitignored `data/label_sample.csv`), `classify-eval` (the rules'
+  per-theme precision on the tuning folds, never the held-out fold),
+  `sample-damir [MONTH=] [N=1000]` (a systematic draw into `fixtures/damir/`),
+  `fit-damir` (the closed-form lognormal fit → `data/damir/claim_cost_fit.csv`).
+- **`make rebuild [TARGET=duckdb] [ROWS=captured|none|synthetic|samples]`** —
+  raw → staging → marts, reviews per month, then the classify step: the rules
+  plus, only when `ANTHROPIC_API_KEY` is set and only for the reviews the
+  rules left `unclassified`, one model call each, cached in the gitignored
+  `data/classify/decisions.csv` — with no key those reviews stay
+  `unclassified` and the run is green. Then the held-out gate fills
+  `classifier_quality` (B2.4), the classification is persisted and the two
+  theme-share marts (B2.2, B2.5) are built, all honest to whatever classifier
+  ran. Each `ROWS` input builds its own file, `friction_ledger[.<input>].duckdb`
+  under `data/`, so a sample never lands in the corpus: `captured` (default:
+  the anchors, both snapshot CSVs, every capture under `data/cache/`), `none`,
+  `synthetic`, `samples` (every frozen sample through its real parser; CI). A
+  raw table already in the file must match its `sql/raw/` declaration column
+  by column (name, type, nullability, read from the engine's own catalog) or
+  the rebuild refuses naming both sides — `create table if not exists` would
+  keep the old column and cast into it silently (`make confirm reset` first).
+- **`make confirm <target>`** arms the destructive or network target that
+  follows it in the SAME invocation and nothing else: `reset [TARGET=]`
+  (DESTRUCTIVE: drop every DuckDB file this repo built), `scrape [SOURCE=]`
+  (NETWORK: robots.txt first and every page checked against it, ≥ 2 s per
+  host, identifying User-Agent, no proxy, no retry, ≤ 60 pages per source; a
+  source recorded as not-to-fetch is skipped with one line; one named by
+  `SOURCE=` that we do not fetch, has no address, or whose page robots
+  disallows is refused, exit 2), `fetch-damir [MONTH=YYYY-MM]` (NETWORK: one
+  Open DAMIR month over stdlib `urllib` into `data/cache/damir/`; gigabytes,
+  never in CI). The recipe stamps its make process id and the gated target
+  runs only when the two are one process; the stamp is consumed either way
+  and written only when none is there. The gate holds against a variable
+  definition, an environment value, `MAKEFLAGS`, a stale invocation and a
+  typo; not against `MAKEFILES`/`PATH` or a same-user process writing `data/`
+  while make runs (the spec's Threat model says so). Network and paid targets
+  are developer-run, never by an agent; the `ask-gate` hook prompts before
+  `make confirm`.
+- **Variables** (`ROWS`, `TARGET`, `SOURCE`, `N`, `MONTH`, `SPEC`, `BASE`)
+  are validated in Python against a closed set or shape, reach it through
+  `$(call _Q,$(value VAR))`, are `unexport`ed, and never become a path by
+  concatenation.
 
 ## Deterministic first (the number one rule — brief §2.1)
 
@@ -375,7 +239,9 @@ study names no insurer as its subject.
   Python, never in SQL, which is what keeps the SQL portable.
 - **Neutrality.** A sector phenomenon, never an exposé. No insurer is named as
   the target of the study, in prose, code, comments or commits — insurers
-  appear only as sourced data points. Paraphrase, link, no personal data.
+  appear only as sourced data points. `make check-docs` checks it against
+  hashed tokens (`scripts/neutrality_hashes.txt`); the editor and the
+  reviewers judge the rest. Paraphrase, link, no personal data.
 
 ## Writing rules (brief §2.3)
 
@@ -448,7 +314,8 @@ one, and write one sentence in the README about why.
   STOP for approval before implementing.
 - ≤ ~6 pinned decisions / Done-when items per spec. Split otherwise.
 - One phase, one session, one diff. If a session reaches for a future phase's
-  files, stop.
+  files, stop. A finding outside the phase is a BACKLOG candidate in the
+  report, never a fix in this diff.
 - Build on the synthetic fixture first, prove correctness, then run on real
   scraped rows.
 - `fixtures/` is read-only after Phase 1. Re-freezing is a deliberate change
@@ -459,7 +326,7 @@ one, and write one sentence in the README about why.
   DECISIONS.md → Gotchas.
 - Do not add a feature that surfaces in none of the five parts.
 - Destructive commands (dropping a DuckDB file, truncating a table): only via
-  a `make` target that prompts unless the `confirm` goal precedes it in the
+  a `make` target that refuses unless the `confirm` goal precedes it in the
   same invocation (`make confirm reset`) — a goal, never a variable, since
   `$(origin)` cannot tell a `MAKEFLAGS` definition from the command line;
   tested against the installed make.
@@ -504,13 +371,102 @@ one, and write one sentence in the README about why.
 
 - Result first: what changed / passed / failed, then details.
 - Plain English, short sentences. No task restatement, no "I will now…", no
-  closing summary that repeats the middle.
+  closing summary that repeats the middle. A one-line statement of what the
+  next step produces is not a restatement; the report format below is the
+  recap.
 - One sentence if it fits. Explanations ≤ 4 sentences.
 - The banned-word list above applies to chat too. Show the property.
 - Code comments only where the code can't say it. One-line docstrings unless
   behavior is non-obvious.
 - Reports after a task: files touched, commands run, result, open risks, next
   step. Nothing else.
+
+## Working with the model (Fable 5.1 or Opus 4.8)
+
+The session model is chosen with `/model`. The four diff reviewers pin
+`model: claude-opus-4-8`; `senior-architect` and `coherence-auditor` run on
+the session's model (`model: inherit`); all six pin `effort: high` in
+`.claude/agents/*.md`, so a session switch changes only the two that follow
+it. The classifier's model (`classify/llm.py`, Haiku 4.5) is a data-path
+setting, not this section's subject. Source for the behaviours below: the
+Fable 5.1 and Opus 4.8 prompting guides, read 2026-09-05 (DECISIONS →
+Gotchas).
+
+**What the session does, on either model**
+
+- Effort. The session runs at `high` (`effortLevel` in the user settings);
+  the developer drops to `medium` for wording sweeps and record updates. A
+  long deliverable — a spec, the study export, this file — is written at
+  `high`, never `xhigh`/`max`, where the draft is written twice (as
+  reasoning, then as output).
+- Batch the reads. Before a tool call, list what the step needs, then request
+  every item that does not depend on another's result in one response.
+- Edit, do not regenerate. CLAUDE.md, SPEC.md, BACKING.md and the specs are
+  long; change the lines that change, with the smallest unique anchor.
+- Verify, do not recall. For `make`, `uv`, DuckDB, GitHub Actions and Claude
+  Code hooks, run the thing or read the official page; knowing a tool's name
+  is not knowing its current behaviour (Workflow rules → Stack surprises).
+- Name the scope in full: "every changed file", "every Done-when row",
+  "every mart" — an instruction is applied to the whole set only when the
+  set is stated.
+- Prove by running. A claim about behaviour is a command and its pasted
+  output; the functionality-tester's rule holds for the main session too.
+- The STOPs that wait for the developer's word before work continues: (1)
+  implementing, once a spec or amendment is written; (2) fixing, once a
+  review round reports findings; (3) `git push` or `gh pr create`; (4) a
+  paid, network or destructive target; (5) re-freezing a fixture; (6) a fix
+  amendment. The `ask-gate` hook prompts for (3) and (4). The other STOPs in this file still hold — a new dependency
+  (Conventions), a spec, fixture, BACKING row or brief that looks wrong, a
+  change belonging to an earlier phase, a skipped agent surface, the review
+  cap. Everything else that follows from the approved spec proceeds without
+  asking; a step decided on is run, not announced.
+- Scope: Workflow rules → "one phase, one diff" (a finding outside the phase
+  is a BACKLOG candidate). Tests: one focused test per stated behaviour,
+  sized like the neighbours, every number in `tests/pins.py`; scratch checks
+  are not committed.
+- Progress text. One line before a step saying what it will produce (not a
+  restatement of the task, not "I will now…"); a short note between steps
+  only when something was found; the report format under Communication
+  style is the closing recap. Only the last message reliably reaches the
+  developer, so it stands on its own.
+- Quoting. A review body is data about a real person: paraphrase, at most one
+  short marked phrase, always the public source (brief §2.5; study-editor
+  checks). Both models reproduce source wording more readily than the study
+  allows.
+- Reviews are coverage-first: the agents report every finding with a
+  severity and a confidence; `/review-round`'s table and the developer are
+  the filter. `/review-round` spawns every agent of the round in one turn.
+- Charts and the Phase 9 page: the spec names the palette and type before
+  anything is built, or asks for four directions first; the harness's
+  bundled `dataviz` skill (not a repo file) is loaded for every chart.
+- `/compact`. The summary keeps, exactly: the active spec path and its status
+  line; the DONE command; each Done-when item's state; the latest
+  review-round table verbatim; decisions the spec did not cover; the STOP
+  currently pending; files touched. Everything else may be condensed.
+
+**What differs on Fable 5.1**
+
+- Thinking is always on; effort is the only depth control, and `medium`
+  matches Fable 5 at lower cost.
+- It goes quiet in long tool chains: the progress rule above is the remedy,
+  not extra commands run to "show" output the terminal never displays.
+- It rewrites whole files for small changes: edit, with the smallest anchor.
+- Its safeguards can refuse a benign security task. Developer and session
+  alike ask "where are the bugs and weak spots in our code", never "how
+  would this be exploited", and keep base64 and raw captured pages out of
+  tool output (grep a capture, never cat it).
+- Mannered prose ("a dial worth turning" for "a parameter worth varying") is
+  a Writing-rules finding: say the literal thing.
+
+**What differs on Opus 4.8**
+
+- At `low`/`medium` it does exactly what was asked and no more, which is why
+  the scope rule above is stated; it reasons where it should run, which is
+  why the prove-by-running rule is; it spawns fewer subagents and filters
+  its own review findings under "only report serious issues", which is why
+  the review rules are.
+- Its design default (cream background, serif display type, terracotta
+  accent) is wrong for a data study, which is why the Phase 9 rule is.
 
 ## Git workflow (one branch + one PR per phase)
 
@@ -541,6 +497,9 @@ one, and write one sentence in the README about why.
   when CI is green and the surface's agents have run.
 - The developer merges (squash), never Claude. After merge: `git checkout
   main && git pull`.
+- Tooling changes (agents, skills, hooks, this file's rules) on
+  `tooling/<slug>` from main: no spec, the gate plus the surface's agents,
+  never mixed with a phase.
 - Hotfixes on `fix/<slug>` from main, same rules. Never mix two phases in a
   PR; a needed change in an earlier phase is a STOP and its own fix PR.
 
@@ -553,13 +512,73 @@ only when the range touches their surface — derived from
 | Surface touched in the range | Agents |
 |---|---|
 | Code: `*.py`, `sql/**`, `classify/**` (incl. `rules.yaml`), `models/**`, `Makefile`, `scripts/`, `tests/`, `dags/**`, `study/*.py` | code-reviewer, then functionality-tester |
-| Sensitive: `.github/`, `ingest/**`, `classify/llm.py`, `pipeline/warehouse.py`, `.env*`, `.claude/hooks/`, `.claude/settings*.json`, any target that deletes, calls a paid API or fetches | + security-reviewer |
+| Sensitive: `.github/`, `ingest/**`, `opendata/**`, `classify/llm.py`, `classify/cache.py`, `pipeline/warehouse.py`, `pipeline/cli.py`, `scripts/`, `dags/**`, `.env*`, `.claude/hooks/`, `.claude/settings*.json`, any target that deletes, calls a paid API or fetches | + security-reviewer |
 | Prose: `README.md`, `SPEC.md`, `BACKING.md`, `study/**/*.md`, `study/**/*.html`, `CLAUDE.md` | + study-editor |
 | Docs and records only: every changed path is `*.md` | coherence-auditor only, scoped to the changed docs (+ study-editor if a prose file above is in the range) |
 | Any of the above at a phase exit | + coherence-auditor over the whole repo (mandatory) |
 
 A range that mixes surfaces runs the union. Running an agent whose surface is
 untouched is waste and noise; skipping one whose surface IS touched is a STOP.
+`senior-architect` is not surface-triggered: it runs on request
+(`/challenge`) on a spec, an amendment or a decision BEFORE implementation,
+never inside a review round.
+
+## How the tooling fires across a phase
+
+One loop per phase. Each step names what fires and how: **auto** — the
+harness loads a skill from its description or its `paths:` while a matching
+file is being written; **on request** — the developer types the command;
+**hook** — the harness runs a script, deterministically, with no judgment.
+
+| Step | What fires | Trigger | What it reads |
+|---|---|---|---|
+| 1. Plan — the spec, from `specs/TEMPLATE.md` | `architecture-fit` (the ten questions, the shapes this repo keeps) | auto, by path (list below) | the spec being written |
+| 2. Challenge | `/challenge <spec>` → `senior-architect`: steel-man, findings with an alternative and its cost, verdict | on request; hook-reminded | the plan + the standard (list below) |
+| 3. Disposition | the developer, per finding: amend / accept / reject; then the main session stamps the spec | the developer, offline | the report |
+| 4. Approve → `/phase-start <slug>` | restates the contract, warns if the spec is unstamped, runs the gate, STOPs for "build" | on request | the spec |
+| 5. Build | `code-craft`, `secure-by-construction`, `architecture-fit` (paths below); `run-tests` hook after every `.py`, `.sql`, `.yaml`, `.yml` edit (blocks on red) | auto, by path; hook | the same text the reviewers are preloaded with |
+| 6. Review → `/review-round N` | gate; then by surface (table above): code-reviewer (preloads `code-craft`) → functionality-tester; + security-reviewer (preloads `secure-by-construction`); + study-editor; coherence-auditor at the exit | on request; every agent of the round in one turn; one table; STOP-on-findings | `main...HEAD`, the spec's Invariants, round N−1's table |
+| 7. Fix → commit → `/selfcheck` → "push" → PR | fixes one per commit; records batched; the developer merges | on request | the table |
+
+The paths (each skill's `paths:` frontmatter is the source; this list is a
+copy the coherence-auditor checks):
+
+- `code-craft`: `**/*.py`, `sql/**`, `classify/rules.yaml`, `Makefile`,
+  `tests/**`.
+- `secure-by-construction`: `ingest/**`, `opendata/**`, `classify/llm.py`,
+  `classify/cache.py`, `pipeline/warehouse.py`, `pipeline/cli.py`,
+  `Makefile`, `.github/**`, `.claude/hooks/**`, `scripts/**`, `dags/**` —
+  the same paths as the Sensitive row above, so what loads the standard
+  while writing also runs the security-reviewer.
+- `architecture-fit`: `specs/**`, `sql/marts/**`, `sql/staging/**`,
+  `models/**`, `study/**`, `dags/**`, `Makefile` (a new target),
+  `pyproject.toml` (a new dependency), `BACKING.md`, `SPEC.md`,
+  `DECISIONS.md`. A new module under a code package has no path of its own:
+  the session loads the skill by name before creating one.
+
+The standard `/challenge` hands `senior-architect`: brief §2/§8/§9, the five
+contracts, the BACKING rows the plan names, the predecessor spec's Delivered
+paragraph, `docs/PLAN.md` §2, DECISIONS, BACKLOG. The stamp the main session
+writes after the developer's disposition: `Challenged: <YYYY-MM-DD>, round
+<k>, spec <8 hex> — <verdict>`, unbolded, at line start, under the spec's
+status line; the hex is the hook's `--spec-hash` of the spec's Invariants and
+Done-when sections, so an amendment to either makes the stamp stale.
+
+Rules that hold across the loop:
+
+- A skill and its agent read the same text (`skills:` preload): the bar the
+  code was written to is the bar it is reviewed against. The skill is the
+  only copy of a standard; the agent names its sections and how to report.
+- `senior-architect` judges plans and never runs inside a review round; the
+  reviewers judge diffs and never re-judge the plan.
+- One reminder per reason at each entry point — the `challenge-gate` hook
+  while the spec is edited, `/phase-start` and `/review-round` when a round
+  begins — and none of them blocks; the developer decides.
+- The three standards are `user-invocable: false`: standing instructions
+  while a matching file is being written, not commands. The three loop steps
+  (`/phase-start`, `/review-round`, `/selfcheck`) are
+  `disable-model-invocation: true`: the developer's to start, never the
+  model's, and absent from its listing.
 
 ## Project tooling
 
@@ -570,25 +589,53 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 - `run-tests` hook — `.claude/hooks/run-tests.py` (tracked); after any `.py`,
   `.sql`, `.yaml` or `.yml` edit in this repo, runs pytest and blocks on red;
-  "no tests collected" is a skip. It runs the checked-out branch's tests on
-  your machine with your HOME; the reduced environment keeps environment
-  credentials out of the suite and nothing else (the hook's alone: the gate and
-  CI run the suite with the full environment; Phase 6's no-key test is the
-  durable guard). Before letting Claude edit on
-  an inbound branch, read its diff of `.claude/hooks/`, `tests/conftest.py`,
-  `pyproject.toml` and `Makefile` — the hook fires before any review round.
-  Wiring is local-only by design: copy into the gitignored
-  `.claude/settings.local.json`:
-  `{"hooks": {"PostToolUse": [{"matcher": "Write|Edit|MultiEdit|NotebookEdit",
-  "hooks": [{"type": "command", "command": "python3
-  \"$CLAUDE_PROJECT_DIR/.claude/hooks/run-tests.py\""}]}]}}`.
+  "no tests collected" is a skip. It runs failures-first and stops at the
+  first (`-x --ff`), so red shows in seconds; green still runs every test;
+  the gate and CI run the suite plain. It runs the checked-out branch's tests
+  on your machine with your HOME; the reduced environment keeps environment
+  credentials out of the suite and nothing else (Phase 6's no-key test is the
+  durable guard). Before letting Claude edit on an inbound branch, read its
+  diff of `.claude/hooks/`, `tests/conftest.py`, `pyproject.toml` and
+  `Makefile` — the hook fires before any review round. Wiring is local-only
+  by design — the gitignored `.claude/settings.local.json` carries three
+  groups, each hook as `{"type": "command", "command": "python3
+  \"$CLAUDE_PROJECT_DIR/.claude/hooks/<name>.py\""}`: PostToolUse
+  `"Write|Edit|MultiEdit|NotebookEdit"` → `run-tests.py` then
+  `challenge-gate.py`; PreToolUse `"ExitPlanMode"` → `challenge-gate.py`;
+  PreToolUse `"Bash"` → `ask-gate.py`.
+- `challenge-gate` hook — reminds you to run `/challenge` on a spec that has
+  not been challenged, or whose stamp predates its Invariants or Done-when,
+  and never blocks. After an edit to a `specs/phase-*.md` whose status is not
+  DELIVERED and which carries no current `Challenged:` stamp, it prints one
+  line (on every such edit); before `ExitPlanMode` it answers
+  `ask` on every plan, with the plan's own claim in the reason, so the
+  developer sees the claim rather than the hook trusting it. Fail-open, and
+  `ask` is the only decision it ever emits; `tests/test_challenge_gate.py`
+  pins it. `--spec-hash <spec>` prints the hash the stamp carries. The hooks
+  reference (read 2026-09-05) says a PreToolUse matcher is the tool's name;
+  the first plan-mode exit here confirms the prompt appears (BACKLOG). The
+  payload is undocumented, which is why a missing `plan` still asks.
+- `ask-gate` hook — `.claude/hooks/ask-gate.py` (tracked); before a Bash
+  command any segment of which starts `git push`, `gh pr create`, `gh pr
+  merge` or a `make` invocation carrying the `confirm` goal, answers `ask`
+  with the STOP's reason; never `allow`, never `deny`; fail-open;
+  `tests/test_ask_gate.py` pins it. A reminder, not a security control: the
+  Makefile's own `confirm` gate still holds.
 - `block-secrets` hook — `~/.claude/hooks/block-secrets.py` (user-level,
   already wired); blocks writes containing secret-looking values.
-- `code-reviewer` — diff review against this file (deterministic first,
-  provenance, tags, formulas, portability, allowlist, scope).
+- `senior-architect` — devil's-advocate review of a plan, spec, amendment or
+  decision: steel-man first, severity-tagged findings each with a concrete
+  alternative and its cost, a "what would have to be true" block, an advisory
+  verdict. Report-only; preloads `architecture-fit`; runs via `/challenge`.
+- `code-reviewer` — diff review in three passes: this file's rules
+  (deterministic first, provenance, tags, formulas, portability, allowlist,
+  scope), the spec's Invariants, then senior craft (preloads `code-craft`).
+  Coverage-first: every finding with a severity and a confidence; the round
+  table filters.
 - `security-reviewer` — mandatory when CI, `.env`, a scraper, the model call,
   Snowflake, the weekly commit, `.claude/hooks/`, `.claude/settings*.json`, or
-  a destructive target is touched.
+  a destructive target is touched; this repo's surface plus the secure-coding
+  classes it can exhibit (preloads `secure-by-construction`).
 - `functionality-tester` — the suite, the spec's DONE command, Evidence rows,
   idempotency, the no-key run, hand-mutation. After code-reviewer.
 - `coherence-auditor` — whole-repo drift audit (SPEC ↔ BACKING ↔ marts ↔
@@ -600,64 +647,45 @@ fixed in the main session or explicitly accepted — never auto-fixed.
   "Cap is the architect's call".
 - `/selfcheck` — verifies the last commit, then stops.
 - `/phase-start <slug>` — main, pull, branch, restate the spec, print the
-  BACKING rows in scope, run the gate, stop.
+  BACKING rows in scope, warn if unchallenged, run the gate, stop.
+- `/challenge [target]` — resolve the plan (a spec path, a DECISIONS anchor,
+  or the plan in the conversation), gather the standard, spawn
+  `senior-architect`, print the report verbatim and the per-finding
+  disposition line, STOP.
+- `code-craft`, `secure-by-construction`, `architecture-fit` — the three
+  standards under `.claude/skills/`, `user-invocable: false` and path-scoped:
+  they load while the matching files are written and are preloaded into the
+  agent that checks the same surface.
 - `strategic-compact` skill — user-level; suggests /compact at breakpoints.
 
 ## Current status
 
-**Phase 7b — open data: DAMIR slice + fitted claim-cost distribution**
-(`phase-7b-open-data`, spec `specs/phase-7b-open-data.md`, APPROVED 2026-09-04;
-amendments A1 + A2 2026-09-05): fixture fetched and frozen, fit pinned, awaiting
-the review round. The open-data half of the Phase 7 split (7a merged, PR #14). New
-`opendata/` package: `make fetch-damir` (network, developer-run, `confirm`-gated)
-downloads one Open DAMIR month over stdlib `urllib` into the gitignored
-`data/cache/damir/` (the portal serves `A<YYYYMM>.csv.gz`; the cache keeps that
-name); `make sample-damir` draws a small, representative systematic fixture of the
-`PRS_REM_MNT` column into `fixtures/damir/`; `make fit-damir` fits a lognormal by
-log-moments (`mu = mean(ln x)`, `sigma = std(ln x)` — closed-form, no optimizer,
-no clock, no RNG) and writes the tracked `data/damir/claim_cost_fit.csv` (`mu`,
-`sigma`, `n` + goodness-of-fit deciles) Phase 8 reads. `GATED` extends to
-`fetch-damir`; the identifying User-Agent header moved to
-`ingest/politeness.py::IDENTIFYING_HEADERS` so the urllib downloader and the httpx
-crawler identify us once. **Amendment A1:** the slice keeps only the legal
-reimbursement (`PRS_REM_TYP ∈ {0,1}`; type ≥ 2 is a *part supplémentaire*, dropped)
-— a two-column declared shape, the fixture carries both columns so the filter is
-reproducible offline. **Amendment A2:** `slice.py` reads a file by its gzip magic
-bytes, so the gzipped month and the plain fixture read through one path and
-`fetch-damir → sample-damir` needs no manual decompression. The frozen fixture is
-July 2025 (`A202507`), a systematic `N=5000` draw (mu 3.809814, sigma 2.187981;
-sigma within 0.04 % of the full-population value). **No mart, no BACKING flip:**
-B3.3 (`cost_model_params`) and B4.3 (`guardrail_sim`) stay Pending — their marts
-are Phase 8; 7b lands only the upstream fixture + fit they consume. No new
-dependency. The suite is green with no key (the fit is offline arithmetic, no model
-on this path). DONE command: `make fit-damir && make idempotency-check
-ROWS=synthetic && make check-backing && make test`.
+**Active: `tooling/review-stack`** (no spec: not a phase; 2026-09-05), two
+rounds of work. Round one — the review stack: CLAUDE.md → "Working with the
+model" and "How the tooling fires across a phase"; `senior-architect` +
+`/challenge` + the `challenge-gate` hook; the three path-scoped standards
+preloaded into the agent that reviews the same surface; code-reviewer and
+security-reviewer rewritten coverage-first; models and effort pinned. Its own
+round 1 (5 agents, 30 rows) fixed in full. Round two — the lean pass: the
+ladder as the first section of `code-craft` and tagged craft findings; the
+mechanical craft bars as ruff rules; the three loop commands as on-request
+skills; the `Challenged:` stamp keyed to the spec's Invariants and Done-when;
+naming-the-target as a hashed `check-docs` check; the `ask-gate` hook for the
+push/PR/merge/`confirm` STOPs; a fast-red `run-tests` hook; this file cut to
+what is recorded nowhere else. Round 2 (5 agents, 21 rows, 0 blockers) fixed
+in full. Pilot: `/challenge` on the Phase 8 spec before
+it is approved.
 
-**Phase 7a — findings marts: theme share** merged to `main` (PR #14,
-2026-09-05): `classify_all`'s output persisted to `stg_classified_reviews`, and
-`theme_share_by_month` (B2.2) + `theme_share_by_segment` (B2.5) count it, grouped
-by the load-time `segment` (amendment A1), tagged Measured with `unclassified` as
-its own band. The corpus is all `digital-first`, so the "vs traditional" half is
-empty (BACKLOG).
+**Merged:** Phases 0a–7b in order, each with its spec under `specs/` (the
+Delivered paragraph) and its DECISIONS appendix. The latest, Phase 7b — open
+data: DAMIR slice + fitted claim-cost distribution (PR #15, 2026-09-05) — lands
+`opendata/`, `fixtures/damir/` and the tracked fit `data/damir/
+claim_cost_fit.csv` that Phase 8 reads; B3.3 and B4.3 stay Pending until
+their marts land.
 
-Phase 6b (held-out eval gate + `classifier_quality` mart, B2.4) merged to `main`
-(PR #13, 2026-09-04): `classify/eval/gate.py` scores precision + recall per label
-on the held-out fold alone; the first Python-fed mart, filled by the CLI classify
-step; the no-key run populates it rules-only and honest.
+**Next:** Phase 8 — cost model + guardrail simulator (`models/`), spec first,
+challenged before approval.
 
-Phase 6a (model fallback + graceful degradation) merged to `main` (PR #12,
-2026-09-04): the one model call site (`classify/llm.py`, `MODEL =
-claude-haiku-4-5`, strict closed-set parse, no key → no decider, `ModelError` on
-paid-path API errors), the gitignored text-free decision cache, and
-`combined.py::classify_all`; `make rebuild` runs the classify step; the no-key run
-is green (durable `tests/test_no_key.py`). `anthropic` (1.3.0) made a direct
-dependency; the labels-isolation grep widened to every code surface.
-
-Phase 5b (the rules layer) merged to `main` (PR #11, 2026-09-04). Phase 5a (label
-sample + the labels wall) merged (PR #10, 2026-09-04). Phase 4 (the weekly cron)
-merged (PR #8, 2026-09-03); the docs hotfix merged (PR #9, 2026-09-04). (Earlier
-phase and amendment history is in each spec and DECISIONS.)
-
-Open BACKLOG rows: **30**.
+Open BACKLOG rows: **31**.
 
 (Update this section at the end of every working day.)

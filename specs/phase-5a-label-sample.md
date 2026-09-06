@@ -6,7 +6,7 @@ Phase 5 ("Hand labels + rules layer"), split into 5a/5b per `docs/PLAN.md` §5
 Rules layer"). Depends on Phase 4 merged (PR #8) and the Phase 4 docs hotfix
 merged (PR #9).
 
-**Status: APPROVED 2026-09-04 — in progress.** No new dependencies (uses
+**Status: APPROVED 2026-09-04 — DELIVERED 2026-09-04, PR #10 merged.** No new dependencies (uses
 DuckDB via `pipeline/warehouse.py`, stdlib `csv`/`hashlib`; no `pyyaml`, no
 `anthropic` — `rules.yaml` and the model are 5b and 6). The allowlist is in
 CLAUDE.md → Conventions.

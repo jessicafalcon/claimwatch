@@ -1,5 +1,9 @@
 ---
+name: phase-start
+argument-hint: <slug>
 description: Start a phase — checkout main, pull, create phase-<slug>, print the spec's Done-when, DONE command and the BACKING rows in scope; refuse if the spec is missing or not approved. Then STOP for the developer to say "build".
+# On request only: the developer types /phase-start; the model never invokes it.
+disable-model-invocation: true
 ---
 
 Start phase **$ARGUMENTS** (a slug such as `0a-machinery`, `1-schema`).
@@ -11,7 +15,14 @@ Start phase **$ARGUMENTS** (a slug such as `0a-machinery`, `1-schema`).
 3. **Spec.** `specs/phase-$ARGUMENTS.md` must exist. If it does not: STOP and
    say the spec is written first, from `specs/TEMPLATE.md`, and approved
    before any code (CLAUDE.md → Workflow rules). If its status line still says
-   `PROPOSED — do not start`, STOP and ask for approval.
+   `PROPOSED — do not start`, STOP and ask for approval. Run `python3
+   .claude/hooks/challenge-gate.py --spec-hash specs/phase-$ARGUMENTS.md`. If
+   the spec carries no `Challenged:` line under its status, or the line's
+   `spec <hash>` differs from what was printed (the stamp predates the
+   Invariants or Done-when), print one line — `not challenged` or `stamp
+   stale`; `/challenge specs/phase-$ARGUMENTS.md before "build" is
+   recommended` — and continue: skipping the challenge is the developer's
+   call, not the command's.
 4. **Restate the contract.** Print, verbatim from the spec: the central
    constraint, the DONE command, the Done-when list, and the Scope (files).
 5. **Scope from the evidence contract.** Print the BACKING.md rows this phase
@@ -22,5 +33,3 @@ Start phase **$ARGUMENTS** (a slug such as `0a-machinery`, `1-schema`).
    lines — the branch starts green or the previous phase left a problem.
 7. Print one line: `Phase $ARGUMENTS ready — say "build" to start.` Then
    STOP. Do not write code until told.
-
-This is an explicit, on-request command. It runs only when invoked.

@@ -99,6 +99,10 @@ scripts/
 └── review_common.py    spec-path validator, section parser, subprocess runner (stdlib only)
 ```
 
+The tree and the wiring below are the Phase 0a design as approved; on
+2026-09-05 the commands became skills and the hooks became three — §9 and
+CLAUDE.md → Project tooling hold the current shape.
+
 Wiring for the hook (local only, `.claude/settings.local.json`, gitignored):
 `{"hooks":{"PostToolUse":[{"matcher":"Write|Edit|MultiEdit|NotebookEdit","hooks":[{"type":"command","command":"python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/run-tests.py\""}]}]}}`
 
@@ -342,3 +346,25 @@ If this plan is approved as written: branch `phase-0a-machinery`, write
 `specs/phase-0a-machinery.md` from the template first, STOP for its approval,
 then build. If parts are struck, this file is amended and re-read before the
 spec is written. Nothing in `docs/` beyond this file is planned.
+
+---
+
+## 9. Amendment 2026-09-05 — the review stack (after Phase 7b)
+
+The §2 table is the approved history and is not rewritten. Three pieces the
+reference did not have, all landing on `tooling/review-stack` once the two
+platform prompting guides (Fable 5.1, Opus 4.8) were read against this repo:
+
+| Piece | Verdict | For this project |
+|---|---|---|
+| Model-specific instructions | **New** | CLAUDE.md → "Working with the model": the six named STOPs, effort policy, batch reads, edit-not-regenerate, verify-not-recall, scope and test discipline, the `/compact` keep-list; per-model notes. The agents pin `model:` and `effort:` (the `opus` alias drifts with the build). |
+| `senior-architect` agent + `/challenge` skill + `challenge-gate` hook | **New** | A devil's-advocate round on a plan before it is built: steel-man, findings each with an alternative and its cost, advisory verdict, stamped on the spec. The hook reminds; it never denies. |
+| `code-craft`, `secure-by-construction`, `architecture-fit` skills | **New** | The three standards, path-scoped and `user-invocable: false`, preloaded into the agent that reviews the same surface ("one standard, two readers", DECISIONS → Process). The examples supplied (TypeScript/React/Supabase checklists) contributed vocabulary only; their web-security and scaling content names a surface this repo does not have (no endpoint, no login, no payments), so it was dropped rather than adapted. |
+| `code-reviewer`, `security-reviewer` | **Adapt again** | Coverage-first (the Opus 4.8 recall note), a confidence column, a craft pass (Class `craft` in the round table), the secure-coding classes this repo can exhibit. |
+| A lean-mode reference (the ladder, review tags, marker comments, intensity levels) | **Adapt** | The ladder becomes the first section of `code-craft` and the tags the vocabulary of the code-reviewer's craft findings; marker comments are BACKLOG rows here; levels, cards and "question the spec" are dropped (DECISIONS → Process, 2026-09-05). |
+| Prose rules that a mechanism can hold | **New** | Ruff rules for the mechanical craft bars; `disable-model-invocation` for the loop steps; the `ask-gate` hook for the push/PR/merge/`confirm` STOPs; the `Challenged:` stamp hashed to the spec's Invariants and Done-when; naming-the-target as a hashed `check-docs` check; CLAUDE.md cut to what is recorded nowhere else. |
+
+CLAUDE.md → "How the tooling fires across a phase" is the one place the
+seven-step loop (plan → challenge → disposition → approve → build → review →
+fix) names what fires, on which trigger, reading what.
+

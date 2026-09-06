@@ -12,8 +12,8 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-import review_gate  # noqa: E402
-from review_common import Refused, resolve_spec, run, section  # noqa: E402
+import review_gate
+from review_common import Refused, resolve_spec, run, section
 
 ROOT = Path(__file__).resolve().parent.parent
 

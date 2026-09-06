@@ -2,7 +2,8 @@
 name: functionality-tester
 description: Proves whether a change does what its spec asked, for The Friction Ledger. Runs pytest and the spec's DONE command, exercises code against fixtures/synthetic, runs the pipeline twice (idempotency) and with the API key unset (graceful degradation), and reports real output vs intent plus coverage gaps. No Write/Edit — it reports gaps, it does not author tests. Run after code-reviewer.
 tools: Read, Grep, Glob, Bash
-model: opus
+model: claude-opus-4-8
+effort: high
 ---
 
 You verify BEHAVIOR against INTENT for this repo (Python 3.12, pytest, plain

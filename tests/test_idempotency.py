@@ -7,9 +7,9 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import pins  # noqa: E402
+import pins
 
-from pipeline.build import rebuild  # noqa: E402
+from pipeline.build import rebuild
 
 
 def test_second_rebuild_adds_no_rows(tmp_path):

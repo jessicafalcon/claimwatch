@@ -4,12 +4,13 @@ is green today. Offline, no services."""
 
 from __future__ import annotations
 
+import hashlib
 import re
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-import check_docs  # noqa: E402
+import check_docs
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -62,29 +63,37 @@ def test_partial_rename_is_a_failure(tmp_path: Path):
 
 def test_every_named_make_target_exists_today():
     files = check_docs.living_files(ROOT) + check_docs.command_files(ROOT)
-    assert len(check_docs.tooling_files(ROOT)) == 8  # five agents, three commands
-    assert len(check_docs.command_files(ROOT)) == 3
+    tooling = {p.relative_to(ROOT).parts[1] for p in check_docs.tooling_files(ROOT)}
+    assert tooling == {"agents", "skills"}
+    by_class = {
+        c: sum(
+            p.relative_to(ROOT).parts[1] == c for p in check_docs.tooling_files(ROOT)
+        )
+        for c in tooling
+    }
+    assert by_class == {"agents": 6, "skills": 7}, by_class
+    assert len(check_docs.command_files(ROOT)) == 7  # every skill runs today
     assert check_docs.check_make_targets(files, ROOT) == []
 
 
 def test_tooling_prose_is_checked(tmp_path: Path):
     """`.claude/**/*.md` is a document class: links are checked everywhere
-    under it, make targets in commands/; banned words never (an agent names
+    under it, make targets in skills/; banned words never (an agent names
     them to flag them)."""
     agent = tmp_path / ".claude" / "agents" / "a.md"
-    command = tmp_path / ".claude" / "commands" / "c.md"
-    for f in (agent, command):
+    skill = tmp_path / ".claude" / "skills" / "s" / "SKILL.md"
+    for f in (agent, skill):
         f.parent.mkdir(parents=True)
         f.write_text("Run `make nope`; see [x](../../missing.md). Flag 'robust'.\n")
     (tmp_path / "Makefile").write_text("test:\n\tx\n")
-    assert check_docs.tooling_files(tmp_path) == [agent, command]
-    assert check_docs.command_files(tmp_path) == [command]
-    assert check_docs.check_links([agent, command], tmp_path) == [
+    assert check_docs.tooling_files(tmp_path) == [agent, skill]
+    assert check_docs.command_files(tmp_path) == [skill]
+    assert check_docs.check_links([agent, skill], tmp_path) == [
         ".claude/agents/a.md: broken link: ../../missing.md",
-        ".claude/commands/c.md: broken link: ../../missing.md",
+        ".claude/skills/s/SKILL.md: broken link: ../../missing.md",
     ]
-    assert check_docs.check_make_targets([command], tmp_path) == [
-        ".claude/commands/c.md: names `make nope` — not in the Makefile"
+    assert check_docs.check_make_targets([skill], tmp_path) == [
+        ".claude/skills/s/SKILL.md: names `make nope` — not in the Makefile",
     ]
     (tmp_path / "study").mkdir()
     (tmp_path / "study" / "index.html").write_text("<p>a robust page</p>\n")
@@ -165,6 +174,69 @@ def test_check_backlog_count_reports_a_mismatch(tmp_path: Path):
         "nope.md: record file is missing",
         "BACKLOG.md: record file is missing",
     ]
+
+
+def test_check_neutrality_reports_a_token_never_a_url_and_never_the_name(
+    tmp_path: Path,
+):
+    """A listed token as a word is reported by file:line and digest prefix; the
+    same token inside a URL is not; the report never carries the token."""
+    digest = hashlib.sha256(b"zzbrand").hexdigest()
+    hashes = tmp_path / "scripts" / "neutrality_hashes.txt"
+    hashes.parent.mkdir()
+    hashes.write_text(f"# a comment\n\n{digest}\nnot-a-digest\n")
+    digests, errors = check_docs.neutrality_hashes(hashes)
+    assert digests == {digest}
+    assert errors == ["neutrality_hashes.txt:4: not a sha256 hex digest"]
+    readme = tmp_path / "README.md"
+    readme.write_text(
+        "ZZBrand held the refund.\n"
+        "See https://zzbrand.example/zzbrand/page only.\n"
+        "See https://zzbrand.example/page and zzbrand-mobile.\n"
+        "A rebranding is not a hit.\n"
+    )
+    out = check_docs.check_neutrality([readme], digests, tmp_path)
+    assert out == [
+        f"README.md:1: names the study's target (sha256 {digest[:8]}…)",
+        f"README.md:3: names the study's target (sha256 {digest[:8]}…)",
+    ]  # line 2 carries the token only inside a URL: stripped, not a hit
+    assert "zzbrand" not in "\n".join(out)
+    accented = tmp_path / "notes.md"
+    accented.write_text("ZZBRÄND held it; zzbránd too.\n")
+    assert check_docs.check_neutrality([accented], digests, tmp_path) == [
+        f"notes.md:1: names the study's target (sha256 {digest[:8]}…)"
+    ]
+    assert check_docs.plain_tokens("Générali, café https://x.y/z") == {
+        "generali",
+        "cafe",
+    }
+    assert check_docs.check_neutrality([readme], set(), tmp_path) == []
+    _, missing = check_docs.neutrality_hashes(tmp_path / "gone.txt")
+    assert missing == ["gone.txt: hash file is missing"]
+
+
+def test_neutrality_files_are_the_tracked_code_and_prose_minus_the_declarations():
+    paths = [
+        "README.md",
+        "pipeline/build.py",
+        "Makefile",
+        ".github/workflows/ci.yml",
+        "sql/marts/x.sql",
+        "ingest/sources.py",
+        "fixtures/anchors/a.csv",
+        "data/snapshots/m.csv",
+        "scripts/neutrality_hashes.txt",
+        "study/index.png",
+    ]
+    kept = check_docs.neutrality_files(ROOT, paths)
+    assert [p.relative_to(ROOT).as_posix() for p in kept] == [
+        "README.md",
+        "pipeline/build.py",
+        "Makefile",
+        ".github/workflows/ci.yml",
+        "sql/marts/x.sql",
+    ]
+    assert "CLAUDE.md" in check_docs.tracked_paths(ROOT)
 
 
 def test_backlog_count_matches_today():

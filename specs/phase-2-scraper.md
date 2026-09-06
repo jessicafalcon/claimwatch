@@ -6,7 +6,7 @@ review feed, recommended over Opinion Assurances) and §2's Boundary/Adapter row
 (a scraped page is a foreign input: parse strictly to a declared shape). Depends
 on `phase-1-schema` merged (PR #3).
 
-**Status: APPROVED 2026-09-02 — in progress.** One dependency change:
+**Status: APPROVED 2026-09-02 — DELIVERED 2026-09-02, PR #4 merged.** One dependency change:
 `httpx` (pre-approved for Phase 2, CLAUDE.md → Conventions). `pyyaml` is also
 pre-approved for Phase 2 but nothing here needs it — the source list and the
 politeness knobs are Python constants — so it waits for `rules.yaml` (Phase 5b).

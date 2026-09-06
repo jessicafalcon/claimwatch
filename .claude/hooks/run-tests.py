@@ -3,11 +3,13 @@
 # PostToolUse hook (matcher: Write|Edit|MultiEdit|NotebookEdit) — runs pytest
 # after a .py, .sql, .yaml or .yml file in this project changes. SQL files
 # and rules.yaml are code here. Makes a broken test VISIBLE the instant it breaks.
+# Runs failures-first and stops at the first (FAST_RED), so red is fast.
 #
 # This gate deliberately fails OPEN — exit 0, no run — in exactly four cases:
-# a malformed event, no CLAUDE_PROJECT_DIR in the environment, a project dir
-# it cannot chdir into, and no pytest on the venv or PATH. It is a visibility
-# aid, not a security control. A red suite blocks (exit 2) and so does a hung
+# a malformed or oversized event, no CLAUDE_PROJECT_DIR in the environment, a
+# project dir it cannot chdir into, and no pytest on the venv or PATH. It is a
+# visibility aid, not a security control. A red suite blocks (exit 2) and so
+# does a hung
 # one: the timeout is RUN_TESTS_TIMEOUT seconds (digits only, default 120) —
 # silence there would hide a real problem. Don't "fix" the open cases into
 # fail-closed — that would block all edits on a broken venv.
@@ -22,6 +24,11 @@ import sys
 
 CODE_SUFFIXES = (".py", ".sql", ".yaml", ".yml")
 DEFAULT_TIMEOUT = 120
+MAX_EVENT_BYTES = 4 * 1024 * 1024  # the harness is the producer; bigger is not ours
+# Failures first, stop at the first: a red suite shows in seconds instead of
+# the full run; a green suite still runs every test. The gate and CI run the
+# suite plain — this is the edit loop's visibility aid, not their check.
+FAST_RED = ("-x", "--ff")
 
 
 def timeout_seconds() -> int:
@@ -30,49 +37,60 @@ def timeout_seconds() -> int:
     return int(raw) if raw.isdigit() and int(raw) > 0 else DEFAULT_TIMEOUT
 
 
-def main() -> None:
-    try:
-        data = json.load(sys.stdin)
-    except (json.JSONDecodeError, UnicodeDecodeError, OSError):
-        sys.exit(0)
-
-    # The event is an input this repo does not own: parse it to the one shape
-    # we act on (a dict with a dict tool_input carrying a str file_path) and
-    # fail OPEN on anything else — never a traceback.
+def edited_code_file(data: object, root: str) -> str | None:
+    """The edited path when the event is the one shape we act on: a dict whose
+    tool_input carries a str file_path with a code suffix inside this project.
+    Anything else is None — fail OPEN, never a traceback."""
     if not isinstance(data, dict):
-        sys.exit(0)
+        return None
     ti = data.get("tool_input")
     if not isinstance(ti, dict):
-        sys.exit(0)
+        return None
     fp = ti.get("file_path")
     if not isinstance(fp, str) or not fp.lower().endswith(CODE_SUFFIXES):
-        sys.exit(0)  # not code — skip silently; only "tests green" means "ran"
-
-    root = os.environ.get("CLAUDE_PROJECT_DIR", "")
-    if not root:
-        sys.exit(0)
-    # Only react to files inside THIS project — an edit in a sibling repo would
+        return None  # not code — skip silently; only "tests green" means "ran"
+    # Only files inside THIS project — an edit in a sibling repo would
     # otherwise produce a misleading green from a suite that never covers it.
     if not os.path.abspath(fp).startswith(os.path.abspath(root) + os.sep):
+        return None
+    return fp
+
+
+def pytest_command() -> list[str] | None:
+    """The venv's pytest, else the PATH's, else None (run `make setup`)."""
+    venv_pytest = os.path.join(".venv", "bin", "pytest")
+    if os.path.exists(venv_pytest):
+        return [venv_pytest, *FAST_RED]  # pyproject already sets addopts="-q"
+    from shutil import which
+
+    return ["pytest", *FAST_RED] if which("pytest") else None
+
+
+def _event() -> object:
+    """The event as JSON, or None when malformed or over the cap (fail open)."""
+    try:
+        raw = sys.stdin.buffer.read(MAX_EVENT_BYTES + 1)
+        if len(raw) > MAX_EVENT_BYTES:
+            return None
+        return json.loads(raw.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError, OSError):
+        return None
+
+
+def main() -> None:
+    data = _event()
+    root = os.environ.get("CLAUDE_PROJECT_DIR", "")
+    fp = edited_code_file(data, root) if root else None
+    if fp is None:
         sys.exit(0)
     try:
         os.chdir(root)
     except OSError:
         sys.exit(0)
-
-    venv_pytest = os.path.join(".venv", "bin", "pytest")
-    if os.path.exists(venv_pytest):
-        cmd = [venv_pytest]  # pyproject already sets addopts="-q"
-    else:
-        from shutil import which
-
-        if which("pytest"):
-            cmd = ["pytest"]
-        else:
-            print(
-                "[run-tests] pytest not found yet — run `make setup`.", file=sys.stderr
-            )
-            sys.exit(0)
+    cmd = pytest_command()
+    if cmd is None:
+        print("[run-tests] pytest not found yet — run `make setup`.", file=sys.stderr)
+        sys.exit(0)
 
     # Reduced environment: PATH and HOME only. This keeps ENVIRONMENT credentials
     # (an .env-loaded API key) out of the suite and nothing else — the tests still

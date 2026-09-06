@@ -13,11 +13,11 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
-from review_common import make_targets  # noqa: E402
+from review_common import make_targets
 
-from pipeline.build import INPUTS  # noqa: E402
-from pipeline.cli import CONFIRM_STAMP, Refused, confirmed, resolve_choice  # noqa: E402
-from pipeline.warehouse import TARGETS  # noqa: E402
+from pipeline.build import INPUTS
+from pipeline.cli import CONFIRM_STAMP, Refused, confirmed, resolve_choice
+from pipeline.warehouse import TARGETS
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRUB = (

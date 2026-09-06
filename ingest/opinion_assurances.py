@@ -161,7 +161,7 @@ class _Walker(HTMLParser):
     def current(self) -> _Review | None:
         return self.reviews[-1] if self.review_depth is not None else None
 
-    def handle_starttag(
+    def handle_starttag(  # noqa: C901, PLR0912 -- one branch per microdata tag
         self, tag: str, attrs_list: list[tuple[str, str | None]]
     ) -> None:
         attrs = dict(attrs_list)
@@ -291,7 +291,7 @@ def _iso(day: str, page_url: str, item: str, field: str) -> str:
         raise refuse(page_url, item, field, f"is not a real day: {day!r}") from exc
 
 
-def _review_row(
+def _review_row(  # noqa: C901 -- one guard per field, each refusing by name
     k: int, review: _Review, page_url: str, captured_at: str, source: Source
 ) -> dict[str, object]:
     item = f"review {k}"
