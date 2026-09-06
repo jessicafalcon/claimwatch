@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import ast
 
+import pytest
+
 from models import cost_model
 from pipeline.build import read_model_fit, rebuild
 from pipeline.cli import main
@@ -189,6 +191,18 @@ def test_models_imports_only_stdlib_math():
             elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
                 roots.add(node.module.split(".")[0])
         assert roots <= _IMPORT_ALLOWLIST, (path.name, roots - _IMPORT_ALLOWLIST)
+
+
+def test_read_model_fit_refuses_a_malformed_artifact(tmp_path):
+    """A hand-corrupted fit artifact is refused as a PageShapeError, so the model
+    and rebuild CLI paths surface one line and exit 2 (main catches it), never a
+    traceback."""
+    from ingest.parsed import PageShapeError
+
+    bad = tmp_path / "bad.csv"
+    bad.write_text("name,value\nmu,abc\n", encoding="utf-8")  # non-numeric, short
+    with pytest.raises(PageShapeError, match="fit artifact is unreadable"):
+        read_model_fit(bad)
 
 
 def test_make_model_is_byte_identical_on_rerun(capsys):

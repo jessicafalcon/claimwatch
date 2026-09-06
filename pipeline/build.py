@@ -844,8 +844,14 @@ def read_model_fit(path: Path | None = None) -> cost_model.Fit:
     """Read the tracked lognormal fit and shape it into the cost model's `Fit`:
     the two log-moments, the sample size behind them, and the median cell
     (`emp_p50`). This is the one place the artifact is read for the model — the
-    caller hands the result to `write_model_marts`, so `models/` reads no file."""
-    fit, gof = read_fit() if path is None else read_fit(path)
+    caller hands the result to `write_model_marts`, so `models/` reads no file.
+    A malformed or unreadable artifact (a hand-corrupted tracked file) is refused
+    as a `PageShapeError`, so the `model` and `rebuild` CLI paths print one line
+    and exit 2 rather than a traceback; `path` lets a test exercise that."""
+    try:
+        fit, gof = read_fit() if path is None else read_fit(path)
+    except (ValueError, OSError) as exc:
+        raise PageShapeError(f"the fit artifact is unreadable: {exc}") from exc
     emp_p50 = next(d.empirical for d in gof if d.decile == 50)
     return cost_model.Fit(mu=fit.mu, sigma=fit.sigma, n=fit.n, emp_p50=emp_p50)
 
