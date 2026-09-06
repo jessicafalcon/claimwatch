@@ -96,6 +96,12 @@ def test_unreachable_project_dir_fails_open(tmp_path: Path):
     assert res.returncode == 0 and "Traceback" not in res.stderr
 
 
+def test_an_oversized_event_fails_open(tmp_path: Path):
+    p = _project(tmp_path, RED)
+    res = _hook((" " * (4 * 1024 * 1024)) + _event(p), p)
+    assert res.returncode == 0 and res.stderr == "" and res.stdout == ""
+
+
 def test_malformed_input_fails_open(tmp_path: Path):
     p = _project(tmp_path, RED)
     shapes = (

@@ -6,9 +6,10 @@
 # Runs failures-first and stops at the first (FAST_RED), so red is fast.
 #
 # This gate deliberately fails OPEN — exit 0, no run — in exactly four cases:
-# a malformed event, no CLAUDE_PROJECT_DIR in the environment, a project dir
-# it cannot chdir into, and no pytest on the venv or PATH. It is a visibility
-# aid, not a security control. A red suite blocks (exit 2) and so does a hung
+# a malformed or oversized event, no CLAUDE_PROJECT_DIR in the environment, a
+# project dir it cannot chdir into, and no pytest on the venv or PATH. It is a
+# visibility aid, not a security control. A red suite blocks (exit 2) and so
+# does a hung
 # one: the timeout is RUN_TESTS_TIMEOUT seconds (digits only, default 120) —
 # silence there would hide a real problem. Don't "fix" the open cases into
 # fail-closed — that would block all edits on a broken venv.
@@ -23,6 +24,7 @@ import sys
 
 CODE_SUFFIXES = (".py", ".sql", ".yaml", ".yml")
 DEFAULT_TIMEOUT = 120
+MAX_EVENT_BYTES = 4 * 1024 * 1024  # the harness is the producer; bigger is not ours
 # Failures first, stop at the first: a red suite shows in seconds instead of
 # the full run; a green suite still runs every test. The gate and CI run the
 # suite plain — this is the edit loop's visibility aid, not their check.
@@ -64,11 +66,19 @@ def pytest_command() -> list[str] | None:
     return ["pytest", *FAST_RED] if which("pytest") else None
 
 
-def main() -> None:
+def _event() -> object:
+    """The event as JSON, or None when malformed or over the cap (fail open)."""
     try:
-        data = json.load(sys.stdin)
+        raw = sys.stdin.buffer.read(MAX_EVENT_BYTES + 1)
+        if len(raw) > MAX_EVENT_BYTES:
+            return None
+        return json.loads(raw.decode("utf-8"))
     except (json.JSONDecodeError, UnicodeDecodeError, OSError):
-        sys.exit(0)
+        return None
+
+
+def main() -> None:
+    data = _event()
     root = os.environ.get("CLAUDE_PROJECT_DIR", "")
     fp = edited_code_file(data, root) if root else None
     if fp is None:
