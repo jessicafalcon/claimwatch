@@ -191,14 +191,15 @@ def test_check_neutrality_reports_a_token_never_a_url_and_never_the_name(
     readme = tmp_path / "README.md"
     readme.write_text(
         "ZZBrand held the refund.\n"
+        "See https://zzbrand.example/zzbrand/page only.\n"
         "See https://zzbrand.example/page and zzbrand-mobile.\n"
         "A rebranding is not a hit.\n"
     )
     out = check_docs.check_neutrality([readme], digests, tmp_path)
     assert out == [
         f"README.md:1: names the study's target (sha256 {digest[:8]}…)",
-        f"README.md:2: names the study's target (sha256 {digest[:8]}…)",
-    ]
+        f"README.md:3: names the study's target (sha256 {digest[:8]}…)",
+    ]  # line 2 carries the token only inside a URL: stripped, not a hit
     assert "zzbrand" not in "\n".join(out)
     accented = tmp_path / "notes.md"
     accented.write_text("ZZBRÄND held it; zzbránd too.\n")
