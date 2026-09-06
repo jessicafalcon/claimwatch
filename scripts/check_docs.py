@@ -3,7 +3,7 @@
 (CI runs it too). Not a pytest file, so a docs-only edit does not re-trigger
 the suite.
 
-Five checks. Four document classes:
+Six checks. Four document classes:
   LIVING  — CLAUDE.md, README.md, SPEC.md, BACKING.md: describe what exists.
   RECORDS — DECISIONS.md, BACKLOG.md: history; may name targets not built.
   PLANS   — PROJECT_BRIEF.md, docs/*.md, specs/*.md: describe what will exist.
@@ -28,7 +28,9 @@ Five checks. Four document classes:
      commit message, carries a token whose sha256 is listed in
      scripts/neutrality_hashes.txt (the names never enter the repo). URLs are
      stripped first; ingest/sources.py, fixtures/ and data/ are excluded —
-     insurers appear there only as sourced data points.
+     insurers appear there only as sourced data points. The commit window is
+     the last COMMIT_MESSAGES the checkout holds: a shallow CI clone sees
+     fewer; the local run and the weekly checkout see all of them.
 """
 
 from __future__ import annotations

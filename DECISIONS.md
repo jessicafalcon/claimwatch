@@ -232,7 +232,9 @@ place and never deleted.
   code-reviewer #3 / security-reviewer #2); a `deny` would block a plan the
   architect chose not to challenge, and caps and dispositions are the
   architect's call. A stamp goes stale when the spec is amended after the
-  round; accepted, BACKLOG. The agent judges plans only and never runs
+  round; accepted, BACKLOG — superseded the same day by "The `Challenged:`
+  stamp is keyed to the spec's Invariants and Done-when" below (the stamp now
+  carries the spec hash). The agent judges plans only and never runs
   inside a review round.
 - **Per-diff agents are pinned to a model id (tooling, 2026-09-05).**
   `model: claude-opus-4-8`, `effort: high` for code-reviewer,
@@ -260,11 +262,15 @@ place and never deleted.
   keyword-only options and declaration fields, the self-documenting shape
   this repo uses), boolean flag parameters (`FBT`), simplifiable forms
   (`SIM`, `RET`, `PIE`), commented-out code (`ERA`), unused arguments (`ARG`).
-  No new dependency. The six functions over the complexity bar (a scraper's
-  refusal chain, three parsers, a declaration's validator, a hook) carry a
-  `# noqa: … -- <reason>` rather than a refactor: the standard asks for the
-  split or the one-line reason, and a refactor of `ingest/` is a phase's
-  work, not a lint's. Tests ignore `ARG` and `FBT` (fixtures and lambdas take
+  No new dependency. The four functions over the complexity bar (two
+  parsers' branch-per-tag bodies, the robots line kinds, a declaration's
+  validator) carry a `# noqa: … -- <reason>` rather than a refactor: the
+  standard asks for the split or the one-line reason, and a refactor of
+  `ingest/` is a phase's work, not a lint's; `scrape` was split in round 2
+  (its guards and robots capture into two helpers) and lost its three. A
+  test pins the reason clause; `RUF100` deletes a `noqa` that suppresses
+  nothing. Not taken: hand review of the same bars (drifts, uncounted); a
+  stricter `PLR0913` (flags the keyword-only shape). Tests ignore `ARG` and `FBT` (fixtures and lambdas take
   the signature pytest hands them).
 - **On-request loop steps are `disable-model-invocation: true` skills
   (tooling, 2026-09-05).** `/review-round`, `/phase-start` and `/selfcheck`
@@ -289,7 +295,8 @@ place and never deleted.
   the text's guard, not a secret: a short dictionary inverts them.
 - **The developer-word STOPs are a hook (tooling, 2026-09-05).**
   `ask-gate.py` answers `ask` before `git push`, `gh pr create`, `gh pr
-  merge` and `make … confirm`; never `allow`/`deny`. Not taken: the hooks
+  merge` and `make … confirm`, seeing through a leading subshell opener, env
+  assignment or wrapper word (round 2); never `allow`/`deny`. Not taken: the hooks
   reference's `if: Bash(git push *)` field on a settings entry (documented,
   not verified on this build — a field the build ignores would prompt on
   every Bash call, or never); the user-level `autoMode.soft_deny` list (per
@@ -302,12 +309,13 @@ place and never deleted.
 - **CLAUDE.md is cut to what is recorded nowhere else (tooling,
   2026-09-05).** Repo map, Commands and Current status carried the per-phase
   history that the specs' Delivered paragraphs, DECISIONS' appendix and `make
-  help` already hold; at 855 lines (55 KB) the file cost roughly 14k tokens
+  help` already hold; at 853 lines (54.7 KB) the file cost roughly 14k tokens
   on every turn and inside every custom subagent (which receive CLAUDE.md —
   sub-agents reference, read 2026-09-05). Now 690 lines (43 KB): the three
   sections keep only the semantics `make help` cannot state (the `confirm`
   gate, `ROWS`, the raw-table shape check, the no-key classify step). The
-  rules sections are untouched; the next cut is theirs to earn.
+  rules sections are untouched; cut them only when they too carry
+  redundancy.
 
 ## Gotchas (stack surprises found live)
 
@@ -1766,9 +1774,12 @@ what a lean-mode reference should contribute and what the workflow itself
 should lose: the ladder in `code-craft`; the mechanical craft bars as ruff
 rules; the three commands as on-request skills; the stamp keyed to the
 spec's hashed sections; naming-the-target as a hashed check; the `ask-gate`
-hook; the fast-red `run-tests` hook; CLAUDE.md cut from 855 to 690 lines. Each
-choice and its alternatives is a Process entry above; BACKLOG rows 14, 55,
-57 and 58 close. Verified against the official references that day: a
+hook; the fast-red `run-tests` hook; CLAUDE.md cut from 853 to 690 lines. Each
+choice and its alternatives is a Process entry above; BACKLOG rows 14, 55
+and 58 close (BACKLOG.md line numbers, the convention throughout this
+file); row 57 was closed by reading the reference and reopened in round 2
+until its own trigger — the `ask` prompt observed at a plan-mode exit —
+fires. Verified against the official references that day: a
 skill's `paths:` auto-loads it while matching files are worked on; an agent's
 `skills:` preloads the full text at start; custom subagents receive
 CLAUDE.md (Explore and Plan skip it); a PreToolUse matcher is the tool's

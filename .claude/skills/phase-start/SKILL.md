@@ -15,11 +15,14 @@ Start phase **$ARGUMENTS** (a slug such as `0a-machinery`, `1-schema`).
 3. **Spec.** `specs/phase-$ARGUMENTS.md` must exist. If it does not: STOP and
    say the spec is written first, from `specs/TEMPLATE.md`, and approved
    before any code (CLAUDE.md → Workflow rules). If its status line still says
-   `PROPOSED — do not start`, STOP and ask for approval. If the spec carries
-   no `Challenged:` line under its status, print one line — `not challenged;
-   /challenge specs/phase-$ARGUMENTS.md before "build" is recommended` — and
-   continue: skipping the challenge is the developer's call, not the
-   command's.
+   `PROPOSED — do not start`, STOP and ask for approval. Run `python3
+   .claude/hooks/challenge-gate.py --spec-hash specs/phase-$ARGUMENTS.md`. If
+   the spec carries no `Challenged:` line under its status, or the line's
+   `spec <hash>` differs from what was printed (the stamp predates the
+   Invariants or Done-when), print one line — `not challenged` or `stamp
+   stale`; `/challenge specs/phase-$ARGUMENTS.md before "build" is
+   recommended` — and continue: skipping the challenge is the developer's
+   call, not the command's.
 4. **Restate the contract.** Print, verbatim from the spec: the central
    constraint, the DONE command, the Done-when list, and the Scope (files).
 5. **Scope from the evidence contract.** Print the BACKING.md rows this phase

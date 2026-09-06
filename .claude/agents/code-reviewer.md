@@ -82,7 +82,7 @@ finding names the rewrite or the closed set that replaces the case.
 Start Pass 3 with the ladder (the first section of the preloaded standard)
 over every added function, class, branch and file: what could the diff not
 have written? Each craft finding's "Rewrite / closed set" cell starts with
-exactly one of these tags:
+exactly one of these tags (a rung of the ladder, named by what it means):
 
 - `delete:` dead code, unused flexibility, a case the spec does not name.
   Replacement: nothing.
@@ -91,7 +91,7 @@ exactly one of these tags:
 - `engine:` Python doing what SQL, DuckDB's catalog or a `make` target
   already does. Name the feature.
 - `reuse:` a helper, guard or type this repo already has. Name the symbol.
-- `yagni:` an abstraction with one implementation, a parameter nobody
+- `speculative:` an abstraction with one implementation, a parameter nobody
   passes, a layer with one caller.
 - `shrink:` the same logic in fewer lines. Show the shorter form.
 

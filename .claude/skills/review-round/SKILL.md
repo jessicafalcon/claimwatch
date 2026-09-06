@@ -27,9 +27,11 @@ registers and removes for hand-mutation.
   consolidated table if it is not already in the conversation; it becomes part
   of every agent prompt in step 4.
 
-If the spec carries no `Challenged:` line under its status, print
-`spec was not challenged — /challenge <SPEC> is available` and continue; a
-review round never refuses on it.
+Run `python3 .claude/hooks/challenge-gate.py --spec-hash <SPEC>`. If the spec
+carries no `Challenged:` line under its status, or the line's `spec <hash>`
+differs from what was printed, print `spec was not challenged` or `stamp is
+stale` `— /challenge <SPEC> is available` and continue; a review round never
+refuses on it.
 
 Print first:
 

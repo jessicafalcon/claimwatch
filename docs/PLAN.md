@@ -99,6 +99,10 @@ scripts/
 └── review_common.py    spec-path validator, section parser, subprocess runner (stdlib only)
 ```
 
+The tree and the wiring below are the Phase 0a design as approved; on
+2026-09-05 the commands became skills and the hooks became three — §9 and
+CLAUDE.md → Project tooling hold the current shape.
+
 Wiring for the hook (local only, `.claude/settings.local.json`, gitignored):
 `{"hooks":{"PostToolUse":[{"matcher":"Write|Edit|MultiEdit|NotebookEdit","hooks":[{"type":"command","command":"python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/run-tests.py\""}]}]}}`
 

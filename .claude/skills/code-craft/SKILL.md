@@ -17,7 +17,7 @@ spec wins and the conflict is reported.
 
 ## Before writing: the ladder
 
-The best code is the code never written. Understand the change first (read
+Code that is not written cannot break. Understand the change first (read
 the task, the spec item, every file it touches, the real flow), then stop at
 the first rung that holds:
 
@@ -37,8 +37,7 @@ the first rung that holds:
 7. **Only then** the minimum that passes the test.
 
 Two rungs work → take the higher one. Two stdlib forms, same size → the one
-that is right on the edge case; lazy means less code, not the flimsier
-algorithm.
+that is right on the edge case: fewer lines, never a weaker algorithm.
 
 A bug fix is a root cause: grep every caller of the function before editing
 and fix the shared function once (one guard there is a smaller diff than one
@@ -50,8 +49,8 @@ the row is where deferrals are counted and reviewed at each phase exit.
 
 Not lazy about: understanding the problem; guards at inputs the repo does not
 own; the error policy; the pinning test (one focused test per behaviour, no
-more); anything the spec names. Explanation is code too: after the code, at
-most three lines — what was skipped and when to add it.
+more); anything the spec names. The explanation is held to the same bar: after
+the code, at most three lines — what was skipped and when to add it.
 
 ## Naming by meaning (brief §2.3)
 
@@ -89,7 +88,7 @@ row, a CLI variable, hook stdin, an env var, a file name under `data/cache/`.
   to the nearest valid value.
 - No `.get(…, default)` on foreign JSON; no `try: int(x) except: 0`.
 - Refuse loudly at the process boundary: exit 2 with one line naming the
-  input, or `ValueError` naming the field. The two hooks under
+  input, or `ValueError` naming the field. The three hooks under
   `.claude/hooks/` are the documented fail-opens, each listing its cases in
   its header; a new fail-open needs the same.
 - Fix the class, not the case: a denylist, a regex of bad cases or a

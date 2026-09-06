@@ -612,9 +612,9 @@ fixed in the main session or explicitly accepted — never auto-fixed.
   developer sees the claim rather than the hook trusting it. Fail-open, and
   `ask` is the only decision it ever emits; `tests/test_challenge_gate.py`
   pins it. `--spec-hash <spec>` prints the hash the stamp carries. The hooks
-  reference (read 2026-09-05) says a PreToolUse matcher is the tool's name,
-  so `"ExitPlanMode"` fires; its payload is undocumented, which is why a
-  missing `plan` still asks.
+  reference (read 2026-09-05) says a PreToolUse matcher is the tool's name;
+  the first plan-mode exit here confirms the prompt appears (BACKLOG). The
+  payload is undocumented, which is why a missing `plan` still asks.
 - `ask-gate` hook — `.claude/hooks/ask-gate.py` (tracked); before a Bash
   command any segment of which starts `git push`, `gh pr create`, `gh pr
   merge` or a `make` invocation carrying the `confirm` goal, answers `ask`
@@ -672,7 +672,8 @@ mechanical craft bars as ruff rules; the three loop commands as on-request
 skills; the `Challenged:` stamp keyed to the spec's Invariants and Done-when;
 naming-the-target as a hashed `check-docs` check; the `ask-gate` hook for the
 push/PR/merge/`confirm` STOPs; a fast-red `run-tests` hook; this file cut to
-what is recorded nowhere else. Pilot: `/challenge` on the Phase 8 spec before
+what is recorded nowhere else. Round 2 (5 agents, 21 rows, 0 blockers) fixed
+in full. Pilot: `/challenge` on the Phase 8 spec before
 it is approved.
 
 **Merged:** Phases 0a–7b in order, each with its spec under `specs/` (the
@@ -685,6 +686,6 @@ their marts land.
 **Next:** Phase 8 — cost model + guardrail simulator (`models/`), spec first,
 challenged before approval.
 
-Open BACKLOG rows: **30**.
+Open BACKLOG rows: **31**.
 
 (Update this section at the end of every working day.)
