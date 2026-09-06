@@ -58,8 +58,8 @@ every rule below except the last sentence, which is editorial (PROJECT_BRIEF.md
 | B2.3 Peer context: public ratings across the market segment (three kinds of point, each carrying its own tag — see the note above the table) | peer_ratings | `sql/marts/peer_ratings.sql` | `fixtures/anchors/platform_snapshots_seed.csv`; https://www.trustpilot.com/; https://www.opinion-assurances.fr/ | Documented |
 | B2.4 Classifier quality: per-theme precision and recall vs hand labels, graded on the held-out fold | classifier_quality | `sql/marts/classifier_quality.sql` | `classify/eval/labels.csv` | Measured |
 | B2.5 Held-claim complaint share, digital-first vs traditional mutuelles | theme_share_by_segment | `sql/marts/theme_share_by_segment.sql` | https://apps.apple.com/; https://play.google.com/; https://www.opinion-assurances.fr/; https://www.trustpilot.com/ | Measured |
-| B3.1 Cost-model formulas printed next to their output | cost_model_outputs | `sql/marts/cost_model_outputs.sql` | — | Modeled |
-| B3.2 Fraud saved vs friction cost curves over the flag rate, with the crossover | cost_curves | `sql/marts/cost_curves.sql` | — | Modeled |
+| B3.1 Cost-model formulas printed next to their output | cost_model_outputs | `sql/marts/cost_model_outputs.sql` | `open-damir` | Modeled |
+| B3.2 Fraud saved vs friction cost curves over the flag rate, with the crossover | cost_curves | `sql/marts/cost_curves.sql` | `open-damir` | Modeled |
 | B3.3 Sourced defaults: revenue per member, fraud pool, claim volume | cost_model_params | `sql/marts/cost_model_params.sql` | `open-damir` | Modeled |
 | B3.4 Declared-unsourced parameters as explore-the-range sliders | cost_model_params | `sql/marts/cost_model_params.sql` | — | Modeled |
 | B4.1 Fix 1 ask once: contacts per stuck claim drop to one, the curves move (eventual Modeled) | guardrail_sim | `sql/marts/guardrail_sim.sql` | — | Pending |
@@ -80,9 +80,14 @@ means, not a pool of legal + supplementary parts. Each DAMIR row is an
 aggregated per-cell reimbursement total, not a single claim, so the lognormal
 approximates the claim-cost distribution rather than measuring it claim by claim
 — the honest label Phase 8 carries beside the fit. **B3.3 flipped to Modeled in
-Phase 8a**: `cost_model_params` displays the fit through the `mean_claim` formula
-(with the median cell `emp_p50` printed beside it as the contrast). **B4.3 stays
-Pending** on `guardrail_sim`, built in Phase 8b.
+Phase 8a**: `cost_model_params` holds the sourced inputs, `mu`/`sigma`/`emp_p50`
+among them. The fit's *effect* on the displayed euros — `mean_claim =
+exp(mu + sigma²/2)` (with the median cell `emp_p50` printed beside it as the
+contrast) and `claims = refunded_eur / mean_claim` — is a `cost_model_outputs`
+row, which is why B3.1 and B3.2 also name `open-damir` as their upstream. (When
+Phase 9 renders B3.3's headline derived figures it reads those from
+`cost_model_outputs`, not `cost_model_params`.) **B4.3 stays Pending** on
+`guardrail_sim`, built in Phase 8b.
 
 **On B4.1's eventual mapping (decided in Phase 8a).** The `contacts_once` rows of
 `cost_curves` are the "the curves move" half of B4.1, but Beat 4 flips as one
