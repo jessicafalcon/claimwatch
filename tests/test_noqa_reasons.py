@@ -1,12 +1,14 @@
-"""Pin for the craft rule "past a signal, either split or write the one-line
-reason it stays whole": every `noqa` that suppresses a function-shape or
-boolean-flag rule carries a `-- <reason>`; RUF100 (in pyproject) deletes a
-noqa that suppresses nothing. Offline; reads git only."""
+"""Pins for the mechanical half of code-craft that lives in ruff's config:
+every `noqa` that suppresses a function-shape or boolean-flag rule carries a
+`-- <reason>`; RUF100 (in pyproject) deletes a noqa that suppresses nothing;
+the tag rule sets (TD, FIX) are selected with exactly the three ignores whose
+record side check-docs carries. Offline; reads git and pyproject only."""
 
 from __future__ import annotations
 
 import re
 import subprocess
+import tomllib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -40,3 +42,13 @@ def test_every_shape_rule_noqa_carries_its_reason():
                 missing.append(f"{path.relative_to(ROOT)}:{n}")
     assert missing == [], missing
     assert seen >= 1  # the rule is exercised, not vacuous
+
+
+def test_ruff_selects_the_tag_rules_with_exactly_the_record_side_ignores():
+    """Invariant: FIXME and XXX never merge, and a TODO carries its parens and
+    colon — ruff's half of the tag rule. TD003, FIX002 and FIX004 are off
+    because check-docs check 7 verifies the record entry instead; no other
+    ignore, or the half silently widens."""
+    lint = tomllib.loads((ROOT / "pyproject.toml").read_text())["tool"]["ruff"]["lint"]
+    assert {"TD", "FIX", "RUF100"} <= set(lint["select"])
+    assert lint["ignore"] == ["TD003", "FIX002", "FIX004"]
