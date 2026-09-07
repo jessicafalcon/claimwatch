@@ -26,6 +26,7 @@ from ingest.sources import (
     by_name,
     source_names,
 )
+from tests.repo_text import repo_text
 
 ROOT = Path(__file__).resolve().parent.parent
 EXCLUDED_TOP = ("tests",)  # plus every dot-directory (.venv, .git, .claude)
@@ -53,7 +54,7 @@ def _lines_matching(pattern: str) -> dict[str, list[str]]:
     rx = re.compile(pattern, re.M)
     hits: dict[str, list[str]] = {}
     for p in _modules():
-        found = rx.findall(p.read_text(encoding="utf-8"))
+        found = rx.findall(repo_text(p))
         if found:
             hits[str(p.relative_to(ROOT))] = found
     return hits
@@ -118,7 +119,7 @@ def test_pipeline_never_imports_the_fetcher_at_module_level():
     """A rebuild reads captures from disk; the fetcher is loaded only inside the
     `scrape` command, so `make rebuild` never touches `httpx` or the network."""
     for p in (ROOT / "pipeline").glob("*.py"):
-        for line in p.read_text(encoding="utf-8").splitlines():
+        for line in repo_text(p).splitlines():
             assert not re.match(r"^(from ingest\.fetch|import ingest\.fetch)", line), (
                 p.name,
                 line,
@@ -267,8 +268,9 @@ def test_brand_carrying_strings_appear_only_in_the_declarations():
     """D1, enforced over the tree: every string that spells the studied
     insurer (`ingest/sources.py::BRAND_TOKENS`) appears in no other tracked
     file — not a doc, a comment, a test name, a fixture or a record — as a
-    whole word, in any case. Binary files are skipped by decoding (round 1,
-    code-reviewer #9, security-reviewer #5)."""
+    whole word, in any case. Every tracked file is UTF-8 text (the repo holds
+    no binary), so a file that does not decode fails by name rather than
+    being skipped (round 1 skipped it; tooling round 3 closed the class)."""
     import subprocess
 
     from ingest.sources import BRAND_TOKENS
@@ -283,11 +285,7 @@ def test_brand_carrying_strings_appear_only_in_the_declarations():
         path = ROOT / rel
         if not path.is_file():
             continue
-        try:
-            text = path.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            continue
-        for n, line in enumerate(text.splitlines(), 1):
+        for n, line in enumerate(repo_text(path).splitlines(), 1):
             for token in BRAND_TOKENS:
                 if re.search(
                     rf"(?<![a-z0-9]){re.escape(token)}(?![a-z0-9])", line, re.I

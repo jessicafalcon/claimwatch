@@ -11,6 +11,8 @@ import subprocess
 import tomllib
 from pathlib import Path
 
+from tests.repo_text import repo_text
+
 ROOT = Path(__file__).resolve().parent.parent
 SHAPE_RULES = re.compile(r"# noqa: [^\n]*\b(?:C901|PLR09\d\d|FBT\d\d\d)\b[^\n]*")
 WITH_REASON = re.compile(r"# noqa: (?:[A-Z]+\d+, )*[A-Z]+\d+ -- \S")
@@ -33,7 +35,7 @@ def test_every_shape_rule_noqa_carries_its_reason():
     for path in _tracked_python():
         if path == Path(__file__).resolve():
             continue  # this file spells the pattern it looks for
-        for n, line in enumerate(path.read_text().splitlines(), 1):
+        for n, line in enumerate(repo_text(path).splitlines(), 1):
             m = SHAPE_RULES.search(line)
             if m is None:
                 continue
@@ -49,6 +51,6 @@ def test_ruff_selects_the_tag_rules_with_exactly_the_record_side_ignores():
     colon — ruff's half of the tag rule. TD003, FIX002 and FIX004 are off
     because check-docs check 7 verifies the record entry instead; no other
     ignore, or the half silently widens."""
-    lint = tomllib.loads((ROOT / "pyproject.toml").read_text())["tool"]["ruff"]["lint"]
+    lint = tomllib.loads(repo_text(ROOT / "pyproject.toml"))["tool"]["ruff"]["lint"]
     assert {"TD", "FIX", "RUF100"} <= set(lint["select"])
     assert lint["ignore"] == ["TD003", "FIX002", "FIX004"]

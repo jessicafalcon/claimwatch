@@ -21,6 +21,7 @@ from classify.llm import (
 from classify.rules import classify as rules_classify
 from classify.rules import load_rules
 from pipeline.warehouse import ROOT
+from tests.repo_text import repo_text
 
 # A tiny corpus: one clear document-loop review, one neutral (nothing matches).
 _DOC_LOOP = "on me redemande un document après un autre document justificatif"
@@ -48,7 +49,7 @@ def test_only_llm_imports_anthropic():
             continue
         if "/.venv/" in path.as_posix() or "/tests/" in path.as_posix():
             continue
-        text = path.read_text(encoding="utf-8")
+        text = repo_text(path)
         if "import anthropic" in text or "from anthropic" in text:
             offenders.append(path.relative_to(ROOT).as_posix())
     assert not offenders, f"anthropic imported outside classify/llm.py: {offenders}"
@@ -58,7 +59,7 @@ def test_anthropic_import_is_lazy():
     # The import is inside the real-call function, not at module top: importing
     # classify.llm (this test file already did) loads no paid SDK, and an offline
     # or no-key run never touches it.
-    lines = (ROOT / "classify" / "llm.py").read_text(encoding="utf-8").splitlines()
+    lines = repo_text(ROOT / "classify" / "llm.py").splitlines()
     top_level = [
         ln for ln in lines if ln.startswith(("import anthropic", "from anthropic"))
     ]
@@ -129,7 +130,7 @@ def test_model_input_is_only_rules_unclassified(synthetic_conn):
 
 def test_no_clock_on_the_data_path():
     for name in ("llm.py", "cache.py", "combined.py"):
-        text = (ROOT / "classify" / name).read_text(encoding="utf-8")
+        text = repo_text(ROOT / "classify" / name)
         for banned in ("now(", "current_date", "current_timestamp", "time.time("):
             assert banned not in text, f"{name} touches a clock: {banned}"
 
