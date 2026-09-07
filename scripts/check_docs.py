@@ -5,7 +5,8 @@ the suite.
 
 Eight checks. Four document classes:
   LIVING  — CLAUDE.md, README.md, SPEC.md, BACKING.md: describe what exists.
-  RECORDS — DECISIONS.md, BACKLOG.md: history; may name targets not built.
+  RECORDS — DECISIONS.md, BACKLOG.md, LESSONS.md: history; may name targets
+            not built.
   PLANS   — PROJECT_BRIEF.md, docs/*.md, specs/*.md: describe what will exist.
   TOOLING — .claude/**/*.md: links checked like any class; `make` targets
             checked in skills/ (run today) but not agents/
@@ -67,6 +68,7 @@ from review_common import (
     MAKE_TICK,
     RECORD_DOCS,
     ROOT,
+    diff_paths,
     make_targets,
 )
 
@@ -308,9 +310,7 @@ def tracked_paths(root: Path) -> list[str]:
     res = subprocess.run(
         ["git", "ls-files", "-z"], cwd=root, capture_output=True, text=True
     )
-    if res.returncode != 0:
-        return []
-    return [p for p in res.stdout.split("\0") if p]
+    return sorted(diff_paths(res.stdout)) if res.returncode == 0 else []
 
 
 def neutrality_files(root: Path, paths: list[str]) -> list[Path]:
@@ -486,12 +486,28 @@ def comments(path: Path, text: str) -> list[tuple[int, str]]:
     return out
 
 
+def read_text_or_error(path: Path, root: Path) -> tuple[str | None, str | None]:
+    """(text, None) or (None, one error line): a file that is not UTF-8 text
+    or cannot be read is reported by name, never raised (the read is a
+    boundary too — LESSONS: traceback-at-boundary)."""
+    try:
+        return path.read_text(encoding="utf-8"), None
+    except UnicodeDecodeError:
+        return None, f"{path.relative_to(root)}: not UTF-8 text"
+    except OSError as exc:
+        return None, f"{path.relative_to(root)}: cannot be read: {exc.strerror}"
+
+
 def check_comment_tags(files: list[Path], root: Path) -> list[str]:
     records = _Records.read(root)
     errors: list[str] = []
     for f in files:
+        text, err = read_text_or_error(f, root)
+        if text is None:
+            errors.append(err or f"{f.relative_to(root)}: cannot be read")
+            continue
         try:
-            found = comments(f, f.read_text(encoding="utf-8"))
+            found = comments(f, text)
         except tokenize.TokenError as exc:
             errors.append(f"{f.relative_to(root)}: does not tokenize: {exc.args[0]}")
             continue
@@ -537,8 +553,11 @@ def table_rows(text: str) -> list[list[str]]:
 def check_lessons(path: Path) -> list[str]:
     if not path.is_file():
         return [f"{path.name}: record file is missing"]
+    text, err = read_text_or_error(path, path.parent)
+    if text is None:
+        return [err or f"{path.name}: cannot be read"]
     errors: list[str] = []
-    for n, cells in enumerate(table_rows(path.read_text(encoding="utf-8")), 1):
+    for n, cells in enumerate(table_rows(text), 1):
         if len(cells) != LESSON_CELLS:
             errors.append(
                 f"{path.name} row {n}: {len(cells)} cells, not {LESSON_CELLS}"

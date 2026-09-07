@@ -348,6 +348,21 @@ def test_check_lessons_reports_cells_class_and_status(tmp_path: Path):
     assert check_docs.check_lessons(tmp_path / "none.md") == [
         "none.md: record file is missing"
     ]
+    lessons.write_bytes(b"| a |\n|---|\n| caf\xe9 |\n")
+    assert check_docs.check_lessons(lessons) == ["LESSONS.md: not UTF-8 text"]
+
+
+def test_a_code_file_that_is_not_text_is_one_error_line(tmp_path: Path):
+    """The read is a boundary: a non-UTF-8 tracked file is reported by name,
+    never a traceback through check-docs."""
+    for name in ("BACKLOG.md", "DECISIONS.md"):
+        (tmp_path / name).write_text("| a | b | c |\n|---|---|---|\n")
+    (tmp_path / "specs").mkdir()
+    latin = tmp_path / "latin.py"
+    latin.write_bytes(b"# caf\xe9\n")
+    assert check_docs.check_comment_tags([latin], tmp_path) == [
+        "latin.py: not UTF-8 text"
+    ]
 
 
 def test_lesson_classes_match_the_lessons_md_fence():
