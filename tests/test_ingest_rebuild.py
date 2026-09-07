@@ -21,7 +21,7 @@ from pipeline.metrics import reviews_per_month
 from pipeline.warehouse import connect, database_for
 from tests import pins
 
-pytestmark = pytest.mark.slow  # integration (builds a DuckDB warehouse)
+pytestmark = pytest.mark.slow  # slow: kept out of the fast edit-loop hook
 
 SAMPLE = Path(__file__).resolve().parent.parent / "fixtures" / "app-store"
 FEED = by_name("fr-digital-first")  # the declared feed source; captures live under it

@@ -29,12 +29,14 @@ MAX_EVENT_BYTES = 4 * 1024 * 1024  # the harness is the producer; bigger is not 
 # the full run. The gate and CI run the suite plain — this is the edit loop's
 # visibility aid, not their check.
 FAST_RED = ("-x", "--ff")
-# The edit loop runs the FAST set only. The ~17 warehouse-building integration
-# modules (~2-5s each) carry `@pytest.mark.slow`; running all 830 tests here
-# took ~4 min and always tripped the timeout, so a green edit reported a false
-# block. `-m "not slow"` runs the ~525 fast tests in ~20s; the slow ones are
-# left to `make test` and CI, which run the suite plain. Tradeoff: an edit that
-# breaks only a slow test is caught by the gate/CI, not here.
+# The edit loop runs the FAST set only. The warehouse-building and subprocess-
+# heavy integration modules carry `@pytest.mark.slow`; running the whole suite
+# here took minutes and always tripped the timeout, so a green edit reported a
+# false block. `-m "not slow"` runs the rest in seconds; the slow ones are left
+# to `make test` and CI, which run the suite plain. Tradeoff: an edit that
+# breaks only a slow test — including invariant guards that live in slow modules
+# (the no-key run, provenance, the confirm gate) — is caught by the gate/CI,
+# not here.
 FAST_ONLY = ("-m", "not slow")
 
 

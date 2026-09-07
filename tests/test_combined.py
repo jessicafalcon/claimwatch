@@ -14,7 +14,7 @@ from classify.rules import load_rules
 from pipeline.warehouse import ROOT
 from tests import pins
 
-pytestmark = pytest.mark.slow  # integration (builds a DuckDB warehouse)
+pytestmark = pytest.mark.slow  # slow: kept out of the fast edit-loop hook
 
 
 def _reviews(conn):

@@ -7,7 +7,7 @@ import pytest
 
 from pipeline.warehouse import database_for
 
-pytestmark = pytest.mark.slow  # integration (builds a DuckDB warehouse)
+pytestmark = pytest.mark.slow  # slow: kept out of the fast edit-loop hook
 
 PROVENANCE = ("source", "source_url", "captured_at", "run_id")
 

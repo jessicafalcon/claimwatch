@@ -31,7 +31,7 @@ from pipeline.build import (
 from pipeline.warehouse import connect, database_for
 from tests import pins
 
-pytestmark = pytest.mark.slow  # integration (builds a DuckDB warehouse)
+pytestmark = pytest.mark.slow  # slow: kept out of the fast edit-loop hook
 
 PLAY = by_name("fr-digital-first-google-play-listing")
 

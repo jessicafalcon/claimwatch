@@ -13,7 +13,7 @@ from pipeline.build import rebuild
 from pipeline.warehouse import connect, database_for
 from tests import pins
 
-pytestmark = pytest.mark.slow  # integration (builds a DuckDB warehouse)
+pytestmark = pytest.mark.slow  # slow: kept out of the fast edit-loop hook
 
 MARTS = ("rating_trend", "channel_gap", "platform_stats", "peer_ratings")
 

@@ -20,7 +20,7 @@ from classify.split import HELDOUT_FOLD, is_heldout
 from pipeline.cli import main
 from tests import pins
 
-pytestmark = pytest.mark.slow  # integration (builds a DuckDB warehouse)
+pytestmark = pytest.mark.slow  # slow: kept out of the fast edit-loop hook
 
 
 def _predictions(conn) -> list[tuple[str, str]]:

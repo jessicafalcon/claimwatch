@@ -22,7 +22,7 @@ from pipeline.build import rebuild, write_classifier_quality
 from pipeline.warehouse import connect, database_for
 from tests import pins
 
-pytestmark = pytest.mark.slow  # integration (builds a DuckDB warehouse)
+pytestmark = pytest.mark.slow  # slow: kept out of the fast edit-loop hook
 
 
 def _reviews(conn):

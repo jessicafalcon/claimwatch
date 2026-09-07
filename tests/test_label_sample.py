@@ -17,7 +17,7 @@ from pipeline.label_sample import SHEET, SHEET_COLUMNS, label_sample
 from pipeline.warehouse import ROOT, database_for
 from tests import pins
 
-pytestmark = pytest.mark.slow  # integration (builds a DuckDB warehouse)
+pytestmark = pytest.mark.slow  # slow: kept out of the fast edit-loop hook
 
 
 @pytest.fixture

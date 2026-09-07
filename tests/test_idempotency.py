@@ -12,7 +12,7 @@ import pytest
 
 from pipeline.build import rebuild
 
-pytestmark = pytest.mark.slow  # integration (builds a DuckDB warehouse)
+pytestmark = pytest.mark.slow  # slow: kept out of the fast edit-loop hook
 
 
 def test_second_rebuild_adds_no_rows(tmp_path):

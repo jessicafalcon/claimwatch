@@ -10,7 +10,7 @@ from ingest.sources import app_store_source, by_name
 from pipeline.build import reset
 from pipeline.cli import main
 
-pytestmark = pytest.mark.slow  # integration (builds a DuckDB warehouse)
+pytestmark = pytest.mark.slow  # slow: kept out of the fast edit-loop hook
 
 
 @pytest.fixture(autouse=True)
