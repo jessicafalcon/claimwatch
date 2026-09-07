@@ -51,10 +51,11 @@ CODE_PACKAGES = (
 MARTS = "sql/marts/"
 EXEMPT = ("main",)
 _DEF = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
-# What ast.parse raises besides SyntaxError: a null byte (ValueError), a
-# nesting the parser cannot recurse (RecursionError). A closed set; MemoryError
-# is not caught — it is not a property of the file.
-_PARSE_ERRORS = (ValueError, RecursionError)
+# What ast.parse raises besides SyntaxError on 3.12: a nesting the parser
+# cannot recurse (RecursionError). A null byte is a SyntaxError with no line,
+# handled by the SyntaxError branch. A closed set; MemoryError ("parser stack
+# overflowed") is not caught — it is not a property of the file.
+_PARSE_ERRORS = (RecursionError,)
 
 
 def public_defs(source: str) -> dict[str, str]:

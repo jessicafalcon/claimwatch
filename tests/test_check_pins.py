@@ -164,6 +164,17 @@ def test_a_blob_that_is_not_text_or_does_not_parse_is_a_refusal(tmp_path: Path):
         check_pins.unpinned(tmp_path, base)
     _git(tmp_path, "rm", "-q", "models/nul.py")
     (tmp_path / "models").mkdir(exist_ok=True)
+    # the parser's other exception: a chain ast cannot recurse (3.12 raises
+    # RecursionError during ast construction; the process goes on to refuse)
+    _write(tmp_path, "models/deep.py", "a" + ".b" * 100_000 + "\n")
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "deep")
+    with pytest.raises(
+        Refused, match=r"^refusing: models/deep.py does not parse: RecursionError$"
+    ):
+        check_pins.unpinned(tmp_path, base)
+    _git(tmp_path, "rm", "-q", "models/deep.py")
+    (tmp_path / "models").mkdir(exist_ok=True)
     _write(tmp_path, "models/broken.py", "def (:\n")
     _git(tmp_path, "add", "-A")
     _git(tmp_path, "commit", "-q", "-m", "broken")
