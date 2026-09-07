@@ -41,7 +41,14 @@ select = [
   "C90", "PLR0912", "PLR0915", "PLR0917",
   "FBT", "SIM", "RET", "PIE", "ERA", "ARG",
   "RUF100",  # a noqa that suppresses nothing is deleted, not kept
+  # Tagged comments (code-craft → Comments): TODO carries a record in its
+  # parens and a colon; FIXME and XXX are refused outright. HACK is allowed
+  # (FIX004 off) and TODO is allowed (FIX002 off) because scripts/check_docs.py
+  # checks that each one points at a record entry that exists; TD003 is off
+  # because that record entry is the link.
+  "TD", "FIX",
 ]
+ignore = ["TD003", "FIX002", "FIX004"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10

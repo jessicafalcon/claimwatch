@@ -138,6 +138,21 @@ row, a CLI variable, hook stdin, an env var, a file name under `data/cache/`.
 - Docstrings are one line unless the behaviour is non-obvious.
 - The SQL header comment (grain, provenance columns, BACKING rows fed) is
   required; it is the one comment a file must have.
+- A tagged comment is a pointer at a record, never a loose note. Four tags,
+  a closed set; `make check-docs` verifies each points at an entry that
+  exists, ruff (TD, FIX) refuses the rest:
+  - `TODO(BACKLOG): <open row title>` — a deferral the row already counts
+    (the Workflow rule: a finding outside the phase is a BACKLOG row). The
+    text is the row title's start, verbatim.
+  - `HACK(DECISIONS): <entry title>` — a workaround whose Gotchas or
+    Process entry exists. No entry, no HACK.
+  - `REF: <URL | brief §n | RFC n>` — the source of a number, a shape or a
+    protocol rule (the Constants rule, made greppable).
+  - `INVARIANT(<spec slug> <n>): <why>` — the spec invariant a guard keeps,
+    e.g. `INVARIANT(phase-3a 4): pattern-matching stays out of SQL`.
+  - `FIXME` and `XXX` never merge: the spec is the contract, unfinished code
+    is not committed. A `TODO` with no record, or any tag in another shape,
+    is a check-docs FAIL naming the shape.
 
 ## Types
 

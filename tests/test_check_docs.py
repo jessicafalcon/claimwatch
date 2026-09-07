@@ -239,6 +239,60 @@ def test_neutrality_files_are_the_tracked_code_and_prose_minus_the_declarations(
     assert "CLAUDE.md" in check_docs.tracked_paths(ROOT)
 
 
+def test_check_comment_tags_reports_each_shape_and_missing_record(tmp_path: Path):
+    """Check 7: a tag word is one of four shapes, each pointing at a record entry
+    that exists; a struck BACKLOG row, an unknown DECISIONS entry, a missing
+    spec and any other shape are each one error naming the line."""
+    (tmp_path / "BACKLOG.md").write_text(
+        "| Item | Source | Trigger |\n|---|---|---|\n"
+        "| **Open row about a scan** — detail | r1 | t |\n"
+        "| ~~**Closed row** — detail~~ DONE | r1 | t |\n"
+    )
+    (tmp_path / "DECISIONS.md").write_text(
+        "## Gotchas\n\n- **The gate is a goal (2026-09-03).** Because.\n"
+        "```\n**Not an entry** inside a fence\n```\n"
+    )
+    (tmp_path / "specs").mkdir()
+    (tmp_path / "specs" / "phase-1-schema.md").write_text("# s\n")
+    (tmp_path / "fixtures").mkdir()
+    (tmp_path / "fixtures" / "page.py").write_text("# " + "TODO: sample, never read\n")
+    code = tmp_path / "pipeline.py"
+    lines = [
+        "# " + "TODO(BACKLOG): Open row about a scan",  # ok
+        "x = 1  # " + "TODO(BACKLOG): Open row",  # ok — a prefix, trailing comment
+        "# " + "TODO(BACKLOG): Closed row",
+        "# " + "TODO(BACKLOG): Nothing like it",
+        "# " + "TODO: no record",
+        "# " + "HACK(DECISIONS): The gate is a goal",  # ok
+        "# " + "HACK(DECISIONS): Not an entry",
+        "# " + "REF: https://example.org/spec §2",  # ok
+        "# " + "REF: brief §6.2",  # ok
+        "# " + "REF: RFC 9309",  # ok
+        "# " + "REF: see the brief",
+        "# " + "INVARIANT(phase-1-schema 3): raw is append-only",  # ok
+        "# " + "INVARIANT(phase-9-study 1): not yet",
+        "# " + "INVARIANT 3: no parens",
+    ]
+    code.write_text("\n".join(lines) + "\n")
+    sql = tmp_path / "mart.sql"
+    sql.write_text("-- " + "HACK: no record\nselect 1\n")
+    paths = ["pipeline.py", "mart.sql", "fixtures/page.py", "notes.md"]
+    files = check_docs.comment_files(tmp_path, paths)
+    assert files == [code, sql]
+    assert check_docs.check_comment_tags(files, tmp_path) == [
+        "pipeline.py:3: TODO cites a closed BACKLOG row: 'Closed row'",
+        "pipeline.py:4: TODO cites no single open BACKLOG row: 'Nothing like it'",
+        "pipeline.py:5: malformed TODO comment "
+        "(shape: TODO(BACKLOG): <open row title>)",
+        "pipeline.py:7: HACK cites no single DECISIONS entry: 'Not an entry'",
+        "pipeline.py:11: malformed REF comment (shape: REF: <URL | brief §n | RFC n>)",
+        "pipeline.py:13: INVARIANT names no spec: specs/phase-9-study.md",
+        "pipeline.py:14: malformed INVARIANT comment "
+        "(shape: INVARIANT(<spec slug> <n>): <why>)",
+        "mart.sql:1: malformed HACK comment (shape: HACK(DECISIONS): <entry title>)",
+    ]
+
+
 def test_backlog_count_matches_today():
     assert check_docs.check_backlog_count(ROOT / "CLAUDE.md", ROOT / "BACKLOG.md") == []
 

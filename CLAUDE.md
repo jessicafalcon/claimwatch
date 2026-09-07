@@ -136,7 +136,8 @@ its targets there and here in the same PR. What `make help` cannot say:
   forms, commented-out code, unused arguments — a function that stays whole
   carries a one-line `# noqa: <rule> -- <reason>`), `check-docs` (links,
   named targets, banned words, glossary size, BACKLOG count, naming the
-  target against `scripts/neutrality_hashes.txt`), `check-backing`,
+  target against `scripts/neutrality_hashes.txt`, comment tags pointing at
+  a record entry that exists), `check-backing`,
   `review-gate [SPEC=specs/<f>.md] [BASE=main]` (test + ruff read-only +
   both checks + fixtures; with SPEC, Evidence ids and Record-updates files;
   one line per check, exit 1 on FAIL, 2 on a refused SPEC/BASE;
@@ -302,6 +303,11 @@ study names no insurer as its subject.
   header comment names the grain, the provenance columns and the BACKING rows
   it feeds; lowercase keywords; no `order by` in a table definition; ANSI only
   (no reader function, no regex, no clock — `pipeline/sql_lint.py` pins it).
+- Tagged comments are pointers at records, a closed set of four:
+  `TODO(BACKLOG): <open row title>`, `HACK(DECISIONS): <entry title>`,
+  `REF: <URL | brief §n | RFC n>`, `INVARIANT(<spec slug> <n>): <why>`.
+  `make check-docs` verifies the entry exists; ruff refuses `FIXME`, `XXX`
+  and any TODO without its record (`code-craft` → Comments has the rule).
 - Secrets: the API key and warehouse credentials live in `.env` only — never
   in a tracked file, never in Actions, never echoed. Refusals print names,
   never values.

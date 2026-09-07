@@ -3,7 +3,7 @@
 (CI runs it too). Not a pytest file, so a docs-only edit does not re-trigger
 the suite.
 
-Six checks. Four document classes:
+Seven checks. Four document classes:
   LIVING  — CLAUDE.md, README.md, SPEC.md, BACKING.md: describe what exists.
   RECORDS — DECISIONS.md, BACKLOG.md: history; may name targets not built.
   PLANS   — PROJECT_BRIEF.md, docs/*.md, specs/*.md: describe what will exist.
@@ -31,10 +31,18 @@ Six checks. Four document classes:
      insurers appear there only as sourced data points. The commit window is
      the last COMMIT_MESSAGES the checkout holds: a shallow CI clone sees
      fewer; the local run and the weekly checkout see all of them.
+  7. comment tags — a tagged comment in tracked code (`.py`, `.sql`, `.yaml`,
+     `.yml`, Makefile) is a pointer at a record, and the record entry exists:
+     `TODO(BACKLOG): <open row title>`, `HACK(DECISIONS): <entry title>`,
+     `REF: <URL | brief §n | RFC n>`, `INVARIANT(<spec slug> <n>): …` with
+     `specs/<slug>.md` present. A tag word in any other shape is a FAIL naming
+     the shape. FIXME and XXX never pass ruff (TD001, FIX001, FIX003), so they
+     are not read here. The four are the closed set (code-craft → Comments).
 """
 
 from __future__ import annotations
 
+import dataclasses
 import functools
 import hashlib
 import re
@@ -84,6 +92,26 @@ _BACKLOG_COUNT = re.compile(r"Open BACKLOG rows: \*\*(\d+)\*\*")
 _TERM = re.compile(r"^- \*\*", re.M)
 _URL = re.compile(r"https?://\S+")
 _TOKEN = re.compile(r"[a-z0-9]+")
+
+# Check 7 — tagged comments. A comment opener (`#` or `--`), a tag word, the rest.
+COMMENT_SUFFIXES = (".py", ".sql", ".yaml", ".yml")
+COMMENT_NAMES = ("Makefile",)
+COMMENT_EXCLUDED = ("fixtures/", "data/")
+_TAGGED = re.compile(r"(?:#|--)\s*(TODO|HACK|REF|INVARIANT)\b(.*)$")
+_TAG_SHAPES = {
+    "TODO": re.compile(r"^\(BACKLOG\): (\S.*?)\s*$"),
+    "HACK": re.compile(r"^\(DECISIONS\): (\S.*?)\s*$"),
+    "REF": re.compile(r"^: (?:https?://\S+|brief §\d+(?:\.\d+)*|RFC \d+)(?:\s|$)"),
+    "INVARIANT": re.compile(r"^\((phase-[a-z0-9-]+) \d+\): \S"),
+}
+_TAG_HELP = {
+    "TODO": "TODO(BACKLOG): <open row title>",
+    "HACK": "HACK(DECISIONS): <entry title>",
+    "REF": "REF: <URL | brief §n | RFC n>",
+    "INVARIANT": "INVARIANT(<spec slug> <n>): <why>",
+}
+_BACKLOG_TITLE = re.compile(r"^\|\s*(~~)?\s*\*\*(.+?)\*\*", re.M)
+_BOLD = re.compile(r"\*\*(.+?)\*\*")
 
 
 def plain_tokens(line: str) -> set[str]:
@@ -347,6 +375,88 @@ def check_backlog_count(claude: Path, backlog: Path) -> list[str]:
     return []
 
 
+def backlog_titles(text: str) -> dict[str, bool]:
+    """Row title → open? (a struck first cell is closed)."""
+    return {m.group(2): m.group(1) is None for m in _BACKLOG_TITLE.finditer(text)}
+
+
+def decisions_titles(text: str) -> set[str]:
+    """Every bold span and heading outside fenced blocks: the entry titles."""
+    body = _FENCE.sub("", text)
+    return set(_BOLD.findall(body)) | set(_HEADING.findall(body))
+
+
+def comment_files(root: Path, paths: list[str]) -> list[Path]:
+    """Tracked code the tag check reads: the comment-bearing suffixes and the
+    Makefile, minus fixtures/ and data/ (sample pages are not our comments)."""
+    return [
+        root / p
+        for p in paths
+        if (p.endswith(COMMENT_SUFFIXES) or Path(p).name in COMMENT_NAMES)
+        and not p.startswith(COMMENT_EXCLUDED)
+    ]
+
+
+def _titled(prefix: str, titles: set[str] | dict[str, bool]) -> list[str]:
+    """The titles the comment text is a prefix of (a citation is the title's
+    start, not a paraphrase)."""
+    return [t for t in titles if t.startswith(prefix)]
+
+
+@dataclasses.dataclass(frozen=True)
+class Records:
+    """What a tag may point at, read once per run."""
+
+    backlog_rows: dict[str, bool]
+    decisions_titles: set[str]
+    specs: Path
+
+    @classmethod
+    def read(cls, root: Path) -> Records:
+        return cls(
+            backlog_titles((root / "BACKLOG.md").read_text(encoding="utf-8")),
+            decisions_titles((root / "DECISIONS.md").read_text(encoding="utf-8")),
+            root / "specs",
+        )
+
+
+def _cited_error(tag: str, cited: str, records: Records) -> str | None:
+    """The record side of a well-formed tag: the entry it names exists (and,
+    for a BACKLOG row, is open)."""
+    if tag == "TODO":
+        hits = _titled(cited, records.backlog_rows)
+        if len(hits) != 1:
+            return f"TODO cites no single open BACKLOG row: {cited!r}"
+        if not records.backlog_rows[hits[0]]:
+            return f"TODO cites a closed BACKLOG row: {cited!r}"
+    if tag == "HACK" and len(_titled(cited, records.decisions_titles)) != 1:
+        return f"HACK cites no single DECISIONS entry: {cited!r}"
+    if tag == "INVARIANT" and not (records.specs / f"{cited}.md").is_file():
+        return f"INVARIANT names no spec: specs/{cited}.md"
+    return None
+
+
+def tag_error(tag: str, rest: str, records: Records) -> str | None:
+    m = _TAG_SHAPES[tag].match(rest)
+    if m is None:
+        return f"malformed {tag} comment (shape: {_TAG_HELP[tag]})"
+    return _cited_error(tag, m.group(1), records) if m.groups() else None
+
+
+def check_comment_tags(files: list[Path], root: Path) -> list[str]:
+    records = Records.read(root)
+    errors: list[str] = []
+    for f in files:
+        for n, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
+            m = _TAGGED.search(line)
+            if m is None:
+                continue
+            err = tag_error(m.group(1), m.group(2), records)
+            if err:
+                errors.append(f"{f.relative_to(root)}:{n}: {err}")
+    return errors
+
+
 def _naming_errors(root: Path) -> list[str]:
     digests, errors = neutrality_hashes(root / NEUTRALITY_HASHES)
     files = neutrality_files(root, tracked_paths(root))
@@ -364,6 +474,10 @@ def main(root: Path = ROOT) -> int:
         ("glossary", check_glossary(living, root)),
         ("BACKLOG count", check_backlog_count(root / "CLAUDE.md", root / "BACKLOG.md")),
         ("naming the target", _naming_errors(root)),
+        (
+            "comment tags",
+            check_comment_tags(comment_files(root, tracked_paths(root)), root),
+        ),
     ]
     failed = 0
     for name, errors in checks:
