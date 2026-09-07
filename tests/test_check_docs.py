@@ -360,6 +360,14 @@ def test_a_code_file_that_is_not_text_is_one_error_line(tmp_path: Path):
     (tmp_path / "specs").mkdir()
     latin = tmp_path / "latin.py"
     latin.write_bytes(b"# caf\xe9\n")
+    assert check_docs.read_text_or_error(latin, tmp_path) == (
+        None,
+        "latin.py: not UTF-8 text",
+    )
+    assert check_docs.read_text_or_error(tmp_path / "gone.py", tmp_path) == (
+        None,
+        "gone.py: cannot be read: No such file or directory",
+    )
     assert check_docs.check_comment_tags([latin], tmp_path) == [
         "latin.py: not UTF-8 text"
     ]
