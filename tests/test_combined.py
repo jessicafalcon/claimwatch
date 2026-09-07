@@ -4,6 +4,8 @@ Offline; the model is a fake decider (no key, no network)."""
 
 from __future__ import annotations
 
+import pytest
+
 from classify.combined import classify_all, unresolved_ids
 from classify.labels import THEMES, UNCLASSIFIED
 from classify.llm import MODEL, PROMPT_VERSION
@@ -11,6 +13,8 @@ from classify.rules import classify as rules_classify
 from classify.rules import load_rules
 from pipeline.warehouse import ROOT
 from tests import pins
+
+pytestmark = pytest.mark.slow  # slow: kept out of the fast edit-loop hook
 
 
 def _reviews(conn):

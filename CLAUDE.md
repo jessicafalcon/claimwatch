@@ -687,6 +687,6 @@ slice + fitted claim-cost distribution (PR #15, 2026-09-05) — landed
 **Next:** Phase 8b — the guardrail simulator and the hold timer (B4.1–B4.3),
 spec first, challenged before approval.
 
-Open BACKLOG rows: **35**.
+Open BACKLOG rows: **37**.
 
 (Update this section at the end of every working day.)

@@ -19,6 +19,8 @@ from pipeline.build import INPUTS
 from pipeline.cli import CONFIRM_STAMP, Refused, confirmed, resolve_choice
 from pipeline.warehouse import TARGETS
 
+pytestmark = pytest.mark.slow  # slow: kept out of the fast edit-loop hook
+
 ROOT = Path(__file__).resolve().parent.parent
 SCRUB = (
     "SPEC",

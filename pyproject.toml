@@ -22,8 +22,11 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+addopts = "-q --strict-markers"
 pythonpath = ["."]
+markers = [
+    "slow: an integration test kept out of the fast edit-loop hook because it dominates suite runtime — it builds a DuckDB warehouse or spawns many make subprocesses. The hook runs `-m \"not slow\"`; `make test` and CI run the suite plain, so slow tests always run there. --strict-markers makes a typo'd or unregistered mark fail loud, so a new slow module cannot silently rejoin the fast set.",
+]
 
 [tool.ruff]
 target-version = "py312"

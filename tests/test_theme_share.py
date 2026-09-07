@@ -21,6 +21,8 @@ from pipeline.build import (
 from pipeline.warehouse import connect, database_for
 from tests import pins
 
+pytestmark = pytest.mark.slow  # slow: kept out of the fast edit-loop hook
+
 
 def _classify_and_build(db, run_id: str = "t") -> None:
     """Fill stg_classified_reviews and build the theme-share marts over the

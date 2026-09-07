@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import sys
 
+import pytest
+
 from classify.combined import classify_all
 from classify.eval.gate import ANSWER_KEY, HELDOUT_FOLD, score_heldout
 from classify.labels import UNCLASSIFIED
@@ -19,6 +21,8 @@ from classify.rules import load_rules
 from pipeline.build import rebuild, write_classifier_quality
 from pipeline.warehouse import connect, database_for
 from tests import pins
+
+pytestmark = pytest.mark.slow  # slow: kept out of the fast edit-loop hook
 
 
 def _reviews(conn):

@@ -8,8 +8,11 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import pins
+import pytest
 
 from pipeline.build import rebuild
+
+pytestmark = pytest.mark.slow  # slow: kept out of the fast edit-loop hook
 
 
 def test_second_rebuild_adds_no_rows(tmp_path):

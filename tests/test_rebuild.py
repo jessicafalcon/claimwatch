@@ -26,6 +26,8 @@ from pipeline.build import (
 )
 from pipeline.warehouse import connect, database_for, default_schema
 
+pytestmark = pytest.mark.slow  # slow: kept out of the fast edit-loop hook
+
 _INSERT_RAW = (
     "insert into raw_reviews (source, external_id, source_url, segment, "
     "captured_at, run_id, review_date, rating, title, body, content_hash) "
