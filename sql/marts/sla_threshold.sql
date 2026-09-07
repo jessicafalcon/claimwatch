@@ -1,4 +1,4 @@
--- sla_threshold — the computed hold-timer threshold: for each candidate timer
+-- sla_threshold — the computed hold-length threshold: for each candidate timer
 --   day, the claim amount below which a hold that long is net-negative in
 --   expectation, and the share of synthetic claims under it (B4.2, SPEC.md Beat 4).
 -- Grain: one row per timer day of the fixed grid 1..60, at the baseline

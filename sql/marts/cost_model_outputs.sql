@@ -16,7 +16,8 @@
 -- Reader rule: B3.1 prints every point row (the model formulas and the three
 --   hold-timer formulas loop_days, friction_per_day, timer_amount_eur); B4.2
 --   reads only those three hold-timer rows, at the baseline scenario.
--- Feeds: B3.1, B4.2.
+-- Feeds: B3.1; and B4.2 indirectly — its three hold-timer rows here are read at
+--   baseline into sla_threshold, B4.2's mart of record.
 create or replace table cost_model_outputs (
     scenario varchar,
     name varchar,

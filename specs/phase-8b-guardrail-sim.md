@@ -2,8 +2,9 @@
 
 Contract for the `phase-8b-guardrail-sim` branch. Source: PROJECT_BRIEF.md §3
 Beat 4 ("Three small fixes, no rebuild required"), §7 (the guardrail toggles
-and the computed SLA threshold) and §9 Phase 8 ("Cost model + guardrail
-simulator"), the simulator half of the Phase 8 split: 8a landed Beat 3
+and the computed hold-length threshold — the brief's "SLA threshold") and §9
+Phase 8 ("Cost model + guardrail simulator"), the simulator half of the Phase 8
+split: 8a landed Beat 3
 (B3.1–B3.4, PR #17); 8b lands Beat 4's three number-bearing panels
 (B4.1–B4.3). Depends on Phase 8a merged (the `scenario` column on
 `cost_model_outputs` and `cost_curves`, `models/cost_model.py::FORMULAS`,

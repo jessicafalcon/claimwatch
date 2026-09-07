@@ -152,8 +152,8 @@ its targets there and here in the same PR. What `make help` cannot say:
   parameter table, each formula beside its value at the defaults per scenario,
   the two crossovers; writes nothing; identical text on a rerun),
   `simulate` (no variable: reads the tracked fit and prints the guardrail
-  simulator — the three rules beside their values, the SLA threshold table,
-  the hold days per fix; writes nothing; identical text on a rerun).
+  simulator — the three rules beside their values, the hold-length threshold
+  table, the hold days per fix; writes nothing; identical text on a rerun).
 - **`make rebuild [TARGET=duckdb] [ROWS=captured|none|synthetic|samples]`** —
   raw → staging → marts, reviews per month, then the classify step: the rules
   plus, only when `ANTHROPIC_API_KEY` is set and only for the reviews the
