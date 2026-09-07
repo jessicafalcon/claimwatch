@@ -399,6 +399,14 @@ def test_lesson_classes_match_the_lessons_md_fence():
     assert set(fence.group(1).split()) == set(check_docs.LESSON_CLASSES)
 
 
+def test_commit_messages_read_the_log_and_are_empty_outside_git(tmp_path: Path):
+    """The naming check's commit window comes through the shared runner: the
+    repo's own log has bodies; a directory that is not a repository reads as
+    no messages, never a traceback."""
+    assert "phase-" in check_docs.commit_messages(ROOT)
+    assert check_docs.commit_messages(tmp_path) == ""
+
+
 def test_backlog_count_matches_today():
     assert check_docs.check_backlog_count(ROOT / "CLAUDE.md", ROOT / "BACKLOG.md") == []
 
