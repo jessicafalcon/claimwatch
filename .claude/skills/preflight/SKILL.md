@@ -32,7 +32,7 @@ sentence; do not re-ask it.
 ## 4. One row per changed symbol
 
 For every public symbol `check-pins` considers (added or changed, under
-`models/`, `pipeline/`, `classify/`, `ingest/`, `opendata/`, `scripts/`,
+`models/`, `pipeline/`, `classify/`, `ingest/`, `opendata/`, `study/`, `scripts/`,
 `.claude/hooks/`) and every changed file under `sql/`:
 
 | Symbol | Pinning test | Foreign inputs → declared shape | Same concept, other names | Lesson class risked |

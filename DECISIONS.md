@@ -2032,7 +2032,8 @@ mistake from being made twice. Three commits, one per piece.
    working-tree diff (the gate reviews commits). Name-mention is the honest
    ceiling of a mechanical check; the behaviour column of `/preflight` is
    where "named" becomes "asserted". The guard flagged its own branch first
-   (four helpers in check_docs with no test naming them), which is the point.
+   (four helpers in check_docs with no test naming them), the behaviour it is
+   meant to catch.
 3. **`LESSONS.md` is the learning loop, with a promotion rule so it stays
    read.** One row per correctness finding class a review round reported; the
    fix commit writes it (CLAUDE.md → Fix commits); `/phase-start` prints the
@@ -2051,3 +2052,21 @@ mistake from being made twice. Three commits, one per piece.
    hits countable); a lessons section inside DECISIONS (a record of choices,
    not of misses). Also closed here: the BACKLOG row on `architecture-fit`'s
    shape sentence, which now names `RULES` beside `FORMULAS`.
+
+Round 1 (2026-09-07; code-reviewer, functionality-tester, security-reviewer,
+study-editor, coherence-auditor scoped to the changed records): 20 rows, 0
+BLOCKER, 5 should-fix; the developer chose to fix all twenty rather than defer
+any to BACKLOG. Seven correctness commits: check-pins reads both sides from git
+(a symlink is its blob; a non-text blob is a refusal), a tag comment is a
+comment token the tag opens, a table cell keeps a pipe inside backticks,
+check-docs reports a non-text file by name, the ruff tag rules are pinned, CI
+runs the pin guard with full history. The `traceback-at-boundary` lesson
+recurred inside the very tools that enforce it (a strict `read_text` with no
+catch), so under the promotion rule its row was reopened and re-closed with a
+second standard sentence: a read is a boundary too. `study/` joined the pin
+guard's packages before Phase 9 needs it; the template's LESSONS row applies
+to no file by default; `/selfcheck` gained the lesson reminder. Question 3 of
+the coherence-auditor (a name-mention guard rather than a behaviour one) is
+answered as designed: name-mention is the honest ceiling of a mechanical
+check, and `/preflight`'s pinning-test column is where "named" becomes
+"asserted".

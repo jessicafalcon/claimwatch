@@ -53,7 +53,7 @@ test: ## pytest — offline, no services, no network
 lint: ## ruff via pre-commit (REWRITES files — never run inside a gate)
 	uv run pre-commit run --all-files
 
-check-docs: ## links, named make targets, banned words, glossary size, BACKLOG count, naming the target (hashed), comment tags
+check-docs: ## links, named make targets, banned words, glossary size, BACKLOG count, naming the target (hashed), comment tags, the LESSONS table
 	uv run python scripts/check_docs.py
 
 check-backing: ## BACKING rows ↔ sql/marts files ↔ tags ↔ sources ↔ SPEC citations

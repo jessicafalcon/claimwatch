@@ -120,6 +120,10 @@ row, a CLI variable, hook stdin, an env var, a file name under `data/cache/`.
   a traceback.
 - A load writes its batch or nothing: one transaction per load, and a
   refused row refuses the batch (*LESSONS: partial-write*).
+- A read is a boundary too: a file that is not UTF-8 text, a path that
+  cannot be read, a subprocess whose output does not decode is a one-line
+  refusal naming the path, caught where the read happens (*LESSONS:
+  traceback-at-boundary*, reopened and re-closed 2026-09-07).
 
 ## Data shapes across a boundary
 
@@ -162,8 +166,9 @@ row, a CLI variable, hook stdin, an env var, a file name under `data/cache/`.
     Process entry exists. No entry, no HACK.
   - `REF: <URL | brief §n | RFC n>` — the source of a number, a shape or a
     protocol rule (the Constants rule, made greppable).
-  - `INVARIANT(<spec slug> <n>): <why>` — the spec invariant a guard keeps,
-    e.g. `INVARIANT(phase-3a 4): pattern-matching stays out of SQL`.
+  - `INVARIANT(<spec stem> <n>): <why>` — the spec invariant a guard keeps;
+    the stem is the file name under `specs/`, e.g.
+    `INVARIANT(phase-3a-snapshots 4): pattern-matching stays out of SQL`.
   - `FIXME` and `XXX` never merge: the spec is the contract, unfinished code
     is not committed. A `TODO` with no record, or any tag in another shape,
     is a check-docs FAIL naming the shape.

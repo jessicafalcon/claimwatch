@@ -134,11 +134,13 @@ its targets there and here in the same PR. What `make help` cannot say:
   `lint` (ruff via pre-commit — REWRITES files, never inside a gate; the rule
   set is the mechanical half of `code-craft`: complexity, branches,
   statements, positional arguments, boolean flag parameters, simplifiable
-  forms, commented-out code, unused arguments — a function that stays whole
-  carries a one-line `# noqa: <rule> -- <reason>`), `check-docs` (links,
-  named targets, banned words, glossary size, BACKLOG count, naming the
-  target against `scripts/neutrality_hashes.txt`, comment tags pointing at
-  a record entry that exists), `check-backing`, `check-pins [BASE=main]`
+  forms, commented-out code, unused arguments, the comment-tag shapes (`TD`,
+  `FIX`), a `noqa` that suppresses nothing (`RUF100`) — a function that stays
+  whole carries a one-line `# noqa: <rule> -- <reason>`), `check-docs`
+  (links, named targets, banned words, glossary size, BACKLOG count, naming
+  the target against `scripts/neutrality_hashes.txt`, comment tags pointing
+  at a record entry that exists, the LESSONS table's class set and status
+  shape), `check-backing`, `check-pins [BASE=main]`
   (every public function or class added or changed since BASE under a code
   package is named in a test — a new one, in a test file the range changed;
   a new mart file, in a changed test; one line per miss; the gate's `pins`
@@ -310,9 +312,10 @@ study names no insurer as its subject.
   (no reader function, no regex, no clock — `pipeline/sql_lint.py` pins it).
 - Tagged comments are pointers at records, a closed set of four:
   `TODO(BACKLOG): <open row title>`, `HACK(DECISIONS): <entry title>`,
-  `REF: <URL | brief §n | RFC n>`, `INVARIANT(<spec slug> <n>): <why>`.
-  `make check-docs` verifies the entry exists; ruff refuses `FIXME`, `XXX`
-  and any TODO without its record (`code-craft` → Comments has the rule).
+  `REF: <URL | brief §n | RFC n>`, `INVARIANT(<spec stem> <n>): <why>`. A
+  tag opens the comment. ruff refuses `FIXME`, `XXX` and a TODO without its
+  parens or colon; `make check-docs` refuses a tag whose record entry does
+  not exist (`code-craft` → Comments has the rule).
 - Secrets: the API key and warehouse credentials live in `.env` only — never
   in a tracked file, never in Actions, never echoed. Refusals print names,
   never values.
@@ -527,8 +530,9 @@ Gotchas).
 - PR via `gh pr create` when Done-when passes AND verdicts are approved. Body:
   the PR template. Title `Phase N — <name>`.
 - CI runs `make lint`, `make check-docs`, `make check-backing`, `make test`,
-  `make rebuild ROWS=synthetic`, `make idempotency-check` and the same two
-  with `ROWS=samples` (offline, DuckDB, no key, no fetch). Mergeable only
+  `make check-pins BASE=origin/main`, `make rebuild ROWS=synthetic`, `make
+  idempotency-check` and the same two with `ROWS=samples` (offline, DuckDB,
+  no key, no fetch). Mergeable only
   when CI is green and the surface's agents have run.
 - The developer merges (squash), never Claude. After merge: `git checkout
   main && git pull`.
@@ -705,8 +709,9 @@ as pointers at records (four tags, ruff `TD`/`FIX`, check-docs check 7); the
 pin guard (`scripts/check_pins.py`, the gate's `pins` line, `make check-pins`)
 and `/preflight`, the fourth on-request loop step; `LESSONS.md` (eight classes
 seeded from the fix commits since Phase 0a, every one promoted to a check or a
-standard sentence) with check-docs check 8 as its keeper. Review round not yet
-run.
+standard sentence) with check-docs check 8 as its keeper. Review round 1
+(five agents, 20 rows, 0 BLOCKER) fixed in full: seven correctness commits
+and this records batch; round 2 scoped to the fixes is next.
 
 **Merged:** Phases 0a–8b in order, each with its spec under `specs/` (the
 Delivered paragraph) and its DECISIONS appendix. Phase 8b — the guardrail
