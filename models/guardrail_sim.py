@@ -113,19 +113,32 @@ def _synthetic_amount(params: Mapping[str, float], rank: int) -> float:
     return exp(params["mu"] + params["sigma"] * z)
 
 
+# The draw is pure and scenario-invariant (it reads only mu/sigma), so it is
+# memoized on (mu, sigma): every caller in a run — each scenario, the printer, the
+# marts — shares one computation, and no function takes a `claims` argument a
+# caller could fill with a set drawn from a different fit than its `params`.
+_CLAIMS_CACHE: dict[tuple[float, float], tuple[Claim, ...]] = {}
+
+
 def synthetic_claims(params: Mapping[str, float]) -> tuple[Claim, ...]:
-    """One Claim per point of the fixed quantile grid, non-decreasing in rank and
-    identical in every scenario (it reads only mu/sigma). The quantile is stored
-    as a rate and the amount (the fitted lognormal read at that quantile) as
-    euros, both rounded at the cost model's one site."""
-    return tuple(
-        Claim(
-            rank=rank,
-            quantile=cost_model.rounded("rate", quantile),
-            amount_eur=cost_model.rounded("eur", _synthetic_amount(params, rank)),
+    """One Claim per point of the fixed quantile grid, from the `mu`/`sigma` of
+    `params` (so a slider on the fit moves the claims), non-decreasing in rank and
+    identical in every scenario and every run. The quantile is stored as a rate and
+    the amount (the fitted lognormal read at that quantile) as euros, both rounded
+    at the cost model's one site. Memoized on (mu, sigma)."""
+    key = (params["mu"], params["sigma"])
+    cached = _CLAIMS_CACHE.get(key)
+    if cached is None:
+        cached = tuple(
+            Claim(
+                rank=rank,
+                quantile=cost_model.rounded("rate", quantile),
+                amount_eur=cost_model.rounded("eur", _synthetic_amount(params, rank)),
+            )
+            for rank, quantile in enumerate(QUANTILE_GRID, start=1)
         )
-        for rank, quantile in enumerate(QUANTILE_GRID, start=1)
-    )
+        _CLAIMS_CACHE[key] = cached
+    return cached
 
 
 def hold(
@@ -157,6 +170,9 @@ def share_under(claims: Sequence[Claim], amount: float) -> float:
     return sum(1 for c in claims if c.amount_eur < amount) / len(claims)
 
 
+# Order is load-bearing: format_simulation prints each rule's value through
+# RULES[0].fn / RULES[1].fn / RULES[2].fn by index, so reordering this tuple
+# reorders (or breaks) the printed rules — it is not a free reshuffle.
 RULES: tuple[Rule, ...] = (
     Rule(
         "synthetic_amount",
@@ -191,24 +207,17 @@ def _loop_and_timer_days(
     return {"loop_days": loop_days, "timer_days": timer_days}
 
 
-def simulate(
-    params: Mapping[str, float],
-    scenario: str,
-    claims: Sequence[Claim] | None = None,
-) -> list[dict[str, object]]:
+def simulate(params: Mapping[str, float], scenario: str) -> list[dict[str, object]]:
     """One row per synthetic claim for one simulator scenario: the claim, the
     scenario's loop, the hold and its outcome. The timer amount is the cost
     model's `timer_amount_eur` at `baseline` — the recommendation is made once,
-    before any fix — whatever the scenario. The claims are scenario-invariant, so
-    a caller running every scenario draws them once and passes them in; left None
-    they are drawn here. An unknown scenario is refused."""
+    before any fix — whatever the scenario. The claims come from the memoized draw
+    over `params`, the same in every scenario. An unknown scenario is refused."""
     sim = _sim_scenario(scenario)
     scenario_params = _loop_and_timer_days(params, sim.curves_scenario)
     timer_amount = cost_model.evaluate(params, "baseline")["timer_amount_eur"]
-    if claims is None:
-        claims = synthetic_claims(params)
     rows: list[dict[str, object]] = []
-    for claim in claims:
+    for claim in synthetic_claims(params):
         hold_days, outcome = hold(
             claim, scenario_params, timer_on=sim.timer_on, timer_amount=timer_amount
         )
@@ -227,18 +236,14 @@ def simulate(
     return rows
 
 
-def threshold_table(
-    params: Mapping[str, float], claims: Sequence[Claim] | None = None
-) -> list[dict[str, object]]:
+def threshold_table(params: Mapping[str, float]) -> list[dict[str, object]]:
     """One row per timer day of the grid, at the baseline parameters: the amount
     below which a hold that long is net-negative in expectation (the cost model's
     `timer_amount_eur` with `timer_days` set to that day) and the share of
     synthetic claims under it. Exactly one row — the default timer day — is
-    marked. The recommendation is made once, so there is no scenario column. The
-    claims are drawn here unless the caller passes the ones it already drew."""
+    marked. The recommendation is made once, so there is no scenario column."""
     default_day = cost_model.rounded("count", params["timer_days"])
-    if claims is None:
-        claims = synthetic_claims(params)
+    claims = synthetic_claims(params)
     rows: list[dict[str, object]] = []
     for day in TIMER_DAY_GRID:
         amount = cost_model.evaluate({**params, "timer_days": day}, "baseline")[
@@ -307,7 +312,7 @@ def format_simulation(fit: cost_model.Fit) -> str:
         "SLA threshold — the amount below which a hold that long is net-negative "
         "in expectation, and the share of claims under it (baseline; * = default):",
     ]
-    for row in threshold_table(params, claims):
+    for row in threshold_table(params):
         mark = " *" if row["is_default"] else "  "
         lines.append(
             f" {mark} {row['timer_days']:>3} days  <= "
@@ -315,7 +320,7 @@ def format_simulation(fit: cost_model.Fit) -> str:
         )
     lines.append("")
     lines.append("hold days per fix (mean hold, share the timer released):")
-    summary = simulate_all(params, claims)
+    summary = simulate_all(params)
     for sim in SIM_SCENARIOS:
         s = summary[sim.name]
         lines.append(
@@ -325,16 +330,11 @@ def format_simulation(fit: cost_model.Fit) -> str:
     return "\n".join(lines)
 
 
-def simulate_all(
-    params: Mapping[str, float], claims: Sequence[Claim] | None = None
-) -> dict[str, dict[str, float]]:
-    """The summary over every scenario — `simulate` for each over one draw of the
-    scenario-invariant claims, then `summarize` over the concatenation. The one
-    call the printer and the study both make; the claims are drawn once here unless
-    the caller passes them in."""
-    if claims is None:
-        claims = synthetic_claims(params)
+def simulate_all(params: Mapping[str, float]) -> dict[str, dict[str, float]]:
+    """The summary over every scenario — `simulate` for each, then `summarize`
+    over the concatenation. The one call the printer and the study both make; the
+    draw is memoized, so running every scenario is one computation of the claims."""
     rows: list[dict[str, object]] = []
     for sim in SIM_SCENARIOS:
-        rows.extend(simulate(params, sim.name, claims))
+        rows.extend(simulate(params, sim.name))
     return summarize(rows)

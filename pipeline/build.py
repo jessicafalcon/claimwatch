@@ -977,7 +977,6 @@ def write_sim_marts(conn, fit: cost_model.Fit, run_id: str) -> None:
     `rebuild()` calls this after write_model_marts on every input, so every caller
     sees filled marts."""
     params = cost_model.defaults(fit)
-    claims = guardrail_sim.synthetic_claims(params)
     sim_rows = [
         [
             row["scenario"],
@@ -992,7 +991,7 @@ def write_sim_marts(conn, fit: cost_model.Fit, run_id: str) -> None:
             _MODEL_TAG,
         ]
         for sim in guardrail_sim.SIM_SCENARIOS
-        for row in guardrail_sim.simulate(params, sim.name, claims)
+        for row in guardrail_sim.simulate(params, sim.name)
     ]
     sla_rows = [
         [
@@ -1003,7 +1002,7 @@ def write_sim_marts(conn, fit: cost_model.Fit, run_id: str) -> None:
             run_id,
             _MODEL_TAG,
         ]
-        for row in guardrail_sim.threshold_table(params, claims)
+        for row in guardrail_sim.threshold_table(params)
     ]
     conn.execute("begin transaction")
     try:
