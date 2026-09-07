@@ -66,7 +66,9 @@ Delivered paragraph and `make help`, not here.
   `check_pins.py`, `check_docs.py`, `check_backing.py`, `review_common.py`;
   `neutrality_hashes.txt` (the hashed tokens the naming check reads).
 - `tests/` — pytest; no services, no network, no key. `tests/pins.py` holds
-  every pinned number.
+  every pinned number; `tests/repo_text.py` is the one reader the layout
+  tests that walk a package read through (a file that is not text fails by
+  name).
 - `.claude/` — agents (report-only), skills (the three standards,
   `/challenge`, the four on-request loop steps), the three hooks. Settings
   are local-only and gitignored.
@@ -717,7 +719,12 @@ standard sentence) with check-docs check 8 as its keeper. Review round 1
 records batch. Round 2 (four agents, 17 rows, 0 BLOCKER) found the round-1
 read-boundary fix applied at its sites only, so the boundary was re-implemented
 once against its invariant (one reader, one runner in `review_common`, a grep
-test); one scoped re-review is next.
+test). Round 3, the cap's one scoped re-review (four agents, 12 rows, 0
+BLOCKER), fixed in full: five commits (the parse-error set exact and pinned;
+a failed read hands back nothing, never an empty default — a ninth LESSONS
+class, `empty-default`; the layout guard as an import allowlist; the suite's
+scanners through one reader; the craft pair) and this records batch. Next:
+`/selfcheck`, then the push on the developer's word.
 
 **Merged:** Phases 0a–8b in order, each with its spec under `specs/` (the
 Delivered paragraph) and its DECISIONS appendix. Phase 8b — the guardrail

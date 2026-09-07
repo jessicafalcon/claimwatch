@@ -126,8 +126,10 @@ row, a CLI variable, hook stdin, an env var, a file name under `data/cache/`.
   cannot be read, a subprocess whose output does not decode is a one-line
   refusal naming the input. Under `scripts/` every read and every run goes
   through `review_common` (`read_text_or_error`, `readable`, `run`); a grep
-  test pins it (*LESSONS: traceback-at-boundary*, reopened and re-closed
-  2026-09-07).
+  test pins it; the suite's repository scanners (the layout tests that
+  walk a package) read through `tests/repo_text.py::repo_text`, which fails
+  by name (*LESSONS: traceback-at-boundary*, reopened and re-closed
+  2026-09-07, then closed once more in `tests/`).
 - A reader that fails returns nothing the caller can check against: the
   failure travels with the value (`None`, a `Refused`, an `(empty, error)`
   pair) and the caller reports the one line and stops — never an empty

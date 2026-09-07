@@ -44,7 +44,9 @@ def test_each_stop_asks_with_its_reason():
     assert "STOP 3" in _asks(_hook(_bash("git push origin HEAD")))
     assert "STOP 3" in _asks(_hook(_bash("git push --force-with-lease")))
     assert "PR opens" in _asks(_hook(_bash("gh pr create --title x")))
-    assert "merges" in _asks(_hook(_bash("gh pr merge 12 --squash")))
+    assert "merge commit, never a squash" in _asks(
+        _hook(_bash("gh pr merge 12 --squash"))
+    )
     assert "STOP 4" in _asks(_hook(_bash("make confirm reset")))
     assert "STOP 4" in _asks(_hook(_bash("make -j2 confirm scrape")))
 

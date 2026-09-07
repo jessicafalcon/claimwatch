@@ -2095,3 +2095,30 @@ LESSONS hash rule depends on it), the challenge standard and `architecture-fit`
 list the open LESSONS rows. Rejected: guarding the suite's own tests against a
 non-UTF-8 tracked file (a test failing with a traceback is a failing test);
 rewriting `docs/PLAN.md` (design history).
+
+Round 3 (2026-09-07; code-reviewer, functionality-tester, security-reviewer,
+coherence-auditor, scoped to `f663d20`, `a9fb65d`, `43a1369` — the one
+re-review the cap allows): 12 rows, 0 BLOCKER, 4 should-fix, all four round-2
+findings confirmed closed, and the developer said "fix all". One commit per
+class: the parse-error set is exactly what 3.12 raises (a null byte is a
+`SyntaxError` with no line, so the `ValueError` arm was dead; the
+`RecursionError` arm now has a 100k-attribute chain that reaches it); a
+reader that fails hands back nothing to check against — an unreadable record
+had read as empty records and an unreadable Makefile as no targets, each a
+fan-out of false lines — which is the class round 2's empty test pool
+belonged to, so `empty-default` is the ninth LESSONS class, promoted at once
+to a code-craft Error-policy sentence; the `scripts/` layout guard is an
+import allowlist rather than a regex of spawner names (`os.popen` slipped
+past the old one); the suite's five repository scanners read through
+`tests/repo_text.py`, one reader that fails by name; and the craft pair (the
+dead `err or …` fallbacks, one `shown()` form for a file's name in every
+check). Records: the stale test id in the `traceback-at-boundary` row, the
+`ask-gate` reason now says merge commit, `/preflight` lists `dags/`, the
+architect's fallback standard names the open LESSONS rows. **Reversed on the
+developer's word:** round 2 rejected guarding the suite's own tests against a
+non-UTF-8 tracked file; round 3's tester showed the gate's `test` line then
+carries five tracebacks — the class the branch exists to close, one directory
+over — and the developer chose the fix. The neutrality sweep no longer skips a
+file that does not decode: every tracked file is text, so one that is not is a
+finding by name.
+

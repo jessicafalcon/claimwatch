@@ -27,8 +27,8 @@ against. If the standard is missing, gather it yourself and say so:
 3. `BACKING.md`: the rows the plan claims to populate, and their current tag.
 4. `SPEC.md` (what exists), the predecessor spec's Delivered paragraph, the
    `docs/PLAN.md` §2 verdict table (what was dropped on purpose and why).
-5. `DECISIONS.md` "still in force" and Gotchas; `BACKLOG.md` rows whose
-   trigger the plan might fire.
+5. `DECISIONS.md` "still in force" and Gotchas; `LESSONS.md` rows whose
+   Status is `open`; `BACKLOG.md` rows whose trigger the plan might fire.
 6. `specs/TEMPLATE.md`: the four REQUIRED sections and the ≤ ~6 item rule.
 
 Read the plan in full, then the standard, then the code the plan touches.
