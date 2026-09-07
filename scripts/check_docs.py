@@ -505,11 +505,33 @@ def check_comment_tags(files: list[Path], root: Path) -> list[str]:
     return errors
 
 
+def table_cells(row: str) -> list[str]:
+    """A markdown row's cells: split on `|` outside backticks and not escaped
+    (`\\|`), so a cited pattern or command in a cell keeps its pipe."""
+    cells: list[str] = []
+    cell: list[str] = []
+    in_code = False
+    chars = iter(row.strip().strip("|"))
+    for ch in chars:
+        if ch == "\\":
+            cell.append(next(chars, ""))
+        elif ch == "`":
+            in_code = not in_code
+            cell.append(ch)
+        elif ch == "|" and not in_code:
+            cells.append("".join(cell).strip())
+            cell = []
+        else:
+            cell.append(ch)
+    cells.append("".join(cell).strip())
+    return cells
+
+
 def table_rows(text: str) -> list[list[str]]:
     """Cells of every table row after the header and separator (skipped by
     position, as open_backlog_rows does)."""
     rows = [line for line in text.splitlines() if line.startswith("|")]
-    return [[c.strip() for c in r.strip().strip("|").split("|")] for r in rows[2:]]
+    return [table_cells(r) for r in rows[2:]]
 
 
 def check_lessons(path: Path) -> list[str]:

@@ -333,6 +333,13 @@ def test_check_lessons_reports_cells_class_and_status(tmp_path: Path):
         + "| `unpinned` | five | cells | only | here |\n"
     )
     assert check_docs.table_rows(lessons.read_text())[0][:2] == ["`unpinned`", "w"]
+    # a pipe inside backticks or escaped stays in its cell (the escape is spent)
+    assert check_docs.table_cells("| `ok   pins \\| 6/6` | a \\| b | c |") == [
+        "`ok   pins | 6/6`",
+        "a | b",
+        "c",
+    ]
+    assert check_docs.table_cells("| `x|y` | z |") == ["`x|y`", "z"]
     assert check_docs.check_lessons(lessons) == [
         "LESSONS.md row 4: class not in the closed set: `vibes`",
         "LESSONS.md row 5: status shape: 'promoted'",
