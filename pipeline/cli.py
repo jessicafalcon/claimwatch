@@ -35,6 +35,7 @@ from ingest.parsed import PageShapeError
 from ingest.politeness import MAX_PAGES
 from ingest.sources import SOURCES
 from models.cost_model import format_model
+from models.guardrail_sim import format_simulation
 from opendata.fetch import FetchError, fetch_month
 from opendata.fit import (
     ARTIFACT,
@@ -559,6 +560,23 @@ def _do_model(_args: argparse.Namespace) -> int:
     return 0
 
 
+def _do_simulate(_args: argparse.Namespace) -> int:
+    """Offline, no variable, no warehouse: read the tracked lognormal fit and
+    print the three rules (each beside its value at the defaults), the SLA
+    threshold table (one line per timer day, the default marked) and the hold-day
+    summary per fix. Writes nothing. Run twice: identical text — nothing on this
+    path reads a clock or a key. A missing fit artifact is a clear message and
+    exit 1, not a traceback."""
+    if not ARTIFACT.is_file():
+        print(
+            f"simulate: no fit artifact at {_rel(ARTIFACT)} — run `make fit-damir` "
+            "first (developer-run)"
+        )
+        return 1
+    print(format_simulation(read_model_fit()))
+    return 0
+
+
 def _do_idempotency(args: argparse.Namespace) -> int:
     target = resolve_choice(args.target, TARGETS, "duckdb")
     rows = resolve_choice(args.rows, INPUTS, "synthetic")
@@ -624,6 +642,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--n", default="")
     sub.add_parser("fit-damir", add_help=False)  # no user variable
     sub.add_parser("model", add_help=False)  # no user variable
+    sub.add_parser("simulate", add_help=False)  # no user variable
 
     args = ap.parse_args(argv)
     dispatch = {
@@ -639,6 +658,7 @@ def main(argv: list[str] | None = None) -> int:
         "sample-damir": _do_sample_damir,
         "fit-damir": _do_fit_damir,
         "model": _do_model,
+        "simulate": _do_simulate,
     }
     try:
         return dispatch[args.command](args)

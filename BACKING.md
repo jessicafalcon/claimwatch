@@ -62,9 +62,9 @@ every rule below except the last sentence, which is editorial (PROJECT_BRIEF.md
 | B3.2 Fraud saved vs friction cost curves over the flag rate, with the crossover | cost_curves | `sql/marts/cost_curves.sql` | `open-damir` | Modeled |
 | B3.3 Sourced defaults: revenue per member, fraud pool, claim volume | cost_model_params | `sql/marts/cost_model_params.sql` | `open-damir` | Modeled |
 | B3.4 Declared-unsourced parameters as explore-the-range sliders | cost_model_params | `sql/marts/cost_model_params.sql` | — | Modeled |
-| B4.1 Fix 1 ask once: contacts per stuck claim drop to one, the curves move (eventual Modeled) | guardrail_sim | `sql/marts/guardrail_sim.sql` | — | Pending |
-| B4.2 Fix 2 a clock on every hold: the computed SLA threshold (eventual Modeled) | sla_threshold | `sql/marts/sla_threshold.sql` | — | Pending |
-| B4.3 Before and after hold durations from the simulator on calibrated synthetic claims (eventual Modeled) | guardrail_sim | `sql/marts/guardrail_sim.sql` | `open-damir` | Pending |
+| B4.1 Fix 1 ask once: contacts per stuck claim drop to one, the curves move | cost_curves | `sql/marts/cost_curves.sql` | `open-damir` | Modeled |
+| B4.2 Fix 2 a clock on every hold: the computed hold-length threshold | sla_threshold | `sql/marts/sla_threshold.sql` | `open-damir` | Modeled |
+| B4.3 Before and after hold durations from the simulator on calibrated synthetic claims | guardrail_sim | `sql/marts/guardrail_sim.sql` | `open-damir` | Modeled |
 | B4.4 Fix 3 count the mistakes: a false-positive rate per flag rule (eventual Modeled) | — (outcome log) | — | — | Pending |
 | B5.1 Determinism facts: one model decision, formulas shown, no untagged number (eventual Measured) | — (repo facts) | — | — | Pending |
 | B5.2 Reproducibility: row counts per stage, eval scores, the one rebuild command (eventual Measured) | pipeline_row_counts | `sql/marts/pipeline_row_counts.sql` | — | Pending |
@@ -86,11 +86,16 @@ exp(mu + sigma²/2)` (with the median cell `emp_p50` printed beside it as the
 contrast) and `claims = refunded_eur / mean_claim` — is a `cost_model_outputs`
 row, which is why B3.1 and B3.2 also name `open-damir` as their upstream. (When
 Phase 9 renders B3.3's headline derived figures it reads those from
-`cost_model_outputs`, not `cost_model_params`.) **B4.3 stays Pending** on
-`guardrail_sim`, built in Phase 8b.
+`cost_model_outputs`, not `cost_model_params`.)
 
-**On B4.1's eventual mapping (decided in Phase 8a).** The `contacts_once` rows of
-`cost_curves` are the "the curves move" half of B4.1, but Beat 4 flips as one
-beat in Phase 8b; so B4.1 stays **Pending** on `guardrail_sim` now, and 8b's spec
-re-points its mart cell to `cost_curves` (scenario `contacts_once`) beside the
-simulator's hold durations when it lands Beat 4.
+**What Beat 4 landed (Phase 8b).** The synthetic claims are the same fit read at
+a thousand evenly spaced quantiles — a real distribution, synthetic claims: no
+individual claim is public — so `guardrail_sim` and `sla_threshold` name
+`open-damir` as their upstream too. **B4.1** is the `contacts_once` rows of
+`cost_curves` (the "curves move" half) beside the `ask_once` hold durations in
+`guardrail_sim`. **B4.2**'s printed arithmetic is the `loop_days` /
+`friction_per_day` / `timer_amount_eur` rows of `cost_model_outputs` at
+`baseline`, read into `sla_threshold` as the amount below which a hold that long
+is net-negative in expectation. **B4.3** is the before/after hold durations in
+`guardrail_sim`. **B4.4 stays Pending**: a false-positive rate per flag rule
+needs an outcome log that does not exist.

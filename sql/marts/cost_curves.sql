@@ -13,7 +13,8 @@
 --   column. is_default marks the default flag rate.
 -- Provenance: run_id names the build; no source_url, no captured_at, no clock.
 -- Tag: Modeled (the deterministic model's own output).
--- Feeds: B3.2.
+-- Feeds: B3.2; B4.1 (the contacts_once rows — the document loop one round
+--   shorter, "the curves move").
 create or replace table cost_curves (
     scenario varchar,
     flag_rate double,

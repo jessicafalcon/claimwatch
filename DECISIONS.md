@@ -31,9 +31,12 @@ place and never deleted.
 - **Pattern-matching lives in `rules.yaml` and Python, never in SQL.** SQL that
   carries no regex carries no dialect, which is what keeps it portable.
   ([PLAN §4.10](docs/PLAN.md); [Phase 0a](#phase-0a))
-- **Formulas are data.** `models/cost_model.py::FORMULAS` is the only place a
-  formula is written; the study renders from it and a test pins the outputs.
-  ([PLAN §4](docs/PLAN.md); [Phase 0a](#phase-0a))
+- **Formulas are data.** A printed expression and its callable are one entry in
+  the module that owns the quantity, and the printer prints from the entry, so the
+  shown formula and the computed number cannot drift; a test pins the outputs. Its
+  two instances are `models/cost_model.py::FORMULAS` (the model and the hold-timer
+  threshold) and `models/guardrail_sim.py::RULES` (the quantile draw and the hold).
+  ([PLAN §4](docs/PLAN.md); [Phase 0a](#phase-0a); restated [Phase 8b](#phase-8b))
 - **Classification grain: one row per review × theme.** A review carrying K
   themes writes K rows, a review with none writes one `positive`/`unclassified`
   row; a "theme share" counts theme rows. This is what a theme chart means.
@@ -1891,4 +1894,105 @@ Also decided in this phase:
   computed before any pin was typed: the baseline curves cross at flag rate 0.095
   with the 0.05 "you are here" marker to its left — the story holds without
   tuning a default.
+
+### Phase 8b
+
+`specs/phase-8b-guardrail-sim.md`, APPROVED 2026-09-06 (challenged round 1, stamp
+`7501f9a3`). The simulator half of the Phase 8 split (PROJECT_BRIEF.md §3 Beat 4,
+§7): the synthetic claims, the hold timer, and the computed SLA threshold
+(B4.1–B4.3). No new dependency — the normal quantile is stdlib
+`statistics.NormalDist().inv_cdf`, already used by `opendata/fit.py`.
+
+Six pinned decisions:
+
+1. **The claims are a quantile draw, `n` = 1,000, never a random draw.**
+   `guardrail_sim.py::synthetic_claims` reads the fitted lognormal at the 1,000
+   midpoints `(i − ½)/n` — the same amounts every run, each `exp(mu + sigma ×
+   z((rank − ½)/n))` a reader can redo. Rejected: a seeded pseudo-random draw (the
+   seed is a hidden parameter and "redo by hand" fails for claim 731); the
+   fixture's 5,000 real cells as the claims (a cell is not a claim, the fixture is
+   read-only under a Measured tag); an analytic CDF only (no drill-through to the
+   claims); `n` = 5,000 (five times the rows for the same shape).
+2. **The threshold is Beat 3 arithmetic: three `point` formulas in
+   `cost_model.py::FORMULAS` over two new `unsourced` knobs, capped at the loop.**
+   `loop_days = contacts × days_per_round`; `friction_per_day = (contacts ×
+   cost_per_contact + churn_prob × customer_value) / loop_days`; `timer_amount_eur
+   = fp_share × friction_per_day × min(timer_days, loop_days) / (1 − fp_share)`.
+   The `min(…, loop_days)` cap (challenge #1) makes the threshold linear in the
+   day up to the loop and constant after — friction stops accruing when the loop
+   ends — so "errs toward holding" holds on every grid row. It prices the ex-ante
+   decision (a hold planned at day 0 to run `N` days), the reading the study's
+   sentence makes (challenge Q5). Rejected: an unbounded linear threshold (past the
+   loop it charged friction the model never incurs); the marginal reading (the
+   slope reverses); the fraud pool's average as a per-claim ceiling (independent of
+   the claim's size); a churn-over-hold-days curve (a second unsourced
+   relationship); a separate threshold formula in the simulator (brief §7: computed
+   from the Beat 3 model); an `escalation_days` parameter (below).
+3. **The hold rule and its outcomes are closed data in `RULES`; an escalated
+   claim completes the loop.** `hold(claim, scenario_params, timer_on,
+   timer_amount)` → `(hold_days, outcome)` with `hold_days ∈ {loop_days,
+   timer_days}` and `OUTCOMES = (loop_released, timer_released, timer_escalated)`.
+   For a large claim the timer changes who decides, not how long — a person's
+   turnaround has no public anchor (a BACKLOG row with its trigger). Rejected: an
+   `escalation_days` guess (the one knob that would make the timer look better);
+   the timer shortening large holds; outcomes as free strings.
+4. **Simulator scenarios are a closed set carrying the cost-curve scenario they
+   pair with; the timer is set from the un-fixed world.** `SIM_SCENARIOS`: `no_fix`
+   → `baseline`, `ask_once` → `contacts_once`, `hold_timer` → `churn_halved`,
+   `both_fixes` → `both`; `simulate` evaluates the model at `curves_scenario` for
+   the scenario's `loop_days` and takes `timer_amount_eur` from the `baseline`
+   evaluation, whatever the scenario. Under `both_fixes` the one-round loop (7
+   days) ends before the default timer (14), so the clock never fires and its rows
+   equal `ask_once`'s — expected and labeled, not a STOP (challenge #3). 8a freed
+   the cost-model marts' `scenario` column for a simulated timer; **8b does not use
+   it, because the simulator computes holds, not churn** (challenge Q6). Rejected:
+   reusing the cost-model names; a `hold_timer` scenario in `cost_model.SCENARIOS`
+   with a churn override derived from hold days (a relationship no source gives);
+   the timer amount at the mapped scenario.
+5. **Two DDL-only Python-fed marts, one writer, filled inside `rebuild()` after
+   the model marts.** `guardrail_sim` (4 × 1,000 rows; the per-claim grain exists
+   for the timer's per-claim decision, not a hold distribution) and `sla_threshold`
+   (60 rows, no scenario column — the recommendation is made once). Integer and
+   boolean columns named as such in the DDL (challenge #10, #11; the
+   `cost_curves.is_default` precedent). `write_sim_marts` clears and inserts both
+   in one transaction after `write_model_marts`; one read of the fit feeds both.
+   Rejected: an aggregates-only mart (no drill-through); a scenario column on
+   `sla_threshold` (four recommendations for one decision); folding the print into
+   `make model` (one target per stage).
+6. **Rounding through 8a's one site; one aggregation site for the summary.** A new
+   `days` row (two places, challenge #2) in `_ROUNDING` for the mean hold; every
+   other number reuses the existing units. `summarize(rows)` is the one
+   aggregation site (mean hold days, timer-released share per scenario); the share
+   the timer released under `hold_timer` and `sla_threshold`'s `share_under` at the
+   default day are the same count by construction, pinned across the two marts
+   (challenge #9). Rejected: a summary mart (a third grain); rounding at the
+   printer (a second site); the mean as `count` (loses a day of resolution).
+
+The rule restated as a property (challenge #7): a printed expression and its
+callable are one entry in the module that owns the quantity, and the printer
+prints from the entry — `cost_model.py::FORMULAS` (the model and the timer
+threshold) and `guardrail_sim.py::RULES` (the draw and the hold) are its two
+instances (CLAUDE.md → Deterministic first). The `models/` import allowlist
+widened by `statistics` and `models`, and the forbidden-name scan gained
+`samples` (challenge #8) — `NormalDist().samples` is the one random method the
+allowed `statistics` carries, the gap the import allowlist cannot close.
+
+**Gotchas.** `statistics.NormalDist().inv_cdf` carries a C implementation and a
+pure-Python fallback of the same algorithm; the 1,000 rounded amounts were
+byte-identical locally and under `idempotency-check ROWS=synthetic`, and the
+first/middle/last amounts are pinned. DuckDB binds Python `int` into the
+`integer` columns (`claim_rank`, `loop_days`, `hold_days`, `timer_days`) and
+`bool` into `is_default` with no cast surprise. The two sim marts are each filled
+with one `executemany`, guarded by `_no_pandas_probe` (Amendment A1): binding a
+Python value, DuckDB imports `pandas` to test its type, and with pandas absent (the
+no-pandas rule) and a failed import uncached, the ~4,000-row insert re-scans
+`sys.path` on every value — a sub-second write becomes ~5 s, and every test that
+rebuilds pays it (measured: the per-row loop ran the suite in ~17 min, the guarded
+`executemany` in ~2.5 min). A `None` sentinel in `sys.modules` makes the import
+fail at once; it is set only around the insert and restored after, and the repo
+uses no DuckDB dataframe API. The defaults' outputs were computed before any pin was
+typed: the baseline loop (21 days) is longer than the default timer (14), the
+default threshold (€42.67) lands inside the body of the distribution (median cell
+€49.76) rather than a tail, and each fix shortens the mean hold — the story holds
+without tuning a default.
 

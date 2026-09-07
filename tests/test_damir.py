@@ -481,18 +481,19 @@ def test_read_fit_refuses_a_negative_sigma(tmp_path):
 # --- 7b lands no mart; 8a lands the cost-model marts, 8b the simulator's ------
 
 
-def test_cost_model_marts_exist_and_8b_marts_do_not():
-    """8a lands the three cost-model marts (Beat 3); 8b's simulator marts, and
-    any damir-named mart, do not exist yet."""
+def test_all_python_fed_marts_exist_and_no_damir_mart():
+    """The five Python-fed marts exist — the three cost-model marts (8a, Beat 3)
+    and the two simulator marts (8b, Beat 4) — and no mart is named after the
+    DAMIR source (the fit feeds the model, it is not a mart of its own)."""
     marts = ROOT / "sql" / "marts"
     for landed in (
         "cost_model_params.sql",
         "cost_model_outputs.sql",
         "cost_curves.sql",
+        "guardrail_sim.sql",
+        "sla_threshold.sql",
     ):
         assert (marts / landed).exists()
-    for pending in ("guardrail_sim.sql", "sla_threshold.sql"):
-        assert not (marts / pending).exists()
     assert not any("damir" in p.name for p in marts.glob("*.sql"))
 
 

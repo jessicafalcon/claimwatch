@@ -28,7 +28,7 @@ from math import exp, sqrt
 # log-euros to 6, counts whole — so mart rows and printed text are byte-identical
 # across runs and machines. `rounded(unit, value)` is the ONLY rounding site;
 # the writer, the printer and the tests all call it.
-_ROUNDING = {"eur": 2, "count": 0, "rate": 6, "logeur": 6}
+_ROUNDING = {"eur": 2, "count": 0, "rate": 6, "logeur": 6, "days": 2}
 
 
 def rounded(unit: str, value: float | None) -> float | int | None:
@@ -154,6 +154,27 @@ KNOB_PARAMETERS = (
     Parameter("cost_per_contact", 8.0, "€", "unsourced", "", 2.0, 30.0),
     Parameter("churn_prob", 0.05, "probability", "unsourced", "", 0.00, 0.30),
     Parameter("k", 8.0, "diminishing-returns constant", "unsourced", "", 2.0, 20.0),
+    # The two hold-timer knobs (Phase 8b): one document round trip, and the days
+    # a hold may run before the clock fires. `timer_days` spans the day grid
+    # sla_threshold walks (1..60), so its default (14) lies on it.
+    Parameter(
+        "days_per_round",
+        7.0,
+        "days per document round trip",
+        "unsourced",
+        "",
+        1.0,
+        21.0,
+    ),
+    Parameter(
+        "timer_days",
+        14.0,
+        "days a hold may run before the clock",
+        "unsourced",
+        "",
+        1.0,
+        60.0,
+    ),
 )
 # The static table (fit rows are inserted by parameters()).
 PARAMETERS = SCALE_PARAMETERS + KNOB_PARAMETERS
@@ -276,6 +297,28 @@ def _net(v: Mapping[str, float]) -> float:
     return v["fraud_saved"] - v["friction_cost"]
 
 
+# The hold-timer threshold (Phase 8b, brief §7): Beat 3 arithmetic, so it lives
+# in FORMULAS beside the model it is computed from, never in the simulator. The
+# loop is the contacts spread over document round trips; friction accrues evenly
+# over the loop and stops when it ends; the threshold is the claim amount below
+# which a hold planned to run `timer_days` is net-negative in expectation, with
+# the claim itself the ceiling on what a hold can recover (so it errs toward
+# holding). Used by Beat 4 at the `baseline` evaluation, whatever the scenario.
+def _loop_days(v: Mapping[str, float]) -> float:
+    return v["contacts"] * v["days_per_round"]
+
+
+def _friction_per_day(v: Mapping[str, float]) -> float:
+    return (
+        v["contacts"] * v["cost_per_contact"] + v["churn_prob"] * v["customer_value"]
+    ) / v["loop_days"]
+
+
+def _timer_amount_eur(v: Mapping[str, float]) -> float:
+    held = min(v["timer_days"], v["loop_days"])
+    return v["fp_share"] * v["friction_per_day"] * held / (1 - v["fp_share"])
+
+
 POINT_FORMULAS = (
     Formula("customer_value", "arr_eur / members", "point", _customer_value),
     Formula(
@@ -307,6 +350,23 @@ POINT_FORMULAS = (
         _friction_cost,
     ),
     Formula("net", "fraud_saved - friction_cost", "point", _net),
+    Formula("loop_days", "contacts * days_per_round", "point", _loop_days),
+    Formula(
+        "friction_per_day",
+        "(contacts * cost_per_contact + churn_prob * customer_value) / loop_days"
+        "  -- friction assumed to accrue evenly over the loop and stop when it ends",
+        "point",
+        _friction_per_day,
+    ),
+    Formula(
+        "timer_amount_eur",
+        "fp_share * friction_per_day * min(timer_days, loop_days) / (1 - fp_share)"
+        "  -- a hold planned to run timer_days on a claim under this is "
+        "net-negative in expectation; the claim is the recovery ceiling, so this "
+        "errs toward holding",
+        "point",
+        _timer_amount_eur,
+    ),
 )
 # The rounding unit each point output carries.
 _OUTPUT_UNIT = {
@@ -319,6 +379,9 @@ _OUTPUT_UNIT = {
     "fraud_saved": "eur",
     "friction_cost": "eur",
     "net": "eur",
+    "loop_days": "count",
+    "friction_per_day": "eur",
+    "timer_amount_eur": "eur",
 }
 
 

@@ -335,10 +335,10 @@ DAMIR_EMP_P50 = 49.76
 # places, counts to whole (the one rounding site). Only friction_cost and net
 # move with a scenario; every other point output is scenario-invariant.
 COST_MODELED_TAG = "Modeled"
-COST_PARAM_ROWS = 13  # 4 scale anchors + 3 fit rows (mu, sigma, emp_p50) + 6 knobs
+COST_PARAM_ROWS = 15  # 4 scale + 3 fit + 6 knobs + 2 timer knobs (8b)
 COST_SCENARIOS = ("baseline", "contacts_once", "churn_halved", "both")
 FLAG_RATE_GRID_POINTS = 41  # 0.000..0.200 step 0.005
-COST_OUTPUT_ROWS = len(COST_SCENARIOS) * 11  # 9 point + 2 curve per scenario = 44
+COST_OUTPUT_ROWS = len(COST_SCENARIOS) * 14  # 12 point + 2 curve per scenario = 56
 COST_CURVE_ROWS = len(COST_SCENARIOS) * FLAG_RATE_GRID_POINTS  # 164
 
 # mu/sigma sliders: the fit ± 2 standard errors (se_mu = sigma/√n, se_sigma =
@@ -357,6 +357,9 @@ COST_OUTPUTS = {
         "fraud_saved": 1318719.82,
         "friction_cost": 1132573.36,
         "net": 186146.45,
+        "loop_days": 21,
+        "friction_per_day": 3.05,
+        "timer_amount_eur": 42.67,
     },
     "contacts_once": {
         "customer_value": 800.0,
@@ -368,6 +371,9 @@ COST_OUTPUTS = {
         "fraud_saved": 1318719.82,
         "friction_cost": 849430.02,
         "net": 469289.79,
+        "loop_days": 7,
+        "friction_per_day": 6.86,
+        "timer_amount_eur": 48.0,
     },
     "churn_halved": {
         "customer_value": 800.0,
@@ -379,6 +385,9 @@ COST_OUTPUTS = {
         "fraud_saved": 1318719.82,
         "friction_cost": 778644.19,
         "net": 540075.63,
+        "loop_days": 21,
+        "friction_per_day": 2.1,
+        "timer_amount_eur": 29.33,
     },
     "both": {
         "customer_value": 800.0,
@@ -390,6 +399,9 @@ COST_OUTPUTS = {
         "fraud_saved": 1318719.82,
         "friction_cost": 495500.85,
         "net": 823218.97,
+        "loop_days": 7,
+        "friction_per_day": 4.0,
+        "timer_amount_eur": 28.0,
     },
 }
 # (crossover_flag_rate, marginal_crossover_flag_rate) per scenario. A fix that
@@ -407,4 +419,48 @@ COST_CROSSOVERS = {
         "marginal_crossover_flag_rate": 0.095,
     },
     "both": {"crossover_flag_rate": None, "marginal_crossover_flag_rate": 0.15},
+}
+
+# --- Phase 8b: the guardrail simulator (Beat 4) ------------------------------
+# Every number below is typed from the built output of models/guardrail_sim.py
+# over the tracked fit, never guessed. The claims are the lognormal read at 1,000
+# fixed quantile midpoints (i - 0.5)/n — a real distribution, synthetic claims —
+# and the hold timer is a rule, not a draw; two runs are byte-identical.
+QUANTILE_N = 1000
+GUARDRAIL_SIM_ROWS = 4 * QUANTILE_N  # 4 scenarios x 1000 claims = 4000
+SLA_THRESHOLD_ROWS = 60  # timer days 1..60
+TIMER_DEFAULT_DAY = 14  # the default timer_days; exactly one is_default row
+
+# The simulator scenarios and the cost-curve scenario each pairs with (decision 4).
+SIM_SCENARIO_MAP = {
+    "no_fix": "baseline",
+    "ask_once": "contacts_once",
+    "hold_timer": "churn_halved",
+    "both_fixes": "both",
+}
+
+# The first, middle and last synthetic amounts (ranks 1, 500, 1000), rounded eur:
+# exp(mu + sigma * z((rank - 0.5)/n)) over the pinned fit.
+SYNTHETIC_AMOUNTS = {1: 0.03, 500: 45.02, 1000: 60441.06}
+
+# The SLA threshold at three grid days (amount below which a hold that long is
+# net-negative in expectation; share of claims under it). Linear in the day up to
+# the baseline loop (21 days), then constant (day 21 == day 60), share
+# non-decreasing. The default day (14) is inside the body of the distribution.
+SLA_THRESHOLD_SAMPLE = {
+    7: {"timer_amount_eur": 21.33, "share_under": 0.366},
+    14: {"timer_amount_eur": 42.67, "share_under": 0.49},
+    21: {"timer_amount_eur": 64.0, "share_under": 0.563},
+}
+SLA_DEFAULT_SHARE = 0.49  # share_under at the default day; equals hold_timer's
+#                           timer_released_share (decision 6)
+
+# The hold-day summary per fix (mean hold days, share the timer released). Each
+# fix shortens the mean hold; both_fixes equals ask_once (a one-round loop ends
+# before the default timer, so the clock never fires) — the expected identical bars.
+SIM_SUMMARY = {
+    "no_fix": {"mean_hold_days": 21.0, "timer_released_share": 0.0},
+    "ask_once": {"mean_hold_days": 7.0, "timer_released_share": 0.0},
+    "hold_timer": {"mean_hold_days": 17.57, "timer_released_share": 0.49},
+    "both_fixes": {"mean_hold_days": 7.0, "timer_released_share": 0.0},
 }

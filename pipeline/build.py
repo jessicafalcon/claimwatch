@@ -31,7 +31,10 @@ from __future__ import annotations
 import csv
 import hashlib
 import re
+import sys
 import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -49,7 +52,7 @@ from ingest.sources import (
     by_name,
     sample_source,
 )
-from models import cost_model
+from models import cost_model, guardrail_sim
 from opendata.fit import read_fit
 from pipeline import warehouse
 from pipeline.warehouse import ROOT, connect
@@ -926,6 +929,104 @@ def _insert_output(conn, scenario: str, formula, value, run_id: str) -> None:
     )
 
 
+@contextmanager
+def _no_pandas_probe() -> Iterator[None]:
+    """Suppress DuckDB's per-value `import pandas` probe for the duration of a bulk
+    insert. Binding a Python value, DuckDB checks whether it is a pandas type by
+    importing pandas; pandas is not installed here (a hard project rule — no pandas
+    on a pipeline path) and Python does not cache a failed import, so the check
+    re-scans `sys.path` on every value — ~4,000 rows × 10 columns per rebuild turns
+    a sub-second write into ~5 s, and every rebuild (and every test that rebuilds)
+    pays it. A sentinel `None` in `sys.modules` makes `import pandas` fail
+    immediately with no path scan; it is set only around the insert and restored
+    after, and the repo never uses DuckDB's dataframe API, so nothing else is
+    affected. DECISIONS → Phase 8b Gotchas."""
+    sentinel = object()
+    previous = sys.modules.get("pandas", sentinel)
+    sys.modules["pandas"] = None  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        if previous is sentinel:
+            del sys.modules["pandas"]
+        else:
+            sys.modules["pandas"] = previous  # type: ignore[assignment]
+
+
+def _insert_rows(conn, table: str, columns: str, rows: list[list]) -> None:
+    """Insert `rows` into `table` with one `executemany`, under the no-pandas-probe
+    guard. `table` and `columns` are literals from the caller (no user input
+    reaches the SQL); the placeholder count is the columns' arity."""
+    if not rows:
+        return
+    placeholders = ",".join(["?"] * len(rows[0]))
+    with _no_pandas_probe():
+        conn.executemany(
+            f"insert into {table} ({columns}) values ({placeholders})", rows
+        )
+
+
+def write_sim_marts(conn, fit: cost_model.Fit, run_id: str) -> None:
+    """Fill the two simulator marts (B4.1–B4.3) from models/guardrail_sim.py — the
+    one place the draw, the hold and the share-under count are written; the
+    threshold itself is the cost model's formula, read at baseline. Every number
+    is a callable over the parameters; no literal is typed here. Cleared and
+    inserted in one transaction via `_insert_rows` (one guarded `executemany` per
+    mart — the ~4,000 sim rows make the per-value pandas probe worth suppressing),
+    rows in scenario / rank and day order, so a re-run is byte-identical.
+    `rebuild()` calls this after write_model_marts on every input, so every caller
+    sees filled marts."""
+    params = cost_model.defaults(fit)
+    sim_rows = [
+        [
+            row["scenario"],
+            row["curves_scenario"],
+            row["claim_rank"],
+            row["quantile"],
+            row["amount_eur"],
+            row["loop_days"],
+            row["hold_days"],
+            row["outcome"],
+            run_id,
+            _MODEL_TAG,
+        ]
+        for sim in guardrail_sim.SIM_SCENARIOS
+        for row in guardrail_sim.simulate(params, sim.name)
+    ]
+    sla_rows = [
+        [
+            row["timer_days"],
+            row["timer_amount_eur"],
+            row["share_under"],
+            row["is_default"],
+            run_id,
+            _MODEL_TAG,
+        ]
+        for row in guardrail_sim.threshold_table(params)
+    ]
+    conn.execute("begin transaction")
+    try:
+        for table in ("guardrail_sim", "sla_threshold"):
+            conn.execute(f"delete from {table}")
+        _insert_rows(
+            conn,
+            "guardrail_sim",
+            "scenario, curves_scenario, claim_rank, quantile, amount_eur, "
+            "loop_days, hold_days, outcome, run_id, tag",
+            sim_rows,
+        )
+        _insert_rows(
+            conn,
+            "sla_threshold",
+            "timer_days, timer_amount_eur, share_under, is_default, run_id, tag",
+            sla_rows,
+        )
+    except BaseException:
+        conn.execute("rollback")
+        raise
+    conn.execute("commit")
+
+
 def read_fixture(name: str) -> list[dict[str, str]]:
     with (ROOT / "fixtures" / name / "reviews.csv").open(encoding="utf-8") as fh:
         return list(csv.DictReader(fh))
@@ -1184,10 +1285,13 @@ def rebuild(
                 )
                 load_snapshots(conn, parsed.snapshots, run_id or stamp, rows)
         build_derived(conn)
-        # the model marts need no key, no reviews and no classify step — they
-        # compute over the tracked fit, so they fill inside rebuild() on every
-        # input, and idempotency-check (which calls rebuild() only) sees them.
-        write_model_marts(conn, read_model_fit(), run_id or "model")
+        # the model and simulator marts need no key, no reviews and no classify
+        # step — they compute over the tracked fit, so they fill inside rebuild()
+        # on every input, and idempotency-check (which calls rebuild() only) sees
+        # them. One read of the fit feeds both writers.
+        fit = read_model_fit()
+        write_model_marts(conn, fit, run_id or "model")
+        write_sim_marts(conn, fit, run_id or "model")
         return table_counts(conn)
     finally:
         conn.close()

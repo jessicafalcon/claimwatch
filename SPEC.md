@@ -133,7 +133,9 @@ climbs; friction cost rises with the false positives that same rate creates.
 
 - **B3.1 — The formulas, next to their output.** Flagged claims, false
   positives, fraud saved, friction cost, and the net — each formula shown beside
-  the value it produces. Tag: *Modeled*.
+  the value it produces. The hold timer's three formulas (the loop length, the
+  friction per day, and the threshold amount) print in the same list, used by
+  Beat 4 at the defaults. Tag: *Modeled*.
 - **B3.2 — The crossover chart.** Fraud euros saved and friction euros cost, both
   as curves over the flag rate, with a "you are here" marker. Where the two
   curves cross, the flagging as a whole starts to cost more than it recovers.
@@ -155,23 +157,25 @@ The answer is not a better fraud model; it is three boring rules wrapped around
 the one that already exists. This part shows each fix and what it does to the
 Beat 3 curves.
 
-*Under the hood:* a simulator runs synthetic claims — drawn from cost
-distributions fitted to real public reimbursement data, with the fit shown —
-through a hold timer, and reports before-and-after hold durations. No individual
-claims data is used; none is public.
+*Under the hood:* a simulator runs synthetic claims — the distribution fitted to
+real public reimbursement data, read at a thousand evenly spaced points, with the
+fit shown — through a hold timer, and reports before-and-after hold durations. No
+individual claims data is used; none is public. When a fix already cuts the
+document loop to a single round, the timer has nothing left to cut, so "ask once"
+and "both fixes" show the same hold.
 
 - **B4.1 — Ask for everything once.** A lookup that returns the complete document
   list for a claim type and flag reason in one request, ending the serial
   document loop — contacts per stuck claim drop to one, and the curves move. Tag:
-  *Modeled* (Pending).
+  *Modeled*.
 - **B4.2 — A clock on every hold.** A timer on each held claim: past a threshold,
   small low-risk claims auto-release and large ones escalate to a person. The
   threshold is computed from the Beat 3 model, not guessed, and the arithmetic
   is shown ("holds beyond N days on claims under €X are net-negative in
-  expectation"). Tag: *Modeled* (Pending).
-- **B4.3 — Before and after.** Hold durations and the Beat 3 curves, simulated
-  with the fixes off and on, side by side. Tag: *Modeled* (Pending until the
-  simulator mart lands).
+  expectation"). Tag: *Modeled*.
+- **B4.3 — Before and after.** For each fix, the mean hold in days and the share
+  of claims the clock released, with the Beat 3 curves beside them — two hold
+  lengths per fix, not a distribution. Tag: *Modeled*.
 - **B4.4 — Count the mistakes.** Logging how each hold ends — fraud-confirmed or
   released-clean — yields a false-positive rate per flag rule, the metric the
   system otherwise lacks; the same event stream also triggers a status

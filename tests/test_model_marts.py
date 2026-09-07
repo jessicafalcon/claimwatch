@@ -18,7 +18,21 @@ from tests import pins
 pytestmark = pytest.mark.slow  # slow: kept out of the fast edit-loop hook
 
 _MARTS = ("cost_model_params", "cost_model_outputs", "cost_curves")
-_IMPORT_ALLOWLIST = {"math", "dataclasses", "collections", "typing", "__future__"}
+# stdlib that reads no clock and draws no random number, plus the package's own
+# modules; 8b widened this by `statistics` (the normal quantile) and `models`.
+_IMPORT_ALLOWLIST = {
+    "math",
+    "statistics",
+    "dataclasses",
+    "collections",
+    "typing",
+    "__future__",
+    "models",
+}
+# Attribute names models/ must never touch: a clock, and statistics' one random
+# method (NormalDist().samples) — the gap the import allowlist cannot close, since
+# `statistics` is allowed for the quantile.
+_FORBIDDEN_ATTRS = {"samples", "now", "today", "utcnow", "time", "random", "seed"}
 
 
 def _built(tmp_path, rows: str = "synthetic", run_id: str = "test"):
@@ -182,17 +196,23 @@ def test_rows_carry_run_id_and_modeled_tag(tmp_path):
 
 def test_models_imports_only_stdlib_math():
     """Every import in models/ is from the closed allowlist (stdlib that reads no
-    clock and no RNG) — no opendata, pipeline or ingest, no network, database or
-    model-client module."""
+    clock and no RNG, plus the package's own modules) — no opendata, pipeline or
+    ingest, no network, database or model-client module — and no source touches a
+    forbidden attribute (a clock, or NormalDist().samples, the one random method
+    the allowed `statistics` carries)."""
     for path in sorted((ROOT / "models").glob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         roots: set[str] = set()
+        attrs: set[str] = set()
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 roots.update(alias.name.split(".")[0] for alias in node.names)
             elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
                 roots.add(node.module.split(".")[0])
+            elif isinstance(node, ast.Attribute):
+                attrs.add(node.attr)
         assert roots <= _IMPORT_ALLOWLIST, (path.name, roots - _IMPORT_ALLOWLIST)
+        assert not (attrs & _FORBIDDEN_ATTRS), (path.name, attrs & _FORBIDDEN_ATTRS)
 
 
 def test_read_model_fit_refuses_a_malformed_artifact(tmp_path):
