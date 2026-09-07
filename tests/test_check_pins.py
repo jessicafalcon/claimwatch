@@ -124,6 +124,8 @@ def test_unpinned_applies_the_rule_over_a_real_range(tmp_path: Path):
     _git(tmp_path, "commit", "-q", "-m", "head")
     assert check_pins.source_at(tmp_path, base, "models/m.py").startswith("def alpha")
     assert check_pins.source_at(tmp_path, base, "tests/test_new.py") is None
+    # the working tree is never read: a dirty edit changes nothing until committed
+    _write(tmp_path, "models/m.py", "def delta():\n    return 0\n")
     assert check_pins.unpinned(tmp_path, base) == [
         "models/m.py::gamma — new, no test in the diff names it",
         "sql/marts/new_mart.sql — new mart, no test in the diff names new_mart",
@@ -131,6 +133,44 @@ def test_unpinned_applies_the_rule_over_a_real_range(tmp_path: Path):
     # an unknown base is a refusal, never an empty green list
     with pytest.raises(Refused, match="^refusing: git merge-base no-such-rev"):
         check_pins.unpinned(tmp_path, "no-such-rev")
+
+
+def test_a_blob_that_is_not_text_or_does_not_parse_is_a_refusal(tmp_path: Path):
+    """The read side of the traceback-at-boundary lesson: a non-UTF-8 blob or
+    a file that does not parse under a code package is one line naming the
+    path, never a traceback — and a tracked symlink is read as its blob (the
+    link text), never followed out of the repository."""
+    _git(tmp_path, "init", "-q")
+    _write(tmp_path, "tests/test_a.py", "x = 1\n")
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "base")
+    base = _git(tmp_path, "rev-parse", "HEAD")
+    (tmp_path / "models").mkdir()
+    (tmp_path / "models" / "latin.py").write_bytes(b"# caf\xe9\ndef f():\n    pass\n")
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "not text")
+    with pytest.raises(
+        Refused, match=r"^refusing: models/latin.py at HEAD is not UTF-8"
+    ):
+        check_pins.unpinned(tmp_path, base)
+    _git(tmp_path, "rm", "-q", "models/latin.py")
+    _write(tmp_path, "models/broken.py", "def (:\n")
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "broken")
+    with pytest.raises(
+        Refused, match=r"^refusing: models/broken.py does not parse: line 1"
+    ):
+        check_pins.unpinned(tmp_path, base)
+    _git(tmp_path, "rm", "-q", "models/broken.py")
+    outside = tmp_path.parent / f"{tmp_path.name}-outside.py"
+    outside.write_text("def escaped():\n    pass\n")
+    (tmp_path / "models").mkdir(exist_ok=True)  # git rm dropped the empty dir
+    (tmp_path / "models" / "link.py").symlink_to(outside)
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "link")
+    # the blob is the link target text, which does not parse: refused by name
+    with pytest.raises(Refused, match=r"^refusing: models/link.py does not parse"):
+        check_pins.unpinned(tmp_path, base)
 
 
 def test_cli_refuses_a_bad_base_with_one_line():

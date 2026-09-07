@@ -10,17 +10,21 @@ by `<table>` in a changed test. Where the most frequent review finding since
 Phase 0a ("pin the …": a rule, a key, a pairing, a boundary with no test) is
 turned into a red line before an agent reads the diff.
 
-  code packages  models/, pipeline/, classify/, ingest/, opendata/, scripts/,
-                 .claude/hooks/
+  code packages  models/, pipeline/, classify/, ingest/, opendata/, study/,
+                 scripts/, .claude/hooks/
   public         a name not starting with `_`, and not `main`
   changed        the def's `ast.dump` differs from the merge-base's: comments
                  and formatting do not count; a docstring or a body does
-  named          the bare name as a whole word in any tracked `tests/*.py`
-                 (read from the working tree, the files pytest runs)
+  named          the bare name as a whole word in any `tests/*.py` at HEAD
 
-Output: one line per miss, `check-pins OK` when none. Exit 0
-clean, 1 on a miss, 2 on a refused BASE, a git failure or a file that does not
-parse. Never a traceback. Nothing here edits, commits or fixes."""
+Every file is read from git (`git show <rev>:<path>`), the merge-base side and
+the HEAD side alike: the gate reviews commits, and a blob never follows a
+symlink out of the repository. A blob that is not UTF-8 text, or one that
+does not parse, is a one-line refusal naming the path.
+
+Output: one line per miss, `check-pins OK` when none. Exit 0 clean, 1 on a
+miss, 2 on a refused BASE, a git failure, a non-text blob or a file that does
+not parse. Never a traceback. Nothing here edits, commits or fixes."""
 
 from __future__ import annotations
 
@@ -39,6 +43,7 @@ CODE_PACKAGES = (
     "classify/",
     "ingest/",
     "opendata/",
+    "study/",
     "scripts/",
     ".claude/hooks/",
 )
@@ -78,32 +83,42 @@ def names_in(texts: list[str], name: str) -> bool:
     return any(pattern.search(t) for t in texts)
 
 
-def tracked(root: Path, *pathspecs: str) -> list[str]:
-    code, out = run(["git", "ls-files", "-z", "--", *pathspecs], root)
-    return sorted(diff_paths(out)) if code == 0 else []
+def _test_files(root: Path, rev: str) -> list[str]:
+    """Every `tests/*.py` in the tree at `rev` (NUL-separated, read whole;
+    `ls-tree` takes a directory, so the suffix is filtered here)."""
+    code, out = run(
+        ["git", "ls-tree", "-r", "-z", "--name-only", rev, "--", "tests"], root
+    )
+    return sorted(p for p in diff_paths(out) if p.endswith(".py")) if code == 0 else []
 
 
 def source_at(root: Path, rev: str, path: str) -> str | None:
-    """The file at `rev`, or None when it did not exist there."""
+    """The blob at `rev:path` as text; None when the path is not in that tree;
+    a Refused naming the path when the blob is not UTF-8 text."""
+    if run(["git", "cat-file", "-e", f"{rev}:{path}"], root)[0] != 0:
+        return None
     code, out = run(["git", "show", f"{rev}:{path}"], root)
-    return out if code == 0 else None
-
-
-def _read(root: Path, path: str) -> str:
-    return (root / path).read_text(encoding="utf-8")
+    if code != 0:
+        raise Refused(f"refusing: {path} at {rev} is not UTF-8 text")
+    return out
 
 
 def _def_misses(
-    root: Path, base_rev: str, changed: set[str], tests: dict[str, str]
+    root: Path,
+    base_rev: str,
+    changed: set[str],
+    all_tests: list[str],
+    changed_tests: list[str],
 ) -> list[str]:
-    all_tests = list(tests.values())
-    changed_tests = [t for p, t in tests.items() if p in changed]
     misses: list[str] = []
     for path in sorted(p for p in changed if p.startswith(CODE_PACKAGES)):
-        if not path.endswith(".py") or not (root / path).is_file():
-            continue  # a deleted file has nothing to pin
+        if not path.endswith(".py"):
+            continue
+        head_src = source_at(root, "HEAD", path)
+        if head_src is None:
+            continue  # deleted in the range: nothing to pin
         try:
-            changes = symbol_changes(source_at(root, base_rev, path), _read(root, path))
+            changes = symbol_changes(source_at(root, base_rev, path), head_src)
         except SyntaxError as exc:
             raise Refused(
                 f"refusing: {path} does not parse: line {exc.lineno}"
@@ -121,14 +136,16 @@ def _def_misses(
 
 
 def _mart_misses(
-    root: Path, base_rev: str, changed: set[str], tests: dict[str, str]
+    root: Path, base_rev: str, changed: set[str], changed_tests: list[str]
 ) -> list[str]:
-    changed_tests = [t for p, t in tests.items() if p in changed]
     misses: list[str] = []
     for path in sorted(
         p for p in changed if p.startswith(MARTS) and p.endswith(".sql")
     ):
-        if not (root / path).is_file() or source_at(root, base_rev, path) is not None:
+        if (
+            source_at(root, "HEAD", path) is None
+            or source_at(root, base_rev, path) is not None
+        ):
             continue  # deleted, or it existed at base: not a new mart
         table = Path(path).stem
         if not names_in(changed_tests, table):
@@ -149,12 +166,12 @@ def unpinned(root: Path, base: str) -> list[str]:
     if code != 0:
         raise Refused(f"refusing: git diff {base}...HEAD failed: {tail(out, 1)}")
     changed = diff_paths(out)
-    tests = {
-        p: _read(root, p) for p in tracked(root, "tests/*.py") if (root / p).is_file()
-    }
-    return _def_misses(root, base_rev, changed, tests) + _mart_misses(
-        root, base_rev, changed, tests
-    )
+    tests = {p: source_at(root, "HEAD", p) or "" for p in _test_files(root, "HEAD")}
+    all_tests = list(tests.values())
+    changed_tests = [t for p, t in tests.items() if p in changed]
+    return _def_misses(
+        root, base_rev, changed, all_tests, changed_tests
+    ) + _mart_misses(root, base_rev, changed, changed_tests)
 
 
 def main(argv: list[str] | None = None) -> int:
