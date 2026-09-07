@@ -352,25 +352,42 @@ def test_check_lessons_reports_cells_class_and_status(tmp_path: Path):
     assert check_docs.check_lessons(lessons) == ["LESSONS.md: not UTF-8 text"]
 
 
-def test_a_code_file_that_is_not_text_is_one_error_line(tmp_path: Path):
-    """The read is a boundary: a non-UTF-8 tracked file is reported by name,
-    never a traceback through check-docs."""
+def test_a_file_that_is_not_text_is_one_error_line_in_every_check(tmp_path: Path):
+    """The read is a boundary for the class, not a site: every per-file check
+    reports a non-UTF-8 file by name and goes on; a record that does not read
+    is the record check's own error line; never a traceback."""
     for name in ("BACKLOG.md", "DECISIONS.md"):
         (tmp_path / name).write_text("| a | b | c |\n|---|---|---|\n")
     (tmp_path / "specs").mkdir()
+    (tmp_path / "Makefile").write_text("test:\n\tx\n")
     latin = tmp_path / "latin.py"
     latin.write_bytes(b"# caf\xe9\n")
-    assert check_docs.read_text_or_error(latin, tmp_path) == (
-        None,
-        "latin.py: not UTF-8 text",
-    )
-    assert check_docs.read_text_or_error(tmp_path / "gone.py", tmp_path) == (
-        None,
-        "gone.py: cannot be read: No such file or directory",
-    )
-    assert check_docs.check_comment_tags([latin], tmp_path) == [
-        "latin.py: not UTF-8 text"
+    fine = tmp_path / "fine.md"
+    fine.write_text("see [x](latin.py#top) and `make nope`\n")
+    line = ["latin.py: not UTF-8 text"]
+    assert check_docs.check_comment_tags([latin], tmp_path) == line
+    assert check_docs.check_neutrality([latin], {"0" * 64}, tmp_path) == line
+    assert check_docs.check_banned_words([latin], tmp_path) == line
+    assert check_docs.check_glossary([latin], tmp_path) == line
+    assert check_docs.check_make_targets([latin, fine], tmp_path) == [
+        *line,
+        "fine.md: names `make nope` — not in the Makefile",
     ]
+    assert (
+        check_docs.check_links([latin, fine], tmp_path) == line * 2
+    )  # source, then anchor target
+    assert check_docs.check_lessons(latin) == line
+    assert check_docs.check_backlog_count(latin, tmp_path / "BACKLOG.md") == line
+    assert check_docs.neutrality_hashes(latin) == (set(), line)
+    # the tokenizer's other exceptions are the same boundary
+    tabs = tmp_path / "tabs.py"
+    tabs.write_text("def f():\n    x = 1\n  y = 2\n")
+    assert check_docs.check_comment_tags([tabs], tmp_path) == [
+        "tabs.py: does not tokenize: "
+        "unindent does not match any outer indentation level"
+    ]
+    (tmp_path / "BACKLOG.md").write_bytes(b"caf\xe9")
+    assert check_docs.check_comment_tags([], tmp_path) == ["BACKLOG.md: not UTF-8 text"]
 
 
 def test_lesson_classes_match_the_lessons_md_fence():

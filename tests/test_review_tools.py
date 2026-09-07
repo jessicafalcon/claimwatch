@@ -5,6 +5,7 @@ CLI refusals by spawning the script. Offline, no services."""
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -13,7 +14,14 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import review_gate
-from review_common import Refused, resolve_spec, run, section
+from review_common import (
+    Refused,
+    read_text_or_error,
+    readable,
+    resolve_spec,
+    run,
+    section,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -57,6 +65,53 @@ def test_base_is_validated():
 def test_run_reports_a_missing_command():
     code, out = run(["definitely-not-a-command-xyz"], ROOT)
     assert code == 127 and out == "command not found: definitely-not-a-command-xyz"
+
+
+def test_run_reports_output_that_is_not_text():
+    """The subprocess-output boundary: a byte that does not decode is one
+    line naming the command, never a traceback."""
+    emit = "import sys; sys.stdout.buffer.write(b'ok\\xff')"
+    code, out = run([sys.executable, "-c", emit], ROOT)
+    assert (code, out) == (1, f"output of {sys.executable} is not UTF-8 text")
+
+
+def test_read_boundary_reports_by_name_and_skips_in_a_loop(tmp_path: Path):
+    """read_text_or_error names the path relative to root (its name when it
+    is not under root); readable() collects the line and goes on."""
+    good = tmp_path / "good.md"
+    good.write_text("fine\n")
+    latin = tmp_path / "latin.md"
+    latin.write_bytes(b"caf\xe9\n")
+    assert read_text_or_error(good, tmp_path) == ("fine\n", None)
+    assert read_text_or_error(latin, tmp_path) == (None, "latin.md: not UTF-8 text")
+    assert read_text_or_error(tmp_path / "gone.md", tmp_path) == (
+        None,
+        "gone.md: cannot be read: No such file or directory",
+    )
+    assert read_text_or_error(latin, tmp_path / "elsewhere") == (
+        None,
+        "latin.md: not UTF-8 text",
+    )
+    errors: list[str] = []
+    seen = [f.name for f, _ in readable([latin, good], tmp_path, errors)]
+    assert (seen, errors) == (["good.md"], ["latin.md: not UTF-8 text"])
+
+
+def test_every_script_reads_and_runs_through_the_shared_boundary():
+    """The class fix for traceback-at-boundary, pinned as a layout rule: no
+    module under scripts/ reads a file or spawns a process on its own; the
+    one reader and the one runner live in review_common.py."""
+    own = re.compile(r"\.read_text\(|\.read_bytes\(|\bopen\(|\bsubprocess\b")
+    offenders = [
+        f"{p.name}:{n}"
+        for p in sorted(ROOT.glob("scripts/*.py"))
+        if p.name != "review_common.py"
+        for n, line in enumerate(p.read_text().splitlines(), 1)
+        if own.search(line)
+    ]
+    assert offenders == [], offenders
+    common = (ROOT / "scripts" / "review_common.py").read_text()
+    assert common.count(".read_text(") == 1 and common.count("subprocess.run(") == 1
 
 
 def test_section_matches_heading_prefix():

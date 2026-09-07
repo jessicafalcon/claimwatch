@@ -11,7 +11,7 @@ Phase 0a ("pin the …": a rule, a key, a pairing, a boundary with no test) is
 turned into a red line before an agent reads the diff.
 
   code packages  models/, pipeline/, classify/, ingest/, opendata/, study/,
-                 scripts/, .claude/hooks/
+                 dags/, scripts/, .claude/hooks/
   public         a name not starting with `_`, and not `main`
   changed        the def's `ast.dump` differs from the merge-base's: comments
                  and formatting do not count; a docstring or a body does
@@ -44,12 +44,17 @@ CODE_PACKAGES = (
     "ingest/",
     "opendata/",
     "study/",
+    "dags/",
     "scripts/",
     ".claude/hooks/",
 )
 MARTS = "sql/marts/"
 EXEMPT = ("main",)
 _DEF = (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+# What ast.parse raises besides SyntaxError: a null byte (ValueError), a
+# nesting the parser cannot recurse (RecursionError). A closed set; MemoryError
+# is not caught — it is not a property of the file.
+_PARSE_ERRORS = (ValueError, RecursionError)
 
 
 def public_defs(source: str) -> dict[str, str]:
@@ -89,7 +94,9 @@ def _test_files(root: Path, rev: str) -> list[str]:
     code, out = run(
         ["git", "ls-tree", "-r", "-z", "--name-only", rev, "--", "tests"], root
     )
-    return sorted(p for p in diff_paths(out) if p.endswith(".py")) if code == 0 else []
+    if code != 0:
+        raise Refused(f"refusing: git ls-tree {rev} tests failed: {tail(out, 1)}")
+    return sorted(p for p in diff_paths(out) if p.endswith(".py"))
 
 
 def source_at(root: Path, rev: str, path: str) -> str | None:
@@ -99,7 +106,7 @@ def source_at(root: Path, rev: str, path: str) -> str | None:
         return None
     code, out = run(["git", "show", f"{rev}:{path}"], root)
     if code != 0:
-        raise Refused(f"refusing: {path} at {rev} is not UTF-8 text")
+        raise Refused(f"refusing: {path} at {rev}: {tail(out, 1)}")
     return out
 
 
@@ -120,8 +127,13 @@ def _def_misses(
         try:
             changes = symbol_changes(source_at(root, base_rev, path), head_src)
         except SyntaxError as exc:
+            where = (
+                f"line {exc.lineno}" if exc.lineno else exc.msg
+            )  # a null byte has no line
+            raise Refused(f"refusing: {path} does not parse: {where}") from exc
+        except _PARSE_ERRORS as exc:
             raise Refused(
-                f"refusing: {path} does not parse: line {exc.lineno}"
+                f"refusing: {path} does not parse: {type(exc).__name__}"
             ) from exc
         for name, kind in changes.items():
             pool = changed_tests if kind == "new" else all_tests

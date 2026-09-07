@@ -48,6 +48,7 @@ from review_common import (
     die,
     diff_paths,
     make_targets,
+    read_text_or_error,
     resolve_base,
     resolve_spec,
     run,
@@ -237,7 +238,11 @@ def main(argv: list[str] | None = None) -> int:
         base = resolve_base(args.base)
     except Refused as exc:
         die(exc)
-    spec_text = spec.read_text(encoding="utf-8") if spec else None
+    spec_text: str | None = None
+    if spec:
+        spec_text, err = read_text_or_error(spec, ROOT)
+        if spec_text is None:
+            die(Refused(f"refusing: SPEC {err}"))
 
     results: list[tuple[str, bool, str]] = []
 

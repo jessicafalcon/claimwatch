@@ -56,7 +56,6 @@ import functools
 import hashlib
 import io
 import re
-import subprocess
 import sys
 import tokenize
 import unicodedata
@@ -70,6 +69,9 @@ from review_common import (
     ROOT,
     diff_paths,
     make_targets,
+    read_text_or_error,
+    readable,
+    run,
 )
 
 PLAN_GLOBS = ("PROJECT_BRIEF.md", "docs/*.md", "specs/*.md")
@@ -200,8 +202,7 @@ def anchors(text: str) -> set[str]:
 
 def check_links(files: list[Path], root: Path) -> list[str]:
     errors: list[str] = []
-    for f in files:
-        text = f.read_text(encoding="utf-8")
+    for f, text in readable(files, root, errors):
         for m in _LINK.finditer(text):
             target, _, anchor = m.group(1).partition("#")
             # `#local` (no file part) is an anchor in THIS file.
@@ -213,11 +214,12 @@ def check_links(files: list[Path], root: Path) -> list[str]:
             if not dest.exists():
                 errors.append(f"{f.relative_to(root)}: broken link: {target}")
                 continue
-            if (
-                anchor
-                and dest.is_file()
-                and anchor not in anchors(dest.read_text(encoding="utf-8"))
-            ):
+            if not anchor or not dest.is_file():
+                continue
+            dest_text, err = read_text_or_error(dest, root)
+            if dest_text is None:
+                errors.append(err or f"{shown}: cannot be read")
+            elif anchor not in anchors(dest_text):
                 errors.append(
                     f"{f.relative_to(root)}: missing anchor #{anchor} in {shown}"
                 )
@@ -236,8 +238,8 @@ def named_targets(text: str) -> set[str]:
 def check_make_targets(files: list[Path], root: Path) -> list[str]:
     declared = make_targets(root)
     errors: list[str] = []
-    for f in files:
-        for name in sorted(named_targets(f.read_text(encoding="utf-8"))):
+    for f, text in readable(files, root, errors):
+        for name in sorted(named_targets(text)):
             if name not in declared:
                 errors.append(
                     f"{f.relative_to(root)}: names `make {name}` — not in the Makefile"
@@ -257,8 +259,8 @@ def banned_hits(text: str) -> list[str]:
 
 def check_banned_words(files: list[Path], root: Path) -> list[str]:
     errors: list[str] = []
-    for f in files:
-        for word in banned_hits(f.read_text(encoding="utf-8")):
+    for f, text in readable(files, root, errors):
+        for word in banned_hits(text):
             errors.append(f"{f.relative_to(root)}: banned word: {word}")
     return errors
 
@@ -271,8 +273,8 @@ def glossary_section(text: str) -> str | None:
 
 def check_glossary(files: list[Path], root: Path) -> list[str]:
     errors: list[str] = []
-    for f in files:
-        body = glossary_section(f.read_text(encoding="utf-8"))
+    for f, text in readable(files, root, errors):
+        body = glossary_section(text)
         if body is None:
             continue
         n = len(_TERM.findall(body))
@@ -307,10 +309,8 @@ def open_backlog_rows(text: str) -> int:
 
 def tracked_paths(root: Path) -> list[str]:
     """Every path git tracks under root, "" entries dropped; [] outside git."""
-    res = subprocess.run(
-        ["git", "ls-files", "-z"], cwd=root, capture_output=True, text=True
-    )
-    return sorted(diff_paths(res.stdout)) if res.returncode == 0 else []
+    code, out = run(["git", "ls-files", "-z"], root)
+    return sorted(diff_paths(out)) if code == 0 else []
 
 
 def neutrality_files(root: Path, paths: list[str]) -> list[Path]:
@@ -333,9 +333,12 @@ def neutrality_hashes(path: Path) -> tuple[set[str], list[str]]:
     """The listed digests and the lines that are not one (a name, a typo)."""
     if not path.is_file():
         return set(), [f"{path.name}: hash file is missing"]
+    text, err = read_text_or_error(path, path.parent)
+    if text is None:
+        return set(), [err or f"{path.name}: cannot be read"]
     digests: set[str] = set()
     errors: list[str] = []
-    for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+    for n, line in enumerate(text.splitlines(), 1):
         line = line.strip()
         if not line or line.startswith("#"):
             continue
@@ -363,19 +366,14 @@ def named_tokens(text: str, digests: set[str]) -> list[tuple[int, str]]:
 
 
 def commit_messages(root: Path) -> str:
-    res = subprocess.run(
-        ["git", "log", f"-{COMMIT_MESSAGES}", "--format=%B"],
-        cwd=root,
-        capture_output=True,
-        text=True,
-    )
-    return res.stdout if res.returncode == 0 else ""
+    code, out = run(["git", "log", f"-{COMMIT_MESSAGES}", "--format=%B"], root)
+    return out if code == 0 else ""
 
 
 def check_neutrality(files: list[Path], digests: set[str], root: Path) -> list[str]:
     errors: list[str] = []
-    for f in files:
-        for n, prefix in named_tokens(f.read_text(encoding="utf-8"), digests):
+    for f, text in readable(files, root, errors):
+        for n, prefix in named_tokens(text, digests):
             rel = f.relative_to(root)
             errors.append(f"{rel}:{n}: names the study's target (sha256 {prefix}…)")
     for n, prefix in named_tokens(commit_messages(root), digests):
@@ -390,10 +388,14 @@ def check_backlog_count(claude: Path, backlog: Path) -> list[str]:
     missing = [p.name for p in (claude, backlog) if not p.is_file()]
     if missing:
         return [f"{name}: record file is missing" for name in missing]
-    m = _BACKLOG_COUNT.search(claude.read_text(encoding="utf-8"))
+    claude_text, err1 = read_text_or_error(claude, claude.parent)
+    backlog_text, err2 = read_text_or_error(backlog, backlog.parent)
+    if claude_text is None or backlog_text is None:
+        return [e for e in (err1, err2) if e]
+    m = _BACKLOG_COUNT.search(claude_text)
     if not m:
         return ["CLAUDE.md: no 'Open BACKLOG rows: **N**' sentence"]
-    stated, actual = int(m.group(1)), open_backlog_rows(backlog.read_text("utf-8"))
+    stated, actual = int(m.group(1)), open_backlog_rows(backlog_text)
     if stated != actual:
         return [f"CLAUDE.md says {stated} open BACKLOG rows; BACKLOG.md has {actual}"]
     return []
@@ -436,12 +438,19 @@ class _Records:
     specs: Path
 
     @classmethod
-    def read(cls, root: Path) -> _Records:
+    def read(cls, root: Path) -> tuple[_Records, list[str]]:
+        """The records and the error lines of the ones that did not read
+        (an unreadable record is empty, so every tag citing it is reported)."""
+        errors: list[str] = []
+        backlog, err = read_text_or_error(root / "BACKLOG.md", root)
+        errors += [err] if err else []
+        decisions, err = read_text_or_error(root / "DECISIONS.md", root)
+        errors += [err] if err else []
         return cls(
-            backlog_titles((root / "BACKLOG.md").read_text(encoding="utf-8")),
-            decisions_titles((root / "DECISIONS.md").read_text(encoding="utf-8")),
+            backlog_titles(backlog or ""),
+            decisions_titles(decisions or ""),
             root / "specs",
-        )
+        ), errors
 
 
 def _cited_error(tag: str, cited: str, records: _Records) -> str | None:
@@ -470,7 +479,9 @@ def _tag_error(tag: str, rest: str, records: _Records) -> str | None:
 def comments(path: Path, text: str) -> list[tuple[int, str]]:
     """(line, comment body) for every comment in the file: Python's from the
     tokenizer (a string literal is not a comment); the other kinds by line,
-    the text after the first opener. Raises tokenize.TokenError."""
+    the text after the first opener — a quoted value that begins with a tag
+    word is read as a comment, the documented ceiling of a line-based read.
+    Raises one of _TOKENIZE_ERRORS."""
     if path.suffix == ".py":
         return [
             (tok.start[0], tok.string[1:])
@@ -486,29 +497,17 @@ def comments(path: Path, text: str) -> list[tuple[int, str]]:
     return out
 
 
-def read_text_or_error(path: Path, root: Path) -> tuple[str | None, str | None]:
-    """(text, None) or (None, one error line): a file that is not UTF-8 text
-    or cannot be read is reported by name, never raised (the read is a
-    boundary too — LESSONS: traceback-at-boundary)."""
-    try:
-        return path.read_text(encoding="utf-8"), None
-    except UnicodeDecodeError:
-        return None, f"{path.relative_to(root)}: not UTF-8 text"
-    except OSError as exc:
-        return None, f"{path.relative_to(root)}: cannot be read: {exc.strerror}"
+# The closed set the tokenizer raises: TokenError (an unterminated statement)
+# and SyntaxError's IndentationError/TabError (inconsistent indentation).
+_TOKENIZE_ERRORS = (tokenize.TokenError, SyntaxError)
 
 
 def check_comment_tags(files: list[Path], root: Path) -> list[str]:
-    records = _Records.read(root)
-    errors: list[str] = []
-    for f in files:
-        text, err = read_text_or_error(f, root)
-        if text is None:
-            errors.append(err or f"{f.relative_to(root)}: cannot be read")
-            continue
+    records, errors = _Records.read(root)
+    for f, text in readable(files, root, errors):
         try:
             found = comments(f, text)
-        except tokenize.TokenError as exc:
+        except _TOKENIZE_ERRORS as exc:
             errors.append(f"{f.relative_to(root)}: does not tokenize: {exc.args[0]}")
             continue
         for n, body in found:

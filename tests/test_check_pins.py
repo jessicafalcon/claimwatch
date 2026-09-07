@@ -150,10 +150,20 @@ def test_a_blob_that_is_not_text_or_does_not_parse_is_a_refusal(tmp_path: Path):
     _git(tmp_path, "add", "-A")
     _git(tmp_path, "commit", "-q", "-m", "not text")
     with pytest.raises(
-        Refused, match=r"^refusing: models/latin.py at HEAD is not UTF-8"
+        Refused, match=r"^refusing: models/latin.py at HEAD: output of git is not UTF-8"
     ):
         check_pins.unpinned(tmp_path, base)
     _git(tmp_path, "rm", "-q", "models/latin.py")
+    (tmp_path / "models").mkdir(exist_ok=True)
+    (tmp_path / "models" / "nul.py").write_bytes(b"x = 1\x00\n")
+    _git(tmp_path, "add", "-A")
+    _git(tmp_path, "commit", "-q", "-m", "null byte")
+    with pytest.raises(
+        Refused, match=r"^refusing: models/nul.py does not parse: source code string"
+    ):
+        check_pins.unpinned(tmp_path, base)
+    _git(tmp_path, "rm", "-q", "models/nul.py")
+    (tmp_path / "models").mkdir(exist_ok=True)
     _write(tmp_path, "models/broken.py", "def (:\n")
     _git(tmp_path, "add", "-A")
     _git(tmp_path, "commit", "-q", "-m", "broken")
@@ -162,7 +172,7 @@ def test_a_blob_that_is_not_text_or_does_not_parse_is_a_refusal(tmp_path: Path):
     ):
         check_pins.unpinned(tmp_path, base)
     _git(tmp_path, "rm", "-q", "models/broken.py")
-    outside = tmp_path.parent / f"{tmp_path.name}-outside.py"
+    outside = tmp_path / "outside-the-repo.py"  # untracked, beside the tree
     outside.write_text("def escaped():\n    pass\n")
     (tmp_path / "models").mkdir(exist_ok=True)  # git rm dropped the empty dir
     (tmp_path / "models" / "link.py").symlink_to(outside)
@@ -171,6 +181,16 @@ def test_a_blob_that_is_not_text_or_does_not_parse_is_a_refusal(tmp_path: Path):
     # the blob is the link target text, which does not parse: refused by name
     with pytest.raises(Refused, match=r"^refusing: models/link.py does not parse"):
         check_pins.unpinned(tmp_path, base)
+
+
+def test_a_failed_test_listing_is_a_refusal_not_an_empty_pool(monkeypatch):
+    """A git failure while listing tests never blanks the pool into 'every
+    symbol unpinned'; it is one line naming the command."""
+    monkeypatch.setattr(check_pins, "run", lambda cmd, cwd: (128, "fatal: bad tree"))
+    with pytest.raises(
+        Refused, match=r"^refusing: git ls-tree HEAD tests failed: fatal"
+    ):
+        check_pins._test_files(ROOT, "HEAD")
 
 
 def test_cli_refuses_a_bad_base_with_one_line():
