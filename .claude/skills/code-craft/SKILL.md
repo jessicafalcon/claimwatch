@@ -128,6 +128,11 @@ row, a CLI variable, hook stdin, an env var, a file name under `data/cache/`.
   through `review_common` (`read_text_or_error`, `readable`, `run`); a grep
   test pins it (*LESSONS: traceback-at-boundary*, reopened and re-closed
   2026-09-07).
+- A reader that fails returns nothing the caller can check against: the
+  failure travels with the value (`None`, a `Refused`, an `(empty, error)`
+  pair) and the caller reports the one line and stops — never an empty
+  default (no tests, no records, no targets) that the check downstream
+  reports as findings (*LESSONS: empty-default*).
 
 ## Data shapes across a boundary
 

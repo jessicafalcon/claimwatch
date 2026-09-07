@@ -323,7 +323,7 @@ def test_gate_prints_one_line_per_check_and_the_total(monkeypatch, tmp_path: Pat
     spec.write_text(_spec("| 1 | `tests/test_a.py::test_x` |"))
     monkeypatch.setattr(review_gate, "ROOT", tmp_path)
     monkeypatch.setattr(review_gate, "run", lambda cmd, cwd: (0, ""))
-    monkeypatch.setattr(review_gate, "make_targets", lambda root: set())
+    monkeypatch.setattr(review_gate, "make_targets", lambda root: (set(), None))
     monkeypatch.setattr(review_gate, "unpinned", lambda root, base: [])
     monkeypatch.setattr(
         review_gate,
@@ -362,6 +362,17 @@ def test_gate_prints_one_line_per_check_and_the_total(monkeypatch, tmp_path: Pat
         "ok   pins",
         "review-gate OK: 6/6 checks",
     ]
+    # a Makefile that did not read is the evidence check's one line, never
+    # "not in the Makefile" for every target the spec names (empty-default)
+    monkeypatch.setattr(
+        review_gate, "make_targets", lambda root: (set(), "Makefile: not UTF-8 text")
+    )
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        assert review_gate.main(["--spec=specs/s.md"]) == 1
+    assert (
+        "FAIL evidence\n     Makefile: not UTF-8 text\nok   records\n" in buf.getvalue()
+    )
 
 
 def test_range_checks_report_a_failed_diff_as_one_fail_and_no_paths(monkeypatch):

@@ -135,6 +135,7 @@ LESSON_CLASSES = (
     "caller-sourced",
     "partial-write",
     "name-drift",
+    "empty-default",
 )
 LESSON_CELLS = 6
 _LESSON_STATUS = re.compile(r"^(?:open|promoted → \S.*|expired \d{4}-\d{2}-\d{2})$")
@@ -236,7 +237,9 @@ def named_targets(text: str) -> set[str]:
 
 
 def check_make_targets(files: list[Path], root: Path) -> list[str]:
-    declared = make_targets(root)
+    declared, err = make_targets(root)
+    if err:
+        return [err]  # nothing to check names against
     errors: list[str] = []
     for f, text in readable(files, root, errors):
         for name in sorted(named_targets(text)):
@@ -438,19 +441,17 @@ class _Records:
     specs: Path
 
     @classmethod
-    def read(cls, root: Path) -> tuple[_Records, list[str]]:
-        """The records and the error lines of the ones that did not read
-        (an unreadable record is empty, so every tag citing it is reported)."""
-        errors: list[str] = []
-        backlog, err = read_text_or_error(root / "BACKLOG.md", root)
-        errors += [err] if err else []
-        decisions, err = read_text_or_error(root / "DECISIONS.md", root)
-        errors += [err] if err else []
+    def read(cls, root: Path) -> tuple[_Records | None, list[str]]:
+        """(the records, []) or (None, the error lines of the ones that did not
+        read): a record that did not read is never an empty record, which
+        would report every tag citing it (LESSONS: empty-default)."""
+        backlog, err1 = read_text_or_error(root / "BACKLOG.md", root)
+        decisions, err2 = read_text_or_error(root / "DECISIONS.md", root)
+        if backlog is None or decisions is None:
+            return None, [e for e in (err1, err2) if e]
         return cls(
-            backlog_titles(backlog or ""),
-            decisions_titles(decisions or ""),
-            root / "specs",
-        ), errors
+            backlog_titles(backlog), decisions_titles(decisions), root / "specs"
+        ), []
 
 
 def _cited_error(tag: str, cited: str, records: _Records) -> str | None:
@@ -504,6 +505,8 @@ _TOKENIZE_ERRORS = (tokenize.TokenError, SyntaxError)
 
 def check_comment_tags(files: list[Path], root: Path) -> list[str]:
     records, errors = _Records.read(root)
+    if records is None:
+        return errors  # the tags cannot be checked against a record that did not read
     for f, text in readable(files, root, errors):
         try:
             found = comments(f, text)

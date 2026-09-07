@@ -269,7 +269,8 @@ def main(argv: list[str] | None = None) -> int:
                 ("evidence", False, "pytest --collect-only failed:\n" + tail(out))
             )
         else:
-            errs = check_evidence(spec_text, ids, make_targets(ROOT))
+            declared, err = make_targets(ROOT)
+            errs = [err] if err else check_evidence(spec_text, ids, declared)
             results.append(("evidence", not errs, "\n".join(errs)))
         fails, warns = check_records(spec_text, diff)
         results.append(

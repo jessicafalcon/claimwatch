@@ -126,11 +126,13 @@ def readable(
         yield f, text
 
 
-def make_targets(root: Path = ROOT) -> set[str]:
-    """Targets the Makefile declares (rule lines), read as text — never `make -n`;
-    an unreadable Makefile declares nothing (the caller's check then fails by name)."""
-    text, _ = read_text_or_error(root / "Makefile", root)
-    return set(_TARGET_LINE.findall(text)) if text is not None else set()
+def make_targets(root: Path = ROOT) -> tuple[set[str], str | None]:
+    """(targets the Makefile declares as rule lines, None), read as text — never
+    `make -n`; or (an empty set, the one line naming why the Makefile did not
+    read). The caller reports the line and checks nothing against the empty
+    set: a reader that failed never hands back a default (LESSONS: empty-default)."""
+    text, err = read_text_or_error(root / "Makefile", root)
+    return (set(_TARGET_LINE.findall(text)), None) if text is not None else (set(), err)
 
 
 def tail(text: str, n: int = 20) -> str:

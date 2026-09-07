@@ -386,8 +386,19 @@ def test_a_file_that_is_not_text_is_one_error_line_in_every_check(tmp_path: Path
         "tabs.py: does not tokenize: "
         "unindent does not match any outer indentation level"
     ]
+    # a record or the Makefile that did not read is the check's one line: the
+    # tags and targets are not checked against an empty default (empty-default)
     (tmp_path / "BACKLOG.md").write_bytes(b"caf\xe9")
-    assert check_docs.check_comment_tags([], tmp_path) == ["BACKLOG.md: not UTF-8 text"]
+    tagged = tmp_path / "tagged.py"
+    tagged.write_text("# TODO(BACKLOG): A real row\n# HACK(DECISIONS): An entry\n")
+    assert check_docs.check_comment_tags([tagged], tmp_path) == [
+        "BACKLOG.md: not UTF-8 text"
+    ]
+    (tmp_path / "Makefile").write_bytes(b"caf\xe9")
+    assert check_docs.check_make_targets([fine], tmp_path) == [
+        "Makefile: not UTF-8 text"
+    ]
+    assert check_docs.make_targets(tmp_path) == (set(), "Makefile: not UTF-8 text")
 
 
 def test_lesson_classes_match_the_lessons_md_fence():
