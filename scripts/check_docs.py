@@ -34,10 +34,15 @@ Eight checks. Four document classes:
   7. comment tags — a tagged comment in tracked code (`.py`, `.sql`, `.yaml`,
      `.yml`, Makefile) is a pointer at a record, and the record entry exists:
      `TODO(BACKLOG): <open row title>`, `HACK(DECISIONS): <entry title>`,
-     `REF: <URL | brief §n | RFC n>`, `INVARIANT(<spec slug> <n>): …` with
-     `specs/<slug>.md` present. A tag word in any other shape is a FAIL naming
-     the shape. FIXME and XXX never pass ruff (TD001, FIX001, FIX003), so they
-     are not read here. The four are the closed set (code-craft → Comments).
+     `REF: <URL | brief §n | RFC n>`, `INVARIANT(<spec stem> <n>): …` where
+     the stem is the spec's file name, `specs/<stem>.md`. A tag OPENS a
+     comment: `# TODO(...)`, `-- HACK(...)`; a tag word later in a comment
+     is prose and is not read. Python comments are the tokenizer's COMMENT
+     tokens (a tag inside a string literal or docstring is not a comment);
+     the other files are read by line, the text after the first `#` or `--`.
+     A tag in any other shape is a FAIL naming the shape. FIXME and XXX never
+     pass ruff (TD001, FIX001, FIX003), so they are not read here. The four
+     are the closed set (code-craft → Comments).
   8. lessons — every row of LESSONS.md's table has six cells, a Class from the
      closed set LESSON_CLASSES (the same set the file's fence spells) and a
      Status shaped `open`, `promoted → <mechanism>` or `expired <date>`.
@@ -48,9 +53,11 @@ from __future__ import annotations
 import dataclasses
 import functools
 import hashlib
+import io
 import re
 import subprocess
 import sys
+import tokenize
 import unicodedata
 from pathlib import Path
 
@@ -100,7 +107,8 @@ _TOKEN = re.compile(r"[a-z0-9]+")
 COMMENT_SUFFIXES = (".py", ".sql", ".yaml", ".yml")
 COMMENT_NAMES = ("Makefile",)
 COMMENT_EXCLUDED = ("fixtures/", "data/")
-_TAGGED = re.compile(r"(?:#|--)\s*(TODO|HACK|REF|INVARIANT)\b(.*)$")
+_TAG_OPENS = re.compile(r"^\s*(TODO|HACK|REF|INVARIANT)\b(.*)$")
+_LINE_COMMENT = {".sql": "--", ".yaml": "#", ".yml": "#", "": "#"}
 _TAG_SHAPES = {
     "TODO": re.compile(r"^\(BACKLOG\): (\S.*?)\s*$"),
     "HACK": re.compile(r"^\(DECISIONS\): (\S.*?)\s*$"),
@@ -111,7 +119,7 @@ _TAG_HELP = {
     "TODO": "TODO(BACKLOG): <open row title>",
     "HACK": "HACK(DECISIONS): <entry title>",
     "REF": "REF: <URL | brief §n | RFC n>",
-    "INVARIANT": "INVARIANT(<spec slug> <n>): <why>",
+    "INVARIANT": "INVARIANT(<spec stem> <n>): <why>",
 }
 # Check 8 — the lessons record: a closed class set and a status shape.
 LESSON_CLASSES = (
@@ -459,12 +467,36 @@ def _tag_error(tag: str, rest: str, records: _Records) -> str | None:
     return _cited_error(tag, m.group(1), records) if m.groups() else None
 
 
+def comments(path: Path, text: str) -> list[tuple[int, str]]:
+    """(line, comment body) for every comment in the file: Python's from the
+    tokenizer (a string literal is not a comment); the other kinds by line,
+    the text after the first opener. Raises tokenize.TokenError."""
+    if path.suffix == ".py":
+        return [
+            (tok.start[0], tok.string[1:])
+            for tok in tokenize.generate_tokens(io.StringIO(text).readline)
+            if tok.type == tokenize.COMMENT
+        ]
+    opener = _LINE_COMMENT[path.suffix]
+    out: list[tuple[int, str]] = []
+    for n, line in enumerate(text.splitlines(), 1):
+        _, found, body = line.partition(opener)
+        if found:
+            out.append((n, body))
+    return out
+
+
 def check_comment_tags(files: list[Path], root: Path) -> list[str]:
     records = _Records.read(root)
     errors: list[str] = []
     for f in files:
-        for n, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
-            m = _TAGGED.search(line)
+        try:
+            found = comments(f, f.read_text(encoding="utf-8"))
+        except tokenize.TokenError as exc:
+            errors.append(f"{f.relative_to(root)}: does not tokenize: {exc.args[0]}")
+            continue
+        for n, body in found:
+            m = _TAG_OPENS.match(body)
             if m is None:
                 continue
             err = _tag_error(m.group(1), m.group(2), records)

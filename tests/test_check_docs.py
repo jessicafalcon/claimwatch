@@ -268,27 +268,30 @@ def test_check_comment_tags_reports_each_shape_and_missing_record(tmp_path: Path
     (tmp_path / "specs").mkdir()
     (tmp_path / "specs" / "phase-1-schema.md").write_text("# s\n")
     (tmp_path / "fixtures").mkdir()
-    (tmp_path / "fixtures" / "page.py").write_text("# " + "TODO: sample, never read\n")
+    (tmp_path / "fixtures" / "page.py").write_text("# TODO: sample, never read\n")
     code = tmp_path / "pipeline.py"
     lines = [
-        "# " + "TODO(BACKLOG): Open row about a scan",  # ok
-        "x = 1  # " + "TODO(BACKLOG): Open row",  # ok — a prefix, trailing comment
-        "# " + "TODO(BACKLOG): Closed row",
-        "# " + "TODO(BACKLOG): Nothing like it",
-        "# " + "TODO: no record",
-        "# " + "HACK(DECISIONS): The gate is a goal",  # ok
-        "# " + "HACK(DECISIONS): Not an entry",
-        "# " + "REF: https://example.org/spec §2",  # ok
-        "# " + "REF: brief §6.2",  # ok
-        "# " + "REF: RFC 9309",  # ok
-        "# " + "REF: see the brief",
-        "# " + "INVARIANT(phase-1-schema 3): raw is append-only",  # ok
-        "# " + "INVARIANT(phase-9-study 1): not yet",
-        "# " + "INVARIANT 3: no parens",
+        "# TODO(BACKLOG): Open row about a scan",  # ok
+        "x = 1  # TODO(BACKLOG): Open row",  # ok — a prefix, trailing comment
+        "# TODO(BACKLOG): Closed row",
+        "# TODO(BACKLOG): Nothing like it",
+        "# TODO: no record",
+        "# HACK(DECISIONS): The gate is a goal",  # ok
+        "# HACK(DECISIONS): Not an entry",
+        "# REF: https://example.org/spec §2",  # ok
+        "# REF: brief §6.2",  # ok
+        "# REF: RFC 9309",  # ok
+        "# REF: see the brief",
+        "# INVARIANT(phase-1-schema 3): raw is append-only",  # ok
+        "# INVARIANT(phase-9-study 1): not yet",
+        "# INVARIANT 3: no parens",
+        'S = """docstring with # TODO: not a comment"""',  # a string, not read
+        "T = '# HACK: in a literal'",  # a string, not read
+        "# see TODO(BACKLOG): nope — a tag that does not open the comment",
     ]
     code.write_text("\n".join(lines) + "\n")
     sql = tmp_path / "mart.sql"
-    sql.write_text("-- " + "HACK: no record\nselect 1\n")
+    sql.write_text("-- HACK: no record\nselect 1 -- REF: RFC 9309\n")
     paths = ["pipeline.py", "mart.sql", "fixtures/page.py", "notes.md"]
     files = check_docs.comment_files(tmp_path, paths)
     assert files == [code, sql]
@@ -301,8 +304,16 @@ def test_check_comment_tags_reports_each_shape_and_missing_record(tmp_path: Path
         "pipeline.py:11: malformed REF comment (shape: REF: <URL | brief §n | RFC n>)",
         "pipeline.py:13: INVARIANT names no spec: specs/phase-9-study.md",
         "pipeline.py:14: malformed INVARIANT comment "
-        "(shape: INVARIANT(<spec slug> <n>): <why>)",
+        "(shape: INVARIANT(<spec stem> <n>): <why>)",
         "mart.sql:1: malformed HACK comment (shape: HACK(DECISIONS): <entry title>)",
+    ]
+    assert check_docs.comments(sql, sql.read_text()) == [
+        (1, " HACK: no record"),
+        (2, " REF: RFC 9309"),
+    ]
+    code.write_text("x = (1,\n")  # an unterminated statement does not tokenize
+    assert check_docs.check_comment_tags([code], tmp_path) == [
+        "pipeline.py: does not tokenize: unexpected EOF in multi-line statement"
     ]
 
 
