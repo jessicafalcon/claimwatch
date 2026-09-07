@@ -171,7 +171,7 @@ def check_citations(rows: list[Row], root: Path) -> list[str]:
         return []
     text, err = read_text_or_error(spec, root)
     if text is None:
-        return [err or "SPEC.md: cannot be read"]
+        return [err]
     cited = set(_CITE.findall(_FENCE.sub("", text)))
     defined = {rid for r in rows if (rid := row_id(r.claim))}
     return [

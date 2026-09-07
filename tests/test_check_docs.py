@@ -153,13 +153,13 @@ def test_check_backlog_count_reports_a_mismatch(tmp_path: Path):
     )
     claude = tmp_path / "CLAUDE.md"
     claude.write_text("Open BACKLOG rows: **3**\n")
-    assert check_docs.check_backlog_count(claude, backlog) == [
+    assert check_docs.check_backlog_count(tmp_path) == [
         "CLAUDE.md says 3 open BACKLOG rows; BACKLOG.md has 2"
     ]
     claude.write_text("Open BACKLOG rows: **2**\n")
-    assert check_docs.check_backlog_count(claude, backlog) == []
+    assert check_docs.check_backlog_count(tmp_path) == []
     claude.write_text("no sentence\n")
-    assert check_docs.check_backlog_count(claude, backlog) == [
+    assert check_docs.check_backlog_count(tmp_path) == [
         "CLAUDE.md: no 'Open BACKLOG rows: **N**' sentence"
     ]
     # the header is skipped by position, not by the word "Item"
@@ -167,11 +167,12 @@ def test_check_backlog_count_reports_a_mismatch(tmp_path: Path):
     assert check_docs.open_backlog_rows(renamed) == 2
     # a missing record file is an error, never a vacuous green
     backlog.unlink()
-    assert check_docs.check_backlog_count(claude, backlog) == [
+    assert check_docs.check_backlog_count(tmp_path) == [
         "BACKLOG.md: record file is missing"
     ]
-    assert check_docs.check_backlog_count(tmp_path / "nope.md", backlog) == [
-        "nope.md: record file is missing",
+    claude.unlink()
+    assert check_docs.check_backlog_count(tmp_path) == [
+        "CLAUDE.md: record file is missing",
         "BACKLOG.md: record file is missing",
     ]
 
@@ -185,9 +186,9 @@ def test_check_neutrality_reports_a_token_never_a_url_and_never_the_name(
     hashes = tmp_path / "scripts" / "neutrality_hashes.txt"
     hashes.parent.mkdir()
     hashes.write_text(f"# a comment\n\n{digest}\nnot-a-digest\n")
-    digests, errors = check_docs.neutrality_hashes(hashes)
+    digests, errors = check_docs.neutrality_hashes(tmp_path)
     assert digests == {digest}
-    assert errors == ["neutrality_hashes.txt:4: not a sha256 hex digest"]
+    assert errors == ["scripts/neutrality_hashes.txt:4: not a sha256 hex digest"]
     readme = tmp_path / "README.md"
     readme.write_text(
         "ZZBrand held the refund.\n"
@@ -211,8 +212,9 @@ def test_check_neutrality_reports_a_token_never_a_url_and_never_the_name(
         "cafe",
     }
     assert check_docs.check_neutrality([readme], set(), tmp_path) == []
-    _, missing = check_docs.neutrality_hashes(tmp_path / "gone.txt")
-    assert missing == ["gone.txt: hash file is missing"]
+    (tmp_path / "empty").mkdir()
+    _, missing = check_docs.neutrality_hashes(tmp_path / "empty")
+    assert missing == ["scripts/neutrality_hashes.txt: hash file is missing"]
 
 
 def test_neutrality_files_are_the_tracked_code_and_prose_minus_the_declarations():
@@ -340,16 +342,17 @@ def test_check_lessons_reports_cells_class_and_status(tmp_path: Path):
         "c",
     ]
     assert check_docs.table_cells("| `x|y` | z |") == ["`x|y`", "z"]
-    assert check_docs.check_lessons(lessons) == [
+    assert check_docs.check_lessons(tmp_path) == [
         "LESSONS.md row 4: class not in the closed set: `vibes`",
         "LESSONS.md row 5: status shape: 'promoted'",
         "LESSONS.md row 6: 5 cells, not 6",
     ]
-    assert check_docs.check_lessons(tmp_path / "none.md") == [
-        "none.md: record file is missing"
+    (tmp_path / "empty").mkdir()
+    assert check_docs.check_lessons(tmp_path / "empty") == [
+        "LESSONS.md: record file is missing"
     ]
     lessons.write_bytes(b"| a |\n|---|\n| caf\xe9 |\n")
-    assert check_docs.check_lessons(lessons) == ["LESSONS.md: not UTF-8 text"]
+    assert check_docs.check_lessons(tmp_path) == ["LESSONS.md: not UTF-8 text"]
 
 
 def test_a_file_that_is_not_text_is_one_error_line_in_every_check(tmp_path: Path):
@@ -376,9 +379,16 @@ def test_a_file_that_is_not_text_is_one_error_line_in_every_check(tmp_path: Path
     assert (
         check_docs.check_links([latin, fine], tmp_path) == line * 2
     )  # source, then anchor target
-    assert check_docs.check_lessons(latin) == line
-    assert check_docs.check_backlog_count(latin, tmp_path / "BACKLOG.md") == line
-    assert check_docs.neutrality_hashes(latin) == (set(), line)
+    # the single-file checks name their file the same way: relative to root
+    (tmp_path / "scripts").mkdir()
+    for rel in ("LESSONS.md", "CLAUDE.md", "scripts/neutrality_hashes.txt"):
+        (tmp_path / rel).write_bytes(b"caf\xe9\n")
+    assert check_docs.check_lessons(tmp_path) == ["LESSONS.md: not UTF-8 text"]
+    assert check_docs.check_backlog_count(tmp_path) == ["CLAUDE.md: not UTF-8 text"]
+    assert check_docs.neutrality_hashes(tmp_path) == (
+        set(),
+        ["scripts/neutrality_hashes.txt: not UTF-8 text"],
+    )
     # the tokenizer's other exceptions are the same boundary
     tabs = tmp_path / "tabs.py"
     tabs.write_text("def f():\n    x = 1\n  y = 2\n")
@@ -419,7 +429,7 @@ def test_commit_messages_read_the_log_and_are_empty_outside_git(tmp_path: Path):
 
 
 def test_backlog_count_matches_today():
-    assert check_docs.check_backlog_count(ROOT / "CLAUDE.md", ROOT / "BACKLOG.md") == []
+    assert check_docs.check_backlog_count(ROOT) == []
 
 
 def test_check_docs_is_green_today(capsys):

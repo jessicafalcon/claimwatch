@@ -72,6 +72,7 @@ from review_common import (
     read_text_or_error,
     readable,
     run,
+    shown,
 )
 
 PLAN_GLOBS = ("PROJECT_BRIEF.md", "docs/*.md", "specs/*.md")
@@ -208,7 +209,7 @@ def check_links(files: list[Path], root: Path) -> list[str]:
             target, _, anchor = m.group(1).partition("#")
             # `#local` (no file part) is an anchor in THIS file.
             dest = f.resolve() if not target else (f.parent / target).resolve()
-            shown = target or f.name
+            target_shown = target or f.name
             if root.resolve() not in dest.parents and dest != root.resolve():
                 errors.append(f"{f.relative_to(root)}: link escapes the repo: {target}")
                 continue
@@ -219,10 +220,10 @@ def check_links(files: list[Path], root: Path) -> list[str]:
                 continue
             dest_text, err = read_text_or_error(dest, root)
             if dest_text is None:
-                errors.append(err or f"{shown}: cannot be read")
+                errors.append(err)
             elif anchor not in anchors(dest_text):
                 errors.append(
-                    f"{f.relative_to(root)}: missing anchor #{anchor} in {shown}"
+                    f"{f.relative_to(root)}: missing anchor #{anchor} in {target_shown}"
                 )
     return errors
 
@@ -332,13 +333,14 @@ def neutrality_files(root: Path, paths: list[str]) -> list[Path]:
     return keep
 
 
-def neutrality_hashes(path: Path) -> tuple[set[str], list[str]]:
+def neutrality_hashes(root: Path) -> tuple[set[str], list[str]]:
     """The listed digests and the lines that are not one (a name, a typo)."""
+    path = root / NEUTRALITY_HASHES
     if not path.is_file():
-        return set(), [f"{path.name}: hash file is missing"]
-    text, err = read_text_or_error(path, path.parent)
+        return set(), [f"{shown(path, root)}: hash file is missing"]
+    text, err = read_text_or_error(path, root)
     if text is None:
-        return set(), [err or f"{path.name}: cannot be read"]
+        return set(), [err]
     digests: set[str] = set()
     errors: list[str] = []
     for n, line in enumerate(text.splitlines(), 1):
@@ -348,7 +350,7 @@ def neutrality_hashes(path: Path) -> tuple[set[str], list[str]]:
         if _SHA256.match(line):
             digests.add(line)
         else:
-            errors.append(f"{path.name}:{n}: not a sha256 hex digest")
+            errors.append(f"{shown(path, root)}:{n}: not a sha256 hex digest")
     return digests, errors
 
 
@@ -387,12 +389,13 @@ def check_neutrality(files: list[Path], digests: set[str], root: Path) -> list[s
     return errors
 
 
-def check_backlog_count(claude: Path, backlog: Path) -> list[str]:
-    missing = [p.name for p in (claude, backlog) if not p.is_file()]
+def check_backlog_count(root: Path) -> list[str]:
+    claude, backlog = root / "CLAUDE.md", root / "BACKLOG.md"
+    missing = [shown(p, root) for p in (claude, backlog) if not p.is_file()]
     if missing:
         return [f"{name}: record file is missing" for name in missing]
-    claude_text, err1 = read_text_or_error(claude, claude.parent)
-    backlog_text, err2 = read_text_or_error(backlog, backlog.parent)
+    claude_text, err1 = read_text_or_error(claude, root)
+    backlog_text, err2 = read_text_or_error(backlog, root)
     if claude_text is None or backlog_text is None:
         return [e for e in (err1, err2) if e]
     m = _BACKLOG_COUNT.search(claude_text)
@@ -552,30 +555,28 @@ def table_rows(text: str) -> list[list[str]]:
     return [table_cells(r) for r in rows[2:]]
 
 
-def check_lessons(path: Path) -> list[str]:
+def check_lessons(root: Path) -> list[str]:
+    path = root / "LESSONS.md"
+    name = shown(path, root)
     if not path.is_file():
-        return [f"{path.name}: record file is missing"]
-    text, err = read_text_or_error(path, path.parent)
+        return [f"{name}: record file is missing"]
+    text, err = read_text_or_error(path, root)
     if text is None:
-        return [err or f"{path.name}: cannot be read"]
+        return [err]
     errors: list[str] = []
     for n, cells in enumerate(table_rows(text), 1):
         if len(cells) != LESSON_CELLS:
-            errors.append(
-                f"{path.name} row {n}: {len(cells)} cells, not {LESSON_CELLS}"
-            )
+            errors.append(f"{name} row {n}: {len(cells)} cells, not {LESSON_CELLS}")
             continue
         if cells[0].strip("`") not in LESSON_CLASSES:
-            errors.append(
-                f"{path.name} row {n}: class not in the closed set: {cells[0]}"
-            )
+            errors.append(f"{name} row {n}: class not in the closed set: {cells[0]}")
         if not _LESSON_STATUS.match(cells[5]):
-            errors.append(f"{path.name} row {n}: status shape: {cells[5]!r}")
+            errors.append(f"{name} row {n}: status shape: {cells[5]!r}")
     return errors
 
 
 def _naming_errors(root: Path) -> list[str]:
-    digests, errors = neutrality_hashes(root / NEUTRALITY_HASHES)
+    digests, errors = neutrality_hashes(root)
     files = neutrality_files(root, tracked_paths(root))
     return errors + check_neutrality(files, digests, root)
 
@@ -589,13 +590,13 @@ def main(root: Path = ROOT) -> int:
         ("make targets", check_make_targets(living + command_files(root), root)),
         ("banned words", check_banned_words(living + study_files(root), root)),
         ("glossary", check_glossary(living, root)),
-        ("BACKLOG count", check_backlog_count(root / "CLAUDE.md", root / "BACKLOG.md")),
+        ("BACKLOG count", check_backlog_count(root)),
         ("naming the target", _naming_errors(root)),
         (
             "comment tags",
             check_comment_tags(comment_files(root, tracked_paths(root)), root),
         ),
-        ("lessons", check_lessons(root / "LESSONS.md")),
+        ("lessons", check_lessons(root)),
     ]
     failed = 0
     for name, errors in checks:

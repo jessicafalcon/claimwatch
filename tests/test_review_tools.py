@@ -22,6 +22,7 @@ from review_common import (
     resolve_spec,
     run,
     section,
+    shown,
 )
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -93,6 +94,8 @@ def test_read_boundary_reports_by_name_and_skips_in_a_loop(tmp_path: Path):
         None,
         "latin.md: not UTF-8 text",
     )
+    assert shown(tmp_path / "a" / "b.md", tmp_path) == "a/b.md"
+    assert shown(latin, tmp_path / "elsewhere") == "latin.md"
     errors: list[str] = []
     seen = [f.name for f, _ in readable([latin, good], tmp_path, errors)]
     assert (seen, errors) == (["good.md"], ["latin.md: not UTF-8 text"])

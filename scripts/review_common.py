@@ -95,22 +95,27 @@ def run(cmd: list[str], cwd: Path) -> tuple[int, str]:
     return res.returncode, res.stdout + res.stderr
 
 
-def _shown(path: Path, root: Path) -> str:
+def shown(path: Path, root: Path) -> str:
+    """The one form a report names a file in: its path relative to the repo
+    root (its bare name only when it is not under the root)."""
     try:
         return str(path.relative_to(root))
     except ValueError:
         return path.name
 
 
-def read_text_or_error(path: Path, root: Path = ROOT) -> tuple[str | None, str | None]:
+def read_text_or_error(
+    path: Path, root: Path = ROOT
+) -> tuple[str, None] | tuple[None, str]:
     """(text, None) or (None, one error line naming the path): a file that is
-    not UTF-8 text or cannot be read is reported, never raised."""
+    not UTF-8 text or cannot be read is reported, never raised — exactly one
+    side is None, so a caller never needs a fallback line."""
     try:
         return path.read_text(encoding="utf-8"), None
     except UnicodeDecodeError:
-        return None, f"{_shown(path, root)}: not UTF-8 text"
+        return None, f"{shown(path, root)}: not UTF-8 text"
     except OSError as exc:
-        return None, f"{_shown(path, root)}: cannot be read: {exc.strerror}"
+        return None, f"{shown(path, root)}: cannot be read: {exc.strerror}"
 
 
 def readable(
@@ -121,7 +126,7 @@ def readable(
     for f in files:
         text, err = read_text_or_error(f, root)
         if text is None:
-            errors.append(err or f"{_shown(f, root)}: cannot be read")
+            errors.append(err)
             continue
         yield f, text
 
