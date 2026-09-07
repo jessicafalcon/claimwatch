@@ -93,11 +93,17 @@ def test_threshold_marks_exactly_one_default_day():
 
 def test_hold_rule_every_branch_by_hand():
     """The four branches, each a hand case: timer off; timer on and loop <= timer;
-    timer on, loop > timer, claim under; timer on, loop > timer, claim not under."""
+    timer on, loop > timer, claim under; timer on, loop > timer, claim not under.
+    The loop <= timer branch is walked at both the strict case (loop < timer) and
+    the equality boundary (loop == timer, reachable from the slider ranges), and
+    the under-threshold comparison is walked at a claim exactly on the threshold
+    (a tie is not "under") so the two guards are pinned strict."""
     small = gs.Claim(rank=1, quantile=0.0005, amount_eur=10.0)
     large = gs.Claim(rank=1000, quantile=0.9995, amount_eur=5000.0)
+    on_threshold = gs.Claim(rank=500, quantile=0.5, amount_eur=42.67)
     long_loop = {"loop_days": 21, "timer_days": 14}
     short_loop = {"loop_days": 7, "timer_days": 14}
+    equal_loop = {"loop_days": 14, "timer_days": 14}
     assert gs.hold(small, long_loop, timer_on=False, timer_amount=42.67) == (
         21,
         "loop_released",
@@ -106,14 +112,34 @@ def test_hold_rule_every_branch_by_hand():
         7,
         "loop_released",
     )
+    assert gs.hold(small, equal_loop, timer_on=True, timer_amount=42.67) == (
+        14,
+        "loop_released",
+    )
     assert gs.hold(small, long_loop, timer_on=True, timer_amount=42.67) == (
         14,
         "timer_released",
+    )
+    assert gs.hold(on_threshold, long_loop, timer_on=True, timer_amount=42.67) == (
+        21,
+        "timer_escalated",
     )
     assert gs.hold(large, long_loop, timer_on=True, timer_amount=42.67) == (
         21,
         "timer_escalated",
     )
+
+
+def test_share_under_is_strict_below():
+    """A claim exactly at the threshold is not counted under it — the share-under
+    guard is strict `<`, so the pinned share_under == timer_released-share identity
+    (a claim on the threshold escalates, it is not released) holds at a tie."""
+    claims = (
+        gs.Claim(rank=1, quantile=0.25, amount_eur=10.0),
+        gs.Claim(rank=2, quantile=0.5, amount_eur=42.67),
+        gs.Claim(rank=3, quantile=0.75, amount_eur=100.0),
+    )
+    assert gs.share_under(claims, 42.67) == 1 / 3
 
 
 # --- the scenarios are a closed set mapped onto the cost-model scenarios -------
