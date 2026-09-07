@@ -31,9 +31,12 @@ place and never deleted.
 - **Pattern-matching lives in `rules.yaml` and Python, never in SQL.** SQL that
   carries no regex carries no dialect, which is what keeps it portable.
   ([PLAN §4.10](docs/PLAN.md); [Phase 0a](#phase-0a))
-- **Formulas are data.** `models/cost_model.py::FORMULAS` is the only place a
-  formula is written; the study renders from it and a test pins the outputs.
-  ([PLAN §4](docs/PLAN.md); [Phase 0a](#phase-0a))
+- **Formulas are data.** A printed expression and its callable are one entry in
+  the module that owns the quantity, and the printer prints from the entry, so the
+  shown formula and the computed number cannot drift; a test pins the outputs. Its
+  two instances are `models/cost_model.py::FORMULAS` (the model and the hold-timer
+  threshold) and `models/guardrail_sim.py::RULES` (the quantile draw and the hold).
+  ([PLAN §4](docs/PLAN.md); [Phase 0a](#phase-0a); restated [Phase 8b](#phase-8b))
 - **Classification grain: one row per review × theme.** A review carrying K
   themes writes K rows, a review with none writes one `positive`/`unclassified`
   row; a "theme share" counts theme rows. This is what a theme chart means.
@@ -1979,8 +1982,15 @@ pure-Python fallback of the same algorithm; the 1,000 rounded amounts were
 byte-identical locally and under `idempotency-check ROWS=synthetic`, and the
 first/middle/last amounts are pinned. DuckDB binds Python `int` into the
 `integer` columns (`claim_rank`, `loop_days`, `hold_days`, `timer_days`) and
-`bool` into `is_default` with no cast surprise, through the existing
-parameterised insert path. The defaults' outputs were computed before any pin was
+`bool` into `is_default` with no cast surprise. The two sim marts are each filled
+with one `executemany`, guarded by `_no_pandas_probe` (Amendment A1): binding a
+Python value, DuckDB imports `pandas` to test its type, and with pandas absent (the
+no-pandas rule) and a failed import uncached, the ~4,000-row insert re-scans
+`sys.path` on every value — a sub-second write becomes ~5 s, and every test that
+rebuilds pays it (measured: the per-row loop ran the suite in ~17 min, the guarded
+`executemany` in ~2.5 min). A `None` sentinel in `sys.modules` makes the import
+fail at once; it is set only around the insert and restored after, and the repo
+uses no DuckDB dataframe API. The defaults' outputs were computed before any pin was
 typed: the baseline loop (21 days) is longer than the default timer (14), the
 default threshold (€42.67) lands inside the body of the distribution (median cell
 €49.76) rather than a tail, and each fix shortens the mean hold — the story holds

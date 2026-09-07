@@ -1,8 +1,8 @@
 -- cost_model_outputs — each cost-model formula printed next to the value it
 --   produces, per scenario (B3.1, SPEC.md Beat 3).
--- Grain: one row per (scenario, formula) — the nine point formulas and the two
+-- Grain: one row per (scenario, formula) — the twelve point formulas and the two
 --   curve crossovers, over the four §7 scenarios (baseline, contacts_once,
---   churn_halved, both). 4 x 11 = 44 rows.
+--   churn_halved, both). 4 x 14 = 56 rows.
 -- A Python-fed mart: this file is DDL only (the fixed shape);
 --   pipeline/build.py::write_model_marts fills it from models/cost_model.py, the
 --   one place the formulas are written — the printed `expression` and the
@@ -13,7 +13,10 @@
 --   curve formula whose crossover never happens stores value NULL.
 -- Provenance: run_id names the build; no source_url, no captured_at, no clock.
 -- Tag: Modeled (the deterministic model's own output).
--- Feeds: B3.1.
+-- Reader rule: B3.1 prints every point row (the model formulas and the three
+--   hold-timer formulas loop_days, friction_per_day, timer_amount_eur); B4.2
+--   reads only those three hold-timer rows, at the baseline scenario.
+-- Feeds: B3.1, B4.2.
 create or replace table cost_model_outputs (
     scenario varchar,
     name varchar,

@@ -160,7 +160,9 @@ Beat 3 curves.
 *Under the hood:* a simulator runs synthetic claims — the distribution fitted to
 real public reimbursement data, read at a thousand evenly spaced points, with the
 fit shown — through a hold timer, and reports before-and-after hold durations. No
-individual claims data is used; none is public.
+individual claims data is used; none is public. When a fix already cuts the
+document loop to a single round, the timer has nothing left to cut, so "ask once"
+and "both fixes" show the same hold.
 
 - **B4.1 — Ask for everything once.** A lookup that returns the complete document
   list for a claim type and flag reason in one request, ending the serial
@@ -173,8 +175,7 @@ individual claims data is used; none is public.
   expectation"). Tag: *Modeled*.
 - **B4.3 — Before and after.** For each fix, the mean hold in days and the share
   of claims the clock released, with the Beat 3 curves beside them — two hold
-  lengths per fix, not a distribution (with one round the clock has nothing left
-  to cut, so ask-once and both-fixes read the same). Tag: *Modeled*.
+  lengths per fix, not a distribution. Tag: *Modeled*.
 - **B4.4 — Count the mistakes.** Logging how each hold ends — fraud-confirmed or
   released-clean — yields a false-positive rate per flag rule, the metric the
   system otherwise lacks; the same event stream also triggers a status
