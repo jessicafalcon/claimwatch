@@ -191,16 +191,24 @@ def _loop_and_timer_days(
     return {"loop_days": loop_days, "timer_days": timer_days}
 
 
-def simulate(params: Mapping[str, float], scenario: str) -> list[dict[str, object]]:
+def simulate(
+    params: Mapping[str, float],
+    scenario: str,
+    claims: Sequence[Claim] | None = None,
+) -> list[dict[str, object]]:
     """One row per synthetic claim for one simulator scenario: the claim, the
     scenario's loop, the hold and its outcome. The timer amount is the cost
     model's `timer_amount_eur` at `baseline` — the recommendation is made once,
-    before any fix — whatever the scenario. An unknown scenario is refused."""
+    before any fix — whatever the scenario. The claims are scenario-invariant, so
+    a caller running every scenario draws them once and passes them in; left None
+    they are drawn here. An unknown scenario is refused."""
     sim = _sim_scenario(scenario)
     scenario_params = _loop_and_timer_days(params, sim.curves_scenario)
     timer_amount = cost_model.evaluate(params, "baseline")["timer_amount_eur"]
+    if claims is None:
+        claims = synthetic_claims(params)
     rows: list[dict[str, object]] = []
-    for claim in synthetic_claims(params):
+    for claim in claims:
         hold_days, outcome = hold(
             claim, scenario_params, timer_on=sim.timer_on, timer_amount=timer_amount
         )
@@ -219,14 +227,18 @@ def simulate(params: Mapping[str, float], scenario: str) -> list[dict[str, objec
     return rows
 
 
-def threshold_table(params: Mapping[str, float]) -> list[dict[str, object]]:
+def threshold_table(
+    params: Mapping[str, float], claims: Sequence[Claim] | None = None
+) -> list[dict[str, object]]:
     """One row per timer day of the grid, at the baseline parameters: the amount
     below which a hold that long is net-negative in expectation (the cost model's
     `timer_amount_eur` with `timer_days` set to that day) and the share of
     synthetic claims under it. Exactly one row — the default timer day — is
-    marked. The recommendation is made once, so there is no scenario column."""
+    marked. The recommendation is made once, so there is no scenario column. The
+    claims are drawn here unless the caller passes the ones it already drew."""
     default_day = cost_model.rounded("count", params["timer_days"])
-    claims = synthetic_claims(params)
+    if claims is None:
+        claims = synthetic_claims(params)
     rows: list[dict[str, object]] = []
     for day in TIMER_DAY_GRID:
         amount = cost_model.evaluate({**params, "timer_days": day}, "baseline")[
@@ -273,23 +285,29 @@ def format_simulation(fit: cost_model.Fit) -> str:
     first = claims[0]
     baseline_days = _loop_and_timer_days(params, "baseline")
     timer_amount = cost_model.evaluate(params, "baseline")["timer_amount_eur"]
-    first_hold = hold(first, baseline_days, timer_on=True, timer_amount=timer_amount)
+    # Each printed value is computed through that rule's own callable (RULES[i].fn),
+    # so the text beside it and the number under it are the one entry the module
+    # docstring promises — printed rule and computed row cannot drift.
+    first_amount = cost_model.rounded("eur", RULES[0].fn(params, first.rank))
+    hold_days, outcome = RULES[1].fn(
+        first, baseline_days, timer_on=True, timer_amount=timer_amount
+    )
+    default_share = cost_model.rounded("rate", RULES[2].fn(claims, timer_amount))
     lines = [
         "guardrail simulator — the rules, the threshold, and the holds each fix gives",
         "",
         "rules (each beside its value at the defaults, on the first synthetic claim):",
-        f"  synthetic_amount = {RULES[0].text}",
-        f"  {'':18} -> rank {first.rank}: {first.amount_eur}",
-        f"  hold             = {RULES[1].text}",
-        f"  {'':18} -> {first_hold}",
-        f"  share_under      = {RULES[2].text}",
-        f"  {'':18} -> at the default threshold {timer_amount}: "
-        f"{cost_model.rounded('rate', share_under(claims, timer_amount))}",
+        f"  {RULES[0].name:16} = {RULES[0].text}",
+        f"  {'':18} -> rank {first.rank}: {first_amount}",
+        f"  {RULES[1].name:16} = {RULES[1].text}",
+        f"  {'':18} -> {hold_days} days, {outcome}",
+        f"  {RULES[2].name:16} = {RULES[2].text}",
+        f"  {'':18} -> at the default threshold {timer_amount}: {default_share}",
         "",
         "SLA threshold — the amount below which a hold that long is net-negative "
         "in expectation, and the share of claims under it (baseline; * = default):",
     ]
-    for row in threshold_table(params):
+    for row in threshold_table(params, claims):
         mark = " *" if row["is_default"] else "  "
         lines.append(
             f" {mark} {row['timer_days']:>3} days  <= "
@@ -297,7 +315,7 @@ def format_simulation(fit: cost_model.Fit) -> str:
         )
     lines.append("")
     lines.append("hold days per fix (mean hold, share the timer released):")
-    summary = simulate_all(params)
+    summary = simulate_all(params, claims)
     for sim in SIM_SCENARIOS:
         s = summary[sim.name]
         lines.append(
@@ -307,10 +325,16 @@ def format_simulation(fit: cost_model.Fit) -> str:
     return "\n".join(lines)
 
 
-def simulate_all(params: Mapping[str, float]) -> dict[str, dict[str, float]]:
-    """The summary over every scenario — `simulate` for each, then `summarize`
-    over the concatenation. The one call the printer and the study both make."""
+def simulate_all(
+    params: Mapping[str, float], claims: Sequence[Claim] | None = None
+) -> dict[str, dict[str, float]]:
+    """The summary over every scenario — `simulate` for each over one draw of the
+    scenario-invariant claims, then `summarize` over the concatenation. The one
+    call the printer and the study both make; the claims are drawn once here unless
+    the caller passes them in."""
+    if claims is None:
+        claims = synthetic_claims(params)
     rows: list[dict[str, object]] = []
     for sim in SIM_SCENARIOS:
-        rows.extend(simulate(params, sim.name))
+        rows.extend(simulate(params, sim.name, claims))
     return summarize(rows)

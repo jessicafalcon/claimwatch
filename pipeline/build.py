@@ -936,10 +936,11 @@ def _no_pandas_probe() -> Iterator[None]:
     importing pandas; pandas is not installed here (a hard project rule — no pandas
     on a pipeline path) and Python does not cache a failed import, so the check
     re-scans `sys.path` on every value — ~4,000 rows × 10 columns per rebuild turns
-    a sub-second write into ~5 s, and every rebuild pays it. A sentinel `None` in
-    `sys.modules` makes `import pandas` fail immediately with no path scan; it is
-    set only around the insert and restored after, and the repo never uses DuckDB's
-    dataframe API, so nothing else is affected. DECISIONS → Phase 8b Gotchas."""
+    a sub-second write into ~5 s, and every rebuild (and every test that rebuilds)
+    pays it. A sentinel `None` in `sys.modules` makes `import pandas` fail
+    immediately with no path scan; it is set only around the insert and restored
+    after, and the repo never uses DuckDB's dataframe API, so nothing else is
+    affected. DECISIONS → Phase 8b Gotchas."""
     sentinel = object()
     previous = sys.modules.get("pandas", sentinel)
     sys.modules["pandas"] = None  # type: ignore[assignment]
@@ -954,8 +955,8 @@ def _no_pandas_probe() -> Iterator[None]:
 
 def _insert_rows(conn, table: str, columns: str, rows: list[list]) -> None:
     """Insert `rows` into `table` with one `executemany`, under the no-pandas-probe
-    guard. `columns` names the target columns (no user input reaches the SQL); the
-    placeholder count is the columns' arity."""
+    guard. `table` and `columns` are literals from the caller (no user input
+    reaches the SQL); the placeholder count is the columns' arity."""
     if not rows:
         return
     placeholders = ",".join(["?"] * len(rows[0]))
@@ -970,10 +971,13 @@ def write_sim_marts(conn, fit: cost_model.Fit, run_id: str) -> None:
     one place the draw, the hold and the share-under count are written; the
     threshold itself is the cost model's formula, read at baseline. Every number
     is a callable over the parameters; no literal is typed here. Cleared and
-    inserted in one transaction, rows in scenario / rank and day order, so a
-    re-run is byte-identical. `rebuild()` calls this after write_model_marts on
-    every input, so every caller sees filled marts."""
+    inserted in one transaction via `_insert_rows` (one guarded `executemany` per
+    mart — the ~4,000 sim rows make the per-value pandas probe worth suppressing),
+    rows in scenario / rank and day order, so a re-run is byte-identical.
+    `rebuild()` calls this after write_model_marts on every input, so every caller
+    sees filled marts."""
     params = cost_model.defaults(fit)
+    claims = guardrail_sim.synthetic_claims(params)
     sim_rows = [
         [
             row["scenario"],
@@ -988,7 +992,7 @@ def write_sim_marts(conn, fit: cost_model.Fit, run_id: str) -> None:
             _MODEL_TAG,
         ]
         for sim in guardrail_sim.SIM_SCENARIOS
-        for row in guardrail_sim.simulate(params, sim.name)
+        for row in guardrail_sim.simulate(params, sim.name, claims)
     ]
     sla_rows = [
         [
@@ -999,7 +1003,7 @@ def write_sim_marts(conn, fit: cost_model.Fit, run_id: str) -> None:
             run_id,
             _MODEL_TAG,
         ]
-        for row in guardrail_sim.threshold_table(params)
+        for row in guardrail_sim.threshold_table(params, claims)
     ]
     conn.execute("begin transaction")
     try:
