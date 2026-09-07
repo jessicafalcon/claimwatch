@@ -21,6 +21,8 @@ from pipeline.build import (
 from pipeline.warehouse import connect, database_for
 from tests import pins
 
+pytestmark = pytest.mark.slow  # integration (builds a DuckDB warehouse)
+
 
 def _classify_and_build(db, run_id: str = "t") -> None:
     """Fill stg_classified_reviews and build the theme-share marts over the

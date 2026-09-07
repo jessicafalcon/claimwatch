@@ -16,6 +16,13 @@ HOOK = ROOT / ".claude" / "hooks" / "run-tests.py"
 VENV_BIN = str(Path(sys.executable).parent)  # pytest on PATH for the tmp project
 RED = "def test_bad():\n    assert False\n"
 GREEN = "def test_ok():\n    assert True\n"
+# A failing slow test beside a passing fast one: the edit-loop hook runs
+# `-m "not slow"`, so the slow failure is left to `make test`/CI, not the hook.
+SLOW_RED_FAST_GREEN = (
+    "import pytest\n\n\n"
+    "@pytest.mark.slow\ndef test_slow_bad():\n    assert False\n\n\n"
+    "def test_fast_ok():\n    assert True\n"
+)
 
 
 def _hook(
@@ -58,6 +65,15 @@ def test_red_suite_blocks_with_exit_2_and_the_tail(tmp_path: Path):
     res = _hook(_event(p), p)
     assert res.returncode == 2
     assert "TESTS FAILING" in res.stderr and "test_bad" in res.stderr
+
+
+def test_slow_marked_failures_do_not_block_the_edit_loop(tmp_path: Path):
+    """The hook runs `-m "not slow"`: a failing slow test is deselected and the
+    fast test passes, so the edit loop stays green. The gate and CI run the
+    suite plain, where the slow failure would block."""
+    p = _project(tmp_path, SLOW_RED_FAST_GREEN)
+    res = _hook(_event(p), p)
+    assert res.returncode == 0 and "tests green" in res.stderr
 
 
 def test_sql_and_yaml_edits_run_the_suite(tmp_path: Path):

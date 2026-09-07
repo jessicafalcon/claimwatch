@@ -17,6 +17,8 @@ from pipeline.label_sample import SHEET, SHEET_COLUMNS, label_sample
 from pipeline.warehouse import ROOT, database_for
 from tests import pins
 
+pytestmark = pytest.mark.slow  # integration (builds a DuckDB warehouse)
+
 
 @pytest.fixture
 def synthetic_db(tmp_path: Path) -> Path:

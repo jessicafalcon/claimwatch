@@ -15,6 +15,8 @@ from pipeline.cli import main
 from pipeline.warehouse import ROOT, connect, database_for
 from tests import pins
 
+pytestmark = pytest.mark.slow  # integration (builds a DuckDB warehouse)
+
 _MARTS = ("cost_model_params", "cost_model_outputs", "cost_curves")
 _IMPORT_ALLOWLIST = {"math", "dataclasses", "collections", "typing", "__future__"}
 

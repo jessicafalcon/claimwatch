@@ -4,6 +4,8 @@ the precision formula on a crafted disagreement. Offline; no service, no key."""
 
 from __future__ import annotations
 
+import pytest
+
 from classify.eval.labels_io import read_labels
 from classify.eval.precision import (
     SCORED_LABELS,
@@ -17,6 +19,8 @@ from classify.rules import classify, load_rules
 from classify.split import HELDOUT_FOLD, is_heldout
 from pipeline.cli import main
 from tests import pins
+
+pytestmark = pytest.mark.slow  # integration (builds a DuckDB warehouse)
 
 
 def _predictions(conn) -> list[tuple[str, str]]:

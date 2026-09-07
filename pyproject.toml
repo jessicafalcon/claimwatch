@@ -24,6 +24,9 @@ dev = [
 testpaths = ["tests"]
 addopts = "-q"
 pythonpath = ["."]
+markers = [
+    "slow: an integration test that builds a DuckDB warehouse (~2-5s each). The edit-loop run-tests hook runs `-m \"not slow\"` for fast feedback; `make test` and CI run the suite plain, so slow tests always run there.",
+]
 
 [tool.ruff]
 target-version = "py312"

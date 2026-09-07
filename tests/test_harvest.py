@@ -30,6 +30,8 @@ from pipeline.build import (
 from pipeline.warehouse import ROOT, database_for
 from tests.test_snapshots import PLAY, _play_capture, _query, _write_csv
 
+pytestmark = pytest.mark.slow  # integration (builds a DuckDB warehouse)
+
 OA = by_name("fr-digital-first-opinion-assurances")
 _INSTANT = re.compile(r"\A[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\Z")
 _NUMBER = re.compile(r"\A[0-9]*\.?[0-9]*\Z")  # a figure or empty; no letters

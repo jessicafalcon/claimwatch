@@ -26,9 +26,16 @@ CODE_SUFFIXES = (".py", ".sql", ".yaml", ".yml")
 DEFAULT_TIMEOUT = 120
 MAX_EVENT_BYTES = 4 * 1024 * 1024  # the harness is the producer; bigger is not ours
 # Failures first, stop at the first: a red suite shows in seconds instead of
-# the full run; a green suite still runs every test. The gate and CI run the
-# suite plain — this is the edit loop's visibility aid, not their check.
+# the full run. The gate and CI run the suite plain — this is the edit loop's
+# visibility aid, not their check.
 FAST_RED = ("-x", "--ff")
+# The edit loop runs the FAST set only. The ~17 warehouse-building integration
+# modules (~2-5s each) carry `@pytest.mark.slow`; running all 830 tests here
+# took ~4 min and always tripped the timeout, so a green edit reported a false
+# block. `-m "not slow"` runs the ~525 fast tests in ~20s; the slow ones are
+# left to `make test` and CI, which run the suite plain. Tradeoff: an edit that
+# breaks only a slow test is caught by the gate/CI, not here.
+FAST_ONLY = ("-m", "not slow")
 
 
 def timeout_seconds() -> int:
@@ -60,10 +67,10 @@ def pytest_command() -> list[str] | None:
     """The venv's pytest, else the PATH's, else None (run `make setup`)."""
     venv_pytest = os.path.join(".venv", "bin", "pytest")
     if os.path.exists(venv_pytest):
-        return [venv_pytest, *FAST_RED]  # pyproject already sets addopts="-q"
+        return [venv_pytest, *FAST_RED, *FAST_ONLY]  # pyproject sets addopts="-q"
     from shutil import which
 
-    return ["pytest", *FAST_RED] if which("pytest") else None
+    return ["pytest", *FAST_RED, *FAST_ONLY] if which("pytest") else None
 
 
 def _event() -> object:

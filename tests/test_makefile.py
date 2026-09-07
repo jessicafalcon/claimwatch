@@ -19,6 +19,8 @@ from pipeline.build import INPUTS
 from pipeline.cli import CONFIRM_STAMP, Refused, confirmed, resolve_choice
 from pipeline.warehouse import TARGETS
 
+pytestmark = pytest.mark.slow  # integration (builds a DuckDB warehouse)
+
 ROOT = Path(__file__).resolve().parent.parent
 SCRUB = (
     "SPEC",

@@ -6,6 +6,8 @@ fold 4, and the mart is deterministic across reruns."""
 
 from __future__ import annotations
 
+import pytest
+
 from classify.eval.gate import ANSWER_KEY, HELDOUT_FOLD, LabelScore, score_heldout
 from classify.labels import review_id
 from classify.rules import classify as rules_classify
@@ -13,6 +15,8 @@ from classify.rules import load_rules
 from pipeline.build import rebuild, write_classifier_quality
 from pipeline.warehouse import connect, database_for
 from tests import pins
+
+pytestmark = pytest.mark.slow  # integration (builds a DuckDB warehouse)
 
 
 def _staged_reviews(conn):
