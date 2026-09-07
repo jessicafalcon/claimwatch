@@ -70,8 +70,8 @@ Delivered paragraph and `make help`, not here.
 - `.claude/` — agents (report-only), skills (the three standards,
   `/challenge`, the four on-request loop steps), the three hooks. Settings
   are local-only and gitignored.
-- `.github/workflows/ci.yml` — lint, check-docs, check-backing, test, then
-  rebuild + idempotency-check on the synthetic reviews and on every frozen
+- `.github/workflows/ci.yml` — lint, check-docs, check-backing, test,
+  check-pins, then rebuild + idempotency-check on the synthetic reviews and on every frozen
   sample. `weekly.yml` — the scheduled scrape; the one workflow that writes
   to the repo, `data/snapshots/` only. `.github/pull_request_template.md`.
 - `pyproject.toml`, `uv.lock`, `.python-version`, `.pre-commit-config.yaml` —
@@ -534,7 +534,9 @@ Gotchas).
   idempotency-check` and the same two with `ROWS=samples` (offline, DuckDB,
   no key, no fetch). Mergeable only
   when CI is green and the surface's agents have run.
-- The developer merges (squash), never Claude. After merge: `git checkout
+- The developer merges with a merge commit (never a squash: `LESSONS.md`
+  cites fix commits by hash, and they must stay reachable from `main`), never
+  Claude. After merge: `git checkout
   main && git pull`.
 - Tooling changes (agents, skills, hooks, this file's rules) on
   `tooling/<slug>` from main: no spec, the gate plus the surface's agents,
@@ -598,7 +600,8 @@ copy the coherence-auditor checks):
 
 The standard `/challenge` hands `senior-architect`: brief §2/§8/§9, the five
 contracts, the BACKING rows the plan names, the predecessor spec's Delivered
-paragraph, `docs/PLAN.md` §2, DECISIONS, BACKLOG. The stamp the main session
+paragraph, `docs/PLAN.md` §2, DECISIONS, BACKLOG, the `open` LESSONS rows. The
+stamp the main session
 writes after the developer's disposition: `Challenged: <YYYY-MM-DD>, round
 <k>, spec <8 hex> — <verdict>`, unbolded, at line start, under the spec's
 status line; the hex is the hook's `--spec-hash` of the spec's Invariants and
@@ -710,8 +713,11 @@ pin guard (`scripts/check_pins.py`, the gate's `pins` line, `make check-pins`)
 and `/preflight`, the fourth on-request loop step; `LESSONS.md` (eight classes
 seeded from the fix commits since Phase 0a, every one promoted to a check or a
 standard sentence) with check-docs check 8 as its keeper. Review round 1
-(five agents, 20 rows, 0 BLOCKER) fixed in full: seven correctness commits
-and this records batch; round 2 scoped to the fixes is next.
+(five agents, 20 rows, 0 BLOCKER) fixed in full: six correctness commits and a
+records batch. Round 2 (four agents, 17 rows, 0 BLOCKER) found the round-1
+read-boundary fix applied at its sites only, so the boundary was re-implemented
+once against its invariant (one reader, one runner in `review_common`, a grep
+test); one scoped re-review is next.
 
 **Merged:** Phases 0a–8b in order, each with its spec under `specs/` (the
 Delivered paragraph) and its DECISIONS appendix. Phase 8b — the guardrail

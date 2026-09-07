@@ -2005,7 +2005,7 @@ mistake from being made twice. Three commits, one per piece.
 
 1. **Tagged comments are pointers at records.** Four tags, a closed set:
    `TODO(BACKLOG): <open row title>`, `HACK(DECISIONS): <entry title>`,
-   `REF: <URL | brief §n | RFC n>`, `INVARIANT(<spec slug> <n>): <why>`. ruff's
+   `REF: <URL | brief §n | RFC n>`, `INVARIANT(<spec stem> <n>): <why>`. ruff's
    `TD` and `FIX` rule sets refuse `FIXME`, `XXX` and a `TODO` without its
    parens or colon (configuration over a script: the tool ships the check);
    check-docs check 7 verifies the cited entry exists — an open BACKLOG row by
@@ -2056,7 +2056,7 @@ mistake from being made twice. Three commits, one per piece.
 Round 1 (2026-09-07; code-reviewer, functionality-tester, security-reviewer,
 study-editor, coherence-auditor scoped to the changed records): 20 rows, 0
 BLOCKER, 5 should-fix; the developer chose to fix all twenty rather than defer
-any to BACKLOG. Seven correctness commits: check-pins reads both sides from git
+any to BACKLOG. Six correctness commits: check-pins reads both sides from git
 (a symlink is its blob; a non-text blob is a refusal), a tag comment is a
 comment token the tag opens, a table cell keeps a pipe inside backticks,
 check-docs reports a non-text file by name, the ruff tag rules are pinned, CI
@@ -2070,3 +2070,28 @@ the coherence-auditor (a name-mention guard rather than a behaviour one) is
 answered as designed: name-mention is the honest ceiling of a mechanical
 check, and `/preflight`'s pinning-test column is where "named" becomes
 "asserted".
+
+Round 2 (2026-09-07; code-reviewer, functionality-tester, security-reviewer,
+coherence-auditor, scoped to the round-1 fixes): 17 rows, 0 BLOCKER, 3
+should-fix. Every correctness row sat in or beside round 1's fix of one
+finding — the read boundary — which had been applied at the sites the finding
+named (checks 7 and 8, `source_at`) and not to the class: the neutrality check
+still read raw, the tokenizer's `IndentationError` is not a `TokenError`,
+`ast.parse` also raises `ValueError` and `RecursionError`, the runner's decode
+branch had no test. That is the `site-fix` lesson recurring inside the fix of a
+`traceback-at-boundary` recurrence, and the first of the two rounds the review
+cap counts, so the boundary was re-implemented once against its invariant
+rather than patched a second time: every file read and every subprocess under
+`scripts/` goes through `review_common.read_text_or_error` / `readable` and
+`run`, the parse boundaries are closed sets, and a layout test pins that no
+other module reads or spawns on its own — the mechanism `site-fix` lacked (a
+prose sentence) is now, for reads, a grep test, and in general a `/selfcheck`
+step that pastes the grep over the class's sibling sites. The rest of the round:
+a failed test listing is a refusal, a `git show` failure carries the runner's
+line, `dags/` joins the pin guard's packages, the symlink test keeps its target
+under `tmp_path`, the records' "seven" is six, one "slug" is "stem", the
+repo-map CI bullet names check-pins, the merge claim says merge commit (the
+LESSONS hash rule depends on it), the challenge standard and `architecture-fit`
+list the open LESSONS rows. Rejected: guarding the suite's own tests against a
+non-UTF-8 tracked file (a test failing with a traceback is a failing test);
+rewriting `docs/PLAN.md` (design history).

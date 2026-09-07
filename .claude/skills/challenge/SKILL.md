@@ -43,7 +43,8 @@ Read and pass along, verbatim where short:
   mention of them.
 - The predecessor spec's Delivered paragraph and the `docs/PLAN.md` §2
   verdict rows that touch the same piece.
-- `DECISIONS.md` "still in force" + Gotchas; `BACKLOG.md` rows whose trigger
+- `DECISIONS.md` "still in force" + Gotchas; `LESSONS.md` rows whose Status
+  is `open`; `BACKLOG.md` rows whose trigger
   the plan could fire.
 - `git log --oneline -15` and `git status --porcelain` (what state the repo
   is in).

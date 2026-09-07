@@ -83,4 +83,5 @@ raise.
 - Threat model: a row per target that takes a variable, deletes, pays or
   fetches; the five cells; a named test per cell.
 - Record updates: every file the phase implies (CLAUDE.md status and
-  commands, SPEC.md, BACKING.md tags, DECISIONS, BACKLOG count, README).
+  commands, SPEC.md, BACKING.md tags, DECISIONS, BACKLOG count, LESSONS rows,
+  README).

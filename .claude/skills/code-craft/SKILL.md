@@ -105,7 +105,9 @@ row, a CLI variable, hook stdin, an env var, a file name under `data/cache/`.
   its header; a new fail-open needs the same.
 - Fix the class, not the case: a denylist, a regex of bad cases or a
   special-case branch is refused; the mechanism's KIND changes (closed set,
-  strict parse, derived value).
+  strict parse, derived value). Before the fix, grep the class — every site
+  that reads, parses or matches the same kind of input — and list the sites
+  in the commit; `/selfcheck` asks for the grep (*LESSONS: site-fix*).
 
 ## Error policy
 
@@ -122,8 +124,10 @@ row, a CLI variable, hook stdin, an env var, a file name under `data/cache/`.
   refused row refuses the batch (*LESSONS: partial-write*).
 - A read is a boundary too: a file that is not UTF-8 text, a path that
   cannot be read, a subprocess whose output does not decode is a one-line
-  refusal naming the path, caught where the read happens (*LESSONS:
-  traceback-at-boundary*, reopened and re-closed 2026-09-07).
+  refusal naming the input. Under `scripts/` every read and every run goes
+  through `review_common` (`read_text_or_error`, `readable`, `run`); a grep
+  test pins it (*LESSONS: traceback-at-boundary*, reopened and re-closed
+  2026-09-07).
 
 ## Data shapes across a boundary
 

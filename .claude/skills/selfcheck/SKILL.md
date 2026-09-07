@@ -15,6 +15,10 @@ file:line):
 - **(a2) Lesson** — if the commit fixes a correctness finding from a review
   round, name the `LESSONS.md` row it appended or extended (CLAUDE.md →
   Workflow rules, "Fix commits"); a fix with no row is a gap to report.
+- **(a3) The class** — for a fix: paste the grep over the class's sibling
+  sites (every place that reads, parses or matches the same kind of input)
+  and confirm each is covered by the commit or named as out of scope; a fix
+  at one site with siblings unlisted is a gap (LESSONS: site-fix).
 - **(b) DONE command** — if the commit implements a spec in `specs/`, run that
   spec's DONE command and paste its real result. The DONE command is the only
   definition of done; "tests pass" alone does not substitute. Exception: if
