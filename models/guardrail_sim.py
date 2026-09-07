@@ -84,10 +84,10 @@ class SimScenario:
 # simulator derives. `both_fixes` runs a one-round loop that ends before the
 # default timer, so its clock never fires and its rows equal `ask_once`'s.
 SIM_SCENARIOS: tuple[SimScenario, ...] = (
-    SimScenario("no_fix", "baseline", False, False),
-    SimScenario("ask_once", "contacts_once", True, False),
-    SimScenario("hold_timer", "churn_halved", False, True),
-    SimScenario("both_fixes", "both", True, True),
+    SimScenario("no_fix", "baseline", contacts_once=False, timer_on=False),
+    SimScenario("ask_once", "contacts_once", contacts_once=True, timer_on=False),
+    SimScenario("hold_timer", "churn_halved", contacts_once=False, timer_on=True),
+    SimScenario("both_fixes", "both", contacts_once=True, timer_on=True),
 )
 
 # The three possible outcomes of a hold — a closed set, never a free string.
@@ -131,6 +131,7 @@ def synthetic_claims(params: Mapping[str, float]) -> tuple[Claim, ...]:
 def hold(
     claim: Claim,
     scenario_params: Mapping[str, int],
+    *,
     timer_on: bool,
     timer_amount: float,
 ) -> tuple[int, str]:
@@ -200,7 +201,9 @@ def simulate(params: Mapping[str, float], scenario: str) -> list[dict[str, objec
     timer_amount = cost_model.evaluate(params, "baseline")["timer_amount_eur"]
     rows: list[dict[str, object]] = []
     for claim in synthetic_claims(params):
-        hold_days, outcome = hold(claim, scenario_params, sim.timer_on, timer_amount)
+        hold_days, outcome = hold(
+            claim, scenario_params, timer_on=sim.timer_on, timer_amount=timer_amount
+        )
         rows.append(
             {
                 "scenario": sim.name,
@@ -270,7 +273,7 @@ def format_simulation(fit: cost_model.Fit) -> str:
     first = claims[0]
     baseline_days = _loop_and_timer_days(params, "baseline")
     timer_amount = cost_model.evaluate(params, "baseline")["timer_amount_eur"]
-    first_hold = hold(first, baseline_days, True, timer_amount)
+    first_hold = hold(first, baseline_days, timer_on=True, timer_amount=timer_amount)
     lines = [
         "guardrail simulator — the rules, the threshold, and the holds each fix gives",
         "",

@@ -98,10 +98,22 @@ def test_hold_rule_every_branch_by_hand():
     large = gs.Claim(rank=1000, quantile=0.9995, amount_eur=5000.0)
     long_loop = {"loop_days": 21, "timer_days": 14}
     short_loop = {"loop_days": 7, "timer_days": 14}
-    assert gs.hold(small, long_loop, False, 42.67) == (21, "loop_released")
-    assert gs.hold(small, short_loop, True, 42.67) == (7, "loop_released")
-    assert gs.hold(small, long_loop, True, 42.67) == (14, "timer_released")
-    assert gs.hold(large, long_loop, True, 42.67) == (21, "timer_escalated")
+    assert gs.hold(small, long_loop, timer_on=False, timer_amount=42.67) == (
+        21,
+        "loop_released",
+    )
+    assert gs.hold(small, short_loop, timer_on=True, timer_amount=42.67) == (
+        7,
+        "loop_released",
+    )
+    assert gs.hold(small, long_loop, timer_on=True, timer_amount=42.67) == (
+        14,
+        "timer_released",
+    )
+    assert gs.hold(large, long_loop, timer_on=True, timer_amount=42.67) == (
+        21,
+        "timer_escalated",
+    )
 
 
 # --- the scenarios are a closed set mapped onto the cost-model scenarios -------
