@@ -531,7 +531,8 @@ read is the tracked fit, through `read_fit`'s declared shape (8a).
   difference shows at the sixth place, the pin stays and the Gotcha records
   it). DuckDB binding of Python `int` into `integer` columns for
   `claim_rank`, `loop_days`, `hold_days`, `timer_days`, and of `bool` for
-  `is_default`, through the existing parameterised insert path. Compute the
+  `is_default`, through the guarded bulk insert of Amendment A1 (`_insert_rows`
+  — one `executemany` per mart under `_no_pandas_probe`). Compute the
   defaults' outputs before any pin is typed; if the timer never fires at the
   defaults under `hold_timer`, or the threshold lands in a tail, STOP and
   report — do not tune a default to make the story hold. (Under `both_fixes`
@@ -601,3 +602,37 @@ became.
   share** — folded: decision 6, Evidence row 6.
 - **#10 the per-claim grain's reason in the header** — folded: decision 5.
 - **#11 integer and boolean column types named** — folded: decision 5.
+
+## Amendment A1 — the sim-mart bulk insert (post-approval, review round 1)
+
+Review round 1 (code-reviewer, security notes) found `write_sim_marts` filling
+the two marts with a mechanism the approved Scope did not name: a shared helper
+`_insert_rows` running one `executemany` per mart under a `_no_pandas_probe`
+context manager (a `None` sentinel in `sys.modules["pandas"]` for the duration
+of the insert). The Scope named only `write_sim_marts`, and 8a's
+`write_model_marts` inserts per row with `conn.execute`, so this was a write-path
+change outside the stated scope — a design change owing an amendment.
+
+Reverting to a per-row loop for consistency was tried and **measured**: it runs
+the test suite in ~17 min against the guarded `executemany`'s ~2.5 min, because
+DuckDB imports `pandas` to type-check every bound value, the import is absent and
+uncached, and each ~4,000-row rebuild re-scans `sys.path` per value — a cost
+every test that rebuilds pays. The developer chose to keep the optimization
+under this amendment rather than accept the regression.
+
+- **Scope.** `pipeline/build.py`'s Beat 4 write path is `write_sim_marts` plus
+  the two module-level helpers it uses, `_no_pandas_probe` and `_insert_rows`.
+  Both are used only by `write_sim_marts`; `table`/`columns` reach `_insert_rows`
+  as caller literals (no foreign input in the SQL), the placeholder count is the
+  columns' arity, and the sentinel is set only around the insert and restored in
+  `finally`.
+- **Invariant it upholds.** Invariant 6 — the two marts' rows are identical on
+  any input, key set or unset, and on a re-run: `executemany` inserts the
+  pre-built rows in scenario / rank and day order, byte-identical to the per-row
+  path (`tests/test_sim_marts.py::test_two_rebuilds_identical_sim_mart_rows`,
+  `::test_no_key…`). No literal number is typed on the path; the guard touches no
+  data. `write_model_marts` (a few hundred rows) keeps its per-row insert — the
+  probe cost is negligible there — so the two writers differ by row scale, on
+  purpose.
+- **Record.** DECISIONS → Phase 8b Gotchas describes the probe, the sentinel and
+  the measured suite times.
