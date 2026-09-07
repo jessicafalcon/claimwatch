@@ -306,6 +306,41 @@ def test_check_comment_tags_reports_each_shape_and_missing_record(tmp_path: Path
     ]
 
 
+def test_check_lessons_reports_cells_class_and_status(tmp_path: Path):
+    """Check 8: six cells, a class from the closed set, a status of the three
+    shapes; the header and separator are skipped by position."""
+    lessons = tmp_path / "LESSONS.md"
+    row = "| `{c}` | w | m | i | p | {s} |\n"
+    lessons.write_text(
+        "| Class | Where | The mistake | The invariant restored | The pin | Status |\n"
+        "|---|---|---|---|---|---|\n"
+        + row.format(c="unpinned", s="open")
+        + row.format(c="name-drift", s="promoted → `/preflight`")
+        + row.format(c="site-fix", s="expired 2026-12-01")
+        + row.format(c="vibes", s="open")
+        + row.format(c="unpinned", s="promoted")
+        + "| `unpinned` | five | cells | only | here |\n"
+    )
+    assert check_docs.table_rows(lessons.read_text())[0][:2] == ["`unpinned`", "w"]
+    assert check_docs.check_lessons(lessons) == [
+        "LESSONS.md row 4: class not in the closed set: `vibes`",
+        "LESSONS.md row 5: status shape: 'promoted'",
+        "LESSONS.md row 6: 5 cells, not 6",
+    ]
+    assert check_docs.check_lessons(tmp_path / "none.md") == [
+        "none.md: record file is missing"
+    ]
+
+
+def test_lesson_classes_match_the_lessons_md_fence():
+    """LESSONS.md spells the closed set inside a fence; the code's tuple must
+    be the same set, or a class is added on one side only."""
+    text = (ROOT / "LESSONS.md").read_text()
+    fence = re.search(r"```\n(.*?)```", text, re.S)
+    assert fence is not None
+    assert set(fence.group(1).split()) == set(check_docs.LESSON_CLASSES)
+
+
 def test_backlog_count_matches_today():
     assert check_docs.check_backlog_count(ROOT / "CLAUDE.md", ROOT / "BACKLOG.md") == []
 

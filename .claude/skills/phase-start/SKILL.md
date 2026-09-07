@@ -29,6 +29,9 @@ Start phase **$ARGUMENTS** (a slug such as `0a-machinery`, `1-schema`).
    populates (the rows the spec's Record updates name, or the rows whose SQL
    file is under the spec's Scope). Work that maps to no row is out of scope
    (PROJECT_BRIEF §8).
+5b. **Lessons in force.** Print the `open` rows of `LESSONS.md` (class and
+   the invariant restored), or one line `no open lessons`; a `promoted` row
+   is already a check or a standard sentence and is not printed.
 6. **Guardrails inherited.** Run `make review-gate` (no SPEC) and print its
    lines — the branch starts green or the previous phase left a problem.
 7. Print one line: `Phase $ARGUMENTS ready — say "build" to start.` Then

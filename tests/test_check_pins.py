@@ -59,6 +59,7 @@ def main():
 def test_symbol_changes_marks_new_and_changed_public_defs_only():
     """Formatting and comments do not count; a private def, `main` and a
     deleted def never appear; a body or docstring change is `changed`."""
+    assert set(check_pins.public_defs(BASE_SRC)) == {"alpha", "Row", "gone"}
     assert check_pins.symbol_changes(BASE_SRC, HEAD_SRC) == {
         "Row": "changed",
         "beta": "new",
@@ -121,6 +122,8 @@ def test_unpinned_applies_the_rule_over_a_real_range(tmp_path: Path):
     _write(tmp_path, "notes/free.py", "def unwatched():\n    return 0\n")
     _git(tmp_path, "add", "-A")
     _git(tmp_path, "commit", "-q", "-m", "head")
+    assert check_pins.source_at(tmp_path, base, "models/m.py").startswith("def alpha")
+    assert check_pins.source_at(tmp_path, base, "tests/test_new.py") is None
     assert check_pins.unpinned(tmp_path, base) == [
         "models/m.py::gamma — new, no test in the diff names it",
         "sql/marts/new_mart.sql — new mart, no test in the diff names new_mart",

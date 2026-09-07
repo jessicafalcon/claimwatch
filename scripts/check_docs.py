@@ -3,7 +3,7 @@
 (CI runs it too). Not a pytest file, so a docs-only edit does not re-trigger
 the suite.
 
-Seven checks. Four document classes:
+Eight checks. Four document classes:
   LIVING  — CLAUDE.md, README.md, SPEC.md, BACKING.md: describe what exists.
   RECORDS — DECISIONS.md, BACKLOG.md: history; may name targets not built.
   PLANS   — PROJECT_BRIEF.md, docs/*.md, specs/*.md: describe what will exist.
@@ -38,6 +38,9 @@ Seven checks. Four document classes:
      `specs/<slug>.md` present. A tag word in any other shape is a FAIL naming
      the shape. FIXME and XXX never pass ruff (TD001, FIX001, FIX003), so they
      are not read here. The four are the closed set (code-craft → Comments).
+  8. lessons — every row of LESSONS.md's table has six cells, a Class from the
+     closed set LESSON_CLASSES (the same set the file's fence spells) and a
+     Status shaped `open`, `promoted → <mechanism>` or `expired <date>`.
 """
 
 from __future__ import annotations
@@ -110,6 +113,19 @@ _TAG_HELP = {
     "REF": "REF: <URL | brief §n | RFC n>",
     "INVARIANT": "INVARIANT(<spec slug> <n>): <why>",
 }
+# Check 8 — the lessons record: a closed class set and a status shape.
+LESSON_CLASSES = (
+    "unpinned",
+    "unshaped-input",
+    "traceback-at-boundary",
+    "suppression",
+    "site-fix",
+    "caller-sourced",
+    "partial-write",
+    "name-drift",
+)
+LESSON_CELLS = 6
+_LESSON_STATUS = re.compile(r"^(?:open|promoted → \S.*|expired \d{4}-\d{2}-\d{2})$")
 _BACKLOG_TITLE = re.compile(r"^\|\s*(~~)?\s*\*\*(.+?)\*\*", re.M)
 _BOLD = re.compile(r"\*\*(.+?)\*\*")
 
@@ -457,6 +473,32 @@ def check_comment_tags(files: list[Path], root: Path) -> list[str]:
     return errors
 
 
+def table_rows(text: str) -> list[list[str]]:
+    """Cells of every table row after the header and separator (skipped by
+    position, as open_backlog_rows does)."""
+    rows = [line for line in text.splitlines() if line.startswith("|")]
+    return [[c.strip() for c in r.strip().strip("|").split("|")] for r in rows[2:]]
+
+
+def check_lessons(path: Path) -> list[str]:
+    if not path.is_file():
+        return [f"{path.name}: record file is missing"]
+    errors: list[str] = []
+    for n, cells in enumerate(table_rows(path.read_text(encoding="utf-8")), 1):
+        if len(cells) != LESSON_CELLS:
+            errors.append(
+                f"{path.name} row {n}: {len(cells)} cells, not {LESSON_CELLS}"
+            )
+            continue
+        if cells[0].strip("`") not in LESSON_CLASSES:
+            errors.append(
+                f"{path.name} row {n}: class not in the closed set: {cells[0]}"
+            )
+        if not _LESSON_STATUS.match(cells[5]):
+            errors.append(f"{path.name} row {n}: status shape: {cells[5]!r}")
+    return errors
+
+
 def _naming_errors(root: Path) -> list[str]:
     digests, errors = neutrality_hashes(root / NEUTRALITY_HASHES)
     files = neutrality_files(root, tracked_paths(root))
@@ -478,6 +520,7 @@ def main(root: Path = ROOT) -> int:
             "comment tags",
             check_comment_tags(comment_files(root, tracked_paths(root)), root),
         ),
+        ("lessons", check_lessons(root / "LESSONS.md")),
     ]
     failed = 0
     for name, errors in checks:

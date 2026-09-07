@@ -15,6 +15,11 @@ Standing instructions while writing code here. CLAUDE.md's rules come first
 under them. Where a bar below conflicts with a spec's pinned decision, the
 spec wins and the conflict is reported.
 
+`LESSONS.md` is the record of what reached a review round before. Its `open`
+rows are questions to ask of every symbol while it is written; a `promoted`
+row names the sentence below, the ruff rule or the guard that now carries it
+(a sentence marked *LESSONS: <class>* is one of those).
+
 ## Before writing: the ladder
 
 Code that is not written cannot break. Understand the change first (read
@@ -63,6 +68,9 @@ the code, at most three lines — what was skipped and when to add it.
 - The only abbreviations are the study's own (`B2.4`, `raw_`, `stg_`) and
   the source's own column names (`PRS_REM_MNT`, kept verbatim so a reader
   can find them in the source).
+- One concept, one name — in the code, the mart header, SPEC.md, BACKING.md
+  and the spec; where they differ, the mart's name is canonical and the
+  others follow (*LESSONS: name-drift*).
 
 ## Function shape
 
@@ -77,6 +85,10 @@ the code, at most three lines — what was skipped and when to add it.
   label, not an absence.
 - Inputs are not mutated. Declarations and rows are frozen dataclasses
   (`ingest/sources.py`, `ingest/parsed.py` set the pattern).
+- A value the data determines (a page's platform, an input's database file,
+  a fit's claim draw) is derived where it is used — never a parameter a
+  caller may pass differently, never a module default (*LESSONS:
+  caller-sourced*).
 
 ## Guards at inputs the repo does not own
 
@@ -106,6 +118,8 @@ row, a CLI variable, hook stdin, an env var, a file name under `data/cache/`.
   (`pipeline/cli.py`, the scripts).
 - The paid path raises one typed error with one line (`ModelError`), never
   a traceback.
+- A load writes its batch or nothing: one transaction per load, and a
+  refused row refuses the batch (*LESSONS: partial-write*).
 
 ## Data shapes across a boundary
 

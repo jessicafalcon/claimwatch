@@ -1996,3 +1996,58 @@ default threshold (€42.67) lands inside the body of the distribution (median c
 €49.76) rather than a tail, and each fix shortens the mean hold — the story holds
 without tuning a default.
 
+### Tooling — the implementation loop (2026-09-07, branch `tooling/implementation-loop`)
+
+Not a phase (no spec, no BACKING row). After the Phase 8b merge the developer
+asked three things of the build step: comments that say their intent, fewer
+findings left for the reviewers to catch, and a loop that keeps a fixed
+mistake from being made twice. Three commits, one per piece.
+
+1. **Tagged comments are pointers at records.** Four tags, a closed set:
+   `TODO(BACKLOG): <open row title>`, `HACK(DECISIONS): <entry title>`,
+   `REF: <URL | brief §n | RFC n>`, `INVARIANT(<spec slug> <n>): <why>`. ruff's
+   `TD` and `FIX` rule sets refuse `FIXME`, `XXX` and a `TODO` without its
+   parens or colon (configuration over a script: the tool ships the check);
+   check-docs check 7 verifies the cited entry exists — an open BACKLOG row by
+   title (rows are cited by title, never by number: BACKLOG.md's own rule), a
+   DECISIONS bold title or heading, a spec file. Rejected: `TODO(BACKLOG-12)`
+   by row number (rows shift, and the file forbids it); a `CONCEPT` tag (the
+   Teaching rule lives in the README and docstrings, and an untagged comment
+   already says why); a `FIXME` allowed with a link (unfinished code does not
+   merge — the spec is the contract). Gotcha: TD003's issue-code regex
+   (`[A-Z]+-?\d+`) does not read the parens slot, probed live on ruff 0.16.3,
+   so TD003 is off and the record side lives in check-docs; FIX002 and FIX004
+   are off for the same reason (TODO and HACK are allowed once they cite).
+2. **The pin guard turns the most frequent finding class into a red line.**
+   `scripts/check_pins.py`: a public top-level function or class added or
+   changed in `<base>...HEAD` under a code package is named in a test — a new
+   one, in a test file the same range changed; a new mart file is named in a
+   changed test. "Changed" is an `ast.dump` difference (formatting and
+   comments do not count). It is the gate's `pins` line (8/8 with a spec, 6/6
+   without) and `make check-pins [BASE=main]`. Rejected: a coverage tool (a
+   new dependency, and line coverage is not the "one test fails when the rule
+   moves" property); a suite test that runs it on the checkout (its verdict
+   depends on the branch, so `make test` would go red mid-work and the
+   `run-tests` hook would block the very edit that adds the test); the
+   working-tree diff (the gate reviews commits). Name-mention is the honest
+   ceiling of a mechanical check; the behaviour column of `/preflight` is
+   where "named" becomes "asserted". The guard flagged its own branch first
+   (four helpers in check_docs with no test naming them), which is the point.
+3. **`LESSONS.md` is the learning loop, with a promotion rule so it stays
+   read.** One row per correctness finding class a review round reported; the
+   fix commit writes it (CLAUDE.md → Fix commits); `/phase-start` prints the
+   `open` rows, `/preflight` asks each of every changed symbol, `code-craft`
+   points at it. A class hit twice becomes a mechanism and the row says which;
+   a promoted class that recurs reopens the row and reworks the mechanism.
+   Check-docs check 8 keeps the class set closed and the status shaped.
+   Seeded from the fix commits since Phase 0a: eight classes, all promoted at
+   seed time — five were already carried by a standard sentence or a check
+   (the guards and error-policy sections, RUF100, the fix-the-class rule),
+   `unpinned` by piece 2, and three got their sentence on this branch
+   (`caller-sourced` → Function shape, `partial-write` → Error policy,
+   `name-drift` → Naming plus a `/preflight` column). Rejected: the session's
+   auto-memory as the record (per machine, untracked, invisible to the
+   reviewers); a free-text log with no class set (the class is what makes two
+   hits countable); a lessons section inside DECISIONS (a record of choices,
+   not of misses). Also closed here: the BACKLOG row on `architecture-fit`'s
+   shape sentence, which now names `RULES` beside `FORMULAS`.

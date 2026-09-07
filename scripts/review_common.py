@@ -22,7 +22,7 @@ _TARGET_LINE = re.compile(r"^([a-z][a-z0-9-]*):(?!:?=)", re.M)
 MAKE_TICK = re.compile(r"`make ([a-z][a-z0-9-]*)[^`]*`")
 # Document classes (check_docs.py explains them); the gate's record files build on them.
 LIVING_DOCS = ("CLAUDE.md", "README.md", "SPEC.md", "BACKING.md")
-RECORD_DOCS = ("DECISIONS.md", "BACKLOG.md")
+RECORD_DOCS = ("DECISIONS.md", "BACKLOG.md", "LESSONS.md")
 
 
 class Refused(Exception):

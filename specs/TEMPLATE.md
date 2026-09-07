@@ -98,6 +98,7 @@ the list is a WARN. A row that applies to no file is written WITHOUT backticks
 
 - [ ] `DECISIONS.md` — Phase N entry; supersede pointers on reversed entries
 - [ ] `BACKLOG.md` — rows closed (struck + "DONE Phase N") and rows opened
+- [ ] `LESSONS.md` — a row per correctness finding class a review round reported (class, invariant, pin, status)
 - [ ] `CLAUDE.md` — Current status; Commands; Repo map; allowlist; BACKLOG count
 - [ ] `BACKING.md` — rows this phase populates (tag changes Pending → Measured/Modeled)
 - [ ] `SPEC.md` — only if a chart or beat changed (a design change: STOP first)

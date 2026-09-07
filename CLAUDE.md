@@ -57,7 +57,8 @@ Delivered paragraph and `make help`, not here.
 - `PROJECT_BRIEF.md` (the master document), `SPEC.md` (the five parts —
   *beats* in the row ids `B<beat>.<n>` — and every chart with its tag and
   BACKING row), `BACKING.md` (the evidence contract, enforced by `make
-  check-backing`), `DECISIONS.md` and `BACKLOG.md` (the records),
+  check-backing`), `DECISIONS.md`, `BACKLOG.md` and `LESSONS.md` (the
+  records; the last is what reached a review round and what carries it now),
   `docs/PLAN.md` (how this workflow was designed).
 - `specs/` — one spec per phase from `specs/TEMPLATE.md`, ONE DONE command
   each; the "Delivered" paragraph is appended at exit.
@@ -350,7 +351,8 @@ one, and write one sentence in the README about why.
 - `fixtures/` is read-only after Phase 1. Re-freezing is a deliberate change
   with a DECISIONS entry and a `Freeze:` line in the spec.
 - At each phase exit: run the coherence audit, review BACKLOG.md for due
-  rows, append the "Delivered" paragraph to the spec.
+  rows and LESSONS.md for `open` rows two phases old, append the "Delivered"
+  paragraph to the spec.
 - Stack surprises: check official docs before working around; log under
   DECISIONS.md → Gotchas.
 - Do not add a feature that surfaces in none of the five parts.
@@ -368,7 +370,10 @@ one, and write one sentence in the README about why.
   denylist, regex or `.get(…, default)` is refused; the mechanism's KIND
   changes (a closed set, a strict parse).
 - Fix commits: one correctness finding per commit, the invariant it restores
-  in the message; wording and record fixes batched in their own commit.
+  in the message; wording and record fixes batched in their own commit. A
+  correctness fix appends or extends its class's row in `LESSONS.md`; a
+  class hit twice becomes a mechanism (a ruff rule, a test, a guard, a
+  sentence in a standard) and the row's Status names it.
 - Review cap: if two consecutive review rounds report correctness findings
   only in the previous round's fixes, stop patching. Write the invariant,
   re-implement against it ONCE, one scoped re-review. A human applies this by
@@ -694,27 +699,24 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 ## Current status
 
-**Active: `phase-8b-guardrail-sim`** (spec APPROVED 2026-09-06, challenged round
-1, stamp `7501f9a3`). The simulator half of the Phase 8 split (Beat 4): the
-synthetic-claim quantile draw, the hold rule and the share-under count as data in
-`models/guardrail_sim.py::RULES`; the hold timer's three formulas
-(`loop_days`, `friction_per_day`, `timer_amount_eur`) and two knobs
-(`days_per_round`, `timer_days`) added to `models/cost_model.py`; two DDL-only
-Python-fed marts (`guardrail_sim`, `sla_threshold`) filled inside `rebuild()`
-after the model marts; the `make simulate` target; and B4.1–B4.3 flipped Pending
-→ Modeled. The DONE command (`make simulate && make idempotency-check
-ROWS=synthetic && make check-backing && make test`) passes. Review round not yet
+**Active: `tooling/implementation-loop`** (no spec; a tooling branch from
+main after the Phase 8b merge). Three pieces, one commit each: tagged comments
+as pointers at records (four tags, ruff `TD`/`FIX`, check-docs check 7); the
+pin guard (`scripts/check_pins.py`, the gate's `pins` line, `make check-pins`)
+and `/preflight`, the fourth on-request loop step; `LESSONS.md` (eight classes
+seeded from the fix commits since Phase 0a, every one promoted to a check or a
+standard sentence) with check-docs check 8 as its keeper. Review round not yet
 run.
 
-**Merged:** Phases 0a–8a in order, each with its spec under `specs/` (the
-Delivered paragraph) and its DECISIONS appendix. Phase 8a — the cost model
-(B3.1–B3.4, PR #17, 2026-09-06) — landed `models/cost_model.py::FORMULAS`, the
-strict fit reader `opendata/fit.py::read_fit`, the three cost-model marts, and
-the `make model` target that Phase 8b builds on.
+**Merged:** Phases 0a–8b in order, each with its spec under `specs/` (the
+Delivered paragraph) and its DECISIONS appendix. Phase 8b — the guardrail
+simulator (B4.1–B4.3, PR #19, 2026-09-07) — landed
+`models/guardrail_sim.py::RULES`, the hold timer's three formulas in
+`models/cost_model.py`, the two simulator marts and `make simulate`.
 
 **Next:** Phase 9 — the study: Metabase dashboard + the static HTML export +
 the README (the first render of every beat).
 
-Open BACKLOG rows: **40**.
+Open BACKLOG rows: **39**.
 
 (Update this section at the end of every working day.)

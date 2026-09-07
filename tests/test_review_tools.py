@@ -309,6 +309,22 @@ def test_gate_prints_one_line_per_check_and_the_total(monkeypatch, tmp_path: Pat
     ]
 
 
+def test_range_checks_report_a_failed_diff_as_one_fail_and_no_paths(monkeypatch):
+    """The two range checks (fixtures, pins) share one diff: when git cannot
+    produce it, one FAIL line names the command and the record check gets no
+    paths — never a green fixtures line over an unknown range."""
+    monkeypatch.setattr(review_gate, "run", lambda cmd, cwd: (128, "fatal: bad"))
+    results, diff = review_gate.range_checks(None, "nowhere")
+    assert diff == set()
+    assert results == [
+        ("fixtures", False, "git diff nowhere...HEAD failed: fatal: bad")
+    ]
+    monkeypatch.setattr(review_gate, "run", lambda cmd, cwd: (0, ""))
+    monkeypatch.setattr(review_gate, "unpinned", lambda root, base: ["x::y — new"])
+    results, diff = review_gate.range_checks(None, "main")
+    assert results == [("fixtures", True, ""), ("pins", False, "x::y — new")]
+
+
 def test_collected_tests_finds_the_suite():
     """The Evidence check reads real node ids (a bare count would make every
     Evidence row FAIL — pyproject's addopts="-q" plus -q did exactly that)."""

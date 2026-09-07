@@ -67,8 +67,9 @@ raise.
 - A Python-fed mart has a DDL-only `.sql` (the shape) and one writer in
   `pipeline/build.py`, excluded from the generic marts loop, run by the step
   that owns it.
-- A source is one declaration in `ingest/sources.py`; a formula is one entry
-  in `models/cost_model.py::FORMULAS`; a label is one of seven; a dialect
+- A source is one declaration in `ingest/sources.py`; a formula or a
+  simulator rule is one entry in `models/cost_model.py::FORMULAS` or
+  `models/guardrail_sim.py::RULES`; a label is one of seven; a dialect
   difference lives in `pipeline/warehouse.py`.
 - A phase is one branch, one spec (≤ ~6 Done-when items, the four REQUIRED
   sections), one DONE command, one PR; the spec is the first commit; a
