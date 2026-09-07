@@ -52,6 +52,18 @@ def test_amounts_non_decreasing_and_scenario_invariant():
         assert len(set(at_rank.values())) == 1, rank
 
 
+def test_synthetic_claims_keyed_on_mu_and_sigma():
+    """The memoized draw is keyed on (mu, sigma): two fits differing only in sigma
+    give different claims — a slider on the fit moves them (spec Pinned decision 1).
+    A cache key that dropped sigma would hand the second fit the first fit's stale
+    draw and this fails."""
+    base = dict(cost_model.defaults(FIT))
+    wider = {**base, "sigma": base["sigma"] + 0.5}
+    a = [c.amount_eur for c in gs.synthetic_claims(base)]
+    b = [c.amount_eur for c in gs.synthetic_claims(wider)]
+    assert a != b
+
+
 # --- the threshold is three formulas over two guesses, linear then flat -------
 
 
