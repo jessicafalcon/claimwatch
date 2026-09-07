@@ -154,3 +154,15 @@ def test_make_simulate_is_byte_identical_on_rerun(capsys):
     assert main(["simulate"]) == 0
     second = capsys.readouterr().out
     assert first == second and first.strip()
+
+
+def test_make_simulate_pairs_each_rule_with_its_value(capsys):
+    """The printer names each rule (RULES[i].name) and prints the value computed
+    through that rule's own RULES[i].fn beside it, with the hold labelled — a
+    regression in the rule/value pairing fails here, not only a rerun difference.
+    At the defaults the first synthetic claim (the smallest amount, under the
+    threshold) is released at the timer, so its hold is the default timer day."""
+    assert main(["simulate"]) == 0
+    out = capsys.readouterr().out
+    assert "synthetic_amount =" in out
+    assert f"-> {pins.TIMER_DEFAULT_DAY} days, timer_released" in out
