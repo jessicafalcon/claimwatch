@@ -4,6 +4,7 @@ CLI refusals by spawning the script. Offline, no services."""
 
 from __future__ import annotations
 
+import ast
 import os
 import re
 import subprocess
@@ -97,21 +98,76 @@ def test_read_boundary_reports_by_name_and_skips_in_a_loop(tmp_path: Path):
     assert (seen, errors) == (["good.md"], ["latin.md: not UTF-8 text"])
 
 
+# The modules a script under scripts/ may import: stdlib that neither spawns a
+# process nor is a process module (no subprocess, os, pty, asyncio, shutil,
+# multiprocessing), plus the two sibling modules. A closed set, not a list of
+# spawner names: a module outside it is a finding whatever it is called.
+SCRIPT_IMPORTS = frozenset(
+    {
+        "__future__",
+        "argparse",
+        "ast",
+        "collections",
+        "dataclasses",
+        "functools",
+        "hashlib",
+        "io",
+        "pathlib",
+        "re",
+        "sys",
+        "tokenize",
+        "unicodedata",
+        "check_pins",
+        "review_common",
+    }
+)
+# The reader calls an allowed module still offers: pathlib's, io's, tokenize's
+# and the builtin `open` (`\bopen\(` matches `Path.open(`, `io.open(`,
+# `tokenize.open(` and the bare call alike).
+_RAW_READ = re.compile(r"\.read_text\(|\.read_bytes\(|\bopen\(")
+
+
+def _imported_roots(source: str) -> set[str]:
+    roots: set[str] = set()
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Import):
+            roots.update(alias.name.split(".")[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            roots.add(node.module.split(".")[0])
+    return roots
+
+
 def test_every_script_reads_and_runs_through_the_shared_boundary():
     """The class fix for traceback-at-boundary, pinned as a layout rule: no
     module under scripts/ reads a file or spawns a process on its own; the
-    one reader and the one runner live in review_common.py."""
-    own = re.compile(r"\.read_text\(|\.read_bytes\(|\bopen\(|\bsubprocess\b")
-    offenders = [
-        f"{p.name}:{n}"
-        for p in sorted(ROOT.glob("scripts/*.py"))
-        if p.name != "review_common.py"
-        for n, line in enumerate(p.read_text().splitlines(), 1)
-        if own.search(line)
-    ]
+    one reader and the one runner live in review_common.py. Spawning is
+    closed off by the import allowlist (no process module can be named), a
+    raw read by the call regex over the modules that remain."""
+    offenders: list[str] = []
+    for p in sorted(ROOT.glob("scripts/*.py")):
+        if p.name == "review_common.py":
+            continue
+        source = p.read_text()
+        offenders += [
+            f"{p.name}: imports {m}"
+            for m in sorted(_imported_roots(source) - SCRIPT_IMPORTS)
+        ]
+        offenders += [
+            f"{p.name}:{n}"
+            for n, line in enumerate(source.splitlines(), 1)
+            if _RAW_READ.search(line)
+        ]
     assert offenders == [], offenders
     common = (ROOT / "scripts" / "review_common.py").read_text()
     assert common.count(".read_text(") == 1 and common.count("subprocess.run(") == 1
+    assert _imported_roots(common) - SCRIPT_IMPORTS == {"subprocess"}
+    # the guard's own edges: a spawner by any name, a reader on an allowed module
+    assert _imported_roots("import os.path\nfrom pty import spawn\n") == {"os", "pty"}
+    assert all(
+        _RAW_READ.search(s)
+        for s in ("io.open(p)", "tokenize.open(p)", "p.open()", "open(p)")
+    )
+    assert not _RAW_READ.search("os.popen(c)")  # a spawn, refused by the allowlist
 
 
 def test_section_matches_heading_prefix():
