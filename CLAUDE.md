@@ -62,12 +62,12 @@ Delivered paragraph and `make help`, not here.
 - `specs/` — one spec per phase from `specs/TEMPLATE.md`, ONE DONE command
   each; the "Delivered" paragraph is appended at exit.
 - `scripts/` — the offline guards, none a pytest file: `review_gate.py`,
-  `check_docs.py`, `check_backing.py`, `review_common.py`;
+  `check_pins.py`, `check_docs.py`, `check_backing.py`, `review_common.py`;
   `neutrality_hashes.txt` (the hashed tokens the naming check reads).
 - `tests/` — pytest; no services, no network, no key. `tests/pins.py` holds
   every pinned number.
 - `.claude/` — agents (report-only), skills (the three standards,
-  `/challenge`, the three on-request loop steps), the three hooks. Settings
+  `/challenge`, the four on-request loop steps), the three hooks. Settings
   are local-only and gitignored.
 - `.github/workflows/ci.yml` — lint, check-docs, check-backing, test, then
   rebuild + idempotency-check on the synthetic reviews and on every frozen
@@ -137,9 +137,13 @@ its targets there and here in the same PR. What `make help` cannot say:
   carries a one-line `# noqa: <rule> -- <reason>`), `check-docs` (links,
   named targets, banned words, glossary size, BACKLOG count, naming the
   target against `scripts/neutrality_hashes.txt`, comment tags pointing at
-  a record entry that exists), `check-backing`,
-  `review-gate [SPEC=specs/<f>.md] [BASE=main]` (test + ruff read-only +
-  both checks + fixtures; with SPEC, Evidence ids and Record-updates files;
+  a record entry that exists), `check-backing`, `check-pins [BASE=main]`
+  (every public function or class added or changed since BASE under a code
+  package is named in a test — a new one, in a test file the range changed;
+  a new mart file, in a changed test; one line per miss; the gate's `pins`
+  line), `review-gate [SPEC=specs/<f>.md] [BASE=main]` (test + ruff
+  read-only + both checks + fixtures + pins; with SPEC, Evidence ids and
+  Record-updates files;
   one line per check, exit 1 on FAIL, 2 on a refused SPEC/BASE;
   `/review-round` runs it first), `idempotency-check [ROWS=synthetic]`
   (rebuild twice, diff per-table row counts), `record-snapshots` (captures on
@@ -381,7 +385,8 @@ one, and write one sentence in the README about why.
    fetch: show behavior for an empty value, `../x`, a value containing `"; `,
    the variable set from the environment, and no credentials.
 4. For every new write path, rule or formula: can it give a different answer
-   on re-run, with the key unset, with equal sort keys? Name the pinning test.
+   on re-run, with the key unset, with equal sort keys? Name the pinning test
+   (`make check-pins` lists the public symbols no test names yet).
 5. For every new number a reader sees: its tag and its BACKING row.
 6. List every record file touched and every one the change implies you should
    have touched.
@@ -562,6 +567,7 @@ file is being written; **on request** — the developer types the command;
 | 3. Disposition | the developer, per finding: amend / accept / reject; then the main session stamps the spec | the developer, offline | the report |
 | 4. Approve → `/phase-start <slug>` | restates the contract, warns if the spec is unstamped, runs the gate, STOPs for "build" | on request | the spec |
 | 5. Build | `code-craft`, `secure-by-construction`, `architecture-fit` (paths below); `run-tests` hook after every `.py`, `.sql`, `.yaml`, `.yml` edit (blocks on red) | auto, by path; hook | the same text the reviewers are preloaded with |
+| 5b. Preflight → `/preflight` | `make check-pins`, then one row per changed public symbol: its pinning test, each foreign input's declared shape, the other names the diff or the docs give the same concept, the LESSONS class it could repeat; the records the diff implies | on request, before round 1 | `main...HEAD`, `LESSONS.md`'s open rows |
 | 6. Review → `/review-round N` | gate; then by surface (table above): code-reviewer (preloads `code-craft`) → functionality-tester; + security-reviewer (preloads `secure-by-construction`); + study-editor; coherence-auditor at the exit | on request; every agent of the round in one turn; one table; STOP-on-findings | `main...HEAD`, the spec's Invariants, round N−1's table |
 | 7. Fix → commit → `/selfcheck` → "push" → PR | fixes one per commit; records batched; the developer merges | on request | the table |
 
@@ -600,8 +606,8 @@ Rules that hold across the loop:
   while the spec is edited, `/phase-start` and `/review-round` when a round
   begins — and none of them blocks; the developer decides.
 - The three standards are `user-invocable: false`: standing instructions
-  while a matching file is being written, not commands. The three loop steps
-  (`/phase-start`, `/review-round`, `/selfcheck`) are
+  while a matching file is being written, not commands. The four loop steps
+  (`/phase-start`, `/preflight`, `/review-round`, `/selfcheck`) are
   `disable-model-invocation: true`: the developer's to start, never the
   model's, and absent from its listing.
 
@@ -670,6 +676,9 @@ fixed in the main session or explicitly accepted — never auto-fixed.
   BACKING claims, `study/`, this file.
 - `/review-round N` — gate → invariants → agents by surface → one table →
   "Cap is the architect's call".
+- `/preflight` — before round 1: `make check-pins`, then the per-symbol table
+  (pinning test, foreign-input shapes, other names for one concept, the
+  LESSONS class risked) and the records the diff implies; prints, then stops.
 - `/selfcheck` — verifies the last commit, then stops.
 - `/phase-start <slug>` — main, pull, branch, restate the spec, print the
   BACKING rows in scope, warn if unchallenged, run the gate, stop.

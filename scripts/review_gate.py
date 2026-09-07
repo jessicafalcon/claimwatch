@@ -15,6 +15,10 @@ FAIL, 2 on a refused SPEC/BASE, never a traceback. Run via
                  its MANIFEST.sha256 in the diff; `Freeze: fixtures/<path>`
                  covers that one file. With no --spec any fixture change is a
                  FAIL (read-only after the phase that froze them)
+  e2. pins     — `scripts/check_pins.py` over the same range: every public
+                 def added or changed under a code package is named in a
+                 test (a new one, in a test file the range changed); a new
+                 mart file is named in a changed test (one line per miss)
   f. evidence  — (--spec) the four REQUIRED sections exist; every
                  `tests/….py::test_x` id the spec names — in Evidence,
                  Invariants or Threat model — is collected, and every
@@ -34,6 +38,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from check_pins import unpinned
 from review_common import (
     LIVING_DOCS,
     MAKE_TICK,
@@ -41,14 +46,15 @@ from review_common import (
     ROOT,
     Refused,
     die,
+    diff_paths,
     make_targets,
+    resolve_base,
     resolve_spec,
     run,
     section,
     tail,
 )
 
-_BASE = re.compile(r"^[\w./-]+$")
 _TEST_ID = re.compile(r"`(tests/[\w/]+\.py)?(::test_\w+)`")
 _RECORD_LINE = re.compile(r"^- \[[ x]\] (.*)$", re.M)
 _TICKED = re.compile(r"`([^`\s]+)`")
@@ -62,14 +68,6 @@ def is_record_path(token: str) -> bool:
     """A backticked token on a checklist line is a record PATH only if it is a
     record file or lives under specs/ or docs/ — `uv` in prose is not one."""
     return token in RECORD_FILES or token.startswith(("specs/", "docs/"))
-
-
-def resolve_base(arg: str) -> str:
-    """`--base` is a git rev used as an argv token: a safe charset and never a
-    leading `-` (git would read it as an option). Refused, never a traceback."""
-    if not arg or not _BASE.match(arg) or arg.startswith("-"):
-        raise Refused(f"refusing: BASE must be a plain git rev, got {arg!r}")
-    return arg
 
 
 def parse_test_ids(body: str) -> tuple[list[str], list[str]]:
@@ -193,12 +191,6 @@ def check_fixtures(spec_text: str | None, diff: set[str]) -> list[str]:
     return errors
 
 
-def diff_paths(out: str) -> set[str]:
-    """Paths from `git diff -z --name-only`: NUL-separated, read whole — a
-    space, a quote or a non-ASCII letter never splits or hides a path."""
-    return {p for p in out.split("\0") if p}
-
-
 def collected_tests(root: Path) -> tuple[int, set[str], str]:
     """(exit code, collected ids, output). A non-zero code means the suite did
     not collect — the caller FAILs evidence explicitly, never via an empty set."""
@@ -213,6 +205,26 @@ def collected_tests(root: Path) -> tuple[int, set[str], str]:
             file, _, rest = line.partition("::")
             ids.add(f"{file}::{rest.split('[')[0].split('::')[-1]}")
     return code, ids, out
+
+
+def range_checks(
+    spec_text: str | None, base: str
+) -> tuple[list[tuple[str, bool, str]], set[str]]:
+    """The two checks over `<base>...HEAD` (fixtures, pins) and the diff's
+    paths for the record check; a failed diff is one FAIL line and no paths."""
+    code, out = run(["git", "diff", "-z", "--name-only", f"{base}...HEAD"], ROOT)
+    if code != 0:
+        fail = f"git diff {base}...HEAD failed: {tail(out, 3)}"
+        return [("fixtures", False, fail)], set()
+    diff = diff_paths(out)
+    errs = check_fixtures(spec_text, diff)
+    results = [("fixtures", not errs, "\n".join(errs))]
+    try:
+        errs = unpinned(ROOT, base)
+    except Refused as exc:
+        errs = [str(exc)]
+    results.append(("pins", not errs, "\n".join(errs)))
+    return results, diff
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -242,15 +254,8 @@ def main(argv: list[str] | None = None) -> int:
     code, out = run(["make", "check-backing"], ROOT)
     results.append(("backing", code == 0, tail(out)))
 
-    code, out = run(["git", "diff", "-z", "--name-only", f"{base}...HEAD"], ROOT)
-    diff = diff_paths(out) if code == 0 else set()
-    if code != 0:
-        results.append(
-            ("fixtures", False, f"git diff {base}...HEAD failed: {tail(out, 3)}")
-        )
-    else:
-        errs = check_fixtures(spec_text, diff)
-        results.append(("fixtures", not errs, "\n".join(errs)))
+    range_results, diff = range_checks(spec_text, base)
+    results.extend(range_results)
 
     if spec_text is not None:
         code, ids, out = collected_tests(ROOT)

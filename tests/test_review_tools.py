@@ -261,7 +261,7 @@ def test_cli_refusals_are_one_line_exit_2(argv: list[str]):
 
 def test_gate_prints_one_line_per_check_and_the_total(monkeypatch, tmp_path: Path):
     """Evidence row 1: the printed shape — `ok   <check>` per check and
-    `review-gate OK: 7/7 checks` with a SPEC, `5/5` without — pinned with every
+    `review-gate OK: 8/8 checks` with a SPEC, `6/6` without — pinned with every
     subprocess stubbed green (the real gate runs `make test`, which is this suite)."""
     spec = tmp_path / "specs" / "s.md"
     spec.parent.mkdir()
@@ -269,6 +269,7 @@ def test_gate_prints_one_line_per_check_and_the_total(monkeypatch, tmp_path: Pat
     monkeypatch.setattr(review_gate, "ROOT", tmp_path)
     monkeypatch.setattr(review_gate, "run", lambda cmd, cwd: (0, ""))
     monkeypatch.setattr(review_gate, "make_targets", lambda root: set())
+    monkeypatch.setattr(review_gate, "unpinned", lambda root, base: [])
     monkeypatch.setattr(
         review_gate,
         "collected_tests",
@@ -288,9 +289,10 @@ def test_gate_prints_one_line_per_check_and_the_total(monkeypatch, tmp_path: Pat
         "ok   docs",
         "ok   backing",
         "ok   fixtures",
+        "ok   pins",
         "ok   evidence",
         "ok   records",
-        "review-gate OK: 7/7 checks",
+        "review-gate OK: 8/8 checks",
     ]
     buf = io.StringIO()
     with redirect_stdout(buf):
@@ -302,7 +304,8 @@ def test_gate_prints_one_line_per_check_and_the_total(monkeypatch, tmp_path: Pat
         "ok   docs",
         "ok   backing",
         "ok   fixtures",
-        "review-gate OK: 5/5 checks",
+        "ok   pins",
+        "review-gate OK: 6/6 checks",
     ]
 
 

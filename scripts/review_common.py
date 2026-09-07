@@ -1,6 +1,7 @@
-"""Shared by scripts/review_gate.py, check_docs.py and check_backing.py (not a
-pytest file). One spec-path validator, one section parser, one subprocess
-runner, one Makefile-target reader. Stdlib only."""
+"""Shared by scripts/review_gate.py, check_pins.py, check_docs.py and
+check_backing.py (not a pytest file). One spec-path validator, one base-rev
+validator, one diff-path reader, one section parser, one subprocess runner,
+one Makefile-target reader. Stdlib only."""
 
 from __future__ import annotations
 
@@ -10,6 +11,9 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+
+# A git rev used as an argv token: a safe charset and never a leading `-`.
+_BASE = re.compile(r"^[\w./-]+$")
 
 # A target is DECLARED by a rule line `name:` at column 0 (not `.PHONY`).
 # `x:= v` and `x::= v` are assignments, not targets; `x::` (a double-colon rule) is one.
@@ -45,6 +49,20 @@ def resolve_spec(arg: str, root: Path = ROOT) -> Path:
     if not target.is_file():
         raise Refused(f"refusing: SPEC is not an existing file: {arg!r}")
     return target
+
+
+def resolve_base(arg: str) -> str:
+    """`--base` is a git rev used as an argv token: a safe charset and never a
+    leading `-` (git would read it as an option). Refused, never a traceback."""
+    if not arg or not _BASE.match(arg) or arg.startswith("-"):
+        raise Refused(f"refusing: BASE must be a plain git rev, got {arg!r}")
+    return arg
+
+
+def diff_paths(out: str) -> set[str]:
+    """Paths from `git diff -z --name-only`: NUL-separated, read whole — a
+    space, a quote or a non-ASCII letter never splits or hides a path."""
+    return {p for p in out.split("\0") if p}
 
 
 def section(text: str, heading: str) -> str:

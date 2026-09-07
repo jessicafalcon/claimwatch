@@ -27,7 +27,7 @@ AGENTS = (
 )
 # The developer types these; `disable-model-invocation` keeps them out of the
 # model's hands and its listing (one flag, not a trailing sentence).
-ON_REQUEST = ("review-round", "selfcheck", "phase-start")
+ON_REQUEST = ("review-round", "selfcheck", "phase-start", "preflight")
 SKILLS = (
     *ON_REQUEST,
     "challenge",

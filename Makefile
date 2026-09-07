@@ -3,7 +3,7 @@
 # rebuild, idempotency-check, reset (Phase 1); scrape (Phase 2); label-sample,
 # classify-eval (5); model, simulate (8); study (9).
 
-.PHONY: help setup test lint check-docs check-backing review-gate \
+.PHONY: help setup test lint check-docs check-backing check-pins review-gate \
         rebuild idempotency-check confirm reset scrape record-snapshots \
         label-sample classify-eval fetch-damir sample-damir fit-damir model \
         simulate
@@ -58,6 +58,9 @@ check-docs: ## links, named make targets, banned words, glossary size, BACKLOG c
 
 check-backing: ## BACKING rows ↔ sql/marts files ↔ tags ↔ sources ↔ SPEC citations
 	uv run python scripts/check_backing.py
+
+check-pins: ## every public def added or changed since BASE is named in a test — a new one, in a changed test [BASE=main]
+	uv run python scripts/check_pins.py --base=$(call _Q,$(if $(value BASE),$(value BASE),main))
 
 review-gate: ## offline gate [SPEC=specs/<f>.md] [BASE=main]; /review-round runs it first
 	uv run python scripts/review_gate.py $(if $(value SPEC),--spec=$(call _Q,$(value SPEC)),) --base=$(call _Q,$(if $(value BASE),$(value BASE),main))

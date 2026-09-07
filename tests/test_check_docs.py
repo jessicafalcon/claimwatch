@@ -71,8 +71,8 @@ def test_every_named_make_target_exists_today():
         )
         for c in tooling
     }
-    assert by_class == {"agents": 6, "skills": 7}, by_class
-    assert len(check_docs.command_files(ROOT)) == 7  # every skill runs today
+    assert by_class == {"agents": 6, "skills": 8}, by_class
+    assert len(check_docs.command_files(ROOT)) == 8  # every skill runs today
     assert check_docs.check_make_targets(files, ROOT) == []
 
 
@@ -237,6 +237,19 @@ def test_neutrality_files_are_the_tracked_code_and_prose_minus_the_declarations(
         "sql/marts/x.sql",
     ]
     assert "CLAUDE.md" in check_docs.tracked_paths(ROOT)
+
+
+def test_record_titles_are_read_outside_fences_with_open_state():
+    """The two title readers the tag check cites against: a BACKLOG row's bold
+    title with its open/struck state; every DECISIONS bold span and heading,
+    a fenced one excluded."""
+    assert check_docs.backlog_titles(
+        "| Item | Source | Trigger |\n|---|---|---|\n"
+        "| **Open row** — detail | r | t |\n| ~~**Closed row** — d~~ DONE | r | t |\n"
+    ) == {"Open row": True, "Closed row": False}
+    assert check_docs.decisions_titles(
+        "## Gotchas\n- **An entry (2026-09-03).** Why.\n```\n**fenced**\n```\n"
+    ) == {"Gotchas", "An entry (2026-09-03)."}
 
 
 def test_check_comment_tags_reports_each_shape_and_missing_record(tmp_path: Path):

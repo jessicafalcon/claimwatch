@@ -404,7 +404,7 @@ def _titled(prefix: str, titles: set[str] | dict[str, bool]) -> list[str]:
 
 
 @dataclasses.dataclass(frozen=True)
-class Records:
+class _Records:
     """What a tag may point at, read once per run."""
 
     backlog_rows: dict[str, bool]
@@ -412,7 +412,7 @@ class Records:
     specs: Path
 
     @classmethod
-    def read(cls, root: Path) -> Records:
+    def read(cls, root: Path) -> _Records:
         return cls(
             backlog_titles((root / "BACKLOG.md").read_text(encoding="utf-8")),
             decisions_titles((root / "DECISIONS.md").read_text(encoding="utf-8")),
@@ -420,7 +420,7 @@ class Records:
         )
 
 
-def _cited_error(tag: str, cited: str, records: Records) -> str | None:
+def _cited_error(tag: str, cited: str, records: _Records) -> str | None:
     """The record side of a well-formed tag: the entry it names exists (and,
     for a BACKLOG row, is open)."""
     if tag == "TODO":
@@ -436,7 +436,7 @@ def _cited_error(tag: str, cited: str, records: Records) -> str | None:
     return None
 
 
-def tag_error(tag: str, rest: str, records: Records) -> str | None:
+def _tag_error(tag: str, rest: str, records: _Records) -> str | None:
     m = _TAG_SHAPES[tag].match(rest)
     if m is None:
         return f"malformed {tag} comment (shape: {_TAG_HELP[tag]})"
@@ -444,14 +444,14 @@ def tag_error(tag: str, rest: str, records: Records) -> str | None:
 
 
 def check_comment_tags(files: list[Path], root: Path) -> list[str]:
-    records = Records.read(root)
+    records = _Records.read(root)
     errors: list[str] = []
     for f in files:
         for n, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
             m = _TAGGED.search(line)
             if m is None:
                 continue
-            err = tag_error(m.group(1), m.group(2), records)
+            err = _tag_error(m.group(1), m.group(2), records)
             if err:
                 errors.append(f"{f.relative_to(root)}:{n}: {err}")
     return errors
