@@ -237,9 +237,10 @@ def test_main_exports_over_the_module_defaults(monkeypatch, tmp_path, synthetic_
     from study import __main__
 
     out = tmp_path / "friction_ledger.html"
+    # One binding: __main__ references export.DEFAULT_DB, so patching the module
+    # attribute is enough — no second binding to keep in sync (round 1, CR#13).
     monkeypatch.setattr(export, "DEFAULT_DB", synthetic_db)
     monkeypatch.setattr(export, "OUTPUT", out)
-    monkeypatch.setattr(__main__, "DEFAULT_DB", synthetic_db)
     assert __main__.main(["export"]) == 0
     assert out.is_file() and out.read_text(encoding="utf-8").startswith("<!doctype")
     assert __main__.main(["nope"]) == 2  # a bad usage is refused, non-zero

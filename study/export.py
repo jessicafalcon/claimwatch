@@ -29,6 +29,7 @@ from __future__ import annotations
 import html
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from pipeline.warehouse import ROOT, connect, database_for
 
@@ -40,8 +41,13 @@ DEFAULT_DB = database_for("synthetic")
 OUTPUT = ROOT / "study" / "friction_ledger.html"
 
 # The four evidence tags (brief §2.4). A panel's tag, and every point's tag, is
-# exactly one of these; anything else is refused.
+# exactly one of these; anything else is refused (the runtime guard is `TAGS`).
 TAGS = ("Measured", "Documented", "Modeled", "Pending")
+# Closed sets a static checker can read too (round 1, code-reviewer #7): the
+# chart kind and the display unit. Their runtime guards are `_render_body`
+# (unknown kind refuses) and `_display` (unknown unit refuses).
+Kind = Literal["hero", "line", "grouped_bar", "stat_row"]
+Unit = Literal["stars", "pct", "days", "count", ""]
 
 
 class RenderRefused(Exception):
@@ -94,7 +100,7 @@ class Point:
     value: float | None
     tag: str
     source_url: str
-    unit: str = ""  # "stars" | "pct" | "days" | "count" | ""
+    unit: Unit = ""
 
 
 @dataclass(frozen=True)
@@ -116,7 +122,7 @@ class Panel:
     title: str
     blurb: str
     tag: str
-    kind: str
+    kind: Kind
     series: tuple[Series, ...] = ()
     note: str = ""
     placeholder: str = ""  # the Pending panel's labelled gray text
@@ -163,6 +169,10 @@ def _rows(conn, sql: str) -> list[tuple]:
 def _rating_trend(conn) -> tuple[Series, ...]:
     """B1.2: the studied segment's unsolicited rating over time, one line per
     profile (a brand-free role slug). Anchors only under `synthetic`."""
+    # Segment-wide BY DESIGN (SPEC B1.2 is "the studied segment's rating"): no
+    # profile filter, unlike _channel_gap/_platform_stats which are the studied
+    # insurer's profile. The anchors carry one digital-first unsolicited profile
+    # today, so it renders one line; a second lands as a second line, no change.
     rows = _rows(
         conn,
         "select profile, month, rating, tag, source_url from rating_trend "
@@ -221,6 +231,11 @@ def _platform_stats(conn) -> tuple[Series, ...]:
         "and source = 'opinion-assurances' order by stat",
     )
     order = list(_STAT_LABELS)
+    for stat, *_ in rows:
+        if stat not in _STAT_LABELS:  # a stat outside the closed set: refuse by name
+            raise RenderRefused(
+                f"B1.4: unknown platform stat {stat!r} (not in {tuple(_STAT_LABELS)})"
+            )
     points = [
         Point(_STAT_LABELS[stat][0], float(value), tag, url, _STAT_LABELS[stat][1])
         for stat, value, tag, url in sorted(rows, key=lambda r: order.index(r[0]))
@@ -326,12 +341,17 @@ def _display(value: float, unit: str) -> str:
     if unit == "stars":
         return f"{value:.1f}★"
     if unit == "pct":
+        # A fraction stored in the mart (0.231) shown as a percent (23.1%) — a
+        # unit conversion for display, not a recomputed study number; the mart
+        # value on the Point stays mart-equal (round 1, code-reviewer #10).
         return f"{value * 100:.1f}%"
     if unit == "days":
         return f"{value:.1f} days"
     if unit == "count":
         return f"{int(round(value)):,}"
-    return f"{value:.2f}"
+    if unit == "":
+        return f"{value:.2f}"
+    raise RenderRefused(f"unknown display unit {unit!r} (not in {Unit})")
 
 
 def _esc(text: str) -> str:
@@ -339,11 +359,14 @@ def _esc(text: str) -> str:
 
 
 # --- SVG chart rendering ------------------------------------------------------
-def _axis(domain: tuple[float, float], ticks: int) -> list[tuple[float, str]]:
+_AXIS_TICKS = 4  # one grid step count for every plot; a byte-stable constant
+
+
+def _axis(domain: tuple[float, float]) -> list[tuple[float, str]]:
     lo, hi = domain
     return [
-        (lo + (hi - lo) * i / ticks, f"{lo + (hi - lo) * i / ticks:g}")
-        for i in range(ticks + 1)
+        (lo + (hi - lo) * i / _AXIS_TICKS, f"{lo + (hi - lo) * i / _AXIS_TICKS:g}")
+        for i in range(_AXIS_TICKS + 1)
     ]
 
 
@@ -362,7 +385,7 @@ def _svg_open() -> list[str]:
 
 def _grid_and_axis(domain: tuple[float, float]) -> list[str]:
     out: list[str] = []
-    for value, label in _axis(domain, 4):
+    for value, label in _axis(domain):
         y = _y_of(value, domain)
         out.append(
             f'<line x1="{_n(_ML)}" y1="{_n(y)}" x2="{_n(_W - _MR)}" y2="{_n(y)}" '
@@ -453,12 +476,10 @@ def _render_legend(panel: Panel) -> list[str]:
 
 
 def _render_stat_row(panel: Panel) -> list[str]:
-    points = _points(panel)
-    if not points:
-        return ['<p class="nodata">No data yet.</p>']
+    # Reached only with values: _render_body returns the empty-mart state before
+    # dispatching here, and every stat point carries a value (_platform_stats).
     out = ['<div class="stat-row">']
-    for p in points:
-        assert p.value is not None  # a stat tile with no value is caught upstream
+    for p in _points(panel):
         out.append(
             '<div class="stat">'
             f'<div class="stat-value">{_esc(_display(p.value, p.unit))}</div>'
@@ -610,10 +631,13 @@ _CSS_TEMPLATE = (
     "var(--grid);border-radius:8px;padding:14px}}"
     ".stat-value{{font-size:24px;font-weight:700}}"
     ".stat-label{{color:var(--ink2);font-size:13px;margin:2px 0 8px}}"
-    ".pending,.nodata{{background:repeating-linear-gradient(45deg,"
+    ".pending{{background:repeating-linear-gradient(45deg,"
     "var(--pending),var(--pending) 8px,transparent 8px,transparent 16px);"
     "border:1px dashed var(--baseline);border-radius:8px;padding:18px;"
     "color:var(--ink2);font-size:14px}}"
+    ".nodata{{background:var(--page);border:1px solid var(--grid);"
+    "border-radius:8px;padding:18px;color:var(--muted);font-style:italic;"
+    "font-size:14px}}"
     ".chip{{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;"
     "border-radius:99px;border:1px solid var(--baseline);color:var(--ink2);"
     "vertical-align:middle}}"

@@ -10,7 +10,7 @@ from __future__ import annotations
 import sys
 
 from pipeline.warehouse import ROOT, DriverError
-from study.export import DEFAULT_DB, RenderRefused, write
+from study import export
 
 
 def _rel(path):
@@ -28,16 +28,16 @@ def main(argv: list[str] | None = None) -> int:
     if argv != ["export"]:
         print("usage: python -m study export", file=sys.stderr)
         return 2
-    if not DEFAULT_DB.is_file():
+    if not export.DEFAULT_DB.is_file():
         print(
-            f"study: no synthetic warehouse at {DEFAULT_DB} — run "
+            f"study: no synthetic warehouse at {export.DEFAULT_DB} — run "
             "`make rebuild ROWS=synthetic` first",
             file=sys.stderr,
         )
         return 1
     try:
-        out = write()
-    except RenderRefused as exc:
+        out = export.write()
+    except export.RenderRefused as exc:
         print(f"refusing: {exc}", file=sys.stderr)
         return 2
     except DriverError as exc:
