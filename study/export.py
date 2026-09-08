@@ -166,6 +166,15 @@ def _rows(conn, sql: str) -> list[tuple]:
     return conn.execute(sql).fetchall()
 
 
+def _require(value: float | str | None, column: str, panel_id: str) -> float | str:
+    """A displayed number needs its value and provenance: a null mart cell is
+    refused by name at the boundary, never coerced into an uncaught traceback
+    (`float(None)`, `None.startswith`) that escapes `render` (round 2, SR#5)."""
+    if value is None:
+        raise RenderRefused(f"{panel_id}: mart column {column!r} is null")
+    return value
+
+
 def _rating_trend(conn) -> tuple[Series, ...]:
     """B1.2: the studied segment's unsolicited rating over time, one line per
     profile (a brand-free role slug). Anchors only under `synthetic`."""
@@ -185,7 +194,13 @@ def _rating_trend(conn) -> tuple[Series, ...]:
     by_profile: dict[str, list[Point]] = {}
     for profile, month, rating, tag, url in rows:
         by_profile.setdefault(profile, []).append(
-            Point(str(month), float(rating), tag, url, "stars")
+            Point(
+                str(month),
+                float(_require(rating, "rating", "B1.2")),
+                tag,
+                _require(url, "source_url", "B1.2"),
+                "stars",
+            )
         )
     return tuple(
         Series(_PROFILE_NAMES.get(profile, profile), slot, tuple(pts))
@@ -207,7 +222,13 @@ def _channel_gap(conn) -> tuple[Series, ...]:
     by_channel: dict[str, list[Point]] = {}
     for channel, source, rating, tag, url in rows:
         by_channel.setdefault(channel, []).append(
-            Point(source, float(rating), tag, url, "stars")
+            Point(
+                source,
+                float(_require(rating, "rating", "B1.3")),
+                tag,
+                _require(url, "source_url", "B1.3"),
+                "stars",
+            )
         )
     return tuple(
         Series(channel, slot_of[channel], tuple(by_channel[channel]))
@@ -240,7 +261,13 @@ def _platform_stats(conn) -> tuple[Series, ...]:
                 f"B1.4: unknown platform stat {stat!r} (not in {tuple(_STAT_LABELS)})"
             )
     points = [
-        Point(_STAT_LABELS[stat][0], float(value), tag, url, _STAT_LABELS[stat][1])
+        Point(
+            _STAT_LABELS[stat][0],
+            float(_require(value, "value", "B1.4")),
+            tag,
+            _require(url, "source_url", "B1.4"),
+            _STAT_LABELS[stat][1],
+        )
         for stat, value, tag, url in sorted(rows, key=lambda r: order.index(r[0]))
     ]
     return (Series("stats", 0, tuple(points)),) if points else ()

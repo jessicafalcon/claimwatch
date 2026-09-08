@@ -266,6 +266,27 @@ def test_render_chip_class_is_a_closed_lookup_not_a_raw_tag():
         export._render_chip('"><script>')
 
 
+def test_a_null_mart_cell_is_refused_by_name_not_a_traceback():
+    # A null value or provenance cell is refused in one line naming the column
+    # and panel, never coerced into an uncaught float(None)/None.startswith that
+    # escapes render (round 2, SR#5).
+    assert export._require(4.2, "rating", "B1.2") == 4.2
+    with pytest.raises(RenderRefused) as exc:
+        export._require(None, "rating", "B1.2")
+    assert "rating" in str(exc.value) and "B1.2" in str(exc.value)
+    null_rating = [
+        ("unsolicited", "digital-first", "alpha", "fr-digital-first", "2025-01",
+         None, "Documented", "https://a/"),
+    ]
+    conn = _rating_trend_conn(null_rating)
+    try:
+        with pytest.raises(RenderRefused) as exc:
+            export._rating_trend(conn)
+    finally:
+        conn.close()
+    assert "rating" in str(exc.value)
+
+
 def test_b1_2_renders_the_sampling_bias_note(synthetic_db):
     assert "negatively self-selected" in _html(synthetic_db)
 
