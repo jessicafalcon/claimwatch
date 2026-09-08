@@ -208,8 +208,9 @@ Freeze: none
   the *§6 response figures are not seeded* row (stated-waits); the *Health
   details arrive in review bodies* row stays **open**, re-scoped to 9b; update
   the BACKLOG count.
-- [ ] LESSONS.md — none until a review round reports a correctness finding; then
-  backtick it and the fix commit writes the row.
+- [ ] `LESSONS.md` — the `caller-sourced` row extended (review round 1, CR#3 and
+  CR#11: the Pending decision keyed on a proxy, the footer tag authored; the
+  code-reviewer's Pass 2 caught the recurrence, the promoted mechanism holding).
 - [ ] `CLAUDE.md` — Current status; Commands (`make study`); Repo map (`study/`
   first render); the CI list (add `make study` check); allowlist (no change — no
   new dependency); BACKLOG count.
