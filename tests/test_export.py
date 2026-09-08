@@ -180,7 +180,9 @@ def test_beat1_panels_render_each_point_with_its_own_tag(synthetic_db):
     oa = pins.PLATFORM_STATS_OPINION_ASSURANCES
     assert stat["One-star share"] == float(oa["one_star_share"])
     assert stat["Reviews"] == float(oa["review_count"])
-    assert stat["Reviews answered"] == float(oa["response_rate"])  # 0.820, round 2 CR#18
+    assert stat["Reviews answered"] == float(
+        oa["response_rate"]
+    )  # 0.820, round 2 CR#18
     assert ">534<" in page and ">23.1%<" in page and ">1.5 days<" in page
     assert ">82.0%<" in page  # response_rate rendered as a percent (round 2, CR#18)
 
@@ -272,10 +274,26 @@ def test_rating_trend_orders_multi_source_points_deterministically():
     # not the engine's — and the bytes stay stable (round 2, CR#16). Insertion
     # order is zeta-then-alpha; the render must return alpha-then-zeta.
     rows = [
-        ("unsolicited", "digital-first", "zeta", "fr-digital-first", "2025-01",
-         3.0, "Documented", "https://z/"),
-        ("unsolicited", "digital-first", "alpha", "fr-digital-first", "2025-01",
-         4.0, "Documented", "https://a/"),
+        (
+            "unsolicited",
+            "digital-first",
+            "zeta",
+            "fr-digital-first",
+            "2025-01",
+            3.0,
+            "Documented",
+            "https://z/",
+        ),
+        (
+            "unsolicited",
+            "digital-first",
+            "alpha",
+            "fr-digital-first",
+            "2025-01",
+            4.0,
+            "Documented",
+            "https://a/",
+        ),
     ]
     conn = _rating_trend_conn(rows)
     try:
@@ -305,8 +323,16 @@ def test_a_null_mart_cell_is_refused_by_name_not_a_traceback():
         export._require(None, "rating", "B1.2")
     assert "rating" in str(exc.value) and "B1.2" in str(exc.value)
     null_rating = [
-        ("unsolicited", "digital-first", "alpha", "fr-digital-first", "2025-01",
-         None, "Documented", "https://a/"),
+        (
+            "unsolicited",
+            "digital-first",
+            "alpha",
+            "fr-digital-first",
+            "2025-01",
+            None,
+            "Documented",
+            "https://a/",
+        ),
     ]
     conn = _rating_trend_conn(null_rating)
     try:
