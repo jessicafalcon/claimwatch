@@ -341,8 +341,10 @@ def _esc(text: str) -> str:
 # --- SVG chart rendering ------------------------------------------------------
 def _axis(domain: tuple[float, float], ticks: int) -> list[tuple[float, str]]:
     lo, hi = domain
-    return [(lo + (hi - lo) * i / ticks, f"{lo + (hi - lo) * i / ticks:g}")
-            for i in range(ticks + 1)]
+    return [
+        (lo + (hi - lo) * i / ticks, f"{lo + (hi - lo) * i / ticks:g}")
+        for i in range(ticks + 1)
+    ]
 
 
 def _y_of(value: float, domain: tuple[float, float]) -> float:
@@ -460,7 +462,7 @@ def _render_stat_row(panel: Panel) -> list[str]:
             '<div class="stat">'
             f'<div class="stat-value">{_esc(_display(p.value, p.unit))}</div>'
             f'<div class="stat-label">{_esc(p.label)}</div>'
-            f'{_render_chip(p.tag)}</div>'
+            f"{_render_chip(p.tag)}</div>"
         )
     out.append("</div>")
     return out
@@ -497,7 +499,7 @@ def _render_panel(panel: Panel) -> list[str]:
     chips = "".join(_render_chip(t) for t in _panel_tags(panel))
     out = [
         '<section class="panel">',
-        f'<h3>{_esc(panel.id)} · {_esc(panel.title)} {chips}</h3>',
+        f"<h3>{_esc(panel.id)} · {_esc(panel.title)} {chips}</h3>",
         f'<p class="blurb">{_esc(panel.blurb)}</p>',
     ]
     out += _render_body(panel)
@@ -505,9 +507,7 @@ def _render_panel(panel: Panel) -> list[str]:
         out.append(f'<p class="note">{_esc(panel.note)}</p>')
     out.append(
         f'<p class="evidence">Evidence: {_esc(panel.backing_row)} · '
-        f"{_esc(panel.tag)} · "
-        + _drill(panel)
-        + "</p>"
+        f"{_esc(panel.tag)} · " + _drill(panel) + "</p>"
     )
     out.append("</section>")
     return out
@@ -517,9 +517,7 @@ def _drill(panel: Panel) -> str:
     urls = sorted({p.source_url for p in _points(panel) if p.source_url})
     if not urls:
         return "source pending"
-    links = ", ".join(
-        f'<a href="{_esc(u)}" rel="noopener">{_esc(u)}</a>' for u in urls
-    )
+    links = ", ".join(f'<a href="{_esc(u)}" rel="noopener">{_esc(u)}</a>' for u in urls)
     return f"opens to {links} and PROJECT_BRIEF §6"
 
 

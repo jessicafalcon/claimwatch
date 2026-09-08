@@ -213,8 +213,10 @@ Freeze: none
 - [ ] `CLAUDE.md` — Current status; Commands (`make study`); Repo map (`study/`
   first render); the CI list (add `make study` check); allowlist (no change — no
   new dependency); BACKLOG count.
-- [ ] `BACKING.md` — no tag change; a render-home note only if needed.
-- [ ] `SPEC.md` — only if the Beat 1 "Under the hood" note must name the render.
+- [ ] BACKING.md — none (Beat 1 rows are already Documented; no tag flip, and
+  the render needs no BACKING note).
+- [ ] SPEC.md — none (no chart or beat changed; the render is a mechanism, so
+  the Beat 1 "Under the hood" note needs no edit).
 - [ ] README — none (the repo has no README yet; it is the Phase 9f deliverable
   — `make study` is documented in CLAUDE.md → Commands).
 - [ ] this spec — the "Delivered" paragraph appended at exit.
