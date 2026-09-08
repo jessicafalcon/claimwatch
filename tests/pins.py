@@ -288,8 +288,10 @@ CLASSIFIED_REVIEWS_COLUMNS = ("source", "external_id", "theme", "run_id")
 # review x theme grain (a review counts once in `reviews`, once per theme bar).
 # unclassified is a row, not a gap — the gray "not yet classified" band, and with
 # no key it is largest. Tag Measured; provenance is the tag plus run_id (a computed
-# share has no address or capture instant; run_id is carried from
-# stg_classified_reviews so the study can tell which input the rows came from).
+# share has no address or capture instant; run_id — a build-level constant, not a
+# grain key — is carried through min() from stg_classified_reviews so the study
+# can tell which input the rows came from). Columns end run_id, tag, matching the
+# other computed marts (classifier_quality, the cost-model and simulator marts).
 THEME_SHARE_TAG = "Measured"
 THEME_SHARE_BY_SEGMENT_COLUMNS = (
     "segment",
@@ -297,8 +299,8 @@ THEME_SHARE_BY_SEGMENT_COLUMNS = (
     "reviews",
     "theme_rows",
     "share",
-    "tag",
     "run_id",
+    "tag",
 )
 THEME_SHARE_BY_MONTH_COLUMNS = ("month",) + THEME_SHARE_BY_SEGMENT_COLUMNS
 

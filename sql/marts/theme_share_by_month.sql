@@ -14,9 +14,10 @@
 --   regex, no like, no clock, no reader.
 -- Provenance: the Measured tag and run_id. A computed share has no single
 --   address or capture instant; its inputs (reviews, theme_rows) are stored so
---   the share can be redone by hand, and run_id is carried from
---   stg_classified_reviews (one value per build) so the study can tell which
---   input the counted rows came from (the render-time corpus gate, Phase 9b).
+--   the share can be redone by hand, and run_id — one value per build, a
+--   build-level constant, not a grain key — is carried through min() from
+--   stg_classified_reviews so the study can tell which input the counted rows
+--   came from (the render-time corpus gate, Phase 9b).
 -- Tag: Measured (the classifier's own output, counted).
 -- Feeds: B2.2. Built by the classify step after stg_classified_reviews is
 --   filled (excluded from the generic marts pass, which runs before classify).
@@ -48,9 +49,9 @@ select
     totals.reviews,
     count(*)                        as theme_rows,
     count(*) * 1.0 / totals.reviews as share,
-    'Measured'                      as tag,
-    labeled.run_id
+    min(labeled.run_id)             as run_id,
+    'Measured'                      as tag
 from labeled
 join totals
     on labeled.month = totals.month and labeled.segment = totals.segment
-group by labeled.month, labeled.segment, labeled.label, totals.reviews, labeled.run_id;
+group by labeled.month, labeled.segment, labeled.label, totals.reviews;

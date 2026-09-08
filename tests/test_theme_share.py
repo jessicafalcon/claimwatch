@@ -137,8 +137,9 @@ def test_by_month_pins(tmp_path):
 
 def test_theme_marts_carry_the_run_id_they_were_built_from(tmp_path):
     """Fix (2026-09-08): both theme marts carry `run_id` from stg_classified_reviews
-    — one value, the classify step's input — so the study can tell which corpus
-    the counted rows came from; the column set is pinned."""
+    — one value per build, the classify step's input, carried through min() — so
+    the study can tell which corpus the counted rows came from; the column set
+    (ending run_id, tag) is pinned."""
     db = _built(tmp_path)
     conn = connect("duckdb", database=db)
     try:
@@ -146,10 +147,47 @@ def test_theme_marts_carry_the_run_id_they_were_built_from(tmp_path):
             ("theme_share_by_month", pins.THEME_SHARE_BY_MONTH_COLUMNS),
             ("theme_share_by_segment", pins.THEME_SHARE_BY_SEGMENT_COLUMNS),
         ):
-            cols = tuple(r[0] for r in conn.execute(f"describe {table}").fetchall())
+            cols = tuple(
+                r[0]
+                for r in conn.execute(
+                    "select column_name from information_schema.columns "
+                    f"where table_name = '{table}' order by ordinal_position"
+                ).fetchall()
+            )
             assert cols == columns, table
             run_ids = conn.execute(f"select distinct run_id from {table}").fetchall()
             assert run_ids == [("t",)], table
+    finally:
+        conn.close()
+
+
+def test_theme_grain_stays_unique_under_a_second_run_id(tmp_path):
+    """CR#1 (round 1): `share` must not be grouped by run_id. A stray second run_id
+    in stg_classified_reviews would otherwise split a (segment, label) cell into one
+    row per run_id while `reviews` (never grouped by run_id) stayed whole — two bars
+    where the study expects one, each understated. min() keeps run_id off the grain:
+    a row inserted under a second run_id lands in the one existing cell, count + 1."""
+    db = _built(tmp_path)
+    seg = pins.THEME_SHARE_SEGMENT
+    conn = connect("duckdb", database=db)
+    try:
+        src, ext, theme = conn.execute(
+            "select source, external_id, theme from stg_classified_reviews "
+            "order by source, external_id limit 1"
+        ).fetchone()
+        other = "coverage-price" if theme != "coverage-price" else "second-payer"
+        conn.execute(
+            "insert into stg_classified_reviews (source, external_id, theme, run_id) "
+            "values (?, ?, ?, ?)",
+            [src, ext, other, "other"],
+        )
+        build_theme_share_marts(conn)
+        rows = conn.execute(
+            "select theme_rows from theme_share_by_segment "
+            "where segment = ? and label = ?",
+            [seg, other],
+        ).fetchall()
+        assert rows == [(pins.THEME_SHARE_BY_SEGMENT_NOKEY[other] + 1,)]
     finally:
         conn.close()
 
