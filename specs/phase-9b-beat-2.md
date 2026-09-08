@@ -1,4 +1,4 @@
-# Phase 9b — Beat 2: the corpus gate, the counted band and the trail (PROPOSED)
+# Phase 9b — Beat 2: the corpus gate, the counted band and the trail
 
 Contract for the `phase-9b-beat-2` branch. Source: PROJECT_BRIEF.md §9 Phase 9
 ("The study"), sub-phase 9b of the permanent-artifact-first split (DECISIONS →
@@ -6,7 +6,7 @@ Phase 9a). Depends on Phase 9a merged (PR #21, 2026-09-08) **and on the fix PR
 `fix/theme-marts-run-id` merged** (the two theme marts carry `run_id`; challenge
 round 1, finding 3).
 
-**Status: PROPOSED — do not start until approved.** No new dependencies: Beat 2
+**Status: APPROVED 2026-09-08 — in progress.** No new dependencies: Beat 2
 renders through the 9a contract (`duckdb` + stdlib, hand-written inline SVG); no
 script, no `<details>`, no new `make` target.
 Challenged: 2026-09-08, round 1, spec 198ff491 — rework (all findings applied)
