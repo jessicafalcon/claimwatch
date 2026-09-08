@@ -17,18 +17,17 @@ import pytest
 
 from pipeline.build import rebuild
 from pipeline.warehouse import connect, database_for
-from study import export
-from study.export import (
+from study import export, model, panels
+from study.export import render, write
+from study.model import (
     Panel,
     Point,
     RenderRefused,
     Series,
-    beat1_panels,
     check_panel,
     has_values,
-    render,
-    write,
 )
+from study.panels import beat1_panels
 from tests import pins
 
 pytestmark = pytest.mark.slow  # slow: rebuilds a warehouse; out of the edit-loop hook
@@ -297,7 +296,7 @@ def test_rating_trend_orders_multi_source_points_deterministically():
     ]
     conn = _rating_trend_conn(rows)
     try:
-        (line,) = export._rating_trend(conn)
+        (line,) = panels._rating_trend(conn)
     finally:
         conn.close()
     assert [p.value for p in line.points] == [4.0, 3.0]
@@ -318,9 +317,9 @@ def test_a_null_mart_cell_is_refused_by_name_not_a_traceback():
     # A null value or provenance cell is refused in one line naming the column
     # and panel, never coerced into an uncaught float(None)/None.startswith that
     # escapes render (round 2, SR#5).
-    assert export._require(4.2, "rating", "B1.2") == 4.2
+    assert model._require(4.2, "rating", "B1.2") == 4.2
     with pytest.raises(RenderRefused) as exc:
-        export._require(None, "rating", "B1.2")
+        model._require(None, "rating", "B1.2")
     assert "rating" in str(exc.value) and "B1.2" in str(exc.value)
     null_rating = [
         (
@@ -337,7 +336,7 @@ def test_a_null_mart_cell_is_refused_by_name_not_a_traceback():
     conn = _rating_trend_conn(null_rating)
     try:
         with pytest.raises(RenderRefused) as exc:
-            export._rating_trend(conn)
+            panels._rating_trend(conn)
     finally:
         conn.close()
     assert "rating" in str(exc.value)
