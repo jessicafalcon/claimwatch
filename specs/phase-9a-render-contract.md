@@ -192,8 +192,8 @@ below and Out of scope.)
   path; no chart or beat changes (a beat change is a design STOP).
 - `BACKING.md` — no tag flips (Beat 1 rows are already Documented); a render-home
   note only if needed.
-- `README.md` — the `make study` command line and one sentence on the export.
 - `DECISIONS.md`, `BACKLOG.md`, `CLAUDE.md`, this spec — per Record updates.
+  (No `README.md`: the repo has no README yet; it is the Phase 9f deliverable.)
 
 Freeze: none
 
@@ -215,7 +215,8 @@ Freeze: none
   new dependency); BACKLOG count.
 - [ ] `BACKING.md` — no tag change; a render-home note only if needed.
 - [ ] `SPEC.md` — only if the Beat 1 "Under the hood" note must name the render.
-- [ ] `README.md` — `make study` and one sentence on the static export.
+- [ ] README — none (the repo has no README yet; it is the Phase 9f deliverable
+  — `make study` is documented in CLAUDE.md → Commands).
 - [ ] this spec — the "Delivered" paragraph appended at exit.
 
 ## Threat model (REQUIRED when the phase adds a `make` target that takes a variable, deletes anything, calls a paid API, or touches the network)
