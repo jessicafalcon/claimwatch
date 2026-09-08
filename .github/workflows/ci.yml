@@ -43,9 +43,11 @@ jobs:
       - run: make idempotency-check
       # The static study export is deterministic (PLAN §4.6): render it from the
       # synthetic marts just built and fail on any drift from the committed
-      # bytes — the render contract's byte-check, enforced on every PR.
+      # bytes — the render contract's byte-check, enforced on every PR. Staging
+      # first (git add -A) makes the diff catch a NEW untracked artifact under
+      # study/, not only a change to a tracked file (round 1, security #17).
       - run: make study
-      - run: git diff --exit-code -- study/
+      - run: git add -A study/ && git diff --cached --exit-code -- study/
       # Every frozen sample through its real parser and the same load guard:
       # the scraper path, proven offline (no fetch — `make scrape` is
       # developer-run and never appears here).

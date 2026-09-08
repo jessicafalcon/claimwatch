@@ -397,7 +397,8 @@ def _render_line(panel: Panel) -> list[str]:
         for x, y, p in coords:
             out.append(
                 f'<circle cx="{_n(x)}" cy="{_n(y)}" r="4" fill="{colour_var}">'
-                f"<title>{_esc(s.name)} · {p.label}: {_esc(_display(p.value, p.unit))}"
+                f"<title>{_esc(s.name)} · {_esc(p.label)}: "
+                f"{_esc(_display(p.value, p.unit))}"
                 f" ({_esc(p.tag)})</title></circle>"
             )
     for m in months:
@@ -523,11 +524,18 @@ def _render_panel(panel: Panel) -> list[str]:
 
 
 def _drill(panel: Panel) -> str:
-    urls = sorted({p.source_url for p in _points(panel) if p.source_url})
+    # Only an http(s) address becomes a clickable href: escaping neutralises
+    # HTML metacharacters but not the URL scheme, so a `javascript:`/`data:`
+    # source is dropped, not rendered as a live link (round 1, security #16).
+    urls = sorted({p.source_url for p in _points(panel) if _is_http(p.source_url)})
     if not urls:
         return "source pending"
     links = ", ".join(f'<a href="{_esc(u)}" rel="noopener">{_esc(u)}</a>' for u in urls)
     return f"opens to {links} and PROJECT_BRIEF §6"
+
+
+def _is_http(url: str) -> bool:
+    return url.startswith(("http://", "https://"))
 
 
 # --- The page -----------------------------------------------------------------

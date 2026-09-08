@@ -183,6 +183,48 @@ def test_beat1_panels_render_each_point_with_its_own_tag(synthetic_db):
     assert ">534<" in page and ">23.1%<" in page and ">1.5 days<" in page
 
 
+def test_a_label_with_markup_is_escaped_in_the_svg_title():
+    # Every value that reaches the HTML is escaped, including a point label in
+    # the line-chart <title> (round 1, security #2).
+    panel = Panel(
+        "B9.1",
+        "B9.1",
+        "t",
+        "b",
+        "Documented",
+        "line",
+        series=(
+            Series(
+                "s", 0, (Point("<b>&2025", 4.0, "Documented", "https://x/", "stars"),)
+            ),
+        ),
+    )
+    svg = "\n".join(export._render_line(panel))
+    assert "<b>&2025" not in svg
+    assert "&lt;b&gt;&amp;2025" in svg
+
+
+def test_drill_drops_a_non_http_source_url():
+    # A non-http(s) scheme is never rendered as a clickable href (round 1,
+    # security #16).
+    panel = Panel(
+        "B9.2",
+        "B9.2",
+        "t",
+        "b",
+        "Documented",
+        "stat_row",
+        series=(
+            Series(
+                "s", 0, (Point("x", 1.0, "Documented", "javascript:alert(1)", "count"),)
+            ),
+        ),
+    )
+    drilled = export._drill(panel)
+    assert "javascript:" not in drilled
+    assert drilled == "source pending"
+
+
 def test_b1_2_renders_the_sampling_bias_note(synthetic_db):
     assert "negatively self-selected" in _html(synthetic_db)
 
