@@ -146,20 +146,21 @@ def test_every_panel_renders_its_backing_row_id_and_source_link(synthetic_db):
 def test_svg_numbers_are_fixed_precision_and_locale_independent(synthetic_db):
     base = _html(synthetic_db)
     assert "48.00" in base  # a coordinate at fixed 2-decimal precision
+    saved = locale.setlocale(locale.LC_ALL)  # restore the exact prior setting
     picked = None
-    for name in ("de_DE.UTF-8", "fr_FR.UTF-8"):
-        try:
-            locale.setlocale(locale.LC_ALL, name)
-            picked = name
-            break
-        except locale.Error:
-            continue
-    if picked is None:
-        pytest.skip("no comma-decimal locale available")
     try:
+        for name in ("de_DE.UTF-8", "fr_FR.UTF-8"):
+            try:
+                locale.setlocale(locale.LC_ALL, name)
+                picked = name
+                break
+            except locale.Error:
+                continue
+        if picked is None:
+            pytest.skip("no comma-decimal locale available")
         under_comma_locale = _html(synthetic_db)
     finally:
-        locale.setlocale(locale.LC_ALL, "C")
+        locale.setlocale(locale.LC_ALL, saved)
     assert under_comma_locale == base
 
 

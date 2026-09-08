@@ -360,7 +360,7 @@ def _svg_open() -> list[str]:
     ]
 
 
-def _grid_and_axis(domain: tuple[float, float], unit: str) -> list[str]:
+def _grid_and_axis(domain: tuple[float, float]) -> list[str]:
     out: list[str] = []
     for value, label in _axis(domain, 4):
         y = _y_of(value, domain)
@@ -380,7 +380,7 @@ def _render_line(panel: Panel) -> list[str]:
     step = (_W - _ML - _MR) / (max(len(months) - 1, 1))
     x_of = {m: _ML + i * step for i, m in enumerate(months)}
     out = _svg_open()
-    out += _grid_and_axis(panel.domain, panel.axis_unit)
+    out += _grid_and_axis(panel.domain)
     for s in panel.series:
         colour_var = f"var(--s{s.slot})"
         coords = [
@@ -415,7 +415,7 @@ def _render_grouped_bar(panel: Panel) -> list[str]:
     band = (_W - _ML - _MR) / n
     width = band * 0.6
     out = _svg_open()
-    out += _grid_and_axis(panel.domain, panel.axis_unit)
+    out += _grid_and_axis(panel.domain)
     for i, (s, p) in enumerate(bars):
         x = _ML + i * band + (band - width) / 2
         y = _y_of(p.value, panel.domain)
