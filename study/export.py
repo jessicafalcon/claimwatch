@@ -399,10 +399,11 @@ _AXIS_TICKS = 4  # one grid step count for every plot; a byte-stable constant
 
 def _axis(domain: tuple[float, float]) -> list[tuple[float, str]]:
     lo, hi = domain
-    return [
-        (lo + (hi - lo) * i / _AXIS_TICKS, f"{lo + (hi - lo) * i / _AXIS_TICKS:g}")
-        for i in range(_AXIS_TICKS + 1)
-    ]
+    ticks: list[tuple[float, str]] = []
+    for i in range(_AXIS_TICKS + 1):
+        value = lo + (hi - lo) * i / _AXIS_TICKS
+        ticks.append((value, f"{value:g}"))
+    return ticks
 
 
 def _y_of(value: float, domain: tuple[float, float]) -> float:

@@ -180,7 +180,37 @@ def test_beat1_panels_render_each_point_with_its_own_tag(synthetic_db):
     oa = pins.PLATFORM_STATS_OPINION_ASSURANCES
     assert stat["One-star share"] == float(oa["one_star_share"])
     assert stat["Reviews"] == float(oa["review_count"])
+    assert stat["Reviews answered"] == float(oa["response_rate"])  # 0.820, round 2 CR#18
     assert ">534<" in page and ">23.1%<" in page and ">1.5 days<" in page
+    assert ">82.0%<" in page  # response_rate rendered as a percent (round 2, CR#18)
+
+
+def test_a_mixed_documented_measured_panel_names_both_tags():
+    # A panel whose points carry two distinct valid tags shows a chip per tag in
+    # the header and names both in the footer evidence line — the round-1
+    # caller-sourced fix (both derived from _panel_tags), now pinned (round 2,
+    # CR#17). Synthetic Beat 1 carries Documented points only.
+    panel = Panel(
+        "B9.3",
+        "B9.3",
+        "t",
+        "b",
+        "Documented",
+        "stat_row",
+        series=(
+            Series(
+                "s",
+                0,
+                (
+                    Point("a", 1.0, "Documented", "https://a/", "count"),
+                    Point("b", 2.0, "Measured", "https://b/", "count"),
+                ),
+            ),
+        ),
+    )
+    page = "\n".join(export._render_panel(panel))
+    assert "chip chip-documented" in page and "chip chip-measured" in page
+    assert "Measured, Documented" in page  # footer names both, in TAGS order
 
 
 def test_a_label_with_markup_is_escaped_in_the_svg_title():
