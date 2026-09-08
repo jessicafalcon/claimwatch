@@ -69,7 +69,7 @@ left empty. The day, and a midpoint, are placements, not readings.
 - **B1.3 — The channel gap.** Ratings on channels a company controls or invites
   versus unsolicited platforms, side by side. Tag: *Documented* for the
   anchors, *Measured* for our own points (see *How to read a panel*).
-- **B1.4 — The stat row.** One-star share on independent platforms, review
+- **B1.4 — The ratings in context.** One-star share on independent platforms, review
   counts, and the difference in how quickly companies answer reviews. Each
   stat is its own latest point, with its own tag and day. Tag: *Documented*
   for the anchors, *Measured* for our own points (see *How to read a panel*).

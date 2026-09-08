@@ -260,11 +260,11 @@ def beat1_panels(conn) -> list[Panel]:
             backing_row="B1.1",
             title="One refund, held for months",
             blurb=(
-                "One documented case shows the whole pattern: a roughly €340 "
-                "emergency-room refund put on hold pending extra documents, "
-                "reported unresolved for months. The day count is frozen at the "
-                "last publicly confirmed date — never a live ticker we cannot "
-                "verify."
+                "When a public case is curated here it will show the pattern in "
+                "one story: a refund put on hold pending extra documents, "
+                "followed for as long as it stays unresolved. The day count "
+                "will be frozen at the last publicly confirmed date, never a "
+                "live ticker we cannot verify."
             ),
             tag="Pending",
             kind="hero",
@@ -307,13 +307,18 @@ def beat1_panels(conn) -> list[Panel]:
             tag="Documented",
             kind="grouped_bar",
             series=_channel_gap(conn),
+            note=(
+                "Stated here: invited channels (the app stores) are positively "
+                "self-selected and unsolicited platforms negatively, so part of "
+                "the gap is who gets asked, not only how the service performs."
+            ),
             domain=(0.0, 5.0),
             axis_unit="stars",
         ),
         Panel(
             id="B1.4",
             backing_row="B1.4",
-            title="The stat row",
+            title="The ratings in context",
             blurb=(
                 "A few numbers that place the ratings in context: how many reviews, "
                 "how many one-star, how often and how fast the company answers."

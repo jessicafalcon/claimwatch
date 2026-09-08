@@ -2138,8 +2138,8 @@ of Phase 9 (the study).
 - **Phase 9 is split permanent-artifact-first, not by delivery format in the
   brief's order.** A `/challenge` round on the scoping decision (2026-09-07)
   found that the static HTML export — not Metabase — is the permanent,
-  CI-checkable, deterministic artifact the other formats are built on (decision
-  3; brief §4.4), CI is offline (no Docker, so a Metabase-first phase cannot end
+  CI-checkable, deterministic artifact the other formats are built on (Phase 0a
+  decision 3; brief §4.4), CI is offline (no Docker, so a Metabase-first phase cannot end
   CI-green), and Beat 2's drill-through would ship review text before the
   paraphrase rule is written. So the order is: 9a render contract + Beat 1
   (this) → 9b Beat 2 (the counted `unclassified` series, drill-through

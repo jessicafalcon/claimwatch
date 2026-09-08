@@ -22,7 +22,7 @@ It is split because Phase 9 carries three delivery formats (Metabase, static
 HTML, README) over ~19 panels — far past the ~6-item cap — and because the
 `/challenge` round found that the static HTML export, not Metabase, is the
 permanent, CI-checkable, deterministic artifact the other formats are built on
-(DECISIONS decision 3; brief §4.4). So the export goes first.
+(DECISIONS → Phase 0a decision 3; brief §4.4). So the export goes first.
 
 This is not a fix PR: it introduces a new surface (`study/`), a new command
 (`make study`) and the render contract every later render phase inherits. It
@@ -140,7 +140,7 @@ below and Out of scope.)
   it.** `make study` reads `data/friction_ledger.synthetic.duckdb` (Beat 1's
   Documented points are frozen anchors only, byte-stable), never the `captured`
   DB the weekly cron grows. Alternatives rejected: Metabase-first (needs Docker,
-  cannot end CI-green — brief §4.4, DECISIONS decision 3); rendering from
+  cannot end CI-green — brief §4.4, DECISIONS → Phase 0a decision 3); rendering from
   `captured` (the baseline would drift with every weekly run). Satisfies
   invariant 1.
 - **`study/export.py` renders from the marts and `FORMULAS`, never recomputing
@@ -215,8 +215,9 @@ Freeze: none
   new dependency); BACKLOG count.
 - [ ] BACKING.md — none (Beat 1 rows are already Documented; no tag flip, and
   the render needs no BACKING note).
-- [ ] SPEC.md — none (no chart or beat changed; the render is a mechanism, so
-  the Beat 1 "Under the hood" note needs no edit).
+- [ ] `SPEC.md` — the B1.4 panel title reworded "The stat row" → "The ratings
+  in context" (§2.3 name-by-meaning, review round 1 SE#2); no chart, row id or
+  tag changed, so BACKING and the row set are untouched.
 - [ ] README — none (the repo has no README yet; it is the Phase 9f deliverable
   — `make study` is documented in CLAUDE.md → Commands).
 - [ ] this spec — the "Delivered" paragraph appended at exit.
