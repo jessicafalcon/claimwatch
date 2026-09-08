@@ -1643,7 +1643,7 @@ distributions) is Phase 7b.
   select` mart (no way to inject it in static SQL without templating; the
   upstream table carries it).* *Superseded 2026-09-08 (branch
   `fix/theme-marts-run-id`): the two theme marts do carry `run_id` — it is
-  a column of `stg_classified_reviews`, carried through the group by, no
+  a column of `stg_classified_reviews`, carried through `min()`, no
   scalar needed; the Phase 9b corpus gate reads it. See the fix entry
   below.*
 - **B2.2/B2.5 flip Pending → Measured; upstream the four review platforms.**
@@ -2140,9 +2140,10 @@ workflow). The Phase 9b `/challenge` round (finding 3) found that
 `theme_share_by_month` and `theme_share_by_segment` were the only marts without
 `run_id`, and that Phase 7a's reason — a scalar cannot be injected into static
 SQL — did not apply: `run_id` is a column of `stg_classified_reviews`, already in
-the marts' `labeled` CTE's source, so it is selected and grouped like any other
-column. One value per build (the classify step stamps the rows input), so the
-grain is unchanged.
+the marts' `labeled` CTE's source, so it is selected and carried through
+`min()`. One value per build (the classify step stamps the rows input), a
+build-level constant, so the grain stays `(month, segment, label)` and the
+share is never split by `run_id`.
 
 - **Both theme marts carry `run_id`, carried from the classified rows, not
   injected.** The "still in force" rule holds again for every mart: a displayed
@@ -2152,9 +2153,14 @@ grain is unchanged.
   brief's "until real, it's tagged Pending — never faked"). *Rejected: reading
   `stg_classified_reviews.run_id` from the renderer (a study read reaching into
   staging; the marts are the study-ready layer); keeping the 7a entry and
-  adding the column in 9b (an earlier phase's SQL changes in its own PR).*
-  Pinned by `tests/test_theme_share.py::test_theme_marts_carry_the_run_id_they_were_built_from`
-  and the column tuples in `tests/pins.py`.
+  adding the column in 9b (an earlier phase's SQL changes in its own PR);
+  grouping the marts by `run_id` (round 1 `c21caed` replaced it with `min()`:
+  grouping made `share` correctness depend on the single-value invariant with
+  no test to fail if it broke, and a stray second `run_id` would split the
+  grain and understate the share).* Pinned by
+  `tests/test_theme_share.py::test_theme_marts_carry_the_run_id_they_were_built_from`,
+  `::test_theme_grain_stays_unique_under_a_second_run_id` and the column tuples
+  in `tests/pins.py`.
 
 ### Phase 9a
 

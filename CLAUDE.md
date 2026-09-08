@@ -749,6 +749,6 @@ formulas in `models/cost_model.py`, the two simulator marts and `make simulate`.
 acceptance test; 9g — the Metabase demonstration (non-CI). Plus two pulled-out
 data phases: the claims sample-mean slider and data.ameli practitioner fees.
 
-Open BACKLOG rows: **37**.
+Open BACKLOG rows: **38**.
 
 (Update this section at the end of every working day.)
