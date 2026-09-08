@@ -66,6 +66,30 @@ def _rows(db, sql: str):
         conn.close()
 
 
+def _add_second_theme_to_first_review(conn, run_id: str) -> tuple[str, str]:
+    """Give the first classified review a second theme — one already present in the
+    digital-first cell, so a group-by on run_id would split that cell — under
+    `run_id`, then rebuild the theme marts. Returns (the added theme, the review's
+    month)."""
+    src, ext, theme = conn.execute(
+        "select source, external_id, theme from stg_classified_reviews "
+        "order by source, external_id limit 1"
+    ).fetchone()
+    other = "coverage-price" if theme != "coverage-price" else "second-payer"
+    month = conn.execute(
+        "select substr(review_date, 1, 7) from stg_reviews "
+        "where source = ? and external_id = ?",
+        [src, ext],
+    ).fetchone()[0]
+    conn.execute(
+        "insert into stg_classified_reviews (source, external_id, theme, run_id) "
+        "values (?, ?, ?, ?)",
+        [src, ext, other, run_id],
+    )
+    build_theme_share_marts(conn)
+    return other, month
+
+
 def test_classified_reviews_grain_and_sorted(tmp_path):
     """Done-when 1: one row per (source, external_id, theme), the columns and
     count pinned, and stored in sorted order so a re-run is byte-identical."""
@@ -163,31 +187,28 @@ def test_theme_marts_carry_the_run_id_they_were_built_from(tmp_path):
 
 def test_theme_grain_stays_unique_under_a_second_run_id(tmp_path):
     """CR#1 (round 1): `share` must not be grouped by run_id. A stray second run_id
-    in stg_classified_reviews would otherwise split a (segment, label) cell into one
-    row per run_id while `reviews` (never grouped by run_id) stayed whole — two bars
-    where the study expects one, each understated. min() keeps run_id off the grain:
-    a row inserted under a second run_id lands in the one existing cell, count + 1."""
+    in stg_classified_reviews would otherwise split a cell into one row per run_id
+    while `reviews` (never grouped by run_id) stayed whole — two bars where the study
+    expects one, each understated. min() keeps run_id off the grain of BOTH marts:
+    the added row lands in the one existing cell, count + 1 by segment, and the
+    review's by-month cell stays a single bar."""
     db = _built(tmp_path)
     seg = pins.THEME_SHARE_SEGMENT
     conn = connect("duckdb", database=db)
     try:
-        src, ext, theme = conn.execute(
-            "select source, external_id, theme from stg_classified_reviews "
-            "order by source, external_id limit 1"
-        ).fetchone()
-        other = "coverage-price" if theme != "coverage-price" else "second-payer"
-        conn.execute(
-            "insert into stg_classified_reviews (source, external_id, theme, run_id) "
-            "values (?, ?, ?, ?)",
-            [src, ext, other, "other"],
-        )
-        build_theme_share_marts(conn)
-        rows = conn.execute(
+        other, month = _add_second_theme_to_first_review(conn, "other")
+        seg_rows = conn.execute(
             "select theme_rows from theme_share_by_segment "
             "where segment = ? and label = ?",
             [seg, other],
         ).fetchall()
-        assert rows == [(pins.THEME_SHARE_BY_SEGMENT_NOKEY[other] + 1,)]
+        assert seg_rows == [(pins.THEME_SHARE_BY_SEGMENT_NOKEY[other] + 1,)]
+        mon_rows = conn.execute(
+            "select theme_rows from theme_share_by_month "
+            "where month = ? and segment = ? and label = ?",
+            [month, seg, other],
+        ).fetchall()
+        assert len(mon_rows) == 1, "by-month cell split by a second run_id"
     finally:
         conn.close()
 
@@ -263,17 +284,7 @@ def test_distinct_denominator_counts_a_multi_theme_review_once(tmp_path):
 
     conn = connect("duckdb", database=db)
     try:
-        src, ext, theme = conn.execute(
-            "select source, external_id, theme from stg_classified_reviews "
-            "order by source, external_id limit 1"
-        ).fetchone()
-        other = "coverage-price" if theme != "coverage-price" else "second-payer"
-        conn.execute(
-            "insert into stg_classified_reviews (source, external_id, theme, run_id) "
-            "values (?, ?, ?, ?)",
-            [src, ext, other, "t"],
-        )
-        build_theme_share_marts(conn)
+        _add_second_theme_to_first_review(conn, "t")
     finally:
         conn.close()
 
