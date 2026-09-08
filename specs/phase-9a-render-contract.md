@@ -1,10 +1,10 @@
-# Phase 9a — The render contract and Beat 1 (PROPOSED)
+# Phase 9a — The render contract and Beat 1
 
 Contract for the `phase-9a-render-contract` branch. Source: PROJECT_BRIEF.md §9
 Phase 9 ("The study"), split permanent-artifact-first after the `/challenge`
 round of 2026-09-07 (DECISIONS → Phase 9). Depends on Phase 8b merged.
 
-**Status: APPROVED 2026-09-07 — in progress.** No new dependencies: the
+**Status: APPROVED 2026-09-07 — DELIVERED 2026-09-07, PR pending.** No new dependencies: the
 export is one Python module over `duckdb` + stdlib `csv`/`json`/`html`, and
 charts are hand-written inline SVG (no chart library, no CDN, no pandas — PLAN
 §4.6, §4.9).
@@ -302,3 +302,42 @@ Agents are selected by diff surface (CLAUDE.md → "Which review agents run").
 - Curating B1.1's hero case with its public link (flips B1.1 Pending →
   Documented) — a content task recorded in BACKLOG, not this phase; 9a renders
   B1.1 as the Pending placeholder.
+
+## Delivered (2026-09-07)
+
+The render contract landed as data checked at render time, not editorial trust.
+`study/export.py` holds the `Panel`/`Series`/`Point` model; `check_panel`
+(refuses a no-tag, two-tag or Pending-with-value panel in one line naming the
+panel); `TAGS`/`Kind`/`Unit` as closed sets with runtime guards; the "Ledger"
+palette (the dataviz reference default, light + dark) pinned in one place; and
+hand-written inline-SVG line, grouped-bar and stat-row renderers with byte-stable,
+locale-independent number formatting (`_n`, fixed precision). No number is
+recomputed — each figure is read from its mart, and `_require` refuses a null
+value or provenance cell by column and panel rather than coercing it into a
+traceback. `make study` renders `study/friction_ledger.html` from the frozen
+synthetic DB and `FORMULAS`, byte-identical on a rerun and matching the committed
+baseline; `study/__main__.py` maps a render breach, a missing warehouse and an
+unreadable one each to a one-line exit; CI diffs the committed bytes. Beat 1
+renders as the proving ground — B1.1 the Pending placeholder, B1.2 the rating
+trend (one line per insurer, sampling bias stated), B1.3 the channel gap, B1.4
+the stat row ("The ratings in context") — every point tagged, every value equal
+to its `tests/pins.py` pin. All five Done-when items pass; the DONE command exits
+clean and the suite is green (872 tests).
+
+Two review rounds. Round 1: escaping / href-scheme / CI-gate hardening (SR#1–3),
+the caller-sourced Pending-decision and footer-tag derivations (CR#3, CR#11),
+craft cleanups and a locale test-isolation leak, and voice (SE#1, SE#2, SE#4).
+Round 2, all fixed: the rating-trend order-by closed on `source` for byte
+stability (CR#16); the evidence chip's class made a closed lookup, safe by
+construction (SR#4); a null mart cell refused by name instead of a traceback
+(SR#5); the mixed Documented+Measured panel and B1.4's `response_rate` pinned
+(CR#17, CR#18); `_axis` tidied (CR#21); and B1.2's blurb reworded to "one line
+per insurer, not a segment average", keeping the panel's segment-wide design
+rather than the reviewer's literal singular, plus the B1.4 note's "measured" →
+"come from" off the reserved tag word (SE#5, SE#6). CR#19/CR#20 (the `hero`
+`Kind` and the peer profile name) were accepted as 9b-scoped scaffolding.
+`LESSONS.md` extended `unpinned`, `unshaped-input` and `traceback-at-boundary`.
+The render-time-no-number and §6-response-figures BACKLOG rows are struck DONE
+9a; the Health-details row stays open, re-scoped to 9b. Next: 9b renders Beat 2
+(the counted `unclassified` band, drill-through excerpts) and lands the
+excerpt/paraphrase enforcing test the 9a contract defers.

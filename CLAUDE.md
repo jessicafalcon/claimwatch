@@ -731,7 +731,9 @@ and Beat 1 rendered over the frozen synthetic marts (B1.1 Pending placeholder,
 B1.2 line, B1.3 grouped bar, B1.4 stat row); the palette is the dataviz
 reference default ("Ledger"). Byte-identical on rerun and locale-independent;
 CI diffs the committed bytes. Closed the render-time-no-number and §6-response-
-figures BACKLOG rows. Next: the review round.
+figures BACKLOG rows. Review rounds 1–2 complete, all findings fixed (round 2:
+CR#16, SR#4, SR#5 correctness; CR#17/#18/#21 craft+coverage; SE#5/#6 voice);
+gate 8/8, DONE green, spec Delivered. Next: PR, then merge.
 
 **Merged:** Phases 0a–8b in order, each with its spec under `specs/` (the
 Delivered paragraph) and its DECISIONS appendix; then `tooling/implementation-
