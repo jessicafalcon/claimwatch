@@ -4,7 +4,7 @@ Contract for the `phase-9a-render-contract` branch. Source: PROJECT_BRIEF.md §9
 Phase 9 ("The study"), split permanent-artifact-first after the `/challenge`
 round of 2026-09-07 (DECISIONS → Phase 9). Depends on Phase 8b merged.
 
-**Status: PROPOSED — do not start until approved.** No new dependencies: the
+**Status: APPROVED 2026-09-07 — in progress.** No new dependencies: the
 export is one Python module over `duckdb` + stdlib `csv`/`json`/`html`, and
 charts are hand-written inline SVG (no chart library, no CDN, no pandas — PLAN
 §4.6, §4.9).

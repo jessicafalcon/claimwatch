@@ -41,6 +41,11 @@ jobs:
       # graceful-degradation proof on every run (no model is imported).
       - run: make rebuild ROWS=synthetic
       - run: make idempotency-check
+      # The static study export is deterministic (PLAN §4.6): render it from the
+      # synthetic marts just built and fail on any drift from the committed
+      # bytes — the render contract's byte-check, enforced on every PR.
+      - run: make study
+      - run: git diff --exit-code -- study/
       # Every frozen sample through its real parser and the same load guard:
       # the scraper path, proven offline (no fetch — `make scrape` is
       # developer-run and never appears here).

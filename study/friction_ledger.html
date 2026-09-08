@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>The Friction Ledger</title><style>:root{color-scheme:light;--baseline:#c3c2b7;--grid:#e1e0d9;--ink:#0b0b0b;--ink2:#52514e;--muted:#898781;--page:#f9f9f7;--pending:#e1e0d9;--surface:#fcfcfb;--s0:#2a78d6;--s1:#eb6834;--s2:#1baf7a;--s3:#eda100;--s4:#e87ba4;}@media (prefers-color-scheme:dark){:root:where(:not([data-theme=light])){color-scheme:dark;--baseline:#383835;--grid:#2c2c2a;--ink:#ffffff;--ink2:#c3c2b7;--muted:#898781;--page:#0d0d0d;--pending:#2c2c2a;--surface:#1a1a19;--s0:#3987e5;--s1:#d95926;--s2:#199e70;--s3:#c98500;--s4:#d55181;}}:root[data-theme=dark]{color-scheme:dark;--baseline:#383835;--grid:#2c2c2a;--ink:#ffffff;--ink2:#c3c2b7;--muted:#898781;--page:#0d0d0d;--pending:#2c2c2a;--surface:#1a1a19;--s0:#3987e5;--s1:#d95926;--s2:#199e70;--s3:#c98500;--s4:#d55181;}*{box-sizing:border-box}body{margin:0;background:var(--page);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}.wrap{max-width:860px;margin:0 auto;padding:32px 20px}h1{font-size:26px;margin:0 0 4px}.lede{color:var(--ink2);margin:0 0 28px}.panel{background:var(--surface);border:1px solid var(--grid);border-radius:10px;padding:20px 22px;margin:0 0 20px}h3{font-size:17px;margin:0 0 8px}.blurb{color:var(--ink2);margin:0 0 14px}.note{color:var(--muted);font-size:13px;margin:12px 0 0}.evidence{color:var(--muted);font-size:12px;margin:12px 0 0;border-top:1px solid var(--grid);padding-top:8px;word-break:break-word}.evidence a{color:var(--s0)}.chart{width:100%;height:auto;display:block}.grid{stroke:var(--grid);stroke-width:1}.tick{fill:var(--muted);font-size:11px}.barval{fill:var(--ink2);font-size:12px;font-weight:600}.legend{list-style:none;display:flex;flex-wrap:wrap;gap:14px;padding:10px 0 0;margin:0;font-size:13px;color:var(--ink2)}.legend li{display:flex;align-items:center;gap:6px}.swatch{width:12px;height:12px;border-radius:3px;display:inline-block}.stat-row{display:flex;flex-wrap:wrap;gap:16px}.stat{flex:1;min-width:120px;background:var(--page);border:1px solid var(--grid);border-radius:8px;padding:14px}.stat-value{font-size:24px;font-weight:700}.stat-label{color:var(--ink2);font-size:13px;margin:2px 0 8px}.pending,.nodata{background:repeating-linear-gradient(45deg,var(--pending),var(--pending) 8px,transparent 8px,transparent 16px);border:1px dashed var(--baseline);border-radius:8px;padding:18px;color:var(--ink2);font-size:14px}.chip{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;border:1px solid var(--baseline);color:var(--ink2);vertical-align:middle}.chip-pending{background:var(--pending)}.stat .chip{margin-top:2px}</style></head><body><main class="wrap"><h1>The Friction Ledger</h1><p class="lede">Why health-insurance refunds get stuck — read from the customer’s chair, every number tagged for where it came from.</p><h2 style="font-size:20px;margin:24px 0 12px">Beat 1 — People are telling us what’s wrong, in public</h2>
+<section class="panel">
+<h3>B1.1 · One refund, held for months <span class="chip chip-pending">Pending</span></h3>
+<p class="blurb">One documented case shows the whole pattern: a roughly €340 emergency-room refund put on hold pending extra documents, reported unresolved for months. The day count is frozen at the last publicly confirmed date — never a live ticker we cannot verify.</p>
+<div class="pending">Awaiting the curated public case and its link. A “Day N — claim on hold” figure, frozen at the last confirmed date, lands here with its source.</div>
+<p class="evidence">Evidence: B1.1 · Pending · source pending</p>
+</section>
+<section class="panel">
+<h3>B1.2 · The public rating over time <span class="chip chip-documented">Documented</span></h3>
+<p class="blurb">Customers rate the segment’s insurers on platforms they were not invited to. This is that rating month by month, on the unsolicited channel.</p>
+<svg viewBox="0 0 680 280" role="img" preserveAspectRatio="xMidYMid meet" class="chart">
+<line x1="48.00" y1="240.00" x2="664.00" y2="240.00" class="grid"/>
+<text x="42.00" y="243.00" class="tick" text-anchor="end">1</text>
+<line x1="48.00" y1="184.00" x2="664.00" y2="184.00" class="grid"/>
+<text x="42.00" y="187.00" class="tick" text-anchor="end">2</text>
+<line x1="48.00" y1="128.00" x2="664.00" y2="128.00" class="grid"/>
+<text x="42.00" y="131.00" class="tick" text-anchor="end">3</text>
+<line x1="48.00" y1="72.00" x2="664.00" y2="72.00" class="grid"/>
+<text x="42.00" y="75.00" class="tick" text-anchor="end">4</text>
+<line x1="48.00" y1="16.00" x2="664.00" y2="16.00" class="grid"/>
+<text x="42.00" y="19.00" class="tick" text-anchor="end">5</text>
+<polyline points="48.00,60.80 356.00,83.20 664.00,77.60" fill="none" stroke="var(--s0)" stroke-width="2"/>
+<circle cx="48.00" cy="60.80" r="4" fill="var(--s0)"><title>Studied digital-first insurer · 2025-01: 4.2★ (Documented)</title></circle>
+<circle cx="356.00" cy="83.20" r="4" fill="var(--s0)"><title>Studied digital-first insurer · 2025-09: 3.8★ (Documented)</title></circle>
+<circle cx="664.00" cy="77.60" r="4" fill="var(--s0)"><title>Studied digital-first insurer · 2026-06: 3.9★ (Documented)</title></circle>
+<text x="48.00" y="256.00" class="tick" text-anchor="middle">2025-01</text>
+<text x="356.00" y="256.00" class="tick" text-anchor="middle">2025-09</text>
+<text x="664.00" y="256.00" class="tick" text-anchor="middle">2026-06</text>
+</svg>
+<p class="note">Sampling bias, stated here: unsolicited review platforms are negatively self-selected — a company that stops inviting reviews drifts down — so part of any decline is a sampling choice, not only a service change.</p>
+<p class="evidence">Evidence: B1.2 · Documented · opens to <a href="https://www.trustpilot.com/" rel="noopener">https://www.trustpilot.com/</a> and PROJECT_BRIEF §6</p>
+</section>
+<section class="panel">
+<h3>B1.3 · The channel gap <span class="chip chip-documented">Documented</span></h3>
+<p class="blurb">The same insurer looks very different on channels it invites and channels it does not. Each bar is the latest rating on one platform.</p>
+<svg viewBox="0 0 680 280" role="img" preserveAspectRatio="xMidYMid meet" class="chart">
+<line x1="48.00" y1="240.00" x2="664.00" y2="240.00" class="grid"/>
+<text x="42.00" y="243.00" class="tick" text-anchor="end">0</text>
+<line x1="48.00" y1="184.00" x2="664.00" y2="184.00" class="grid"/>
+<text x="42.00" y="187.00" class="tick" text-anchor="end">1.25</text>
+<line x1="48.00" y1="128.00" x2="664.00" y2="128.00" class="grid"/>
+<text x="42.00" y="131.00" class="tick" text-anchor="end">2.5</text>
+<line x1="48.00" y1="72.00" x2="664.00" y2="72.00" class="grid"/>
+<text x="42.00" y="75.00" class="tick" text-anchor="end">3.75</text>
+<line x1="48.00" y1="16.00" x2="664.00" y2="16.00" class="grid"/>
+<text x="42.00" y="19.00" class="tick" text-anchor="end">5</text>
+<rect x="89.07" y="20.48" width="123.20" height="219.52" rx="4" fill="var(--s0)"><title>invited · app-store: 4.9★ (Documented)</title></rect>
+<text x="150.67" y="256.00" class="tick" text-anchor="middle">app-store</text>
+<text x="150.67" y="14.48" class="barval" text-anchor="middle">4.9★</text>
+<rect x="294.40" y="38.40" width="123.20" height="201.60" rx="4" fill="var(--s0)"><title>invited · google-play: 4.5★ (Documented)</title></rect>
+<text x="356.00" y="256.00" class="tick" text-anchor="middle">google-play</text>
+<text x="356.00" y="32.40" class="barval" text-anchor="middle">4.5★</text>
+<rect x="499.73" y="65.28" width="123.20" height="174.72" rx="4" fill="var(--s1)"><title>unsolicited · trustpilot: 3.9★ (Documented)</title></rect>
+<text x="561.33" y="256.00" class="tick" text-anchor="middle">trustpilot</text>
+<text x="561.33" y="59.28" class="barval" text-anchor="middle">3.9★</text>
+</svg>
+<ul class="legend">
+<li><span class="swatch" style="background:var(--s0)"></span>invited</li>
+<li><span class="swatch" style="background:var(--s1)"></span>unsolicited</li>
+</ul>
+<p class="evidence">Evidence: B1.3 · Documented · opens to <a href="https://apps.apple.com/" rel="noopener">https://apps.apple.com/</a>, <a href="https://play.google.com/" rel="noopener">https://play.google.com/</a>, <a href="https://www.trustpilot.com/" rel="noopener">https://www.trustpilot.com/</a> and PROJECT_BRIEF §6</p>
+</section>
+<section class="panel">
+<h3>B1.4 · The stat row <span class="chip chip-documented">Documented</span></h3>
+<p class="blurb">A few numbers that place the ratings in context: how many reviews, how many one-star, how often and how fast the company answers.</p>
+<div class="stat-row">
+<div class="stat"><div class="stat-value">534</div><div class="stat-label">Reviews</div><span class="chip chip-documented">Documented</span></div>
+<div class="stat"><div class="stat-value">23.1%</div><div class="stat-label">One-star share</div><span class="chip chip-documented">Documented</span></div>
+<div class="stat"><div class="stat-value">82.0%</div><div class="stat-label">Reviews answered</div><span class="chip chip-documented">Documented</span></div>
+<div class="stat"><div class="stat-value">1.5 days</div><div class="stat-label">Typical answer time</div><span class="chip chip-documented">Documented</span></div>
+</div>
+<p class="note">Stated here: today the answer rate and time are measured for one profile on one platform, so the comparison across platforms waits for a second platform’s figures.</p>
+<p class="evidence">Evidence: B1.4 · Documented · opens to <a href="https://www.opinion-assurances.fr/" rel="noopener">https://www.opinion-assurances.fr/</a> and PROJECT_BRIEF §6</p>
+</section>
+</main></body></html>

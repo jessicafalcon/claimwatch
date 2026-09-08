@@ -6,7 +6,7 @@
 .PHONY: help setup test lint check-docs check-backing check-pins review-gate \
         rebuild idempotency-check confirm reset scrape record-snapshots \
         label-sample classify-eval fetch-damir sample-damir fit-damir model \
-        simulate
+        simulate study
 
 # User variables reach recipes ONLY as make values via `$(call _Q,$(value VAR))`
 # — UNEXPANDED and single-quoted — so a value like `SPEC='$(shell …)'` or
@@ -104,3 +104,6 @@ model: ## print the cost model — parameters, formulas beside their values, the
 
 simulate: ## print the guardrail simulator — the three rules, the SLA threshold table, the hold days per fix (offline, no variable, writes nothing)
 	uv run python -m pipeline simulate
+
+study: ## render the static HTML study to study/friction_ledger.html from the synthetic marts (offline, no variable; CI diffs the committed bytes)
+	uv run python -m study export

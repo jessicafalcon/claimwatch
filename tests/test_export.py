@@ -1,0 +1,202 @@
+"""Phase 9a — the render contract and Beat 1 (spec Invariants / Done-when).
+
+The export renders one deterministic, self-contained HTML from the frozen
+synthetic marts: a Pending panel shows no number; a Documented panel whose mart
+is empty shows a "no data yet" state, not a blank; every rendered number carries
+exactly one tag and equals its mart; charts are byte-stable, locale-independent
+inline SVG with no CDN and no external asset. Beat 1's rendered figures are the
+anchor pins in tests/pins.py."""
+
+from __future__ import annotations
+
+import locale
+from datetime import date
+from pathlib import Path
+
+import pytest
+
+from pipeline.build import rebuild
+from pipeline.warehouse import connect, database_for
+from study import export
+from study.export import (
+    Panel,
+    Point,
+    RenderRefused,
+    Series,
+    beat1_panels,
+    check_panel,
+    has_values,
+    render,
+    write,
+)
+from tests import pins
+
+pytestmark = pytest.mark.slow  # slow: rebuilds a warehouse; out of the edit-loop hook
+
+
+@pytest.fixture(scope="module")
+def synthetic_db(tmp_path_factory) -> Path:
+    root = tmp_path_factory.mktemp("study")
+    rebuild("duckdb", "synthetic", root=root)
+    return database_for("synthetic", root)
+
+
+@pytest.fixture(scope="module")
+def none_db(tmp_path_factory) -> Path:
+    root = tmp_path_factory.mktemp("study-none")
+    rebuild("duckdb", "none", root=root)
+    return database_for("none", root)
+
+
+def _html(db: Path) -> str:
+    conn = connect("duckdb", database=db)
+    try:
+        return render(conn)
+    finally:
+        conn.close()
+
+
+def _panels(db: Path) -> list[Panel]:
+    conn = connect("duckdb", database=db)
+    try:
+        return beat1_panels(conn)
+    finally:
+        conn.close()
+
+
+def test_make_study_is_byte_identical_on_rerun(synthetic_db, tmp_path):
+    a, b = tmp_path / "a.html", tmp_path / "b.html"
+    write(synthetic_db, a)
+    write(synthetic_db, b)
+    assert a.read_bytes() == b.read_bytes()
+    assert a.stat().st_size > 0
+
+
+def test_export_has_no_cdn_no_external_asset_no_timestamp(synthetic_db):
+    page = _html(synthetic_db)
+    for asset in ("<script", " src=", "<link ", "stylesheet", "url(http"):
+        assert asset not in page, asset
+    # a link to a data source is an anchor, not a loaded asset — allowed.
+    assert 'href="https://www.trustpilot.com/"' in page
+    # no render timestamp: today's date never leaks into the bytes.
+    assert date.today().isoformat() not in page
+
+
+def test_a_pending_panel_renders_a_gray_placeholder_with_no_value(synthetic_db):
+    b11 = next(p for p in _panels(synthetic_db) if p.id == "B1.1")
+    assert b11.tag == "Pending"
+    assert not has_values(b11)
+    page = _html(synthetic_db)
+    assert 'class="pending"' in page
+    assert "Awaiting the curated public case" in page
+
+
+def test_a_documented_panel_with_an_empty_mart_renders_no_data_yet(none_db):
+    # Under ROWS=none the Beat 1 marts exist but hold no rows: a Documented panel
+    # renders a distinct "no data yet" state, never a blank or a crash.
+    page = _html(none_db)
+    assert "No data yet" in page
+    b12 = next(p for p in _panels(none_db) if p.id == "B1.2")
+    assert b12.tag == "Documented"
+    assert not has_values(b12)
+
+
+def test_a_pending_panel_with_a_value_is_refused_one_line_nonzero():
+    bad = Panel(
+        id="B9.9",
+        backing_row="B9.9",
+        title="t",
+        blurb="b",
+        tag="Pending",
+        kind="line",
+        series=(Series("s", 0, (Point("2025-01", 4.2, "Pending", "https://x/", ""),)),),
+    )
+    with pytest.raises(RenderRefused) as exc:
+        check_panel(bad)
+    assert "B9.9" in str(exc.value)
+    assert "\n" not in str(exc.value)  # one line
+
+
+def test_a_panel_with_no_tag_or_two_tags_is_refused():
+    for bad_tag in ("", "Documented,Measured", "Guessed"):
+        panel = Panel("B9.9", "B9.9", "t", "b", bad_tag, "hero")
+        with pytest.raises(RenderRefused):
+            check_panel(panel)
+    with_bad_point = Panel(
+        "B9.8",
+        "B9.8",
+        "t",
+        "b",
+        "Documented",
+        "line",
+        series=(Series("s", 0, (Point("m", 1.0, "Nope", "https://x/", "stars"),)),),
+    )
+    with pytest.raises(RenderRefused):
+        check_panel(with_bad_point)
+
+
+def test_every_panel_renders_its_backing_row_id_and_source_link(synthetic_db):
+    page = _html(synthetic_db)
+    for pid in ("B1.1", "B1.2", "B1.3", "B1.4"):
+        assert f"Evidence: {pid}" in page
+    assert "PROJECT_BRIEF §6" in page
+    assert 'href="https://www.trustpilot.com/"' in page
+
+
+def test_svg_numbers_are_fixed_precision_and_locale_independent(synthetic_db):
+    base = _html(synthetic_db)
+    assert "48.00" in base  # a coordinate at fixed 2-decimal precision
+    picked = None
+    for name in ("de_DE.UTF-8", "fr_FR.UTF-8"):
+        try:
+            locale.setlocale(locale.LC_ALL, name)
+            picked = name
+            break
+        except locale.Error:
+            continue
+    if picked is None:
+        pytest.skip("no comma-decimal locale available")
+    try:
+        under_comma_locale = _html(synthetic_db)
+    finally:
+        locale.setlocale(locale.LC_ALL, "C")
+    assert under_comma_locale == base
+
+
+def test_beat1_panels_render_each_point_with_its_own_tag(synthetic_db):
+    page = _html(synthetic_db)
+    # B1.2 rating trend: each point tagged Documented, values the anchor pins.
+    for month, rating in (("2025-01", "4.2"), ("2025-09", "3.8"), ("2026-06", "3.9")):
+        assert f"{month}: {rating}★ (Documented)" in page
+    # B1.3 channel gap: each bar tagged, ratings equal the mart pins (no recompute).
+    gap = next(p for p in _panels(synthetic_db) if p.id == "B1.3")
+    got = {p.label: p.value for s in gap.series for p in s.points}
+    for (_, source), (rating, _, _) in pins.CHANNEL_GAP_DIGITAL_FIRST.items():
+        assert got[source] == float(rating)
+    # B1.4 stat row: values equal the mart pins.
+    b14 = next(p for p in _panels(synthetic_db) if p.id == "B1.4")
+    stat = {p.label: p.value for s in b14.series for p in s.points}
+    oa = pins.PLATFORM_STATS_OPINION_ASSURANCES
+    assert stat["One-star share"] == float(oa["one_star_share"])
+    assert stat["Reviews"] == float(oa["review_count"])
+    assert ">534<" in page and ">23.1%<" in page and ">1.5 days<" in page
+
+
+def test_b1_2_renders_the_sampling_bias_note(synthetic_db):
+    assert "negatively self-selected" in _html(synthetic_db)
+
+
+def test_b1_4_states_the_response_comparison_waits(synthetic_db):
+    assert "comparison across platforms waits" in _html(synthetic_db)
+
+
+def test_main_exports_over_the_module_defaults(monkeypatch, tmp_path, synthetic_db):
+    from study import __main__
+
+    out = tmp_path / "friction_ledger.html"
+    monkeypatch.setattr(export, "DEFAULT_DB", synthetic_db)
+    monkeypatch.setattr(export, "OUTPUT", out)
+    monkeypatch.setattr(__main__, "DEFAULT_DB", synthetic_db)
+    assert __main__.main(["export"]) == 0
+    assert out.is_file() and out.read_text(encoding="utf-8").startswith("<!doctype")
+    assert __main__.main(["nope"]) == 2  # a bad usage is refused, non-zero
