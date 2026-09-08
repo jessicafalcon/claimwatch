@@ -80,6 +80,13 @@ ANCHOR_PROFILES = {
 }
 # The marts on the anchors alone (`ROWS=synthetic` or `none`+anchors):
 RATING_TREND_ANCHOR_ROWS = 8  # every anchor with a rating, one per month
+# B1.2 as the study export renders it: the studied digital-first insurer's
+# unsolicited rating series, (month, rating) per point (the anchor values).
+RATING_TREND_DIGITAL_FIRST = (
+    ("2025-01", "4.2"),
+    ("2025-09", "3.8"),
+    ("2026-06", "3.9"),
+)
 CHANNEL_GAP_ANCHOR_ROWS = 6  # latest rating per segment × channel × platform × profile
 PLATFORM_STATS_ANCHOR_ROWS = (
     9  # one row per stat (A2): a count per key with one + 4 stats

@@ -167,7 +167,7 @@ def test_svg_numbers_are_fixed_precision_and_locale_independent(synthetic_db):
 def test_beat1_panels_render_each_point_with_its_own_tag(synthetic_db):
     page = _html(synthetic_db)
     # B1.2 rating trend: each point tagged Documented, values the anchor pins.
-    for month, rating in (("2025-01", "4.2"), ("2025-09", "3.8"), ("2026-06", "3.9")):
+    for month, rating in pins.RATING_TREND_DIGITAL_FIRST:
         assert f"{month}: {rating}★ (Documented)" in page
     # B1.3 channel gap: each bar tagged, ratings equal the mart pins (no recompute).
     gap = next(p for p in _panels(synthetic_db) if p.id == "B1.3")
@@ -244,3 +244,41 @@ def test_main_exports_over_the_module_defaults(monkeypatch, tmp_path, synthetic_
     assert __main__.main(["export"]) == 0
     assert out.is_file() and out.read_text(encoding="utf-8").startswith("<!doctype")
     assert __main__.main(["nope"]) == 2  # a bad usage is refused, non-zero
+
+
+def test_main_refuses_a_missing_warehouse_exit_1(monkeypatch, tmp_path, capsys):
+    from study import __main__
+
+    monkeypatch.setattr(export, "DEFAULT_DB", tmp_path / "nope.duckdb")
+    assert __main__.main(["export"]) == 1
+    assert "no synthetic warehouse" in capsys.readouterr().err
+
+
+def test_main_refuses_a_render_breach_one_line_exit_2(
+    monkeypatch, synthetic_db, capsys
+):
+    from study import __main__
+
+    monkeypatch.setattr(export, "DEFAULT_DB", synthetic_db)
+
+    def boom(*_a, **_k):
+        raise export.RenderRefused("B1.1: a Pending panel shows no number")
+
+    monkeypatch.setattr(export, "write", boom)
+    assert __main__.main(["export"]) == 2
+    err = capsys.readouterr().err
+    assert "B1.1" in err and err.count("\n") == 1  # one line naming the panel
+
+
+def test_main_refuses_an_unreadable_warehouse_exit_2(monkeypatch, synthetic_db, capsys):
+    from pipeline.warehouse import DriverError
+    from study import __main__
+
+    monkeypatch.setattr(export, "DEFAULT_DB", synthetic_db)
+
+    def boom(*_a, **_k):
+        raise DriverError("catalog error")
+
+    monkeypatch.setattr(export, "write", boom)
+    assert __main__.main(["export"]) == 2
+    assert "could not be read" in capsys.readouterr().err
