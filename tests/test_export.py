@@ -255,6 +255,17 @@ def test_rating_trend_orders_multi_source_points_deterministically():
     assert [p.value for p in line.points] == [4.0, 3.0]
 
 
+def test_render_chip_class_is_a_closed_lookup_not_a_raw_tag():
+    # The class attribute is derived from the closed tag→class map, safe by
+    # construction; a tag outside the four is refused by name, never reflected
+    # into the attribute on the trust that a caller validated it (round 2, SR#4).
+    assert export._render_chip("Pending") == (
+        '<span class="chip chip-pending">Pending</span>'
+    )
+    with pytest.raises(RenderRefused):
+        export._render_chip('"><script>')
+
+
 def test_b1_2_renders_the_sampling_bias_note(synthetic_db):
     assert "negatively self-selected" in _html(synthetic_db)
 

@@ -498,9 +498,21 @@ def _render_stat_row(panel: Panel) -> list[str]:
     return out
 
 
+# The chip's CSS class is a closed lookup keyed on the four tags, so the class
+# attribute is safe by construction — not a raw tag string interpolated on the
+# trust that `check_panel` validated it first on this path (round 2, SR#4).
+_CHIP_CLASS = {
+    "Measured": "measured",
+    "Documented": "documented",
+    "Modeled": "modeled",
+    "Pending": "pending",
+}
+
+
 def _render_chip(tag: str) -> str:
-    slug = tag.lower()
-    return f'<span class="chip chip-{slug}">{_esc(tag)}</span>'
+    if tag not in _CHIP_CLASS:
+        raise RenderRefused(f"chip tag {tag!r} is not one of {tuple(_CHIP_CLASS)}")
+    return f'<span class="chip chip-{_CHIP_CLASS[tag]}">{_esc(tag)}</span>'
 
 
 def _panel_tags(panel: Panel) -> list[str]:
