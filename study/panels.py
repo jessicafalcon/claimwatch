@@ -169,7 +169,7 @@ def _rating_trend(conn) -> tuple[Series, ...]:
             )
         )
     return tuple(
-        Series(_profile_name(profile), slot, tuple(pts))
+        Series(_PROFILE_NAMES.get(profile, profile), slot, tuple(pts))
         for slot, (profile, pts) in enumerate(sorted(by_profile.items()))
     )
 
