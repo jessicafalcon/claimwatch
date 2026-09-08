@@ -128,10 +128,11 @@ def test_b2_1_renders_the_pending_placeholder_with_no_value(synthetic_db):
 def test_b2_3_labels_each_point_by_platform_and_states_placed_points(synthetic_db):
     b23 = _panel(synthetic_db, "B2.3")
     assert b23.tag == "Documented"
-    by_name = {p.label: p for s in b23.series for p in s.points}
+    by_short = {p.label: p for s in b23.series for p in s.points}
     for profile, (rating, count) in pins.BEAT2_PEER_RATINGS.items():
-        point = by_name[panels._PROFILE_NAMES[profile]]
+        point = by_short[panels._PROFILE_SHORT[profile]]  # short axis label
         assert point.value == rating
+        assert panels._PROFILE_NAMES[profile] in point.detail  # full name in tooltip
         assert "on trustpilot" in point.detail  # labelled by platform
         if count is None:
             assert "reviews" not in point.detail  # a missing count renders blank

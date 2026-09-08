@@ -248,6 +248,20 @@ def _profile_name(profile: str) -> str:
     return _PROFILE_NAMES[profile]
 
 
+# Short axis labels for the peer bars (the full role names overflow a 4-bar band
+# and overlap — B1.3 uses short labels too); the full name sits in the tooltip.
+_PROFILE_SHORT = {
+    "fr-digital-first": "Studied",
+    "peer-digital-challenger-1": "Challenger",
+    "peer-traditional-1": "Mutuelle 1",
+    "peer-traditional-2": "Mutuelle 2",
+}
+
+
+def _profile_short(profile: str) -> str:
+    return _PROFILE_SHORT.get(profile, _profile_name(profile))
+
+
 def beat1_panels(conn) -> list[Panel]:
     """The four Beat 1 panels, built from the marts. B1.1 is Pending (the hero
     case is not yet curated); B1.2–B1.4 are Documented under the anchors."""
@@ -486,12 +500,12 @@ def _peer_ratings(conn) -> tuple[Series, ...]:
     rows = _rows(conn, _Q_PEER_RATINGS)
     points = []
     for _segment, source, profile, rating, review_count, tag, url in rows:
-        detail = f"on {source}"
+        detail = f"{_profile_name(profile)} · on {source}"  # full name + platform
         if review_count is not None:
             detail += f", {int(review_count):,} reviews"
         points.append(
             Point(
-                _profile_name(profile),
+                _profile_short(profile),  # short axis label; full name in the tooltip
                 float(_require(rating, "rating", "B2.3")),
                 tag,
                 _require(url, "source_url", "B2.3"),
