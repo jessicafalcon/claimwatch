@@ -481,7 +481,10 @@ def _panel_tags(panel: Panel) -> list[str]:
 
 
 def _render_body(panel: Panel) -> list[str]:
-    if panel.kind == "hero":
+    # A Pending panel shows its placeholder by its authoritative `tag`, never by
+    # a `kind` coincidence: the "distinct from Pending" state rests on the tag,
+    # not on B1.1 happening to be a hero (round 1, code-reviewer, caller-sourced).
+    if panel.tag == "Pending":
         return [f'<div class="pending">{_esc(panel.placeholder)}</div>']
     if not has_values(panel):
         return ['<p class="nodata">No data yet — this panel’s mart is empty.</p>']
@@ -505,9 +508,15 @@ def _render_panel(panel: Panel) -> list[str]:
     out += _render_body(panel)
     if panel.note:
         out.append(f'<p class="note">{_esc(panel.note)}</p>')
+    # The footer's tag is DERIVED from the points actually shown (the same
+    # `_panel_tags` the header chips use), not the authored `panel.tag`, so the
+    # two can never disagree and a mixed Documented+Measured panel names both
+    # (round 1, code-reviewer, caller-sourced). A Pending panel with no points
+    # falls back to its declared tag.
+    tags = ", ".join(_panel_tags(panel))
     out.append(
         f'<p class="evidence">Evidence: {_esc(panel.backing_row)} · '
-        f"{_esc(panel.tag)} · " + _drill(panel) + "</p>"
+        f"{_esc(tags)} · " + _drill(panel) + "</p>"
     )
     out.append("</section>")
     return out
