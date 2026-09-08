@@ -15,8 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from pipeline.build import rebuild
-from pipeline.warehouse import connect, database_for
+from pipeline.warehouse import connect
 from study import export, model, panels
 from study.export import render, write
 from study.model import (
@@ -29,22 +28,21 @@ from study.model import (
 )
 from study.panels import beat1_panels
 from tests import pins
+from tests.conftest import build_study_db
 
 pytestmark = pytest.mark.slow  # slow: rebuilds a warehouse; out of the edit-loop hook
 
 
 @pytest.fixture(scope="module")
 def synthetic_db(tmp_path_factory) -> Path:
-    root = tmp_path_factory.mktemp("study")
-    rebuild("duckdb", "synthetic", root=root)
-    return database_for("synthetic", root)
+    # The full study warehouse (rebuild + the classify step), so the render walks
+    # all nine panels — Beat 2's theme marts and classifier_quality included.
+    return build_study_db(tmp_path_factory.mktemp("study"), "synthetic")
 
 
 @pytest.fixture(scope="module")
 def none_db(tmp_path_factory) -> Path:
-    root = tmp_path_factory.mktemp("study-none")
-    rebuild("duckdb", "none", root=root)
-    return database_for("none", root)
+    return build_study_db(tmp_path_factory.mktemp("study-none"), "none")
 
 
 def _html(db: Path) -> str:
@@ -136,7 +134,8 @@ def test_a_panel_with_no_tag_or_two_tags_is_refused():
 
 def test_every_panel_renders_its_backing_row_id_and_source_link(synthetic_db):
     page = _html(synthetic_db)
-    for pid in ("B1.1", "B1.2", "B1.3", "B1.4"):
+    # Nine panels after the split: Beat 1's four and Beat 2's five.
+    for pid in ("B1.1", "B1.2", "B1.3", "B1.4", "B2.1", "B2.2", "B2.3", "B2.4", "B2.5"):
         assert f"Evidence: {pid}" in page
     assert "PROJECT_BRIEF §6" in page
     assert 'href="https://www.trustpilot.com/"' in page

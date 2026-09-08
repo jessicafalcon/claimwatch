@@ -475,3 +475,54 @@ SIM_SUMMARY = {
     "hold_timer": {"mean_hold_days": 17.57, "timer_released_share": 0.49},
     "both_fixes": {"mean_hold_days": 7.0, "timer_released_share": 0.0},
 }
+
+# --- Phase 9b: Beat 2 as the study export renders it (over a captured run_id) ---
+# The corpus panels (B2.2, B2.4, B2.5) render a number only over a captured input;
+# a test relabels a copy of the synthetic marts' run_id to `captured`. The values
+# are the no-key synthetic marts above (only run_id changed), read here as the
+# export plots them.
+
+# B2.5 (theme_share_by_segment): each theme bar's share is theme_rows / reviews,
+# the mart's own; positive is excluded from the bars (still in the denominator),
+# unclassified is the neutral band. document-loop is the hypothesis subject.
+BEAT2_SEGMENT_DENOMINATOR = THEME_SHARE_BY_SEGMENT_REVIEWS  # 39
+BEAT2_SEGMENT_BARS = {  # the six drawn labels (positive excluded) → theme_rows
+    "document-loop": 9,
+    "silent-rejection": 4,
+    "second-payer": 4,
+    "support-traction": 4,
+    "coverage-price": 4,
+    "unclassified": 7,
+}
+BEAT2_POSITIVE_EXCLUDED = "positive"  # in the denominator, never a theme bar
+
+# B2.2 (theme_share_by_month): document-loop's share each month = theme_rows /
+# THEME_SHARE_BY_MONTH_REVIEWS[month]. 2026-03 is a single review, one theme —
+# a share of exactly 1.0, plotted at the axis top, never stacked.
+BEAT2_MONTH_DOCUMENT_LOOP = {"2026-01": 7, "2026-02": 1, "2026-03": 1}
+
+# B2.4 (classifier_quality) as the table renders each scored label: precision and
+# recall shown as a percent with the held-out counts, or "no held-out case" with
+# the empty denominator's count (RULES_HELDOUT above is the source).
+BEAT2_QUALITY_CELLS = {
+    "document-loop": ("100.0%", "2/2", "100.0%", "2/2"),
+    "silent-rejection": ("100.0%", "1/1", "100.0%", "1/1"),
+    "second-payer": ("100.0%", "1/1", "100.0%", "1/1"),
+    "support-traction": (
+        "no held-out case", "0 predicted", "no held-out case", "0 actual",
+    ),
+    "coverage-price": (
+        "no held-out case", "0 predicted", "no held-out case", "0 actual",
+    ),
+    "positive": ("100.0%", "1/1", "100.0%", "1/1"),
+}
+
+# B2.3 (peer_ratings): the four anchor profiles the export draws, each a bar
+# labelled by its role, rated on trustpilot. rating as the mart carries it; a
+# count the brief does not give is blank (None) and no count renders.
+BEAT2_PEER_RATINGS = {
+    "fr-digital-first": (3.9, 975),
+    "peer-digital-challenger-1": (3.1, None),
+    "peer-traditional-1": (4.5, 3000),
+    "peer-traditional-2": (3.25, None),
+}

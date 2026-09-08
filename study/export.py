@@ -31,15 +31,17 @@ from pathlib import Path
 
 from pipeline.warehouse import ROOT, connect, database_for
 from study.model import (
+    NEUTRAL,
     TAGS,
     Panel,
     RenderRefused,
     Unit,
     _points,
     check_panel,
+    has_content,
     has_values,
 )
-from study.panels import beat1_panels
+from study.panels import beat1_panels, beat2_panels
 
 # The render input is the frozen synthetic database: Beat 1's Documented points
 # are the anchors only (no manual/fetched snapshot — those are `captured`-only),
@@ -56,6 +58,12 @@ OUTPUT = ROOT / "study" / "friction_ledger.html"
 # series hexes by slot. Never reordered — the order is the CVD-safety mechanism.
 SERIES_LIGHT = ("#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4")
 SERIES_DARK = ("#3987e5", "#d95926", "#199e70", "#c98500", "#d55181")
+# The `unclassified` band's neutral series colour (`var(--sN)`): a mid gray,
+# low-chroma by construction so it reads apart from all five hues without being
+# a sixth categorical slot (Phase 9b, pinned decision 4; dataviz: a neutral band
+# is not a series). Distinct from the recessive grid/baseline chrome.
+NEUTRAL_LIGHT = "#9a988f"
+NEUTRAL_DARK = "#7a7975"
 _LIGHT = {
     "surface": "#fcfcfb",
     "page": "#f9f9f7",
@@ -110,6 +118,25 @@ def _esc(text: str) -> str:
     return html.escape(text, quote=True)
 
 
+def _series_var(colour: int | str) -> str:
+    """The CSS colour for a series: a categorical slot `0..4` or the neutral
+    band token. Anything else is refused by name — never a sentinel integer
+    reaching an undefined `var(--sN)` slot (Phase 9b, pinned decision 4)."""
+    if colour == NEUTRAL:
+        return "var(--sN)"
+    if isinstance(colour, int) and 0 <= colour <= 4:
+        return f"var(--s{colour})"
+    raise RenderRefused(
+        f"series colour {colour!r} is not a slot 0..4 or the {NEUTRAL!r} token"
+    )
+
+
+def _detail(point) -> str:
+    """The tooltip suffix carrying a point's raw counts (the trail behind a
+    share), or empty when the point has none — so Beat 1 tooltips are unchanged."""
+    return f" · {_esc(point.detail)}" if point.detail else ""
+
+
 # --- SVG chart rendering ------------------------------------------------------
 _AXIS_TICKS = 4  # one grid step count for every plot; a byte-stable constant
 
@@ -158,7 +185,7 @@ def _render_line(panel: Panel) -> list[str]:
     out = _svg_open()
     out += _grid_and_axis(panel.domain)
     for s in panel.series:
-        colour_var = f"var(--s{s.slot})"
+        colour_var = _series_var(s.colour)
         coords = [
             (x_of[p.label], _y_of(p.value, panel.domain), p)
             for p in s.points
@@ -174,7 +201,7 @@ def _render_line(panel: Panel) -> list[str]:
             out.append(
                 f'<circle cx="{_n(x)}" cy="{_n(y)}" r="4" fill="{colour_var}">'
                 f"<title>{_esc(s.name)} · {_esc(p.label)}: "
-                f"{_esc(_display(p.value, p.unit))}"
+                f"{_esc(_display(p.value, p.unit))}{_detail(p)}"
                 f" ({_esc(p.tag)})</title></circle>"
             )
     for m in months:
@@ -199,9 +226,10 @@ def _render_grouped_bar(panel: Panel) -> list[str]:
         base = _y_of(panel.domain[0], panel.domain)
         out.append(
             f'<rect x="{_n(x)}" y="{_n(y)}" width="{_n(width)}" '
-            f'height="{_n(base - y)}" rx="4" fill="var(--s{s.slot})">'
+            f'height="{_n(base - y)}" rx="4" fill="{_series_var(s.colour)}">'
             f"<title>{_esc(s.name)} · {_esc(p.label)}: "
-            f"{_esc(_display(p.value, p.unit))} ({_esc(p.tag)})</title></rect>"
+            f"{_esc(_display(p.value, p.unit))}{_detail(p)} "
+            f"({_esc(p.tag)})</title></rect>"
         )
         out.append(
             f'<text x="{_n(x + width / 2)}" y="{_n(base + 16)}" class="tick" '
@@ -221,8 +249,8 @@ def _render_legend(panel: Panel) -> list[str]:
     out = ['<ul class="legend">']
     for s in panel.series:
         out.append(
-            f'<li><span class="swatch" style="background:var(--s{s.slot})"></span>'
-            f"{_esc(s.name)}</li>"
+            f'<li><span class="swatch" style="background:{_series_var(s.colour)}">'
+            f"</span>{_esc(s.name)}</li>"
         )
     out.append("</ul>")
     return out
@@ -240,6 +268,33 @@ def _render_stat_row(panel: Panel) -> list[str]:
             f"{_render_chip(p.tag)}</div>"
         )
     out.append("</div>")
+    return out
+
+
+def _metric_cell(point) -> str:
+    """One table cell: a value with its raw counts, or a labelled absence with
+    its counts — never both, never blank (`check_panel` guarantees the xor)."""
+    if point.absent:
+        absence = f'<span class="absent">{_esc(point.absent)}</span>'
+        return f"{absence} ({_esc(point.detail)})"
+    return (
+        f"{_esc(_display(point.value, point.unit))} "
+        f'<span class="cnt">({_esc(point.detail)})</span>'
+    )
+
+
+def _render_table(panel: Panel) -> list[str]:
+    # Reached only with content: _render_body returns "no data yet" first when a
+    # table has no present cell. One row per series (a label), its cells in the
+    # column order the panel declares.
+    out = ['<table class="metric"><thead><tr>']
+    out += [f"<th>{_esc(col)}</th>" for col in panel.columns]
+    out.append("</tr></thead><tbody>")
+    for s in panel.series:
+        out.append(f'<tr><th scope="row">{_esc(s.name)}</th>')
+        out += [f"<td>{_metric_cell(p)}</td>" for p in s.points]
+        out.append("</tr>")
+    out.append("</tbody></table>")
     return out
 
 
@@ -273,8 +328,18 @@ def _render_body(panel: Panel) -> list[str]:
     # not on B1.1 happening to be a hero (round 1, code-reviewer, caller-sourced).
     if panel.tag == "Pending":
         return [f'<div class="pending">{_esc(panel.placeholder)}</div>']
+    # A corpus panel over a fixture input renders a labelled state and no number
+    # — distinct from Pending and from "no data yet" (Phase 9b, the corpus gate).
+    if panel.fixture:
+        return [f'<div class="fixture">{_esc(panel.fixture)}</div>']
+    # A table dispatches on "any cell present" (value or absence), so a table of
+    # absences still renders as a table, not "no data yet" (pinned decision 5).
+    if panel.kind == "table":
+        if not has_content(panel):
+            return _nodata()
+        return _render_table(panel)
     if not has_values(panel):
-        return ['<p class="nodata">No data yet — this panel’s mart is empty.</p>']
+        return _nodata()
     if panel.kind == "line":
         return _render_line(panel) + _render_legend(panel)
     if panel.kind == "grouped_bar":
@@ -282,6 +347,10 @@ def _render_body(panel: Panel) -> list[str]:
     if panel.kind == "stat_row":
         return _render_stat_row(panel)
     raise RenderRefused(f"{panel.id}: unknown panel kind {panel.kind!r}")
+
+
+def _nodata() -> list[str]:
+    return ['<p class="nodata">No data yet — this panel’s mart is empty.</p>']
 
 
 def _render_panel(panel: Panel) -> list[str]:
@@ -313,7 +382,10 @@ def _drill(panel: Panel) -> str:
     # Only an http(s) address becomes a clickable href: escaping neutralises
     # HTML metacharacters but not the URL scheme, so a `javascript:`/`data:`
     # source is dropped, not rendered as a live link (round 1, security #16).
-    urls = sorted({p.source_url for p in _points(panel) if _is_http(p.source_url)})
+    # A computed number (a theme share) carries no per-row address; the panel
+    # cites its platform roots at the panel level (`sources`) instead.
+    addresses = [p.source_url for p in _points(panel)] + list(panel.sources)
+    urls = sorted({u for u in addresses if _is_http(u)})
     if not urls:
         return "source pending"
     links = ", ".join(f'<a href="{_esc(u)}" rel="noopener">{_esc(u)}</a>' for u in urls)
@@ -329,22 +401,36 @@ def _css() -> str:
     def tokens(scope: dict[str, str]) -> str:
         pairs = [f"--{k}:{v};" for k, v in sorted(scope.items())]
         series = [f"--s{i}:{hex_};" for i, hex_ in enumerate(SERIES_LIGHT)]
-        return "".join(pairs + series)
+        return "".join(pairs + series) + f"--sN:{NEUTRAL_LIGHT};"
 
     def dark_series() -> str:
-        return "".join(f"--s{i}:{hex_};" for i, hex_ in enumerate(SERIES_DARK))
+        slots = "".join(f"--s{i}:{hex_};" for i, hex_ in enumerate(SERIES_DARK))
+        return slots + f"--sN:{NEUTRAL_DARK};"
 
     light = tokens(_LIGHT)
     dark = "".join(f"--{k}:{v};" for k, v in sorted(_DARK.items())) + dark_series()
     return _CSS_TEMPLATE.format(light=light, dark=dark)
 
 
+def _beat_header(title: str) -> str:
+    return f'<h2 class="beat">{_esc(title)}</h2>'
+
+
+# The beats in render order, each a (header, builder) pair. A new beat adds one
+# row; the render loop and the page do not change (9c–9e).
+_BEATS = (
+    ("Beat 1 — People are telling us what’s wrong, in public", beat1_panels),
+    ("Beat 2 — The complaints have a shape", beat2_panels),
+)
+
+
 def render(conn) -> str:
     """The full study HTML as one string, from the panels the marts fill."""
-    panels = beat1_panels(conn)
     body: list[str] = []
-    for panel in panels:
-        body += _render_panel(panel)
+    for header, builder in _BEATS:
+        body.append(_beat_header(header))
+        for panel in builder(conn):
+            body += _render_panel(panel)
     return _PAGE.format(css=_css(), body="\n".join(body))
 
 
@@ -375,6 +461,7 @@ _CSS_TEMPLATE = (
     ".wrap{{max-width:860px;margin:0 auto;padding:32px 20px}}"
     "h1{{font-size:26px;margin:0 0 4px}}"
     ".lede{{color:var(--ink2);margin:0 0 28px}}"
+    ".beat{{font-size:20px;margin:24px 0 12px}}"
     ".panel{{background:var(--surface);border:1px solid var(--grid);"
     "border-radius:10px;padding:20px 22px;margin:0 0 20px}}"
     "h3{{font-size:17px;margin:0 0 8px}}"
@@ -403,6 +490,16 @@ _CSS_TEMPLATE = (
     ".nodata{{background:var(--page);border:1px solid var(--grid);"
     "border-radius:8px;padding:18px;color:var(--muted);font-style:italic;"
     "font-size:14px}}"
+    ".fixture{{background:var(--page);border:1px solid var(--baseline);"
+    "border-left:3px solid var(--sN);border-radius:8px;padding:16px 18px;"
+    "color:var(--ink2);font-size:14px}}"
+    ".metric{{width:100%;border-collapse:collapse;font-size:13px;margin:4px 0 0}}"
+    ".metric th,.metric td{{text-align:left;padding:8px 10px;"
+    "border-bottom:1px solid var(--grid)}}"
+    ".metric thead th{{color:var(--muted);font-weight:600;font-size:12px}}"
+    ".metric tbody th{{font-weight:600;color:var(--ink)}}"
+    ".metric .cnt{{color:var(--muted)}}"
+    ".metric .absent{{color:var(--muted);font-style:italic}}"
     ".chip{{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;"
     "border-radius:99px;border:1px solid var(--baseline);color:var(--ink2);"
     "vertical-align:middle}}"
@@ -418,9 +515,7 @@ _PAGE = (
     '<style>{css}</style></head><body><main class="wrap">'
     "<h1>The Friction Ledger</h1>"
     '<p class="lede">Why health-insurance refunds get stuck — read from the '
-    "customer’s chair, every number tagged for where it came from.</p>"
-    '<h2 style="font-size:20px;margin:24px 0 12px">Beat 1 — People are telling '
-    "us what’s wrong, in public</h2>\n"
+    "customer’s chair, every number tagged for where it came from.</p>\n"
     "{body}\n"
     "</main></body></html>\n"
 )

@@ -64,6 +64,26 @@ def _isolate_fetched_snapshots(
     yield
 
 
+def build_study_db(root: Path, rows: str = "synthetic") -> Path:
+    """A fully built study warehouse in `root`, returned as its db path: `rebuild`
+    plus the CLI's classify step, which fills the theme-share marts (B2.2, B2.5)
+    and classifier_quality (B2.4) that `rebuild` alone does not build. The model
+    decider and the decision cache are neutralised, so the classification is
+    rules-only, deterministic, and writes nothing under data/ — the same result
+    `make rebuild` produces with no key (source: pipeline/cli.py::_do_rebuild)."""
+    from pipeline import cli
+    from pipeline.build import rebuild
+
+    rebuild("duckdb", rows, root=root)
+    db = database_for(rows, root)
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(cli, "make_model_decider", lambda: None)  # never call the model
+        mp.setattr(cli, "read_decisions", lambda *a, **k: {})  # ignore any dev cache
+        mp.setattr(cli, "write_decisions", lambda *a, **k: None)  # no data/ write
+        cli._classify_and_print(db, rows)
+    return db
+
+
 @pytest.fixture
 def synthetic_conn(tmp_path):
     """A DuckDB connection to a freshly built synthetic warehouse in a temp file.
