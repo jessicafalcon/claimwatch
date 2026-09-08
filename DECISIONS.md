@@ -2227,3 +2227,86 @@ added to CI, the SVG byte-formatting rule pinned, invariant 3 split (the counted
 Measured/Documented/Pending, the empty-Documented-mart state specified, and the
 BACKLOG rows cited by title.
 
+### Phase 9b
+
+Branch `phase-9b-beat-2`, spec `specs/phase-9b-beat-2.md`, challenged round 1
+(rework, all twelve findings applied). Beat 2 of the study. Depends on the fix
+PR `fix/theme-marts-run-id` (the two theme marts carry `run_id`), merged first.
+
+- **The corpus gate: a number that derives from the review corpus renders only
+  over a `captured` input, read from the mart's own `run_id`.** The brief says
+  three times a share over fake reviews is never shown as a number (§3 Beat 2,
+  §10, §2.4), and the committed page renders over the frozen synthetic fixture.
+  So B2.2/B2.4/B2.5 read the classified rows' `run_id` against the imported
+  `pipeline.build.INPUTS`: `captured` renders the counted numbers, a fixture
+  input (`synthetic`, `samples`) renders a labelled fixture state and no number,
+  an absent or empty mart renders 9a's "no data yet". Two run_ids, or one outside
+  the set, refuse in one line naming the panel. The input is the mart's own row,
+  never the DB filename or a caller flag. A captured render is a local,
+  developer-run `write(db=…)`, never committed in 9b (whether the published page
+  is such a render is 9f's call — BACKLOG). *Rejected: a sentence beside a
+  Measured fixture number — the brief forbids the number, not the sentence;
+  deriving the input from the filename — caller-sourced (LESSONS).*
+- **The export's trail is the mart's `reviews`/`theme_rows` beside each share,
+  plus the structural no-text guarantee; the review-level drill is the Metabase
+  demonstration (9g).** No declared source yields a per-review public address
+  (every parser stores the brand-carrying page address — D1), so a row-per-review
+  list could be neither traced nor published, and each row's rating would be an
+  untagged number with no mart row. The counts ride on each point (redone by
+  hand). *Rejected: the per-review link list (challenge BLOCKER 2); a rule token
+  as the "one short marked phrase" — that re-runs the rules over text inside the
+  renderer.*
+- **The no-text guarantee is a column allowlist checked on the cursor's
+  description, not a denylist on query text.** One closed `ALLOWED_COLUMNS` the
+  export may read; `_rows` reads each cursor's own description and refuses any
+  other column by name, so `select *` cannot pass and `title`/`body` can never
+  reach the page. `STUDY_QUERIES` is every query the export runs, each linted for
+  portability and the clock by a test. *Rejected: grepping query text for
+  `title`/`body` — a denylist, the `unshaped-input` class; a four-word-run scan
+  — near vacuous against French bodies and English page prose.* This closes the
+  "Health details arrive in review bodies" BACKLOG row.
+- **The `unclassified` band is the palette's neutral token, always in the legend
+  with its count; the series colour is a closed choice on the type.** A
+  `Series.colour` is a categorical slot `0..4` or the `NEUTRAL` token, refused by
+  name outside it (never a sentinel integer reaching an undefined `var(--sN)`).
+  The band is emitted even when empty, its legend name carrying its total count,
+  so a small or absent band reads as zero, never as hidden. `positive` is
+  excluded from the theme bars (a theme chart counts complaints) and the
+  denominator — every classified review, `positive` included — is stated beside
+  the chart; SPEC and BACKING's "negative reviews" wording is corrected to the
+  mart's denominator. *Rejected: a sixth categorical hue (the five-slot order is
+  the CVD-safety mechanism); a stacked area (draws a cumulative number no mart
+  holds).*
+- **A metric cell is a value xor a declared absence.** `Point.absent` carries the
+  labelled reason a cell has no value; `check_panel` refuses both set and refuses
+  a null cell with neither (9a's null-cell refusal, extended). B2.4's table sets
+  the absence exactly when the held-out denominator is zero ("no held-out case")
+  and carries the integer count; the `table` kind dispatches on "any cell
+  present", so a table of absences renders as a table, not "no data yet".
+  *Rejected: rendering 0.0; a dash; a second optional field with no refusal.*
+- **The module split has one direction: `model.py` ← `panels.py` ← `export.py`,
+  moved verbatim in its own commit.** `model.py` the types and the contract,
+  `panels.py` the readers plus the allowlist and the corpus gate, `export.py` the
+  renderers and the page. The move is a separate commit so the diff shows the
+  rename and `check-pins` sees the moved symbols named in the changed tests.
+  *Rejected: builders importing from `export` (a cycle); one 1,100-line file.*
+
+Gotcha: `rebuild()` builds the generic and model/simulator marts but NOT the
+classify step (the theme marts B2.2/B2.5 and the filling of classifier_quality
+B2.4) — that is the CLI's `_do_rebuild` → `_classify_and_print`. So a test that
+needs the Beat 2 marts must run the classify step too; `tests/conftest.py::
+build_study_db` does (rebuild + the CLI step with the model decider and the
+decision cache neutralised, so it is rules-only, deterministic, and writes
+nothing under `data/`). A corpus panel over `ROWS=none` (no reviews, no classify)
+finds the theme marts absent, not empty, so the gate probes
+`information_schema.tables` and renders "no data yet".
+
+Challenge dispositions (round 1, 2026-09-08 — rework, all applied): BLOCKER 1
+(fixture shares under Measured) → the corpus gate. BLOCKER 2 (the per-review
+list) → the list dropped, the trail is counts. #3 (`run_id` on the theme marts)
+→ the fix PR this branch depends on. #4 (`positive`; "negative reviews") → the
+neutral-band decision and the two claim-cell fixes. #5 (allowlist not denylist)
+→ the column allowlist. #6 (value xor absence) → `Point.absent`. #7–#9 (module
+direction, lint the study queries, closed series colour) folded in. #10–#12
+(security-reviewer not triggered; a captured render is local and uncommitted;
+the band's legend entry with its count) answered in the spec.
