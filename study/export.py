@@ -309,8 +309,9 @@ def beat1_panels(conn) -> list[Panel]:
             backing_row="B1.2",
             title="The public rating over time",
             blurb=(
-                "Customers rate the segment’s insurers on platforms they were not "
-                "invited to. This is that rating month by month, on the unsolicited "
+                "Customers rate this segment’s digital-first insurers on platforms "
+                "they were not invited to — one line per insurer, not a segment "
+                "average. This is that rating, month by month, on the unsolicited "
                 "channel."
             ),
             tag="Documented",
@@ -357,9 +358,9 @@ def beat1_panels(conn) -> list[Panel]:
             kind="stat_row",
             series=_platform_stats(conn),
             note=(
-                "Stated here: today the answer rate and time are measured for one "
-                "profile on one platform, so the comparison across platforms waits "
-                "for a second platform’s figures."
+                "Stated here: today the answer rate and time come from one profile "
+                "on one platform, so the comparison across platforms waits for a "
+                "second platform’s figures."
             ),
         ),
     ]
