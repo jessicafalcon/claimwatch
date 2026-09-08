@@ -287,8 +287,9 @@ CLASSIFIED_REVIEWS_COLUMNS = ("source", "external_id", "theme", "run_id")
 # The theme-share marts count those rows. share = theme_rows / reviews, at the
 # review x theme grain (a review counts once in `reviews`, once per theme bar).
 # unclassified is a row, not a gap — the gray "not yet classified" band, and with
-# no key it is largest. Tag Measured; provenance is the tag (a computed share has
-# no address or capture instant), run_id lives one hop upstream.
+# no key it is largest. Tag Measured; provenance is the tag plus run_id (a computed
+# share has no address or capture instant; run_id is carried from
+# stg_classified_reviews so the study can tell which input the rows came from).
 THEME_SHARE_TAG = "Measured"
 THEME_SHARE_BY_SEGMENT_COLUMNS = (
     "segment",
@@ -297,6 +298,7 @@ THEME_SHARE_BY_SEGMENT_COLUMNS = (
     "theme_rows",
     "share",
     "tag",
+    "run_id",
 )
 THEME_SHARE_BY_MONTH_COLUMNS = ("month",) + THEME_SHARE_BY_SEGMENT_COLUMNS
 

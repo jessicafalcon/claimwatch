@@ -11,10 +11,11 @@
 --   from its source (Phase 7a A1) — no join, so a review is counted under
 --   exactly one segment on every input. Portable: string-concat distinct count,
 --   no regex, no like, no clock, no reader.
--- Provenance: the Measured tag. A computed share has no single address, capture
---   instant or run; its inputs (reviews, theme_rows) are stored so the share can
---   be redone by hand, and run_id lives one hop upstream on
---   stg_classified_reviews.
+-- Provenance: the Measured tag and run_id. A computed share has no single
+--   address or capture instant; its inputs (reviews, theme_rows) are stored so
+--   the share can be redone by hand, and run_id is carried from
+--   stg_classified_reviews (one value per build) so the study can tell which
+--   input the counted rows came from (the render-time corpus gate, Phase 9b).
 -- Tag: Measured (the classifier's own output, counted).
 -- Feeds: B2.5. Built by the classify step after stg_classified_reviews is
 --   filled (excluded from the generic marts pass, which runs before classify).
@@ -24,7 +25,8 @@ with labeled as (
         r.segment     as segment,
         c.theme       as label,
         r.source      as source,
-        r.external_id as external_id
+        r.external_id as external_id,
+        c.run_id      as run_id
     from stg_classified_reviews c
     join stg_reviews r
         on c.source = r.source and c.external_id = r.external_id
@@ -42,8 +44,9 @@ select
     totals.reviews,
     count(*)                        as theme_rows,
     count(*) * 1.0 / totals.reviews as share,
-    'Measured'                      as tag
+    'Measured'                      as tag,
+    labeled.run_id
 from labeled
 join totals
     on labeled.segment = totals.segment
-group by labeled.segment, labeled.label, totals.reviews;
+group by labeled.segment, labeled.label, totals.reviews, labeled.run_id;

@@ -135,6 +135,25 @@ def test_by_month_pins(tmp_path):
     assert doc_months == set(months)  # the held-claim theme in every month
 
 
+def test_theme_marts_carry_the_run_id_they_were_built_from(tmp_path):
+    """Fix (2026-09-08): both theme marts carry `run_id` from stg_classified_reviews
+    — one value, the classify step's input — so the study can tell which corpus
+    the counted rows came from; the column set is pinned."""
+    db = _built(tmp_path)
+    conn = connect("duckdb", database=db)
+    try:
+        for table, columns in (
+            ("theme_share_by_month", pins.THEME_SHARE_BY_MONTH_COLUMNS),
+            ("theme_share_by_segment", pins.THEME_SHARE_BY_SEGMENT_COLUMNS),
+        ):
+            cols = tuple(r[0] for r in conn.execute(f"describe {table}").fetchall())
+            assert cols == columns, table
+            run_ids = conn.execute(f"select distinct run_id from {table}").fetchall()
+            assert run_ids == [("t",)], table
+    finally:
+        conn.close()
+
+
 def test_review_segment_is_its_source_segment(tmp_path):
     """Done-when 4 / invariant 2 (A1): a review carries the segment of the source
     it was loaded from. Every synthetic review is digital-first; a sample review
