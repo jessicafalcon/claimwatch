@@ -173,11 +173,14 @@ def _rating_trend(conn) -> tuple[Series, ...]:
     # profile filter, unlike _channel_gap/_platform_stats which are the studied
     # insurer's profile. The anchors carry one digital-first unsolicited profile
     # today, so it renders one line; a second lands as a second line, no change.
+    # The grain is (source, profile, month), so `source` closes the order-by:
+    # two unsolicited sources with a rating in one profile+month append in a
+    # fixed order, not the engine's, and the bytes stay stable (round 2, CR#16).
     rows = _rows(
         conn,
         "select profile, month, rating, tag, source_url from rating_trend "
         "where channel = 'unsolicited' and segment = 'digital-first' "
-        "order by profile, month",
+        "order by profile, month, source",
     )
     by_profile: dict[str, list[Point]] = {}
     for profile, month, rating, tag, url in rows:

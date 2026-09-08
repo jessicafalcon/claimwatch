@@ -225,6 +225,36 @@ def test_drill_drops_a_non_http_source_url():
     assert drilled == "source pending"
 
 
+def _rating_trend_conn(rows: list[tuple]):
+    conn = connect("duckdb", database=":memory:")
+    conn.execute(
+        "create table rating_trend("
+        "channel varchar, segment varchar, source varchar, profile varchar, "
+        "month varchar, rating double, tag varchar, source_url varchar)"
+    )
+    conn.executemany("insert into rating_trend values (?,?,?,?,?,?,?,?)", rows)
+    return conn
+
+
+def test_rating_trend_orders_multi_source_points_deterministically():
+    # Two unsolicited sources carrying a rating in the same profile+month: the
+    # order-by closes on `source`, so the two points append in a fixed order —
+    # not the engine's — and the bytes stay stable (round 2, CR#16). Insertion
+    # order is zeta-then-alpha; the render must return alpha-then-zeta.
+    rows = [
+        ("unsolicited", "digital-first", "zeta", "fr-digital-first", "2025-01",
+         3.0, "Documented", "https://z/"),
+        ("unsolicited", "digital-first", "alpha", "fr-digital-first", "2025-01",
+         4.0, "Documented", "https://a/"),
+    ]
+    conn = _rating_trend_conn(rows)
+    try:
+        (line,) = export._rating_trend(conn)
+    finally:
+        conn.close()
+    assert [p.value for p in line.points] == [4.0, 3.0]
+
+
 def test_b1_2_renders_the_sampling_bias_note(synthetic_db):
     assert "negatively self-selected" in _html(synthetic_db)
 
