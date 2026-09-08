@@ -516,9 +516,7 @@ def _peer_ratings(conn) -> tuple[Series, ...]:
     return (Series("Public rating", 0, tuple(points)),) if points else ()
 
 
-def _score_cell(
-    name: str, value, hits, denominator, denominator_name: str
-) -> Point:
+def _score_cell(name: str, value, hits, denominator, denominator_name: str) -> Point:
     """One classifier-quality cell: a percentage with its raw counts, or — when
     the held-out denominator is zero — a labelled absence carrying that count
     (value xor absence; Phase 9b, pinned decision 5)."""

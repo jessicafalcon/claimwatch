@@ -279,7 +279,12 @@ def test_b2_2_plots_each_share_against_the_axis_not_stacked():
         ("2026-01", "second-payer", 10, 6, 0.6),
     ]
     panel = Panel(
-        "B2.9", "B2.9", "t", "b", "Measured", "line",
+        "B2.9",
+        "B2.9",
+        "t",
+        "b",
+        "Measured",
+        "line",
         series=panels._theme_series(rows, "B2.9", "period"),
         domain=(0.0, 1.0),
     )
@@ -362,7 +367,12 @@ def test_a_zero_denominator_metric_renders_a_labelled_absence_with_its_counts(
 
 def test_a_null_cell_with_no_declared_absence_is_still_refused_by_name():
     panel = Panel(
-        "B2.9", "B2.9", "t", "b", "Measured", "table",
+        "B2.9",
+        "B2.9",
+        "t",
+        "b",
+        "Measured",
+        "table",
         columns=("Theme", "Precision"),
         series=(
             Series("Document loop", 0, (Point("Precision", None, "Measured", ""),)),
@@ -375,7 +385,12 @@ def test_a_null_cell_with_no_declared_absence_is_still_refused_by_name():
 
 def test_a_point_with_both_value_and_absence_is_refused():
     panel = Panel(
-        "B2.9", "B2.9", "t", "b", "Measured", "table",
+        "B2.9",
+        "B2.9",
+        "t",
+        "b",
+        "Measured",
+        "table",
         columns=("Theme", "Precision"),
         series=(
             Series(
@@ -392,7 +407,12 @@ def test_a_point_with_both_value_and_absence_is_refused():
 
 def test_an_all_absent_table_renders_as_a_table_not_no_data():
     panel = Panel(
-        "B2.9", "B2.9", "t", "b", "Measured", "table",
+        "B2.9",
+        "B2.9",
+        "t",
+        "b",
+        "Measured",
+        "table",
         columns=("Theme", "Precision", "Recall"),
         series=(
             Series(
@@ -400,12 +420,22 @@ def test_an_all_absent_table_renders_as_a_table_not_no_data():
                 0,
                 (
                     Point(
-                        "Precision", None, "Measured", "", "pct",
-                        absent="no held-out case", detail="0 predicted",
+                        "Precision",
+                        None,
+                        "Measured",
+                        "",
+                        "pct",
+                        absent="no held-out case",
+                        detail="0 predicted",
                     ),
                     Point(
-                        "Recall", None, "Measured", "", "pct",
-                        absent="no held-out case", detail="0 actual",
+                        "Recall",
+                        None,
+                        "Measured",
+                        "",
+                        "pct",
+                        absent="no held-out case",
+                        detail="0 actual",
                     ),
                 ),
             ),

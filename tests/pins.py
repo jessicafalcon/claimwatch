@@ -509,10 +509,16 @@ BEAT2_QUALITY_CELLS = {
     "silent-rejection": ("100.0%", "1/1", "100.0%", "1/1"),
     "second-payer": ("100.0%", "1/1", "100.0%", "1/1"),
     "support-traction": (
-        "no held-out case", "0 predicted", "no held-out case", "0 actual",
+        "no held-out case",
+        "0 predicted",
+        "no held-out case",
+        "0 actual",
     ),
     "coverage-price": (
-        "no held-out case", "0 predicted", "no held-out case", "0 actual",
+        "no held-out case",
+        "0 predicted",
+        "no held-out case",
+        "0 actual",
     ),
     "positive": ("100.0%", "1/1", "100.0%", "1/1"),
 }
