@@ -23,7 +23,7 @@ reality; every non-obvious claim must have its DECISIONS entry. Skip checks 1,
 ## What to read first (the standard you check against)
 
 CLAUDE.md, PROJECT_BRIEF.md (§2 principles, §3 beats, §4 architecture, §9
-phases), SPEC.md, BACKING.md, DECISIONS.md, BACKLOG.md, the specs in `specs/`,
+phases), SPEC.md, BACKING.md, DECISIONS.md, BACKLOG.md, LESSONS.md, the specs in `specs/`,
 `docs/PLAN.md`. Then the actual codebase (`git ls-files`; `ingest/`, `sql/`,
 `classify/`, `models/`, `study/`, `pipeline/`, `dags/`, `tests/`, Makefile,
 CI).
@@ -65,6 +65,9 @@ clock on a data path; regex in SQL; a dialect form outside
   formula changed.
 - The finished spec's "Delivered" paragraph vs the actual landing; any
   Done-when claim the code can falsify.
+- LESSONS.md rows `open` for two phases with no second hit and not expired; a
+  `promoted` row whose mechanism (the test, rule, guard or sentence it names)
+  is gone; a fix commit in the range with no row.
 - BACKLOG.md rows whose trigger has arrived and were neither done nor
   re-deferred.
 

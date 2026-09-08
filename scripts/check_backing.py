@@ -40,7 +40,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from review_common import ROOT
+from review_common import ROOT, read_text_or_error
 
 COLUMNS = ("Study claim", "Mart table", "SQL file", "Upstream source", "Tag")
 TAGS = frozenset({"Measured", "Documented", "Modeled", "Pending"})
@@ -169,7 +169,10 @@ def check_citations(rows: list[Row], root: Path) -> list[str]:
     spec = root / "SPEC.md"
     if not spec.is_file():
         return []
-    cited = set(_CITE.findall(_FENCE.sub("", spec.read_text(encoding="utf-8"))))
+    text, err = read_text_or_error(spec, root)
+    if text is None:
+        return [err]
+    cited = set(_CITE.findall(_FENCE.sub("", text)))
     defined = {rid for r in rows if (rid := row_id(r.claim))}
     return [
         f"SPEC.md cites {b}, which is not a BACKING row"
@@ -195,7 +198,11 @@ def main(root: Path = ROOT) -> int:
     if not backing.is_file():
         print("FAIL header: BACKING.md does not exist")
         return 1
-    rows, header_errors = parse_table(backing.read_text(encoding="utf-8"))
+    text, err = read_text_or_error(backing, root)
+    if text is None:
+        print(f"FAIL header: {err}")
+        return 1
+    rows, header_errors = parse_table(text)
     checks = [
         ("header", header_errors),
         ("tags", check_tags(rows)),

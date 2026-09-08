@@ -71,8 +71,8 @@ def test_every_named_make_target_exists_today():
         )
         for c in tooling
     }
-    assert by_class == {"agents": 6, "skills": 7}, by_class
-    assert len(check_docs.command_files(ROOT)) == 7  # every skill runs today
+    assert by_class == {"agents": 6, "skills": 8}, by_class
+    assert len(check_docs.command_files(ROOT)) == 8  # every skill runs today
     assert check_docs.check_make_targets(files, ROOT) == []
 
 
@@ -153,13 +153,13 @@ def test_check_backlog_count_reports_a_mismatch(tmp_path: Path):
     )
     claude = tmp_path / "CLAUDE.md"
     claude.write_text("Open BACKLOG rows: **3**\n")
-    assert check_docs.check_backlog_count(claude, backlog) == [
+    assert check_docs.check_backlog_count(tmp_path) == [
         "CLAUDE.md says 3 open BACKLOG rows; BACKLOG.md has 2"
     ]
     claude.write_text("Open BACKLOG rows: **2**\n")
-    assert check_docs.check_backlog_count(claude, backlog) == []
+    assert check_docs.check_backlog_count(tmp_path) == []
     claude.write_text("no sentence\n")
-    assert check_docs.check_backlog_count(claude, backlog) == [
+    assert check_docs.check_backlog_count(tmp_path) == [
         "CLAUDE.md: no 'Open BACKLOG rows: **N**' sentence"
     ]
     # the header is skipped by position, not by the word "Item"
@@ -167,11 +167,12 @@ def test_check_backlog_count_reports_a_mismatch(tmp_path: Path):
     assert check_docs.open_backlog_rows(renamed) == 2
     # a missing record file is an error, never a vacuous green
     backlog.unlink()
-    assert check_docs.check_backlog_count(claude, backlog) == [
+    assert check_docs.check_backlog_count(tmp_path) == [
         "BACKLOG.md: record file is missing"
     ]
-    assert check_docs.check_backlog_count(tmp_path / "nope.md", backlog) == [
-        "nope.md: record file is missing",
+    claude.unlink()
+    assert check_docs.check_backlog_count(tmp_path) == [
+        "CLAUDE.md: record file is missing",
         "BACKLOG.md: record file is missing",
     ]
 
@@ -185,9 +186,9 @@ def test_check_neutrality_reports_a_token_never_a_url_and_never_the_name(
     hashes = tmp_path / "scripts" / "neutrality_hashes.txt"
     hashes.parent.mkdir()
     hashes.write_text(f"# a comment\n\n{digest}\nnot-a-digest\n")
-    digests, errors = check_docs.neutrality_hashes(hashes)
+    digests, errors = check_docs.neutrality_hashes(tmp_path)
     assert digests == {digest}
-    assert errors == ["neutrality_hashes.txt:4: not a sha256 hex digest"]
+    assert errors == ["scripts/neutrality_hashes.txt:4: not a sha256 hex digest"]
     readme = tmp_path / "README.md"
     readme.write_text(
         "ZZBrand held the refund.\n"
@@ -211,8 +212,9 @@ def test_check_neutrality_reports_a_token_never_a_url_and_never_the_name(
         "cafe",
     }
     assert check_docs.check_neutrality([readme], set(), tmp_path) == []
-    _, missing = check_docs.neutrality_hashes(tmp_path / "gone.txt")
-    assert missing == ["gone.txt: hash file is missing"]
+    (tmp_path / "empty").mkdir()
+    _, missing = check_docs.neutrality_hashes(tmp_path / "empty")
+    assert missing == ["scripts/neutrality_hashes.txt: hash file is missing"]
 
 
 def test_neutrality_files_are_the_tracked_code_and_prose_minus_the_declarations():
@@ -239,8 +241,195 @@ def test_neutrality_files_are_the_tracked_code_and_prose_minus_the_declarations(
     assert "CLAUDE.md" in check_docs.tracked_paths(ROOT)
 
 
+def test_record_titles_are_read_outside_fences_with_open_state():
+    """The two title readers the tag check cites against: a BACKLOG row's bold
+    title with its open/struck state; every DECISIONS bold span and heading,
+    a fenced one excluded."""
+    assert check_docs.backlog_titles(
+        "| Item | Source | Trigger |\n|---|---|---|\n"
+        "| **Open row** — detail | r | t |\n| ~~**Closed row** — d~~ DONE | r | t |\n"
+    ) == {"Open row": True, "Closed row": False}
+    assert check_docs.decisions_titles(
+        "## Gotchas\n- **An entry (2026-09-03).** Why.\n```\n**fenced**\n```\n"
+    ) == {"Gotchas", "An entry (2026-09-03)."}
+
+
+def test_check_comment_tags_reports_each_shape_and_missing_record(tmp_path: Path):
+    """Check 7: a tag word is one of four shapes, each pointing at a record entry
+    that exists; a struck BACKLOG row, an unknown DECISIONS entry, a missing
+    spec and any other shape are each one error naming the line."""
+    (tmp_path / "BACKLOG.md").write_text(
+        "| Item | Source | Trigger |\n|---|---|---|\n"
+        "| **Open row about a scan** — detail | r1 | t |\n"
+        "| ~~**Closed row** — detail~~ DONE | r1 | t |\n"
+    )
+    (tmp_path / "DECISIONS.md").write_text(
+        "## Gotchas\n\n- **The gate is a goal (2026-09-03).** Because.\n"
+        "```\n**Not an entry** inside a fence\n```\n"
+    )
+    (tmp_path / "specs").mkdir()
+    (tmp_path / "specs" / "phase-1-schema.md").write_text("# s\n")
+    (tmp_path / "fixtures").mkdir()
+    (tmp_path / "fixtures" / "page.py").write_text("# TODO: sample, never read\n")
+    code = tmp_path / "pipeline.py"
+    lines = [
+        "# TODO(BACKLOG): Open row about a scan",  # ok
+        "x = 1  # TODO(BACKLOG): Open row",  # ok — a prefix, trailing comment
+        "# TODO(BACKLOG): Closed row",
+        "# TODO(BACKLOG): Nothing like it",
+        "# TODO: no record",
+        "# HACK(DECISIONS): The gate is a goal",  # ok
+        "# HACK(DECISIONS): Not an entry",
+        "# REF: https://example.org/spec §2",  # ok
+        "# REF: brief §6.2",  # ok
+        "# REF: RFC 9309",  # ok
+        "# REF: see the brief",
+        "# INVARIANT(phase-1-schema 3): raw is append-only",  # ok
+        "# INVARIANT(phase-9-study 1): not yet",
+        "# INVARIANT 3: no parens",
+        'S = """docstring with # TODO: not a comment"""',  # a string, not read
+        "T = '# HACK: in a literal'",  # a string, not read
+        "# see TODO(BACKLOG): nope — a tag that does not open the comment",
+    ]
+    code.write_text("\n".join(lines) + "\n")
+    sql = tmp_path / "mart.sql"
+    sql.write_text("-- HACK: no record\nselect 1 -- REF: RFC 9309\n")
+    paths = ["pipeline.py", "mart.sql", "fixtures/page.py", "notes.md"]
+    files = check_docs.comment_files(tmp_path, paths)
+    assert files == [code, sql]
+    assert check_docs.check_comment_tags(files, tmp_path) == [
+        "pipeline.py:3: TODO cites a closed BACKLOG row: 'Closed row'",
+        "pipeline.py:4: TODO cites no single open BACKLOG row: 'Nothing like it'",
+        "pipeline.py:5: malformed TODO comment "
+        "(shape: TODO(BACKLOG): <open row title>)",
+        "pipeline.py:7: HACK cites no single DECISIONS entry: 'Not an entry'",
+        "pipeline.py:11: malformed REF comment (shape: REF: <URL | brief §n | RFC n>)",
+        "pipeline.py:13: INVARIANT names no spec: specs/phase-9-study.md",
+        "pipeline.py:14: malformed INVARIANT comment "
+        "(shape: INVARIANT(<spec stem> <n>): <why>)",
+        "mart.sql:1: malformed HACK comment (shape: HACK(DECISIONS): <entry title>)",
+    ]
+    assert check_docs.comments(sql, sql.read_text()) == [
+        (1, " HACK: no record"),
+        (2, " REF: RFC 9309"),
+    ]
+    code.write_text("x = (1,\n")  # an unterminated statement does not tokenize
+    assert check_docs.check_comment_tags([code], tmp_path) == [
+        "pipeline.py: does not tokenize: unexpected EOF in multi-line statement"
+    ]
+
+
+def test_check_lessons_reports_cells_class_and_status(tmp_path: Path):
+    """Check 8: six cells, a class from the closed set, a status of the three
+    shapes; the header and separator are skipped by position."""
+    lessons = tmp_path / "LESSONS.md"
+    row = "| `{c}` | w | m | i | p | {s} |\n"
+    lessons.write_text(
+        "| Class | Where | The mistake | The invariant restored | The pin | Status |\n"
+        "|---|---|---|---|---|---|\n"
+        + row.format(c="unpinned", s="open")
+        + row.format(c="name-drift", s="promoted → `/preflight`")
+        + row.format(c="site-fix", s="expired 2026-12-01")
+        + row.format(c="vibes", s="open")
+        + row.format(c="unpinned", s="promoted")
+        + "| `unpinned` | five | cells | only | here |\n"
+    )
+    assert check_docs.table_rows(lessons.read_text())[0][:2] == ["`unpinned`", "w"]
+    # a pipe inside backticks or escaped stays in its cell (the escape is spent)
+    assert check_docs.table_cells("| `ok   pins \\| 6/6` | a \\| b | c |") == [
+        "`ok   pins | 6/6`",
+        "a | b",
+        "c",
+    ]
+    assert check_docs.table_cells("| `x|y` | z |") == ["`x|y`", "z"]
+    assert check_docs.check_lessons(tmp_path) == [
+        "LESSONS.md row 4: class not in the closed set: `vibes`",
+        "LESSONS.md row 5: status shape: 'promoted'",
+        "LESSONS.md row 6: 5 cells, not 6",
+    ]
+    (tmp_path / "empty").mkdir()
+    assert check_docs.check_lessons(tmp_path / "empty") == [
+        "LESSONS.md: record file is missing"
+    ]
+    lessons.write_bytes(b"| a |\n|---|\n| caf\xe9 |\n")
+    assert check_docs.check_lessons(tmp_path) == ["LESSONS.md: not UTF-8 text"]
+
+
+def test_a_file_that_is_not_text_is_one_error_line_in_every_check(tmp_path: Path):
+    """The read is a boundary for the class, not a site: every per-file check
+    reports a non-UTF-8 file by name and goes on; a record that does not read
+    is the record check's own error line; never a traceback."""
+    for name in ("BACKLOG.md", "DECISIONS.md"):
+        (tmp_path / name).write_text("| a | b | c |\n|---|---|---|\n")
+    (tmp_path / "specs").mkdir()
+    (tmp_path / "Makefile").write_text("test:\n\tx\n")
+    latin = tmp_path / "latin.py"
+    latin.write_bytes(b"# caf\xe9\n")
+    fine = tmp_path / "fine.md"
+    fine.write_text("see [x](latin.py#top) and `make nope`\n")
+    line = ["latin.py: not UTF-8 text"]
+    assert check_docs.check_comment_tags([latin], tmp_path) == line
+    assert check_docs.check_neutrality([latin], {"0" * 64}, tmp_path) == line
+    assert check_docs.check_banned_words([latin], tmp_path) == line
+    assert check_docs.check_glossary([latin], tmp_path) == line
+    assert check_docs.check_make_targets([latin, fine], tmp_path) == [
+        *line,
+        "fine.md: names `make nope` — not in the Makefile",
+    ]
+    assert (
+        check_docs.check_links([latin, fine], tmp_path) == line * 2
+    )  # source, then anchor target
+    # the single-file checks name their file the same way: relative to root
+    (tmp_path / "scripts").mkdir()
+    for rel in ("LESSONS.md", "CLAUDE.md", "scripts/neutrality_hashes.txt"):
+        (tmp_path / rel).write_bytes(b"caf\xe9\n")
+    assert check_docs.check_lessons(tmp_path) == ["LESSONS.md: not UTF-8 text"]
+    assert check_docs.check_backlog_count(tmp_path) == ["CLAUDE.md: not UTF-8 text"]
+    assert check_docs.neutrality_hashes(tmp_path) == (
+        set(),
+        ["scripts/neutrality_hashes.txt: not UTF-8 text"],
+    )
+    # the tokenizer's other exceptions are the same boundary
+    tabs = tmp_path / "tabs.py"
+    tabs.write_text("def f():\n    x = 1\n  y = 2\n")
+    assert check_docs.check_comment_tags([tabs], tmp_path) == [
+        "tabs.py: does not tokenize: "
+        "unindent does not match any outer indentation level"
+    ]
+    # a record or the Makefile that did not read is the check's one line: the
+    # tags and targets are not checked against an empty default (empty-default)
+    (tmp_path / "BACKLOG.md").write_bytes(b"caf\xe9")
+    tagged = tmp_path / "tagged.py"
+    tagged.write_text("# TODO(BACKLOG): A real row\n# HACK(DECISIONS): An entry\n")
+    assert check_docs.check_comment_tags([tagged], tmp_path) == [
+        "BACKLOG.md: not UTF-8 text"
+    ]
+    (tmp_path / "Makefile").write_bytes(b"caf\xe9")
+    assert check_docs.check_make_targets([fine], tmp_path) == [
+        "Makefile: not UTF-8 text"
+    ]
+    assert check_docs.make_targets(tmp_path) == (set(), "Makefile: not UTF-8 text")
+
+
+def test_lesson_classes_match_the_lessons_md_fence():
+    """LESSONS.md spells the closed set inside a fence; the code's tuple must
+    be the same set, or a class is added on one side only."""
+    text = (ROOT / "LESSONS.md").read_text()
+    fence = re.search(r"```\n(.*?)```", text, re.S)
+    assert fence is not None
+    assert set(fence.group(1).split()) == set(check_docs.LESSON_CLASSES)
+
+
+def test_commit_messages_read_the_log_and_are_empty_outside_git(tmp_path: Path):
+    """The naming check's commit window comes through the shared runner: the
+    repo's own log has bodies; a directory that is not a repository reads as
+    no messages, never a traceback."""
+    assert "phase-" in check_docs.commit_messages(ROOT)
+    assert check_docs.commit_messages(tmp_path) == ""
+
+
 def test_backlog_count_matches_today():
-    assert check_docs.check_backlog_count(ROOT / "CLAUDE.md", ROOT / "BACKLOG.md") == []
+    assert check_docs.check_backlog_count(ROOT) == []
 
 
 def test_check_docs_is_green_today(capsys):

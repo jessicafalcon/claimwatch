@@ -9,6 +9,7 @@ scores a lie."""
 from __future__ import annotations
 
 from pipeline.warehouse import ROOT
+from tests.repo_text import repo_text
 
 # The tokens a reader of the answer key would carry: the file name, the reader
 # module and its symbols. A module that opens the file, imports the reader, or
@@ -48,7 +49,7 @@ def _source_files():
 def test_no_reader_of_labels_outside_eval():
     offenders: list[str] = []
     for path in _source_files():
-        text = path.read_text(encoding="utf-8")
+        text = repo_text(path)
         hits = [tok for tok in READER_TOKENS if tok in text]
         if hits:
             offenders.append(f"{path.relative_to(ROOT)}: {hits}")
@@ -80,7 +81,7 @@ def test_the_model_call_site_is_covered_by_the_wall():
 def test_the_one_reader_actually_reads_it():
     # A live wall: the reader package DOES carry the tokens (so the test above is
     # excluding a real reader, not passing on an empty repo).
-    reader = (EXCLUDED / "labels_io.py").read_text(encoding="utf-8")
+    reader = repo_text(EXCLUDED / "labels_io.py")
     assert "labels.csv" in reader and "read_labels" in reader
 
 
@@ -90,6 +91,6 @@ def test_the_gate_is_inside_the_wall():
     # module can never quietly grow into a reader of its own scores.
     gate = EXCLUDED / "gate.py"
     assert gate.is_file() and gate.is_relative_to(EXCLUDED)
-    assert "read_labels" in gate.read_text(encoding="utf-8")
+    assert "read_labels" in repo_text(gate)
     swept = {path.relative_to(ROOT).as_posix() for path in _source_files()}
     assert "classify/eval/gate.py" not in swept  # excluded, correctly

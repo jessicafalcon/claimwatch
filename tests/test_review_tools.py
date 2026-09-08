@@ -4,7 +4,9 @@ CLI refusals by spawning the script. Offline, no services."""
 
 from __future__ import annotations
 
+import ast
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -13,7 +15,15 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import review_gate
-from review_common import Refused, resolve_spec, run, section
+from review_common import (
+    Refused,
+    read_text_or_error,
+    readable,
+    resolve_spec,
+    run,
+    section,
+    shown,
+)
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -57,6 +67,110 @@ def test_base_is_validated():
 def test_run_reports_a_missing_command():
     code, out = run(["definitely-not-a-command-xyz"], ROOT)
     assert code == 127 and out == "command not found: definitely-not-a-command-xyz"
+
+
+def test_run_reports_output_that_is_not_text():
+    """The subprocess-output boundary: a byte that does not decode is one
+    line naming the command, never a traceback."""
+    emit = "import sys; sys.stdout.buffer.write(b'ok\\xff')"
+    code, out = run([sys.executable, "-c", emit], ROOT)
+    assert (code, out) == (1, f"output of {sys.executable} is not UTF-8 text")
+
+
+def test_read_boundary_reports_by_name_and_skips_in_a_loop(tmp_path: Path):
+    """read_text_or_error names the path relative to root (its name when it
+    is not under root); readable() collects the line and goes on."""
+    good = tmp_path / "good.md"
+    good.write_text("fine\n")
+    latin = tmp_path / "latin.md"
+    latin.write_bytes(b"caf\xe9\n")
+    assert read_text_or_error(good, tmp_path) == ("fine\n", None)
+    assert read_text_or_error(latin, tmp_path) == (None, "latin.md: not UTF-8 text")
+    assert read_text_or_error(tmp_path / "gone.md", tmp_path) == (
+        None,
+        "gone.md: cannot be read: No such file or directory",
+    )
+    assert read_text_or_error(latin, tmp_path / "elsewhere") == (
+        None,
+        "latin.md: not UTF-8 text",
+    )
+    assert shown(tmp_path / "a" / "b.md", tmp_path) == "a/b.md"
+    assert shown(latin, tmp_path / "elsewhere") == "latin.md"
+    errors: list[str] = []
+    seen = [f.name for f, _ in readable([latin, good], tmp_path, errors)]
+    assert (seen, errors) == (["good.md"], ["latin.md: not UTF-8 text"])
+
+
+# The modules a script under scripts/ may import: stdlib that neither spawns a
+# process nor is a process module (no subprocess, os, pty, asyncio, shutil,
+# multiprocessing), plus the two sibling modules. A closed set, not a list of
+# spawner names: a module outside it is a finding whatever it is called.
+SCRIPT_IMPORTS = frozenset(
+    {
+        "__future__",
+        "argparse",
+        "ast",
+        "collections",
+        "dataclasses",
+        "functools",
+        "hashlib",
+        "io",
+        "pathlib",
+        "re",
+        "sys",
+        "tokenize",
+        "unicodedata",
+        "check_pins",
+        "review_common",
+    }
+)
+# The reader calls an allowed module still offers: pathlib's, io's, tokenize's
+# and the builtin `open` (`\bopen\(` matches `Path.open(`, `io.open(`,
+# `tokenize.open(` and the bare call alike).
+_RAW_READ = re.compile(r"\.read_text\(|\.read_bytes\(|\bopen\(")
+
+
+def _imported_roots(source: str) -> set[str]:
+    roots: set[str] = set()
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Import):
+            roots.update(alias.name.split(".")[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            roots.add(node.module.split(".")[0])
+    return roots
+
+
+def test_every_script_reads_and_runs_through_the_shared_boundary():
+    """The class fix for traceback-at-boundary, pinned as a layout rule: no
+    module under scripts/ reads a file or spawns a process on its own; the
+    one reader and the one runner live in review_common.py. Spawning is
+    closed off by the import allowlist (no process module can be named), a
+    raw read by the call regex over the modules that remain."""
+    offenders: list[str] = []
+    for p in sorted(ROOT.glob("scripts/*.py")):
+        if p.name == "review_common.py":
+            continue
+        source = p.read_text()
+        offenders += [
+            f"{p.name}: imports {m}"
+            for m in sorted(_imported_roots(source) - SCRIPT_IMPORTS)
+        ]
+        offenders += [
+            f"{p.name}:{n}"
+            for n, line in enumerate(source.splitlines(), 1)
+            if _RAW_READ.search(line)
+        ]
+    assert offenders == [], offenders
+    common = (ROOT / "scripts" / "review_common.py").read_text()
+    assert common.count(".read_text(") == 1 and common.count("subprocess.run(") == 1
+    assert _imported_roots(common) - SCRIPT_IMPORTS == {"subprocess"}
+    # the guard's own edges: a spawner by any name, a reader on an allowed module
+    assert _imported_roots("import os.path\nfrom pty import spawn\n") == {"os", "pty"}
+    assert all(
+        _RAW_READ.search(s)
+        for s in ("io.open(p)", "tokenize.open(p)", "p.open()", "open(p)")
+    )
+    assert not _RAW_READ.search("os.popen(c)")  # a spawn, refused by the allowlist
 
 
 def test_section_matches_heading_prefix():
@@ -261,14 +375,15 @@ def test_cli_refusals_are_one_line_exit_2(argv: list[str]):
 
 def test_gate_prints_one_line_per_check_and_the_total(monkeypatch, tmp_path: Path):
     """Evidence row 1: the printed shape — `ok   <check>` per check and
-    `review-gate OK: 7/7 checks` with a SPEC, `5/5` without — pinned with every
+    `review-gate OK: 8/8 checks` with a SPEC, `6/6` without — pinned with every
     subprocess stubbed green (the real gate runs `make test`, which is this suite)."""
     spec = tmp_path / "specs" / "s.md"
     spec.parent.mkdir()
     spec.write_text(_spec("| 1 | `tests/test_a.py::test_x` |"))
     monkeypatch.setattr(review_gate, "ROOT", tmp_path)
     monkeypatch.setattr(review_gate, "run", lambda cmd, cwd: (0, ""))
-    monkeypatch.setattr(review_gate, "make_targets", lambda root: set())
+    monkeypatch.setattr(review_gate, "make_targets", lambda root: (set(), None))
+    monkeypatch.setattr(review_gate, "unpinned", lambda root, base: [])
     monkeypatch.setattr(
         review_gate,
         "collected_tests",
@@ -288,9 +403,10 @@ def test_gate_prints_one_line_per_check_and_the_total(monkeypatch, tmp_path: Pat
         "ok   docs",
         "ok   backing",
         "ok   fixtures",
+        "ok   pins",
         "ok   evidence",
         "ok   records",
-        "review-gate OK: 7/7 checks",
+        "review-gate OK: 8/8 checks",
     ]
     buf = io.StringIO()
     with redirect_stdout(buf):
@@ -302,8 +418,36 @@ def test_gate_prints_one_line_per_check_and_the_total(monkeypatch, tmp_path: Pat
         "ok   docs",
         "ok   backing",
         "ok   fixtures",
-        "review-gate OK: 5/5 checks",
+        "ok   pins",
+        "review-gate OK: 6/6 checks",
     ]
+    # a Makefile that did not read is the evidence check's one line, never
+    # "not in the Makefile" for every target the spec names (empty-default)
+    monkeypatch.setattr(
+        review_gate, "make_targets", lambda root: (set(), "Makefile: not UTF-8 text")
+    )
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        assert review_gate.main(["--spec=specs/s.md"]) == 1
+    assert (
+        "FAIL evidence\n     Makefile: not UTF-8 text\nok   records\n" in buf.getvalue()
+    )
+
+
+def test_range_checks_report_a_failed_diff_as_one_fail_and_no_paths(monkeypatch):
+    """The two range checks (fixtures, pins) share one diff: when git cannot
+    produce it, one FAIL line names the command and the record check gets no
+    paths — never a green fixtures line over an unknown range."""
+    monkeypatch.setattr(review_gate, "run", lambda cmd, cwd: (128, "fatal: bad"))
+    results, diff = review_gate.range_checks(None, "nowhere")
+    assert diff == set()
+    assert results == [
+        ("fixtures", False, "git diff nowhere...HEAD failed: fatal: bad")
+    ]
+    monkeypatch.setattr(review_gate, "run", lambda cmd, cwd: (0, ""))
+    monkeypatch.setattr(review_gate, "unpinned", lambda root, base: ["x::y — new"])
+    results, diff = review_gate.range_checks(None, "main")
+    assert results == [("fixtures", True, ""), ("pins", False, "x::y — new")]
 
 
 def test_collected_tests_finds_the_suite():

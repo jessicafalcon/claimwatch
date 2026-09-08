@@ -1996,3 +1996,129 @@ default threshold (€42.67) lands inside the body of the distribution (median c
 €49.76) rather than a tail, and each fix shortens the mean hold — the story holds
 without tuning a default.
 
+### Tooling — the implementation loop (2026-09-07, branch `tooling/implementation-loop`)
+
+Not a phase (no spec, no BACKING row). After the Phase 8b merge the developer
+asked three things of the build step: comments that say their intent, fewer
+findings left for the reviewers to catch, and a loop that keeps a fixed
+mistake from being made twice. Three commits, one per piece.
+
+1. **Tagged comments are pointers at records.** Four tags, a closed set:
+   `TODO(BACKLOG): <open row title>`, `HACK(DECISIONS): <entry title>`,
+   `REF: <URL | brief §n | RFC n>`, `INVARIANT(<spec stem> <n>): <why>`. ruff's
+   `TD` and `FIX` rule sets refuse `FIXME`, `XXX` and a `TODO` without its
+   parens or colon (configuration over a script: the tool ships the check);
+   check-docs check 7 verifies the cited entry exists — an open BACKLOG row by
+   title (rows are cited by title, never by number: BACKLOG.md's own rule), a
+   DECISIONS bold title or heading, a spec file. Rejected: `TODO(BACKLOG-12)`
+   by row number (rows shift, and the file forbids it); a `CONCEPT` tag (the
+   Teaching rule lives in the README and docstrings, and an untagged comment
+   already says why); a `FIXME` allowed with a link (unfinished code does not
+   merge — the spec is the contract). Gotcha: TD003's issue-code regex
+   (`[A-Z]+-?\d+`) does not read the parens slot, probed live on ruff 0.16.3,
+   so TD003 is off and the record side lives in check-docs; FIX002 and FIX004
+   are off for the same reason (TODO and HACK are allowed once they cite).
+2. **The pin guard turns the most frequent finding class into a red line.**
+   `scripts/check_pins.py`: a public top-level function or class added or
+   changed in `<base>...HEAD` under a code package is named in a test — a new
+   one, in a test file the same range changed; a new mart file is named in a
+   changed test. "Changed" is an `ast.dump` difference (formatting and
+   comments do not count). It is the gate's `pins` line (8/8 with a spec, 6/6
+   without) and `make check-pins [BASE=main]`. Rejected: a coverage tool (a
+   new dependency, and line coverage is not the "one test fails when the rule
+   moves" property); a suite test that runs it on the checkout (its verdict
+   depends on the branch, so `make test` would go red mid-work and the
+   `run-tests` hook would block the very edit that adds the test); the
+   working-tree diff (the gate reviews commits). Name-mention is the honest
+   ceiling of a mechanical check; the behaviour column of `/preflight` is
+   where "named" becomes "asserted". The guard flagged its own branch first
+   (four helpers in check_docs with no test naming them), the behaviour it is
+   meant to catch.
+3. **`LESSONS.md` is the learning loop, with a promotion rule so it stays
+   read.** One row per correctness finding class a review round reported; the
+   fix commit writes it (CLAUDE.md → Fix commits); `/phase-start` prints the
+   `open` rows, `/preflight` asks each of every changed symbol, `code-craft`
+   points at it. A class hit twice becomes a mechanism and the row says which;
+   a promoted class that recurs reopens the row and reworks the mechanism.
+   Check-docs check 8 keeps the class set closed and the status shaped.
+   Seeded from the fix commits since Phase 0a: eight classes, all promoted at
+   seed time — five were already carried by a standard sentence or a check
+   (the guards and error-policy sections, RUF100, the fix-the-class rule),
+   `unpinned` by piece 2, and three got their sentence on this branch
+   (`caller-sourced` → Function shape, `partial-write` → Error policy,
+   `name-drift` → Naming plus a `/preflight` column). Rejected: the session's
+   auto-memory as the record (per machine, untracked, invisible to the
+   reviewers); a free-text log with no class set (the class is what makes two
+   hits countable); a lessons section inside DECISIONS (a record of choices,
+   not of misses). Also closed here: the BACKLOG row on `architecture-fit`'s
+   shape sentence, which now names `RULES` beside `FORMULAS`.
+
+Round 1 (2026-09-07; code-reviewer, functionality-tester, security-reviewer,
+study-editor, coherence-auditor scoped to the changed records): 20 rows, 0
+BLOCKER, 5 should-fix; the developer chose to fix all twenty rather than defer
+any to BACKLOG. Six correctness commits: check-pins reads both sides from git
+(a symlink is its blob; a non-text blob is a refusal), a tag comment is a
+comment token the tag opens, a table cell keeps a pipe inside backticks,
+check-docs reports a non-text file by name, the ruff tag rules are pinned, CI
+runs the pin guard with full history. The `traceback-at-boundary` lesson
+recurred inside the very tools that enforce it (a strict `read_text` with no
+catch), so under the promotion rule its row was reopened and re-closed with a
+second standard sentence: a read is a boundary too. `study/` joined the pin
+guard's packages before Phase 9 needs it; the template's LESSONS row applies
+to no file by default; `/selfcheck` gained the lesson reminder. Question 3 of
+the coherence-auditor (a name-mention guard rather than a behaviour one) is
+answered as designed: name-mention is the honest ceiling of a mechanical
+check, and `/preflight`'s pinning-test column is where "named" becomes
+"asserted".
+
+Round 2 (2026-09-07; code-reviewer, functionality-tester, security-reviewer,
+coherence-auditor, scoped to the round-1 fixes): 17 rows, 0 BLOCKER, 3
+should-fix. Every correctness row sat in or beside round 1's fix of one
+finding — the read boundary — which had been applied at the sites the finding
+named (checks 7 and 8, `source_at`) and not to the class: the neutrality check
+still read raw, the tokenizer's `IndentationError` is not a `TokenError`,
+`ast.parse` also raises `ValueError` and `RecursionError`, the runner's decode
+branch had no test. That is the `site-fix` lesson recurring inside the fix of a
+`traceback-at-boundary` recurrence, and the first of the two rounds the review
+cap counts, so the boundary was re-implemented once against its invariant
+rather than patched a second time: every file read and every subprocess under
+`scripts/` goes through `review_common.read_text_or_error` / `readable` and
+`run`, the parse boundaries are closed sets, and a layout test pins that no
+other module reads or spawns on its own — the mechanism `site-fix` lacked (a
+prose sentence) is now, for reads, a grep test, and in general a `/selfcheck`
+step that pastes the grep over the class's sibling sites. The rest of the round:
+a failed test listing is a refusal, a `git show` failure carries the runner's
+line, `dags/` joins the pin guard's packages, the symlink test keeps its target
+under `tmp_path`, the records' "seven" is six, one "slug" is "stem", the
+repo-map CI bullet names check-pins, the merge claim says merge commit (the
+LESSONS hash rule depends on it), the challenge standard and `architecture-fit`
+list the open LESSONS rows. Rejected: guarding the suite's own tests against a
+non-UTF-8 tracked file (a test failing with a traceback is a failing test);
+rewriting `docs/PLAN.md` (design history).
+
+Round 3 (2026-09-07; code-reviewer, functionality-tester, security-reviewer,
+coherence-auditor, scoped to `f663d20`, `a9fb65d`, `43a1369` — the one
+re-review the cap allows): 12 rows, 0 BLOCKER, 4 should-fix, all four round-2
+findings confirmed closed, and the developer said "fix all". One commit per
+class: the parse-error set is exactly what 3.12 raises (a null byte is a
+`SyntaxError` with no line, so the `ValueError` arm was dead; the
+`RecursionError` arm now has a 100k-attribute chain that reaches it); a
+reader that fails hands back nothing to check against — an unreadable record
+had read as empty records and an unreadable Makefile as no targets, each a
+fan-out of false lines — which is the class round 2's empty test pool
+belonged to, so `empty-default` is the ninth LESSONS class, promoted at once
+to a code-craft Error-policy sentence; the `scripts/` layout guard is an
+import allowlist rather than a regex of spawner names (`os.popen` slipped
+past the old one); the suite's five repository scanners read through
+`tests/repo_text.py`, one reader that fails by name; and the craft pair (the
+dead `err or …` fallbacks, one `shown()` form for a file's name in every
+check). Records: the stale test id in the `traceback-at-boundary` row, the
+`ask-gate` reason now says merge commit, `/preflight` lists `dags/`, the
+architect's fallback standard names the open LESSONS rows. **Reversed on the
+developer's word:** round 2 rejected guarding the suite's own tests against a
+non-UTF-8 tracked file; round 3's tester showed the gate's `test` line then
+carries five tracebacks — the class the branch exists to close, one directory
+over — and the developer chose the fix. The neutrality sweep no longer skips a
+file that does not decode: every tracked file is text, so one that is not is a
+finding by name.
+

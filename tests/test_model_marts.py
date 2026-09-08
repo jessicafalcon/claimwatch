@@ -14,6 +14,7 @@ from pipeline.build import read_model_fit, rebuild
 from pipeline.cli import main
 from pipeline.warehouse import ROOT, connect, database_for
 from tests import pins
+from tests.repo_text import repo_text
 
 pytestmark = pytest.mark.slow  # slow: kept out of the fast edit-loop hook
 
@@ -201,7 +202,7 @@ def test_models_imports_only_stdlib_math():
     forbidden attribute (a clock, or NormalDist().samples, the one random method
     the allowed `statistics` carries)."""
     for path in sorted((ROOT / "models").glob("*.py")):
-        tree = ast.parse(path.read_text(encoding="utf-8"))
+        tree = ast.parse(repo_text(path))
         roots: set[str] = set()
         attrs: set[str] = set()
         for node in ast.walk(tree):

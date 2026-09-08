@@ -24,6 +24,8 @@ jobs:
           # `make lint` executes a third-party pre-commit hook; it must not find
           # a usable token in .git/config.
           persist-credentials: false
+          # `make check-pins` needs the merge-base with main: full history.
+          fetch-depth: 0
       - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
         with:
           version: "0.12.5" # match local; bump deliberately
@@ -33,6 +35,8 @@ jobs:
       - run: make check-docs
       - run: make check-backing
       - run: make test
+      # The pin guard over the PR's range (empty, hence green, on a push to main).
+      - run: make check-pins BASE=origin/main
       # DuckDB, offline, no key: rebuilding the synthetic fixture is a free
       # graceful-degradation proof on every run (no model is imported).
       - run: make rebuild ROWS=synthetic

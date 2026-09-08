@@ -57,20 +57,23 @@ Delivered paragraph and `make help`, not here.
 - `PROJECT_BRIEF.md` (the master document), `SPEC.md` (the five parts —
   *beats* in the row ids `B<beat>.<n>` — and every chart with its tag and
   BACKING row), `BACKING.md` (the evidence contract, enforced by `make
-  check-backing`), `DECISIONS.md` and `BACKLOG.md` (the records),
+  check-backing`), `DECISIONS.md`, `BACKLOG.md` and `LESSONS.md` (the
+  records; the last is what reached a review round and what carries it now),
   `docs/PLAN.md` (how this workflow was designed).
 - `specs/` — one spec per phase from `specs/TEMPLATE.md`, ONE DONE command
   each; the "Delivered" paragraph is appended at exit.
 - `scripts/` — the offline guards, none a pytest file: `review_gate.py`,
-  `check_docs.py`, `check_backing.py`, `review_common.py`;
+  `check_pins.py`, `check_docs.py`, `check_backing.py`, `review_common.py`;
   `neutrality_hashes.txt` (the hashed tokens the naming check reads).
 - `tests/` — pytest; no services, no network, no key. `tests/pins.py` holds
-  every pinned number.
+  every pinned number; `tests/repo_text.py` is the one reader the layout
+  tests that walk a package read through (a file that is not text fails by
+  name).
 - `.claude/` — agents (report-only), skills (the three standards,
-  `/challenge`, the three on-request loop steps), the three hooks. Settings
+  `/challenge`, the four on-request loop steps), the three hooks. Settings
   are local-only and gitignored.
-- `.github/workflows/ci.yml` — lint, check-docs, check-backing, test, then
-  rebuild + idempotency-check on the synthetic reviews and on every frozen
+- `.github/workflows/ci.yml` — lint, check-docs, check-backing, test,
+  check-pins, then rebuild + idempotency-check on the synthetic reviews and on every frozen
   sample. `weekly.yml` — the scheduled scrape; the one workflow that writes
   to the repo, `data/snapshots/` only. `.github/pull_request_template.md`.
 - `pyproject.toml`, `uv.lock`, `.python-version`, `.pre-commit-config.yaml` —
@@ -133,12 +136,19 @@ its targets there and here in the same PR. What `make help` cannot say:
   `lint` (ruff via pre-commit — REWRITES files, never inside a gate; the rule
   set is the mechanical half of `code-craft`: complexity, branches,
   statements, positional arguments, boolean flag parameters, simplifiable
-  forms, commented-out code, unused arguments — a function that stays whole
-  carries a one-line `# noqa: <rule> -- <reason>`), `check-docs` (links,
-  named targets, banned words, glossary size, BACKLOG count, naming the
-  target against `scripts/neutrality_hashes.txt`), `check-backing`,
-  `review-gate [SPEC=specs/<f>.md] [BASE=main]` (test + ruff read-only +
-  both checks + fixtures; with SPEC, Evidence ids and Record-updates files;
+  forms, commented-out code, unused arguments, the comment-tag shapes (`TD`,
+  `FIX`), a `noqa` that suppresses nothing (`RUF100`) — a function that stays
+  whole carries a one-line `# noqa: <rule> -- <reason>`), `check-docs`
+  (links, named targets, banned words, glossary size, BACKLOG count, naming
+  the target against `scripts/neutrality_hashes.txt`, comment tags pointing
+  at a record entry that exists, the LESSONS table's class set and status
+  shape), `check-backing`, `check-pins [BASE=main]`
+  (every public function or class added or changed since BASE under a code
+  package is named in a test — a new one, in a test file the range changed;
+  a new mart file, in a changed test; one line per miss; the gate's `pins`
+  line), `review-gate [SPEC=specs/<f>.md] [BASE=main]` (test + ruff
+  read-only + both checks + fixtures + pins; with SPEC, Evidence ids and
+  Record-updates files;
   one line per check, exit 1 on FAIL, 2 on a refused SPEC/BASE;
   `/review-round` runs it first), `idempotency-check [ROWS=synthetic]`
   (rebuild twice, diff per-table row counts), `record-snapshots` (captures on
@@ -302,6 +312,12 @@ study names no insurer as its subject.
   header comment names the grain, the provenance columns and the BACKING rows
   it feeds; lowercase keywords; no `order by` in a table definition; ANSI only
   (no reader function, no regex, no clock — `pipeline/sql_lint.py` pins it).
+- Tagged comments are pointers at records, a closed set of four:
+  `TODO(BACKLOG): <open row title>`, `HACK(DECISIONS): <entry title>`,
+  `REF: <URL | brief §n | RFC n>`, `INVARIANT(<spec stem> <n>): <why>`. A
+  tag opens the comment. ruff refuses `FIXME`, `XXX` and a TODO without its
+  parens or colon; `make check-docs` refuses a tag whose record entry does
+  not exist (`code-craft` → Comments has the rule).
 - Secrets: the API key and warehouse credentials live in `.env` only — never
   in a tracked file, never in Actions, never echoed. Refusals print names,
   never values.
@@ -340,7 +356,8 @@ one, and write one sentence in the README about why.
 - `fixtures/` is read-only after Phase 1. Re-freezing is a deliberate change
   with a DECISIONS entry and a `Freeze:` line in the spec.
 - At each phase exit: run the coherence audit, review BACKLOG.md for due
-  rows, append the "Delivered" paragraph to the spec.
+  rows and LESSONS.md for `open` rows two phases old, append the "Delivered"
+  paragraph to the spec.
 - Stack surprises: check official docs before working around; log under
   DECISIONS.md → Gotchas.
 - Do not add a feature that surfaces in none of the five parts.
@@ -358,7 +375,10 @@ one, and write one sentence in the README about why.
   denylist, regex or `.get(…, default)` is refused; the mechanism's KIND
   changes (a closed set, a strict parse).
 - Fix commits: one correctness finding per commit, the invariant it restores
-  in the message; wording and record fixes batched in their own commit.
+  in the message; wording and record fixes batched in their own commit. A
+  correctness fix appends or extends its class's row in `LESSONS.md`; a
+  class hit twice becomes a mechanism (a ruff rule, a test, a guard, a
+  sentence in a standard) and the row's Status names it.
 - Review cap: if two consecutive review rounds report correctness findings
   only in the previous round's fixes, stop patching. Write the invariant,
   re-implement against it ONCE, one scoped re-review. A human applies this by
@@ -375,7 +395,8 @@ one, and write one sentence in the README about why.
    fetch: show behavior for an empty value, `../x`, a value containing `"; `,
    the variable set from the environment, and no credentials.
 4. For every new write path, rule or formula: can it give a different answer
-   on re-run, with the key unset, with equal sort keys? Name the pinning test.
+   on re-run, with the key unset, with equal sort keys? Name the pinning test
+   (`make check-pins` lists the public symbols no test names yet).
 5. For every new number a reader sees: its tag and its BACKING row.
 6. List every record file touched and every one the change implies you should
    have touched.
@@ -511,10 +532,13 @@ Gotchas).
 - PR via `gh pr create` when Done-when passes AND verdicts are approved. Body:
   the PR template. Title `Phase N — <name>`.
 - CI runs `make lint`, `make check-docs`, `make check-backing`, `make test`,
-  `make rebuild ROWS=synthetic`, `make idempotency-check` and the same two
-  with `ROWS=samples` (offline, DuckDB, no key, no fetch). Mergeable only
+  `make check-pins BASE=origin/main`, `make rebuild ROWS=synthetic`, `make
+  idempotency-check` and the same two with `ROWS=samples` (offline, DuckDB,
+  no key, no fetch). Mergeable only
   when CI is green and the surface's agents have run.
-- The developer merges (squash), never Claude. After merge: `git checkout
+- The developer merges with a merge commit (never a squash: `LESSONS.md`
+  cites fix commits by hash, and they must stay reachable from `main`), never
+  Claude. After merge: `git checkout
   main && git pull`.
 - Tooling changes (agents, skills, hooks, this file's rules) on
   `tooling/<slug>` from main: no spec, the gate plus the surface's agents,
@@ -556,6 +580,7 @@ file is being written; **on request** — the developer types the command;
 | 3. Disposition | the developer, per finding: amend / accept / reject; then the main session stamps the spec | the developer, offline | the report |
 | 4. Approve → `/phase-start <slug>` | restates the contract, warns if the spec is unstamped, runs the gate, STOPs for "build" | on request | the spec |
 | 5. Build | `code-craft`, `secure-by-construction`, `architecture-fit` (paths below); `run-tests` hook after every `.py`, `.sql`, `.yaml`, `.yml` edit (blocks on red) | auto, by path; hook | the same text the reviewers are preloaded with |
+| 5b. Preflight → `/preflight` | `make check-pins`, then one row per changed public symbol: its pinning test, each foreign input's declared shape, the other names the diff or the docs give the same concept, the LESSONS class it could repeat; the records the diff implies | on request, before round 1 | `main...HEAD`, `LESSONS.md`'s open rows |
 | 6. Review → `/review-round N` | gate; then by surface (table above): code-reviewer (preloads `code-craft`) → functionality-tester; + security-reviewer (preloads `secure-by-construction`); + study-editor; coherence-auditor at the exit | on request; every agent of the round in one turn; one table; STOP-on-findings | `main...HEAD`, the spec's Invariants, round N−1's table |
 | 7. Fix → commit → `/selfcheck` → "push" → PR | fixes one per commit; records batched; the developer merges | on request | the table |
 
@@ -577,7 +602,8 @@ copy the coherence-auditor checks):
 
 The standard `/challenge` hands `senior-architect`: brief §2/§8/§9, the five
 contracts, the BACKING rows the plan names, the predecessor spec's Delivered
-paragraph, `docs/PLAN.md` §2, DECISIONS, BACKLOG. The stamp the main session
+paragraph, `docs/PLAN.md` §2, DECISIONS, BACKLOG, the `open` LESSONS rows. The
+stamp the main session
 writes after the developer's disposition: `Challenged: <YYYY-MM-DD>, round
 <k>, spec <8 hex> — <verdict>`, unbolded, at line start, under the spec's
 status line; the hex is the hook's `--spec-hash` of the spec's Invariants and
@@ -594,8 +620,8 @@ Rules that hold across the loop:
   while the spec is edited, `/phase-start` and `/review-round` when a round
   begins — and none of them blocks; the developer decides.
 - The three standards are `user-invocable: false`: standing instructions
-  while a matching file is being written, not commands. The three loop steps
-  (`/phase-start`, `/review-round`, `/selfcheck`) are
+  while a matching file is being written, not commands. The four loop steps
+  (`/phase-start`, `/preflight`, `/review-round`, `/selfcheck`) are
   `disable-model-invocation: true`: the developer's to start, never the
   model's, and absent from its listing.
 
@@ -664,6 +690,9 @@ fixed in the main session or explicitly accepted — never auto-fixed.
   BACKING claims, `study/`, this file.
 - `/review-round N` — gate → invariants → agents by surface → one table →
   "Cap is the architect's call".
+- `/preflight` — before round 1: `make check-pins`, then the per-symbol table
+  (pinning test, foreign-input shapes, other names for one concept, the
+  LESSONS class risked) and the records the diff implies; prints, then stops.
 - `/selfcheck` — verifies the last commit, then stops.
 - `/phase-start <slug>` — main, pull, branch, restate the spec, print the
   BACKING rows in scope, warn if unchallenged, run the gate, stop.
@@ -679,27 +708,33 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 ## Current status
 
-**Active: `phase-8b-guardrail-sim`** (spec APPROVED 2026-09-06, challenged round
-1, stamp `7501f9a3`). The simulator half of the Phase 8 split (Beat 4): the
-synthetic-claim quantile draw, the hold rule and the share-under count as data in
-`models/guardrail_sim.py::RULES`; the hold timer's three formulas
-(`loop_days`, `friction_per_day`, `timer_amount_eur`) and two knobs
-(`days_per_round`, `timer_days`) added to `models/cost_model.py`; two DDL-only
-Python-fed marts (`guardrail_sim`, `sla_threshold`) filled inside `rebuild()`
-after the model marts; the `make simulate` target; and B4.1–B4.3 flipped Pending
-→ Modeled. The DONE command (`make simulate && make idempotency-check
-ROWS=synthetic && make check-backing && make test`) passes. Review round not yet
-run.
+**Active: `tooling/implementation-loop`** (no spec; a tooling branch from
+main after the Phase 8b merge). Three pieces, one commit each: tagged comments
+as pointers at records (four tags, ruff `TD`/`FIX`, check-docs check 7); the
+pin guard (`scripts/check_pins.py`, the gate's `pins` line, `make check-pins`)
+and `/preflight`, the fourth on-request loop step; `LESSONS.md` (eight classes
+seeded from the fix commits since Phase 0a, every one promoted to a check or a
+standard sentence) with check-docs check 8 as its keeper. Review round 1
+(five agents, 20 rows, 0 BLOCKER) fixed in full: six correctness commits and a
+records batch. Round 2 (four agents, 17 rows, 0 BLOCKER) found the round-1
+read-boundary fix applied at its sites only, so the boundary was re-implemented
+once against its invariant (one reader, one runner in `review_common`, a grep
+test). Round 3, the cap's one scoped re-review (four agents, 12 rows, 0
+BLOCKER), fixed in full: five commits (the parse-error set exact and pinned;
+a failed read hands back nothing, never an empty default — a ninth LESSONS
+class, `empty-default`; the layout guard as an import allowlist; the suite's
+scanners through one reader; the craft pair) and this records batch. Next:
+`/selfcheck`, then the push on the developer's word.
 
-**Merged:** Phases 0a–8a in order, each with its spec under `specs/` (the
-Delivered paragraph) and its DECISIONS appendix. Phase 8a — the cost model
-(B3.1–B3.4, PR #17, 2026-09-06) — landed `models/cost_model.py::FORMULAS`, the
-strict fit reader `opendata/fit.py::read_fit`, the three cost-model marts, and
-the `make model` target that Phase 8b builds on.
+**Merged:** Phases 0a–8b in order, each with its spec under `specs/` (the
+Delivered paragraph) and its DECISIONS appendix. Phase 8b — the guardrail
+simulator (B4.1–B4.3, PR #19, 2026-09-07) — landed
+`models/guardrail_sim.py::RULES`, the hold timer's three formulas in
+`models/cost_model.py`, the two simulator marts and `make simulate`.
 
 **Next:** Phase 9 — the study: Metabase dashboard + the static HTML export +
 the README (the first render of every beat).
 
-Open BACKLOG rows: **40**.
+Open BACKLOG rows: **39**.
 
 (Update this section at the end of every working day.)

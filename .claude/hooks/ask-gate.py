@@ -44,7 +44,7 @@ STOPS: tuple[tuple[re.Pattern[str], str], ...] = (
     ),
     (
         re.compile(r"gh\s+pr\s+merge(?=\s|$)"),
-        "the developer merges (squash), never Claude.",
+        "the developer merges (a merge commit, never a squash), never Claude.",
     ),
     (
         re.compile(r"make(?:\s+\S+)*\s+confirm(?=\s|$)"),

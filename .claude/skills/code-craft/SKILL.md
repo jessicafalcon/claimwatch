@@ -15,6 +15,11 @@ Standing instructions while writing code here. CLAUDE.md's rules come first
 under them. Where a bar below conflicts with a spec's pinned decision, the
 spec wins and the conflict is reported.
 
+`LESSONS.md` is the record of what reached a review round before. Its `open`
+rows are questions to ask of every symbol while it is written; a `promoted`
+row names the sentence below, the ruff rule or the guard that now carries it
+(a sentence marked *LESSONS: <class>* is one of those).
+
 ## Before writing: the ladder
 
 Code that is not written cannot break. Understand the change first (read
@@ -63,6 +68,9 @@ the code, at most three lines — what was skipped and when to add it.
 - The only abbreviations are the study's own (`B2.4`, `raw_`, `stg_`) and
   the source's own column names (`PRS_REM_MNT`, kept verbatim so a reader
   can find them in the source).
+- One concept, one name — in the code, the mart header, SPEC.md, BACKING.md
+  and the spec; where they differ, the mart's name is canonical and the
+  others follow (*LESSONS: name-drift*).
 
 ## Function shape
 
@@ -77,6 +85,10 @@ the code, at most three lines — what was skipped and when to add it.
   label, not an absence.
 - Inputs are not mutated. Declarations and rows are frozen dataclasses
   (`ingest/sources.py`, `ingest/parsed.py` set the pattern).
+- A value the data determines (a page's platform, an input's database file,
+  a fit's claim draw) is derived where it is used — never a parameter a
+  caller may pass differently, never a module default (*LESSONS:
+  caller-sourced*).
 
 ## Guards at inputs the repo does not own
 
@@ -93,7 +105,9 @@ row, a CLI variable, hook stdin, an env var, a file name under `data/cache/`.
   its header; a new fail-open needs the same.
 - Fix the class, not the case: a denylist, a regex of bad cases or a
   special-case branch is refused; the mechanism's KIND changes (closed set,
-  strict parse, derived value).
+  strict parse, derived value). Before the fix, grep the class — every site
+  that reads, parses or matches the same kind of input — and list the sites
+  in the commit; `/selfcheck` asks for the grep (*LESSONS: site-fix*).
 
 ## Error policy
 
@@ -106,6 +120,21 @@ row, a CLI variable, hook stdin, an env var, a file name under `data/cache/`.
   (`pipeline/cli.py`, the scripts).
 - The paid path raises one typed error with one line (`ModelError`), never
   a traceback.
+- A load writes its batch or nothing: one transaction per load, and a
+  refused row refuses the batch (*LESSONS: partial-write*).
+- A read is a boundary too: a file that is not UTF-8 text, a path that
+  cannot be read, a subprocess whose output does not decode is a one-line
+  refusal naming the input. Under `scripts/` every read and every run goes
+  through `review_common` (`read_text_or_error`, `readable`, `run`); a grep
+  test pins it; the suite's repository scanners (the layout tests that
+  walk a package) read through `tests/repo_text.py::repo_text`, which fails
+  by name (*LESSONS: traceback-at-boundary*, reopened and re-closed
+  2026-09-07, then closed once more in `tests/`).
+- A reader that fails returns nothing the caller can check against: the
+  failure travels with the value (`None`, a `Refused`, an `(empty, error)`
+  pair) and the caller reports the one line and stops — never an empty
+  default (no tests, no records, no targets) that the check downstream
+  reports as findings (*LESSONS: empty-default*).
 
 ## Data shapes across a boundary
 
@@ -138,6 +167,22 @@ row, a CLI variable, hook stdin, an env var, a file name under `data/cache/`.
 - Docstrings are one line unless the behaviour is non-obvious.
 - The SQL header comment (grain, provenance columns, BACKING rows fed) is
   required; it is the one comment a file must have.
+- A tagged comment is a pointer at a record, never a loose note. Four tags,
+  a closed set; `make check-docs` verifies each points at an entry that
+  exists, ruff (TD, FIX) refuses the rest:
+  - `TODO(BACKLOG): <open row title>` — a deferral the row already counts
+    (the Workflow rule: a finding outside the phase is a BACKLOG row). The
+    text is the row title's start, verbatim.
+  - `HACK(DECISIONS): <entry title>` — a workaround whose Gotchas or
+    Process entry exists. No entry, no HACK.
+  - `REF: <URL | brief §n | RFC n>` — the source of a number, a shape or a
+    protocol rule (the Constants rule, made greppable).
+  - `INVARIANT(<spec stem> <n>): <why>` — the spec invariant a guard keeps;
+    the stem is the file name under `specs/`, e.g.
+    `INVARIANT(phase-3a-snapshots 4): pattern-matching stays out of SQL`.
+  - `FIXME` and `XXX` never merge: the spec is the contract, unfinished code
+    is not committed. A `TODO` with no record, or any tag in another shape,
+    is a check-docs FAIL naming the shape.
 
 ## Types
 

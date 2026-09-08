@@ -100,7 +100,7 @@ def test_help_lists_every_declared_target():
     out = subprocess.run(
         ["make", "-s", "help"], cwd=ROOT, capture_output=True, text=True, check=True
     ).stdout
-    declared = make_targets(ROOT)  # the one parser (review_common)
+    declared, _ = make_targets(ROOT)  # the one parser (review_common)
     assert declared, "no targets parsed"
     names = {line.split()[0] for line in out.splitlines() if line.strip()}
     for target in declared:
@@ -113,7 +113,7 @@ def test_make_targets_ignores_variable_assignments(tmp_path: Path):
     (tmp_path / "Makefile").write_text(
         "foo := 1\nfoo2:= 1\nbaz:=3\nqux::= 4\nbar:\n\tx\ndc::\n\ty\n.PHONY: bar\n"
     )
-    assert make_targets(tmp_path) == {"bar", "dc"}
+    assert make_targets(tmp_path) == ({"bar", "dc"}, None)
 
 
 # --- Phase 1: the pipeline targets (rebuild, idempotency-check, reset) ---
