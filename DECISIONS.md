@@ -19,6 +19,13 @@ place and never deleted.
 - **Every number carries one of four evidence tags**, and every model default
   is either sourced or visibly declared unsourced. `BACKING.md` is the
   contract; `make check-backing` enforces the mechanical half. ([Brief §2.4](PROJECT_BRIEF.md); [Phase 0a](#phase-0a))
+- **The study's permanent artifact is the static HTML export, and its render
+  contract is mechanical, not editorial.** `study/export.py` renders one
+  deterministic, self-contained file from the marts and `FORMULAS`; a Pending
+  panel shows no number, every rendered number carries exactly one tag and
+  equals its mart, and a Documented panel with an empty mart shows a "no data
+  yet" state — each refused at render time by construction, not by a reviewer's
+  eye. Metabase is a later, non-CI demonstration read on top of it. ([Brief §4.4](PROJECT_BRIEF.md); [Phase 9a](#phase-9a))
 - **No dbt, no ORM, no vector store, no cloud VMs.** At ~8 SQL files plain
   SQL is clearer than a framework; knowing when not to use a tool is part of
   the study. ([Brief §2.2](PROJECT_BRIEF.md))
@@ -2121,4 +2128,69 @@ carries five tracebacks — the class the branch exists to close, one directory
 over — and the developer chose the fix. The neutrality sweep no longer skips a
 file that does not decode: every tracked file is text, so one that is not is a
 finding by name.
+
+### Phase 9a
+
+Branch `phase-9a-render-contract`, spec `specs/phase-9a-render-contract.md`,
+challenged round 1 (approve with amendments, all applied). The first sub-phase
+of Phase 9 (the study).
+
+- **Phase 9 is split permanent-artifact-first, not by delivery format in the
+  brief's order.** A `/challenge` round on the scoping decision (2026-09-07)
+  found that the static HTML export — not Metabase — is the permanent,
+  CI-checkable, deterministic artifact the other formats are built on (Phase 0a
+  decision 3; brief §4.4), CI is offline (no Docker, so a Metabase-first phase cannot end
+  CI-green), and Beat 2's drill-through would ship review text before the
+  paraphrase rule is written. So the order is: 9a render contract + Beat 1
+  (this) → 9b Beat 2 (the counted `unclassified` series, drill-through
+  excerpts) → 9c Beat 3 → 9d Beat 4 → 9e Beat 5 → 9f the README + the stranger
+  acceptance test → 9g the Metabase demonstration (developer-run, non-CI). Two
+  Phase-9-triggered debts were pulled out of render into their own model/opendata
+  phases: the claims sample-mean slider and data.ameli practitioner fees.
+  *Rejected: Metabase-first (the brief's listing order) — it inverts the
+  permanent-vs-demonstration relationship and has no CI-checkable done-when.
+  Rejected: merging the README into the export phase — a prose-only surface
+  gives study-editor a clean target and owns the stranger test.*
+- **The render contract is data, checked at render time.** A panel is
+  `Panel(id, backing_row, tag, kind, series)`; `study/export.py::check_panel`
+  refuses, in one line, a panel whose tag is not exactly one of the four
+  (no tag, or two), a point whose tag is not one of the four, and a Pending
+  panel carrying any value. A Documented/Measured panel whose mart is empty
+  renders a labelled "no data yet" state — distinct from a Pending placeholder —
+  never a blank or a fabricated number. This is what the long-deferred
+  render-time-no-number BACKLOG row asked for; `study-editor` and the
+  `coherence-auditor` still read, but the guard is mechanical.
+- **`make study` renders from the frozen synthetic database.** Beat 1's
+  Documented points are the anchors only under `ROWS=synthetic` (the manual and
+  fetched snapshot files load only under `captured`), so the committed
+  `study/friction_ledger.html` cannot drift with the weekly cron. *Rejected:
+  rendering from `captured` — the baseline would change on every weekly run and
+  the byte-check would be unmaintainable.*
+- **Charts are hand-written inline SVG with byte-stable, locale-independent
+  formatting** (fixed 2-decimal coordinates through `_n`, sorted attributes, no
+  render timestamp), so two renders — and two locales — produce identical bytes.
+  `make study` is added to CI, which renders and `git diff --exit-code`s the
+  committed baseline. *Rejected: a chart library — a CDN or build step, breaking
+  self-containment and determinism.*
+- **The palette is the dataviz reference default ("Ledger"),** chosen from four
+  directions at build start (all built on the validated categorical set, so all
+  colorblind-safe); it lives in one place `export.py` reads and every later
+  render phase inherits it. Chart types were named in the spec; the palette was
+  the build-time choice.
+- **The excerpt/paraphrase rule is authored here as a contract** (the one render
+  path for review text: paraphrase, at most one short marked phrase, always the
+  public source — brief §2.5), but Beat 1 ships no review text (B1.1 is
+  Pending), so its enforcing test and the first text-drill surface land in 9b.
+  The "Health details arrive in review bodies" BACKLOG row stays open,
+  re-scoped to 9b, not struck.
+
+Challenge dispositions: the scoping round returned *rework* (the split instinct
+right, the order and cut wrong) — the reorder, the excerpt-policy-first rule,
+the debt-assignment pass and the up-front render contract were all accepted. The
+spec round returned *approve with amendments* (0 BLOCKER, 6 should-fix) — all
+applied before the stamp: the frozen-synthetic render input pinned, `make study`
+added to CI, the SVG byte-formatting rule pinned, invariant 3 split (the counted
+`unclassified` series deferred to 9b), Done-when 4 re-scoped to
+Measured/Documented/Pending, the empty-Documented-mart state specified, and the
+BACKLOG rows cited by title.
 

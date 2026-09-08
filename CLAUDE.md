@@ -73,7 +73,9 @@ Delivered paragraph and `make help`, not here.
   `/challenge`, the four on-request loop steps), the three hooks. Settings
   are local-only and gitignored.
 - `.github/workflows/ci.yml` — lint, check-docs, check-backing, test,
-  check-pins, then rebuild + idempotency-check on the synthetic reviews and on every frozen
+  check-pins, then rebuild + idempotency-check on the synthetic reviews, `make
+  study` + `git diff --exit-code` (the export's byte-check), and rebuild +
+  idempotency-check on every frozen
   sample. `weekly.yml` — the scheduled scrape; the one workflow that writes
   to the repo, `data/snapshots/` only. `.github/pull_request_template.md`.
 - `pyproject.toml`, `uv.lock`, `.python-version`, `.pre-commit-config.yaml` —
@@ -111,7 +113,11 @@ Delivered paragraph and `make help`, not here.
   including the hold timer's three, filled into the three Beat 3 marts inside
   `rebuild()`), `guardrail_sim.py::RULES` (Beat 4: the quantile draw, the hold
   and the share-under count, filled into the two Beat 4 marts inside
-  `rebuild()`); `study/` *(Phase 9)* — Metabase setup + the HTML export;
+  `rebuild()`); `study/` — the static HTML export: `export.py` (the render
+  contract as data — one tag per number, a Pending panel shows none — and the
+  hand-written inline-SVG charts), `__main__.py` (the `make study` entry), the
+  committed `friction_ledger.html`; Beat 1 renders (9a), Beats 2–5, the README
+  and the Metabase demonstration are later Phase 9 sub-phases.
   `dags/` *(Phase 10)* — `friction_ledger.py`.
 - `fixtures/` — read-only after Phase 1, each set with a `MANIFEST.sha256`:
   `synthetic/` (hand-written fake reviews), `anchors/` (brief §6 figures with
@@ -163,7 +169,11 @@ its targets there and here in the same PR. What `make help` cannot say:
   the two crossovers; writes nothing; identical text on a rerun),
   `simulate` (no variable: reads the tracked fit and prints the guardrail
   simulator — the three rules beside their values, the hold-length threshold
-  table, the hold days per fix; writes nothing; identical text on a rerun).
+  table, the hold days per fix; writes nothing; identical text on a rerun),
+  `study` (no variable: renders the static HTML study to
+  `study/friction_ledger.html` from the frozen synthetic marts — inline SVG, no
+  CDN, no render timestamp; byte-identical on a rerun, so CI diffs the committed
+  bytes with `git diff --exit-code`).
 - **`make rebuild [TARGET=duckdb] [ROWS=captured|none|synthetic|samples]`** —
   raw → staging → marts, reviews per month, then the classify step: the rules
   plus, only when `ANTHROPIC_API_KEY` is set and only for the reviews the
@@ -708,33 +718,37 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 ## Current status
 
-**Active: `tooling/implementation-loop`** (no spec; a tooling branch from
-main after the Phase 8b merge). Three pieces, one commit each: tagged comments
-as pointers at records (four tags, ruff `TD`/`FIX`, check-docs check 7); the
-pin guard (`scripts/check_pins.py`, the gate's `pins` line, `make check-pins`)
-and `/preflight`, the fourth on-request loop step; `LESSONS.md` (eight classes
-seeded from the fix commits since Phase 0a, every one promoted to a check or a
-standard sentence) with check-docs check 8 as its keeper. Review round 1
-(five agents, 20 rows, 0 BLOCKER) fixed in full: six correctness commits and a
-records batch. Round 2 (four agents, 17 rows, 0 BLOCKER) found the round-1
-read-boundary fix applied at its sites only, so the boundary was re-implemented
-once against its invariant (one reader, one runner in `review_common`, a grep
-test). Round 3, the cap's one scoped re-review (four agents, 12 rows, 0
-BLOCKER), fixed in full: five commits (the parse-error set exact and pinned;
-a failed read hands back nothing, never an empty default — a ninth LESSONS
-class, `empty-default`; the layout guard as an import allowlist; the suite's
-scanners through one reader; the craft pair) and this records batch. Next:
-`/selfcheck`, then the push on the developer's word.
+**Active: `phase-9a-render-contract`** (spec `specs/phase-9a-render-contract.md`,
+challenged round 1 — approve with amendments, all applied). The first Phase 9
+sub-phase: Phase 9 (the study) is split permanent-artifact-first after two
+`/challenge` rounds (the scoping decision, then this spec), because the static
+HTML export — not Metabase — is the permanent, CI-checkable, deterministic
+artifact (DECISIONS decision 3; brief §4.4). Landed `study/export.py` (the
+render contract as data: one tag per number, a Pending panel shows none, a
+Documented panel with an empty mart shows "no data yet", all refused at render
+time by construction), `make study`, the committed `study/friction_ledger.html`,
+and Beat 1 rendered over the frozen synthetic marts (B1.1 Pending placeholder,
+B1.2 line, B1.3 grouped bar, B1.4 stat row); the palette is the dataviz
+reference default ("Ledger"). Byte-identical on rerun and locale-independent;
+CI diffs the committed bytes. Closed the render-time-no-number and §6-response-
+figures BACKLOG rows. Review rounds 1–2 complete, all findings fixed (round 2:
+CR#16, SR#4, SR#5 correctness; CR#17/#18/#21 craft+coverage; SE#5/#6 voice);
+gate 8/8, DONE green, spec Delivered. Next: PR, then merge.
 
 **Merged:** Phases 0a–8b in order, each with its spec under `specs/` (the
-Delivered paragraph) and its DECISIONS appendix. Phase 8b — the guardrail
-simulator (B4.1–B4.3, PR #19, 2026-09-07) — landed
-`models/guardrail_sim.py::RULES`, the hold timer's three formulas in
-`models/cost_model.py`, the two simulator marts and `make simulate`.
+Delivered paragraph) and its DECISIONS appendix; then `tooling/implementation-
+loop` (PR #20, 2026-09-07) — tagged comments as record pointers, the pin guard
+(`scripts/check_pins.py`) + `/preflight`, and `LESSONS.md` (nine classes, each
+promoted). Phase 8b — the guardrail simulator (B4.1–B4.3, PR #19,
+2026-09-07) — landed `models/guardrail_sim.py::RULES`, the hold timer's three
+formulas in `models/cost_model.py`, the two simulator marts and `make simulate`.
 
-**Next:** Phase 9 — the study: Metabase dashboard + the static HTML export +
-the README (the first render of every beat).
+**Next (Phase 9 sub-phases, in order):** 9b — Beat 2 HTML (the counted
+`unclassified` series, drill-through-to-excerpts, applying 9a's excerpt rule);
+9c — Beat 3; 9d — Beat 4; 9e — Beat 5; 9f — the README + the stranger
+acceptance test; 9g — the Metabase demonstration (non-CI). Plus two pulled-out
+data phases: the claims sample-mean slider and data.ameli practitioner fees.
 
-Open BACKLOG rows: **39**.
+Open BACKLOG rows: **37**.
 
 (Update this section at the end of every working day.)
