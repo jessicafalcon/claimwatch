@@ -320,6 +320,23 @@ def test_beat2_values_equal_their_marts_over_a_captured_run_id(captured_db):
         assert seg[label][1] == theme_rows
 
 
+def test_a_point_carries_the_tag_its_mart_row_carries_not_a_literal():
+    # Every mart row carries "Measured" today, so the mart-equal test cannot tell
+    # a mart read from a literal; a row with another tag can (exit round,
+    # functionality-tester #1). The point's tag is the row's, and a null tag
+    # refuses by name.
+    rows = [("2026-01", "document-loop", 10, 3, 0.3, "Documented")]
+    (series,) = [s for s in panels._theme_series(rows, "B2.9", "period") if s.points]
+    assert series.points[0].tag == "Documented"
+    cell = panels._score_cell("Precision", 0.5, 1, 2, "predicted", tag="Documented")
+    absent = panels._score_cell("Recall", None, 0, 0, "actual", tag="Documented")
+    assert cell.tag == "Documented" and absent.tag == "Documented"
+    with pytest.raises(RenderRefused):
+        panels._theme_series(
+            [("2026-01", "document-loop", 10, 3, 0.3, None)], "B2.9", "period"
+        )
+
+
 def test_the_unclassified_band_is_the_neutral_token_and_always_in_the_legend(
     captured_db,
 ):
