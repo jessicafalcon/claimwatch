@@ -771,6 +771,8 @@ def test_every_measured_panel_over_the_platforms_names_the_self_selection(
     assert {p.id for p in over_platforms} == {"B2.2", "B2.5"}  # today's two
     for p in over_platforms:
         assert any("negatively self-selected" in note for note in p.notes), p.id
+        # and, while the corpus is one segment, that the comparison waits (CA#1).
+        assert panels._TRADITIONAL_CAVEAT in p.notes, p.id
 
 
 # The `unclassified` band's label slug, so a rendered series maps back to its

@@ -103,8 +103,11 @@ traction, and coverage-and-price frustration (PROJECT_BRIEF.md §5).
   gray *not yet classified* band — shown, never hidden. *Fixture state:* a share
   over the frozen synthetic reviews is never a number; the committed page shows a
   labelled fixture state, and the counted shares appear only over captured
-  reviews. The counts (theme rows, reviews) ride beside each share so it can be
-  redone by hand; the review-level drill is the Metabase demonstration (9g).
+  reviews. The counts (theme rows, reviews) ride in each share's tooltip so it
+  can be redone by hand; the review-level drill is the Metabase demonstration
+  (9g). *Placed beside the chart:* the corpus is digital-first only for now, so
+  the traditional split awaits a traditional-mutuelle source (BACKLOG); the
+  chart shows the segment the data has.
 - **B2.3 — Peer context.** Public ratings across the market segment, so no one
   insurer is read in isolation. Tag: *Documented* for the anchors, *Measured*
   for our own points (see *How to read a panel*). *Placed points, stated

@@ -449,10 +449,12 @@ def _self_selection_note(shown: str) -> str:
 
 _SELF_SELECTION_NOTE = _self_selection_note("the theme mix")
 _SEGMENT_SELF_SELECTION_NOTE = _self_selection_note("the held-claim complaint share")
-# B2.5 only: the corpus is one segment today — its own note, before the caveat.
+# The corpus is one segment today — B2.2 and B2.5's own note, before the caveat:
+# B2.2's query filters on it and B2.5 draws it (BACKLOG "vs traditional").
 _TRADITIONAL_CAVEAT = (
-    "The corpus is digital-first only for now, so the traditional column awaits "
-    "a traditional-mutuelle source; the chart shows the segment the data has."
+    "The corpus is digital-first only for now, so the traditional comparison "
+    "awaits a traditional-mutuelle source; the chart shows the segment the data "
+    "has."
 )
 
 
@@ -730,7 +732,7 @@ def beat2_panels(conn) -> list[Panel]:
             series=month_series,
             fixture=month_fixture,
             sources=PLATFORM_ROOTS,
-            notes=(_SELF_SELECTION_NOTE, _DENOMINATOR_NOTE),
+            notes=(_TRADITIONAL_CAVEAT, _SELF_SELECTION_NOTE, _DENOMINATOR_NOTE),
             domain=(0.0, 1.0),
         ),
         Panel(
