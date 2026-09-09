@@ -763,6 +763,6 @@ slider decision); 9g — the Metabase demonstration (the review-level drill,
 non-CI). Plus two pulled-out data phases: the claims
 sample-mean slider and data.ameli practitioner fees.
 
-Open BACKLOG rows: **42**.
+Open BACKLOG rows: **43**.
 
 (Update this section at the end of every working day.)
