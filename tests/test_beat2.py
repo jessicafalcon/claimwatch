@@ -475,6 +475,34 @@ def test_corpus_panels_render_no_data_yet_over_none(none_db):
         assert 'class="fixture"' not in sec and 'class="pending"' not in sec
 
 
+# --- Round 1 fix amendment: a panel's notes are a sequence ---------------------
+def test_a_panel_renders_one_block_per_note():
+    # The second layer is a sequence: each note is its own <p class="note">, so a
+    # packed note splits into scannable ideas (round 1 amendment, brief §2.3).
+    panel = Panel(
+        "B2.9",
+        "B2.9",
+        "t",
+        "b",
+        "Pending",
+        "hero",
+        placeholder="x",
+        notes=("first idea", "second idea"),
+    )
+    html = "\n".join(export._render_panel(panel))
+    assert html.count('<p class="note">') == 2
+    assert "first idea" in html and "second idea" in html
+
+
+def test_b2_2_and_b2_5_name_the_self_selection_bias(synthetic_db):
+    # The two theme-share panels carry the negative-self-selection caveat as one
+    # of their notes, as B1.2 does beside the rating trend (round 1 amendment,
+    # brief §2.5). The notes render over any input, so synthetic suffices.
+    page = _html(synthetic_db)
+    for pid in ("B2.2", "B2.5"):
+        assert "negatively self-selected" in _section(page, pid), pid
+
+
 # The `unclassified` band's label slug, so a rendered series maps back to its
 # mart label (the neutral band carries no theme name of its own).
 UNCLASSIFIED_LABEL = "unclassified"

@@ -8,7 +8,7 @@ a database or emits HTML.
 
 The contract, checked here, not by editorial trust:
 
-- A panel is data — `Panel(id, backing_row, tag, kind, series, note)`. Its `tag`
+- A panel is data — `Panel(id, backing_row, tag, kind, series, notes)`. Its `tag`
   is the one BACKING evidence tag; a panel whose tag is not exactly one of
   `TAGS` is refused (no tag, or two).
 - A **Pending** panel carries no value; a Pending panel handed a value is
@@ -91,7 +91,7 @@ class Panel:
     tag: str
     kind: Kind
     series: tuple[Series, ...] = ()
-    note: str = ""
+    notes: tuple[str, ...] = ()  # second-layer commentary, one <p> per note (§2.3)
     placeholder: str = ""  # the Pending panel's labelled gray text
     fixture: str = ""  # the corpus panel's fixture-state text over a fixture input
     columns: tuple[str, ...] = ()  # a metric table's column headers (table kind)

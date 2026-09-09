@@ -299,11 +299,11 @@ def beat1_panels(conn) -> list[Panel]:
             tag="Documented",
             kind="line",
             series=_rating_trend(conn),
-            note=(
+            notes=(
                 "Sampling bias, stated here: unsolicited review platforms are "
                 "negatively self-selected — a company that stops inviting reviews "
                 "drifts down — so part of any decline is a sampling choice, not "
-                "only a service change."
+                "only a service change.",
             ),
             domain=(1.0, 5.0),
         ),
@@ -319,10 +319,10 @@ def beat1_panels(conn) -> list[Panel]:
             tag="Documented",
             kind="grouped_bar",
             series=_channel_gap(conn),
-            note=(
+            notes=(
                 "Stated here: invited channels (the app stores) are positively "
                 "self-selected and unsolicited platforms negatively, so part of "
-                "the gap is who gets asked, not only how the service performs."
+                "the gap is who gets asked, not only how the service performs.",
             ),
             domain=(0.0, 5.0),
         ),
@@ -337,10 +337,10 @@ def beat1_panels(conn) -> list[Panel]:
             tag="Documented",
             kind="stat_row",
             series=_platform_stats(conn),
-            note=(
+            notes=(
                 "Stated here: today the answer rate and time come from one profile "
                 "on one platform, so the comparison across platforms waits for a "
-                "second platform’s figures."
+                "second platform’s figures.",
             ),
         ),
     ]
@@ -389,6 +389,21 @@ _DENOMINATOR_NOTE = (
     "bars, so the shares across themes can sum past one. The gray “not yet "
     "classified” band is the reviews a language model would sort; with no key "
     "it is largest, shown, never hidden."
+)
+# The negative-self-selection caveat, the theme-share panels' own note beside the
+# counting method (brief §2.5; B1.2 carries the same caveat beside the rating
+# trend). A theme SHARE from unsolicited platforms is a mix among the
+# dissatisfied, not a census — stated where the chart shows it.
+_SELF_SELECTION_NOTE = (
+    "Sampling bias, stated here: these reviews come from platforms customers "
+    "were not invited to (unsolicited), which are negatively self-selected — so "
+    "the theme mix is what dissatisfied customers chose to write about, not a "
+    "census of every claim."
+)
+# B2.5 only: the corpus is one segment today — its own note, before the caveat.
+_TRADITIONAL_CAVEAT = (
+    "The corpus is digital-first only for now, so the traditional column awaits "
+    "a traditional-mutuelle source; the chart shows the segment the data has."
 )
 
 
@@ -634,7 +649,7 @@ def beat2_panels(conn) -> list[Panel]:
             series=month_series,
             fixture=month_fixture,
             sources=PLATFORM_ROOTS,
-            note=_DENOMINATOR_NOTE,
+            notes=(_SELF_SELECTION_NOTE, _DENOMINATOR_NOTE),
             domain=(0.0, 1.0),
         ),
         Panel(
@@ -650,11 +665,11 @@ def beat2_panels(conn) -> list[Panel]:
             tag="Documented",
             kind="grouped_bar",
             series=_peer_ratings(conn),
-            note=(
+            notes=(
                 "Placed points, stated here: where the brief gives a range, the "
                 "point is its midpoint, not a reading; a review count the brief "
                 "does not give is left blank. Each point is labelled by its "
-                "platform in the tooltip."
+                "platform in the tooltip.",
             ),
             domain=(0.0, 5.0),
         ),
@@ -673,10 +688,10 @@ def beat2_panels(conn) -> list[Panel]:
             series=quality_series,
             fixture=quality_fixture,
             columns=("Theme", "Precision", "Recall"),
-            note=(
+            notes=(
                 "“No held-out case” means the held-out fold carried no review of "
                 "that theme to score — an empty denominator, not a zero score. "
-                "The counts beside each figure are the cases it was graded on."
+                "The counts beside each figure are the cases it was graded on.",
             ),
         ),
         Panel(
@@ -694,11 +709,7 @@ def beat2_panels(conn) -> list[Panel]:
             series=segment_series,
             fixture=segment_fixture,
             sources=PLATFORM_ROOTS,
-            note=(
-                "The corpus is digital-first only for now, so the traditional "
-                "column awaits a traditional-mutuelle source; the chart shows the "
-                "segment the data has. " + _DENOMINATOR_NOTE
-            ),
+            notes=(_TRADITIONAL_CAVEAT, _SELF_SELECTION_NOTE, _DENOMINATOR_NOTE),
             domain=(0.0, 1.0),
         ),
     ]

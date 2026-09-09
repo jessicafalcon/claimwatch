@@ -364,8 +364,8 @@ def _render_panel(panel: Panel) -> list[str]:
         f'<p class="blurb">{_esc(panel.blurb)}</p>',
     ]
     out += _render_body(panel)
-    if panel.note:
-        out.append(f'<p class="note">{_esc(panel.note)}</p>')
+    for note in panel.notes:  # one <p> per note, so the second layer stays scannable
+        out.append(f'<p class="note">{_esc(note)}</p>')
     # The footer's tag is DERIVED from the points actually shown (the same
     # `_panel_tags` the header chips use), not the authored `panel.tag`, so the
     # two can never disagree and a mixed Documented+Measured panel names both
