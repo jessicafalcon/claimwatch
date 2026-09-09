@@ -722,24 +722,26 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 ## Current status
 
-**Active: `phase-9b-beat-2`** (spec `specs/phase-9b-beat-2.md`, APPROVED
-2026-09-08, challenged round 1 — rework, all applied). Beat 2 rendered: split
-the 9a export into `study/model.py` ← `study/panels.py` ← `study/export.py`
-(verbatim move, its own commit), then added the five Beat 2 panels. B2.1
-Pending; B2.3 the peer-ratings bars (Documented anchors); B2.2/B2.4/B2.5 the
-**corpus gate** — a share over the review corpus renders a number only over a
-`captured` input (read from the mart's own `run_id` against `pipeline.build.
-INPUTS`), and over the frozen synthetic input renders a labelled fixture state
-with no number (the brief's "never faked" at render time). New: the metric
-`table` kind (B2.4, value xor declared absence — a zero-denominator cell shows
-"no held-out case" with its counts); the `unclassified` neutral-token band,
-always in the legend with its count; `positive` excluded from the theme bars;
-the trail (mart `reviews`/`theme_rows` in each share's tooltip); the **column
-allowlist** on each cursor's description (no review text reaches the page,
-`select *` fails by name). Byte-identical on rerun; `make study` renders the
-committed baseline (B2.2/B2.4/B2.5 fixture state, B2.3 the anchors). Closed the
-Health-details BACKLOG row (the allowlist); opened the published-corpus-render
-(9f) and per-review-address (9g) rows. Next: review rounds, then PR.
+**Delivered, PR pending: `phase-9b-beat-2`** (spec `specs/phase-9b-beat-2.md`,
+APPROVED 2026-09-08, DELIVERED 2026-09-08; challenged twice — round 1 rework,
+round 2 approve with amendments — and reviewed three times, the exit round
+with the coherence-auditor; every finding fixed, two fix amendments). Beat 2
+rendered: the 9a export split into `study/model.py` ← `study/panels.py` ←
+`study/export.py`, then the five Beat 2 panels. B2.1 Pending; B2.3 the
+peer-ratings bars (Documented anchors); B2.2/B2.4/B2.5 behind the **corpus
+gate** — one closed mapping over `pipeline.build.INPUTS` read from each mart's
+own `run_id`: `captured` counts, a fixture input renders a labelled fixture
+state with no number (`check_panel` refuses a fixture state carrying content),
+`none` "no data yet". New: the metric `table` kind (B2.4, value xor declared
+absence); the `unclassified` neutral-token band, in the legend with its count
+even as the only series; `positive` excluded from the theme series; B2.5 the
+held-claim share per segment, points labelled by segment; the trail (mart
+`reviews`/`theme_rows` in each share's tooltip); the **column allowlist** on
+each cursor's description plus a recording connection (every query a render
+runs is listed; no review text reaches the page); a panel source is an address,
+a repository file (B2.4 names the answer key) or a refusal. Byte-identical on
+rerun; `make study` renders the committed baseline. Next: `gh pr create`
+(`Phase 9b — Beat 2`), the developer merges with a merge commit.
 
 **Merged:** Phases 0a–9a in order, each with its spec under `specs/` (the
 Delivered paragraph) and its DECISIONS appendix; then `tooling/implementation-

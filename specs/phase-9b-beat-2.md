@@ -6,10 +6,10 @@ Phase 9a). Depends on Phase 9a merged (PR #21, 2026-09-08) **and on the fix PR
 `fix/theme-marts-run-id` merged** (the two theme marts carry `run_id`; challenge
 round 1, finding 3).
 
-**Status: APPROVED 2026-09-08 — in progress.** No new dependencies: Beat 2
+**Status: APPROVED 2026-09-08 — DELIVERED 2026-09-08, PR pending.** No new dependencies: Beat 2
 renders through the 9a contract (`duckdb` + stdlib, hand-written inline SVG); no
 script, no `<details>`, no new `make` target.
-Challenged: 2026-09-08, round 2, spec cb73412b — approve with amendments (all applied)
+Challenged: 2026-09-08, round 2, spec 41e1fca2 — approve with amendments (all applied; re-hashed at exit — falsifier column extended, invariants unchanged)
 Challenged: 2026-09-08, round 1, spec 198ff491 — rework (all findings applied)
 Fix amendment: 2026-09-08, round 1 — a panel's notes are a sequence
 (study-editor #2, #3); appended to Invariants below.
@@ -134,7 +134,7 @@ make rebuild ROWS=synthetic && make study && git diff --exit-code -- study/ && u
 | Done-when | Proof (test id / `make` target / output line) |
 |---|---|
 | 1 | `tests/test_beat2.py::test_b2_1_renders_the_pending_placeholder_with_no_value` |
-| 1 | `tests/test_beat2.py::test_b2_3_labels_each_point_by_platform_and_states_placed_points` (values pinned; `_PROFILE_NAMES` covers the four anchor profiles; an unknown profile refuses by name) |
+| 1 | `tests/test_beat2.py::test_b2_3_labels_each_point_by_platform_and_states_placed_points` (values pinned; B2.3's reader `_profile_name` refuses an unknown profile by name; B1.2 keeps 9a's soft lookup — DECISIONS) |
 | 1 | `tests/test_beat2.py::test_corpus_panels_render_the_fixture_state_over_synthetic` (B2.2/B2.4/B2.5 carry no digit inside the panel body and the state text; distinct from the Pending and no-data strings); `make study && git diff --exit-code -- study/` exits zero |
 | 2 | `tests/test_beat2.py::test_the_corpus_gate_reads_run_id_from_the_mart` (`captured` → numbers; `synthetic`/`samples` → fixture state; `none` → no data yet; the set is `pipeline.build.INPUTS`, imported) |
 | 2 | `tests/test_beat2.py::test_two_run_ids_or_one_outside_inputs_refuse_one_line` |
@@ -156,13 +156,13 @@ panels; imports follow the module split.
 
 | Invariant ("for all …, … holds") | Falsified by (scenario test) |
 |---|---|
-| For all panels whose numbers derive from the review corpus, a number is rendered only when the classified rows' `run_id` is a captured input; a fixture input renders a labelled state and no number. | `tests/test_beat2.py::test_corpus_panels_render_the_fixture_state_over_synthetic`; `::test_the_corpus_gate_reads_run_id_from_the_mart`. |
-| For all corpus panels, the `run_id` the gate reads is exactly one value of the closed `INPUTS` set; anything else refuses in one line. | `tests/test_beat2.py::test_two_run_ids_or_one_outside_inputs_refuse_one_line`. |
-| For all cells of the two theme marts that hold an `unclassified` row, the rendered panel shows that share as the neutral-token series; the legend names the band with its count in every render, so absence reads as zero, never as hidden; the series colour is a closed choice. | `tests/test_beat2.py::test_the_unclassified_band_is_the_neutral_token_and_always_in_the_legend`. |
+| For all panels whose numbers derive from the review corpus, a number is rendered only when the classified rows' `run_id` is a captured input; a fixture input renders a labelled state and no number. | `tests/test_beat2.py::test_corpus_panels_render_the_fixture_state_over_synthetic`; `::test_the_corpus_gate_reads_run_id_from_the_mart`; `::test_b2_2_and_b2_5_render_their_declared_kind_over_captured`; `::test_corpus_panels_render_no_data_yet_over_none`; `::test_a_fixture_state_panel_with_content_is_refused`. |
+| For all corpus panels, the `run_id` the gate reads is exactly one value of the closed `INPUTS` set; anything else refuses in one line. | `tests/test_beat2.py::test_two_run_ids_or_one_outside_inputs_refuse_one_line`; the `_STATE_OF_INPUT` key set equals `INPUTS` in `::test_the_corpus_gate_reads_run_id_from_the_mart`; `::test_the_cli_binds_the_file_it_builds_to_the_run_id_it_classifies_under`; `::test_the_mart_probe_sees_only_the_default_schema`. |
+| For all cells of the two theme marts that hold an `unclassified` row, the rendered panel shows that share as the neutral-token series; the legend names the band with its count in every render, so absence reads as zero, never as hidden; the series colour is a closed choice. | `tests/test_beat2.py::test_the_unclassified_band_is_the_neutral_token_and_always_in_the_legend`; `::test_a_band_only_panel_still_lists_the_band_in_the_legend`. |
 | For all Beat 2 shares, the plotted position is the share itself, never a cumulative stack. | `tests/test_beat2.py::test_b2_2_plots_each_share_against_the_axis_not_stacked`. |
-| For all renders, every query the export runs projects only columns of one closed allowlist that holds no text column, and passes the SQL lint. | `tests/test_beat2.py::test_every_export_query_projects_only_allowlisted_columns`; `::test_every_study_query_passes_the_sql_lint`. |
+| For all renders, every query the export runs projects only columns of one closed allowlist that holds no text column, and passes the SQL lint. | `tests/test_beat2.py::test_every_export_query_projects_only_allowlisted_columns`; `::test_every_query_the_export_runs_is_a_listed_study_query` (a recording connection); `::test_every_study_query_passes_the_sql_lint` (the catalog reads included). |
 | For all metric cells, exactly one of value and declared absence is set; a zero-denominator cell renders its labelled absence with its counts; a table of absences is still a table. | `tests/test_beat2.py::test_a_point_with_both_value_and_absence_is_refused`; `::test_a_zero_denominator_metric_renders_a_labelled_absence_with_its_counts`; `::test_an_all_absent_table_renders_as_a_table_not_no_data`; `::test_a_null_cell_with_no_declared_absence_is_still_refused_by_name`. |
-| For all rendered Beat 2 numbers, the value equals its mart row and carries exactly one tag (9a's contract, extended to the new panels and the table kind). | `tests/test_beat2.py::test_beat2_values_equal_their_marts_over_a_captured_run_id`; 9a's `test_a_panel_with_no_tag_or_two_tags_is_refused` over a table panel. |
+| For all rendered Beat 2 numbers, the value equals its mart row and carries exactly one tag (9a's contract, extended to the new panels and the table kind). | `tests/test_beat2.py::test_beat2_values_equal_their_marts_over_a_captured_run_id`; `::test_a_point_carries_the_tag_its_mart_row_carries_not_a_literal`; `::test_b2_5_draws_the_held_claim_share_per_segment`; 9a's `test_a_panel_with_no_tag_or_two_tags_is_refused` over a table panel. |
 | For all runs over the same DB, the output bytes are identical and match the committed baseline (9a, inherited). | `tests/test_export.py::test_make_study_is_byte_identical_on_rerun`; the DONE command's `git diff --exit-code`. |
 
 ### Fix amendment — round 1 (2026-09-08): a panel's notes are a sequence
@@ -262,7 +262,7 @@ series). Approved and implemented the same day.
   ← `study/export.py`.** `model.py` holds the types, `TAGS`, `Kind`, `Unit`,
   `check_panel`, `_require`, `RenderRefused`; `panels.py` the builders
   (`beat1_panels` moved verbatim, `beat2_panels`, the readers, the corpus gate,
-  `_PROFILE_NAMES` as a closed lookup refusing an unknown profile by name);
+  `_PROFILE_NAMES` as a closed lookup; B2.3's reader refuses an unknown profile by name, B1.2's soft fallback is 9a's and stays);
   `export.py` the renderers, the page and `write`. The move is its own commit
   so the diff shows a rename and `check-pins` sees the moved symbols named in
   the changed tests. *Rejected: builders importing from `export` (a cycle);
@@ -287,6 +287,9 @@ series). Approved and implemented the same day.
   nine panels.
 - `tests/pins.py` — the Beat 2 figures over the captured-run_id copy; the pinned
   HTML fragments per kind.
+- `tests/conftest.py` — `build_study_db`: rebuild plus the CLI classify step with
+  the model decider and the decision cache neutralised, the warehouse every
+  Beat 2 test builds (added during the build; named here at exit).
 - `SPEC.md` — Beat 2: B2.2/B2.5 "share of negative reviews" → the mart's
   denominator (every classified review), `positive` excluded from the theme
   series and stated; one sentence under B2.2/B2.4/B2.5 naming the fixture state
@@ -302,14 +305,14 @@ Freeze: none
 
 ## Record updates (REQUIRED)
 
-- [ ] `DECISIONS.md` — Phase 9b entry: the corpus gate (the brief's "never
+- [x] `DECISIONS.md` — Phase 9b entry: the corpus gate (the brief's "never
   faked" applied at render time); the trail as counts, the drill as Metabase
   (9g); the column allowlist; the neutral-token band and the closed series
   colour; `positive` excluded and the denominator wording fix; value xor
   absence; the module direction; the challenge dispositions (round 1, rework,
   all twelve applied); supersede nothing here (the 7a `run_id` supersede line
   lands in the fix PR).
-- [ ] `BACKLOG.md` — close *Health details arrive in review bodies* (struck +
+- [x] `BACKLOG.md` — close *Health details arrive in review bodies* (struck +
   "DONE Phase 9b": the export projects only an allowlisted column set, pinned
   by test); keep *The "vs traditional" half of B2.2/B2.5 is empty* open
   (stated beside B2.5); open *The published study's corpus render* (trigger:
@@ -320,15 +323,15 @@ Freeze: none
   classify step* (its trigger named 9b and fired; the target is
   `pipeline/build.py`, an earlier phase — a `fix/` PR at 9f or Phase 10);
   update the count.
-- [ ] LESSONS.md — none until a review round reports a correctness finding; then backtick it and the fix commit writes the row
-- [ ] `CLAUDE.md` — Current status; Repo map (`study/model.py`, `study/panels.py`,
+- [x] `LESSONS.md` — `unpinned`, `caller-sourced`, `site-fix` and `empty-default` extended with this phase's fix commits (backticked so the gate's records check lists it).
+- [x] `CLAUDE.md` — Current status; Repo map (`study/model.py`, `study/panels.py`,
   Beat 2 rendered, 9c next); BACKLOG count; Commands unchanged.
-- [ ] `BACKING.md` — the two claim-cell wording fixes above; no tag change, no
+- [x] `BACKING.md` — the two claim-cell wording fixes above; no tag change, no
   row added or removed, so `make check-backing` is unaffected.
-- [ ] `SPEC.md` — the Beat 2 sentences under Scope (panel details and one
+- [x] `SPEC.md` — the Beat 2 sentences under Scope (panel details and one
   wording fix; row ids, tags and chart meanings unchanged).
-- [ ] README — none (the repo has no README yet; Phase 9f).
-- [ ] this spec — the "Delivered" paragraph appended at exit.
+- [x] README — none (the repo has no README yet; Phase 9f).
+- [x] `specs/phase-9b-beat-2.md` — the "Delivered" paragraph appended at exit.
 
 ## Threat model (REQUIRED when the phase adds a `make` target that takes a variable, deletes anything, calls a paid API, or touches the network)
 
@@ -411,3 +414,69 @@ decision 5. Suggestions #7 (module direction), #8 (lint the study queries), #9
 Questions #10 (security-reviewer not triggered), #11 (a captured render is
 local and uncommitted; 9f decides), #12 (the band's legend entry with its count)
 — answered in Review & stack risk, pinned decision 1 and pinned decision 4.
+
+## Delivered (2026-09-08)
+
+Beat 2 renders through 9a's contract, split one direction into `study/model.py`
+(the types and `check_panel`) ← `study/panels.py` (the readers, the allowlist,
+the corpus gate, the note texts) ← `study/export.py` (the renderers and the
+page), the move verbatim in its own commit (`203b5ff`). The **corpus gate** is
+`_STATE_OF_INPUT`, one closed mapping over `pipeline.build.INPUTS`, read off
+each corpus mart's own `run_id`: `captured` counts, a fixture input renders the
+labelled fixture state with no number, `none` "no data yet", anything else
+refuses by name; `check_panel` refuses a fixture state that carries content, as
+it refuses Pending with a value. The committed page is B2.1 Pending, B2.3 the
+peer anchors (Documented), and B2.2/B2.4/B2.5 the fixture state under a Measured
+chip, their footers saying where the counted figures will open. New kinds and
+cells: the metric `table` (B2.4) and `Point.absent` (value xor a declared
+absence, "no held-out case" with its counts); the `unclassified` band on the
+neutral token, in the legend with its count in every render, even as the only
+series; `positive` excluded from the theme series and the denominator stated,
+with SPEC, BACKING and the brief's Beat 2 line corrected to it; B2.5 the
+held-claim (document-loop) share per segment beside the band, points labelled
+by segment so a traditional source is a second bar per series; the trail in
+each share's tooltip (`theme_rows of reviews`; visible text in B2.4 — BACKLOG
+"tooltip-only"). The no-text guarantee is the **column allowlist** checked on
+each cursor's description, `select *` failing by name, and a recording
+connection proves every query a render runs is a listed study query or one of
+the two catalog reads; this is the enforcing test 9a's excerpt contract
+deferred — the export has no render path for review text, and the review-level
+drill is the Metabase demonstration (9g). A panel source is an http(s) address
+(a link), a repository file (plain text — B2.4 names the answer key), or a
+refusal; the brief §6 citation follows the Documented points shown. B1.2 keeps
+9a's soft profile lookup; B2.3's reader refuses an unknown profile.
+`tests/conftest.py::build_study_db` builds the study warehouse (rebuild + the
+CLI classify step, the model and the cache neutralised). All five Done-when
+items pass; the DONE command exits clean with the key unset (10 `theme_share_by_
+month` rows, 7 `theme_share_by_segment`, 7 `unclassified`, the page byte-identical
+to the baseline) and the suite is green (906 tests).
+
+Two challenge rounds (round 1 rework, twelve findings folded into the spec;
+round 2 approve with amendments, nine findings fixed, one fix amendment — the
+fixture-with-content refusal) and three review rounds. Round 1: the corpus
+chart kind and the `ROWS=none` render pinned, dead `axis_unit`, the fixture
+note, one fix amendment (a panel's notes are a sequence, the self-selection
+caveat on B2.2/B2.5). Round 2: the neutral-token render mapping pinned (a
+page-scoped assertion had pinned nothing), the band-only legend, the Beat 2
+tags read from the mart, B2.5's own notes, the fixture label's jargon. The exit
+round (code-reviewer, functionality-tester "works", study-editor, coherence-
+auditor): B2.5 drawn to its BACKING claim (`eb79c13`), the §6 citation derived
+(`a3822f3`), the repository-file source and B2.4's answer key (`92e29e6`), three
+pins (`5c3b17b`, `b157daa`, `26264cc`), B2.2's caveat and row 51 (`7f3a78f`),
+wording (`82ec471`), records here. The cap never fired. `LESSONS.md` extended
+`unpinned`, `caller-sourced`, `site-fix` and `empty-default`. BACKLOG: the
+Health-details row struck DONE 9b; opened the published-corpus-render (9f),
+per-review-address (9g), page-scoped-pin (tooling) and tooltip-only-trail (9f)
+rows; row 51 re-pointed (B2.2's segment filter is the remaining render change),
+row 52 re-pointed (a `fix/` PR at 9f or Phase 10). No fixture re-frozen; no
+earlier-phase file touched; no new dependency.
+
+Handoff to 9c (Beat 3, the first Modeled panels): `ALLOWED_COLUMNS` grows by
+the cost-mart columns (`expression`, `citation`, `sourcing` are varchar — invariant
+5's "no text column" means no review-text column; say so in 9c's spec); `Unit`
+and `_display` need a euro unit; a Modeled mart's source is the Open DAMIR fit
+(a repository file plus the source address — the `_drill` shapes exist);
+Modeled marts carry `run_id = 'synthetic'` on the baseline and must NOT be
+corpus-gated (`_corpus_series` is opt-in per builder); `_render_line` places x
+by sorted label index, so B3.2's curves over `flag_rate` need a uniform grid or
+a numeric-x kind; `_BEATS` takes one row. 9f owns rows 69 and 72; 9g row 70.

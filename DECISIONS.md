@@ -2215,7 +2215,13 @@ of Phase 9 (the study).
   public source — brief §2.5), but Beat 1 ships no review text (B1.1 is
   Pending), so its enforcing test and the first text-drill surface land in 9b.
   The "Health details arrive in review bodies" BACKLOG row stays open,
-  re-scoped to 9b, not struck.
+  re-scoped to 9b, not struck. *Superseded in 9b (exit round): the export has no
+  render path for review text at all — the column allowlist and the recording
+  connection (`tests/test_beat2.py::test_every_export_query_projects_only_allowlisted_columns`,
+  `::test_every_query_the_export_runs_is_a_listed_study_query`) are the
+  enforcing tests, and the review-level drill is the Metabase demonstration
+  (9g); the paraphrase rule governs that surface and B2.1's documented
+  examples when they land.*
 
 Challenge dispositions: the scoping round returned *rework* (the split instinct
 right, the order and cut wrong) — the reorder, the excerpt-policy-first rule,
@@ -2352,3 +2358,38 @@ does not refuse a fixture-state panel that also carries content — is a
 contract extension: a fix amendment, written alone and stamped, implemented
 on approval. *Rejected for #7: parsing the denominator back out of the
 formatted `detail` string — a string round-trip where a field belongs.*
+
+Exit round (2026-09-08; code-reviewer, functionality-tester "works", study-
+editor, coherence-auditor over the whole repo): 23 rows, 0 BLOCKER, 10
+should-fix; fixed in full. Correctness: B2.5 drew every theme where SPEC and
+BACKING claim the held-claim share per segment — `_theme_series` now takes a
+closed `themes` set and labels B2.5's points by segment through a closed
+`_SEGMENT_NAMES` lookup over ingest's `SEGMENTS`, so a traditional source is a
+second bar per series with no render change (`eb79c13`, `unpinned`); the
+footer's brief §6 citation hung on "any URL present" and is now derived from
+the Documented points shown (`a3822f3`, `caller-sourced`); a panel-level
+source the drill could not shape fell to "source pending" — now an http(s)
+address, a repository file in plain text, or a refusal by name, and B2.4 names
+the answer key (`92e29e6`, `empty-default`; the same shape carries 9c's Open
+DAMIR fit); three pins — the point tag against a non-Measured row, the probe's
+schema filter, the catalog reads through the SQL lint (`5c3b17b`, `b157daa`,
+`26264cc`). B2.2 carries the one-segment caveat and row 51 names its segment
+filter as the remaining render change (`7f3a78f`). Wording: "switched off"
+for "no key", the trail as a tooltip, the brief's Beat 2 line (`82ec471`).
+Records: the 9a excerpt-contract bullet superseded above; B1.2 keeps 9a's soft
+profile lookup while B2.3's reader refuses (kept deliberately in `9bb76bb` —
+a Beat 1 semantics change is out of 9b's scope); the Invariants' falsifier
+column extended with the round-2 and challenge-round tests and the round-2
+stamp re-hashed (the invariants themselves unchanged); BACKLOG row 69 loses
+its B2.4-drill sentence, row 71 gains the `site-fix` reminder and the PLAN §5
+split for the next `tooling/` branch. The auditor's four questions, answered:
+(1) the three-layer split holds — `_corpus_series` returning `(series,
+fixture_text)` is the builder's contract and `check_panel`'s fixture refusal
+is the render contract's; two checks, one property, kept; (2) `panels.py` at
+~800 lines holds readers, display names, the allowlist, the gate and the note
+texts — 9c splits the note texts and display tables into `study/text.py` if it
+grows further, not before; (3) the corpus gate stands — a Measured chip beside
+"not a result" is honest (the claim is Measured, the input is not real), and
+publishing a captured render is 9f's decision with its own Threat-model row
+(row 69); (4) "source pending" was the assumption 9c would break — the
+repository-file source now carries a Modeled panel's fit file and address.
