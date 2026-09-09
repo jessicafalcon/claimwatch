@@ -385,16 +385,19 @@ def _render_curve(panel: Panel) -> list[str]:
 
 
 def _render_markers(panel: Panel, x_of: dict[str, float]) -> list[str]:
-    """The labelled vertical rules, in tuple order, each label one step lower
-    than the previous by its index — so two rules at one x stack their labels."""
+    """The labelled vertical rules: one line per distinct grid x (coincident
+    markers share the one line), then each marker's label one step lower than
+    the previous by its index — so two rules at one x stack their labels."""
     out: list[str] = []
     middle = (_ML_CURVE + _W - _MR) / 2
-    for i, (label, x) in enumerate(panel.markers):
+    for x in sorted({x for _label, x in panel.markers}):
         px = x_of[x_key(x)]
         out.append(
             f'<line x1="{_n(px)}" y1="{_n(_MT)}" x2="{_n(px)}" y2="{_n(_H - _MB)}" '
             'class="marker"/>'
         )
+    for i, (label, x) in enumerate(panel.markers):
+        px = x_of[x_key(x)]
         anchor, tx = ("end", px - 4) if px > middle else ("start", px + 4)
         out.append(
             f'<text x="{_n(tx)}" y="{_n(_MT + 10 + i * _MARKER_DY)}" '

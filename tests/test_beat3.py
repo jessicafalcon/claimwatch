@@ -166,6 +166,9 @@ def test_coincident_markers_stack_their_labels_at_one_x(synthetic_db):
     (x0, y0, _), (_, _, _), (x2, y2, _) = labels
     assert x0 == x2  # one x
     assert float(y2) - float(y0) == 2 * export._MARKER_DY  # stacked by draw index
+    # Two markers at one x share one line: three markers, two distinct x, two
+    # `<line class="marker">` rules — no duplicate overlapping line (round 2 #1).
+    assert sec.count('class="marker"') == 2
     note = _section(_html(synthetic_db), "B3.2")
     assert "cross at a flag rate of 9.5%" in note
     assert "stops paying for itself at 5.0%, where the default sits" in note
