@@ -485,14 +485,11 @@ SIM_SUMMARY = {
 # B2.5 (theme_share_by_segment): each theme bar's share is theme_rows / reviews,
 # the mart's own; positive is excluded from the bars (still in the denominator),
 # unclassified is the neutral band. document-loop is the hypothesis subject.
-BEAT2_SEGMENT_BARS = {  # the six drawn labels (positive excluded) → theme_rows
+BEAT2_SEGMENT_BARS = {  # the two drawn series (held-claim + the band) → theme_rows
     "document-loop": 9,
-    "silent-rejection": 4,
-    "second-payer": 4,
-    "support-traction": 4,
-    "coverage-price": 4,
     "unclassified": 7,
 }
+BEAT2_SEGMENT_LABEL = "Digital-first"  # the one segment's bar label (x = segment)
 BEAT2_POSITIVE_EXCLUDED = "positive"  # in the denominator, never a theme bar
 
 # B2.2 (theme_share_by_month): document-loop's share each month = theme_rows /

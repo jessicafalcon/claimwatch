@@ -361,6 +361,16 @@ def beat1_panels(conn) -> list[Panel]:
 # chart (a theme chart counts complaints). A label outside the closed set is
 # refused by name (classify/labels.py is the source of the set).
 _THEME_SLOTS = {theme: slot for slot, theme in enumerate(THEMES)}
+# The study's hypothesis theme (brief §5.1, B2.5): the one theme B2.5 draws per
+# segment, beside the band. Named from the closed label set, never retyped.
+HELD_CLAIM = THEMES[0]  # "document-loop"; a test pins the name
+# Segment display names, a closed lookup over ingest's SEGMENTS (refused by name
+# outside it — a segment is a role, never a brand).
+_SEGMENT_NAMES = {
+    "digital-first": "Digital-first",
+    "traditional": "Traditional mutuelle",
+    "digital-challenger": "Digital challenger",
+}  # a test pins the key set equal to SEGMENTS
 _LABEL_NAMES = {
     "document-loop": "Document loop",
     "silent-rejection": "Silent rejection",
@@ -412,11 +422,11 @@ _DENOMINATOR_NOTE = (
     "it is largest, shown, never hidden."
 )
 _SEGMENT_DENOMINATOR_NOTE = (
-    "Each bar is one theme’s share among every classified review in that "
-    "segment (positive reviews included in the total, never a bar — a theme "
-    "chart counts complaints). A review carrying two themes counts in two bars. "
-    "The gray “not yet classified” band is the reviews a language model would "
-    "sort; with no key it is largest, shown, never hidden."
+    "The bar is the document-loop share among every classified review in that "
+    "segment (positive reviews included in the total, never a bar); a review "
+    "carrying document-loop beside another theme counts once here. The gray "
+    "“not yet classified” band is the reviews a language model would sort; "
+    "with no key it is largest, shown, never hidden."
 )
 
 
@@ -435,7 +445,7 @@ def _self_selection_note(shown: str) -> str:
 
 
 _SELF_SELECTION_NOTE = _self_selection_note("the theme mix")
-_SEGMENT_SELF_SELECTION_NOTE = _self_selection_note("each theme’s share")
+_SEGMENT_SELF_SELECTION_NOTE = _self_selection_note("the held-claim complaint share")
 # B2.5 only: the corpus is one segment today — its own note, before the caveat.
 _TRADITIONAL_CAVEAT = (
     "The corpus is digital-first only for now, so the traditional column awaits "
@@ -494,13 +504,20 @@ def _corpus_input(conn, mart: str, panel_id: str) -> str | None:
 
 
 def _theme_series(
-    rows: list[tuple], panel_id: str, label_by: Literal["period", "theme"]
+    rows: list[tuple],
+    panel_id: str,
+    label_by: Literal["period", "segment"],
+    themes: frozenset[str] = frozenset(THEMES),
 ) -> tuple[Series, ...]:
     """One series per label from `(x, label, reviews, theme_rows, share, tag)` rows:
-    each theme a coloured line/bar, the `unclassified` band the neutral token,
-    `positive` excluded (a theme chart counts complaints). `label_by` names each
-    point by its period (a month) or by its theme (a one-segment bar). The raw
-    counts ride on each point as the trail behind the share, redone by hand.
+    each drawn theme a coloured line/bar, the `unclassified` band the neutral
+    token, `positive` excluded (a theme chart counts complaints). `themes` is the
+    closed set of themes drawn — every theme for B2.2, the held-claim theme alone
+    for B2.5 (SPEC B2.5: the document-loop share per segment). `label_by` names
+    each point by its period (a month) or by its segment (x = segment, theme =
+    series, so a second segment is a second bar per series — BACKLOG "vs
+    traditional"). The raw counts ride on each point as the trail behind the
+    share, redone by hand.
 
     The `unclassified` band is always emitted, even with no rows, and its legend
     name carries its total count — so a small or empty band reads as zero, never
@@ -509,9 +526,9 @@ def _theme_series(
     # The tag is the mart row's own, as every Beat 1 reader reads it — never a
     # literal in the reader (round 2, code-reviewer #1, the caller-sourced class).
     for x_key, label, reviews, theme_rows, share, tag in rows:
-        if label == POSITIVE:
+        if label == POSITIVE or (label in _THEME_SLOTS and label not in themes):
             continue
-        point_label = str(x_key) if label_by == "period" else _label_display(label)
+        point_label = str(x_key) if label_by == "period" else _segment_name(x_key)
         by_label.setdefault(label, []).append(
             Point(
                 point_label,
@@ -539,6 +556,14 @@ def _theme_series(
         )
         for label in labels
     )
+
+
+def _segment_name(segment: str) -> str:
+    if segment not in _SEGMENT_NAMES:
+        raise RenderRefused(
+            f"unknown segment {segment!r} (not in {tuple(_SEGMENT_NAMES)})"
+        )
+    return _SEGMENT_NAMES[segment]
 
 
 def _series_name(label: str, band_total: int) -> str:
@@ -661,7 +686,12 @@ def beat2_panels(conn) -> list[Panel]:
         conn,
         "theme_share_by_segment",
         "B2.5",
-        lambda: _theme_series(_rows(conn, _Q_THEME_BY_SEGMENT), "B2.5", "theme"),
+        lambda: _theme_series(
+            _rows(conn, _Q_THEME_BY_SEGMENT),
+            "B2.5",
+            "segment",
+            themes=frozenset({HELD_CLAIM}),
+        ),
     )
     return [
         Panel(

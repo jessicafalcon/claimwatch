@@ -299,7 +299,10 @@ def test_beat2_values_equal_their_marts_over_a_captured_run_id(captured_db):
             assert point.value == float(share)  # value equals its mart
             assert point.tag == tag  # and so does its tag (round 2, CR#1)
             assert point.detail == f"{int(theme_rows)} of {int(reviews)} reviews"
+            assert point.label == pins.BEAT2_SEGMENT_LABEL  # x = the segment
     assert pins.BEAT2_POSITIVE_EXCLUDED not in drawn  # positive is not a bar
+    # B2.5 draws the held-claim share and the band, nothing else (SPEC B2.5).
+    assert set(drawn) == set(pins.BEAT2_SEGMENT_BARS)
     # B2.4's cells carry the classifier_quality row's tag, value or absence alike.
     quality_tag = {
         label: tag
@@ -397,6 +400,52 @@ def test_a_band_only_panel_still_lists_the_band_in_the_legend():
     assert export._render_legend(one) == []
 
 
+def test_the_held_claim_theme_and_the_segment_names_are_closed():
+    from ingest.sources import SEGMENTS
+
+    assert panels.HELD_CLAIM == "document-loop"  # brief §5.1, the hypothesis theme
+    assert set(panels._SEGMENT_NAMES) == set(SEGMENTS)  # no segment unnamed
+
+
+def test_b2_5_draws_the_held_claim_share_per_segment():
+    # SPEC B2.5: the document-loop share per segment beside the band — x is the
+    # segment, the theme is the series, so a traditional segment is a second bar
+    # in each series with its own label and the same colour (exit round, CR#2/#4,
+    # SE#1). Other themes are not drawn; an unknown segment refuses by name.
+    rows = [
+        ("digital-first", "document-loop", 10, 3, 0.3, "Measured"),
+        ("digital-first", "silent-rejection", 10, 2, 0.2, "Measured"),
+        ("digital-first", "unclassified", 10, 4, 0.4, "Measured"),
+        ("traditional", "document-loop", 20, 2, 0.1, "Measured"),
+        ("traditional", "unclassified", 20, 1, 0.05, "Measured"),
+    ]
+    series = panels._theme_series(
+        rows, "B2.9", "segment", themes=frozenset({panels.HELD_CLAIM})
+    )
+    assert [s.name for s in series] == ["Document loop", "Not yet classified (5)"]
+    held, band = series
+    assert [p.label for p in held.points] == ["Digital-first", "Traditional mutuelle"]
+    assert [p.value for p in held.points] == [0.3, 0.1]
+    assert [p.label for p in band.points] == ["Digital-first", "Traditional mutuelle"]
+    panel = Panel(
+        "B2.9",
+        "B2.9",
+        "t",
+        "b",
+        "Measured",
+        "grouped_bar",
+        series=series,
+        domain=(0.0, 1.0),
+    )
+    check_panel(panel)
+    svg = "\n".join(export._render_grouped_bar(panel))
+    assert "<title>Document loop · Digital-first: 30.0%" in svg  # series · segment
+    with pytest.raises(RenderRefused):
+        panels._theme_series(
+            [("brand-x", "document-loop", 1, 1, 1.0, "Measured")], "B2.9", "segment"
+        )
+
+
 def test_b2_2_plots_each_share_against_the_axis_not_stacked():
     # A cell whose shares sum past 1 (three themes, each 0.6) plots every point at
     # its own share — no cumulative stack — so the y of each is _y_of(0.6).
@@ -430,7 +479,7 @@ def test_positive_rows_are_excluded_from_the_theme_series_and_stated(captured_db
         "select segment, label, reviews, theme_rows, share, tag from "
         "theme_share_by_segment order by label",
     )
-    series = panels._theme_series(rows, "B2.5", "theme")
+    series = panels._theme_series(rows, "B2.5", "segment")
     assert all(_label_of(s) != pins.BEAT2_POSITIVE_EXCLUDED for s in series)
     page = _html(captured_db)
     # the denominator (positive included) is stated beside the chart.
