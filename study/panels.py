@@ -107,9 +107,10 @@ def _run_id_sql(mart: str) -> str:
     return f"select distinct run_id from {mart} order by run_id"
 
 
-# The catalog probe `_mart_exists` runs — the one query the export runs outside
-# STUDY_QUERIES (no data column, so no review text can leak); a test records
-# every query a render runs and refuses one that is neither (challenge round 2).
+# The catalog probe `_mart_exists` runs — with the engine's schema read, one of
+# the two catalog reads the export runs outside STUDY_QUERIES (no data column,
+# so no review text can leak); a test records every query a render runs and
+# refuses one that is neither (challenge round 2).
 _MART_PROBE = (
     "select 1 from information_schema.tables where table_schema = ? and table_name = ?"
 )
@@ -421,15 +422,15 @@ _DENOMINATOR_NOTE = (
     "(positive reviews included in the total, but not drawn as a theme bar — a "
     "theme chart counts complaints). A review carrying two themes counts in two "
     "bars, so the shares across themes can sum past one. The gray “not yet "
-    "classified” band is the reviews a language model would sort; with no key "
-    "it is largest, shown, never hidden."
+    "classified” band is the reviews a language model would sort; when that "
+    "model is switched off it is largest, shown, never hidden."
 )
 _SEGMENT_DENOMINATOR_NOTE = (
     "The bar is the document-loop share among every classified review in that "
     "segment (positive reviews included in the total, never a bar); a review "
     "carrying document-loop beside another theme counts once here. The gray "
     "“not yet classified” band is the reviews a language model would sort; "
-    "with no key it is largest, shown, never hidden."
+    "when that model is switched off it is largest, shown, never hidden."
 )
 
 

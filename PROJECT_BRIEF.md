@@ -85,8 +85,8 @@ Five beats, told from the customer's chair. The customer is the protagonist; the
 
 ### Beat 2 — The complaints have a shape
 - The taxonomy (5 themes, see §5) with paraphrased documented examples. Tag: Documented.
-- **The chart the pipeline exists to produce:** theme share of negative reviews over time, per insurer / per segment (digital-first vs traditional). Tag: Measured (via the gated classifier). Until real, it's tagged Pending — never faked.
-- Peer context: public ratings across the market segment. Tag: Measured.
+- **The chart the pipeline exists to produce:** theme share among every classified review over time, per segment (digital-first vs traditional; positive reviews in the denominator, never a theme bar). Tag: Measured (via the gated classifier). Until real, it's tagged Pending — never faked.
+- Peer context: public ratings across the market segment. Tag: Documented (the anchors), Measured for our own points.
 - Every theme bar must drill through to the underlying review excerpts (Metabase drill-through). Audit trail, not citation.
 - Classifier quality (per-theme precision/recall vs hand labels) is displayed **inside the study**, next to the charts it feeds.
 

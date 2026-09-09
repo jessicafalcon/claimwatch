@@ -734,7 +734,7 @@ with no number (the brief's "never faked" at render time). New: the metric
 `table` kind (B2.4, value xor declared absence — a zero-denominator cell shows
 "no held-out case" with its counts); the `unclassified` neutral-token band,
 always in the legend with its count; `positive` excluded from the theme bars;
-the trail (mart `reviews`/`theme_rows` beside each share); the **column
+the trail (mart `reviews`/`theme_rows` in each share's tooltip); the **column
 allowlist** on each cursor's description (no review text reaches the page,
 `select *` fails by name). Byte-identical on rerun; `make study` renders the
 committed baseline (B2.2/B2.4/B2.5 fixture state, B2.3 the anchors). Closed the
