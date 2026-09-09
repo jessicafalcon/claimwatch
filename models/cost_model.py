@@ -3,11 +3,13 @@ held claim costs, as plain arithmetic a reader can redo by hand.
 
 Formulas are data. `FORMULAS` is an ordered tuple where each entry carries a
 name, the formula written out as text, whether it is a single number (`point`)
-or a point read off the whole flag-rate curve (`curve`), and the function that
-computes it. The study prints the text; a test evaluates the function at the
-defaults and pins the result; the mart stores both side by side. The printed
-formula and the computed number therefore cannot drift apart — they are one
-entry, 1:1 by construction (docs/PLAN.md §4 decision 5).
+or a point read off the whole flag-rate curve (`curve`), the unit its value is
+rounded and displayed in (one of `_ROUNDING`'s keys), and the function that
+computes it. The study prints the text and formats the value by the unit; a
+test evaluates the function at the defaults and pins the result; the mart
+stores all of it side by side. The printed formula, the unit and the computed
+number therefore cannot drift apart — they are one entry, 1:1 by construction
+(docs/PLAN.md §4 decision 5).
 
 `PARAMETERS` carries the static assumptions; the three DAMIR-fit rows (`mu`,
 `sigma`, `emp_p50`) are handed in by the caller as a `Fit` and added by
@@ -84,12 +86,16 @@ CurveFn = Callable[[Sequence[Mapping[str, float]]], float | None]
 class Formula:
     """One entry of the model: its name, the expression written out as text
     (what the study prints), its `kind` (`point` — one number per parameter set,
-    or `curve` — a point read off the whole flag-rate grid), and the callable
-    that computes it."""
+    or `curve` — a point read off the whole flag-rate grid), its `unit` (the
+    rounding unit the value is written and displayed in — a key of `_ROUNDING`;
+    a curve formula's value is a flag rate, so `rate`), and the callable that
+    computes it. The unit is part of the entry, never a map beside it, so the
+    mart column and the page's number format come from the same row."""
 
     name: str
     expression: str
     kind: str
+    unit: str
     fn: PointFn | CurveFn
 
 
@@ -320,42 +326,47 @@ def _timer_amount_eur(v: Mapping[str, float]) -> float:
 
 
 POINT_FORMULAS = (
-    Formula("customer_value", "arr_eur / members", "point", _customer_value),
+    Formula("customer_value", "arr_eur / members", "point", "eur", _customer_value),
     Formula(
         "mean_claim",
         "exp(mu + sigma^2 / 2)  -- a DAMIR cell sums >= 1 claims, so this "
         "overstates a claim's cost and understates claims and friction_cost",
         "point",
+        "eur",
         _mean_claim,
     ),
     Formula(
         "median_cell",
         "emp_p50  -- the middle DAMIR cell, the contrast to the mean",
         "point",
+        "eur",
         _median_cell,
     ),
-    Formula("claims", "refunded_eur / mean_claim", "point", _claims),
-    Formula("flagged", "claims * flag_rate", "point", _flagged),
-    Formula("false_pos", "flagged * fp_share", "point", _false_pos),
+    Formula("claims", "refunded_eur / mean_claim", "point", "count", _claims),
+    Formula("flagged", "claims * flag_rate", "point", "count", _flagged),
+    Formula("false_pos", "flagged * fp_share", "point", "count", _false_pos),
     Formula(
         "fraud_saved",
         "fraud_pool_eur * (1 - exp(-k * flag_rate))",
         "point",
+        "eur",
         _fraud_saved,
     ),
     Formula(
         "friction_cost",
         "false_pos * (contacts * cost_per_contact + churn_prob * customer_value)",
         "point",
+        "eur",
         _friction_cost,
     ),
-    Formula("net", "fraud_saved - friction_cost", "point", _net),
-    Formula("loop_days", "contacts * days_per_round", "point", _loop_days),
+    Formula("net", "fraud_saved - friction_cost", "point", "eur", _net),
+    Formula("loop_days", "contacts * days_per_round", "point", "days", _loop_days),
     Formula(
         "friction_per_day",
         "(contacts * cost_per_contact + churn_prob * customer_value) / loop_days"
         "  -- friction assumed to accrue evenly over the loop and stop when it ends",
         "point",
+        "eur",
         _friction_per_day,
     ),
     Formula(
@@ -365,24 +376,10 @@ POINT_FORMULAS = (
         "net-negative in expectation; the claim is the recovery ceiling, so this "
         "errs toward holding",
         "point",
+        "eur",
         _timer_amount_eur,
     ),
 )
-# The rounding unit each point output carries.
-_OUTPUT_UNIT = {
-    "customer_value": "eur",
-    "mean_claim": "eur",
-    "median_cell": "eur",
-    "claims": "count",
-    "flagged": "count",
-    "false_pos": "count",
-    "fraud_saved": "eur",
-    "friction_cost": "eur",
-    "net": "eur",
-    "loop_days": "count",
-    "friction_per_day": "eur",
-    "timer_amount_eur": "eur",
-}
 
 
 # The two curve formulas: each reads the grid's rows and returns a flag rate (or
@@ -409,6 +406,7 @@ CURVE_FORMULAS = (
         "first grid flag_rate with net < 0 (the curves cross; the flags as a "
         "whole cost more than they recover); null if none",
         "curve",
+        "rate",
         _crossover,
     ),
     Formula(
@@ -416,6 +414,7 @@ CURVE_FORMULAS = (
         "first grid flag_rate whose net is below the previous point's (each "
         "extra flag costs more than it recovers); null if none",
         "curve",
+        "rate",
         _marginal_crossover,
     ),
 )
@@ -468,7 +467,7 @@ def _run_points(values: Mapping[str, float]) -> dict[str, float | int]:
     v = dict(values)
     for f in POINT_FORMULAS:
         v[f.name] = f.fn(v)
-    return {f.name: rounded(_OUTPUT_UNIT[f.name], v[f.name]) for f in POINT_FORMULAS}
+    return {f.name: rounded(f.unit, v[f.name]) for f in POINT_FORMULAS}
 
 
 def evaluate(
@@ -508,8 +507,8 @@ def curves(
 def format_model(fit: Fit) -> str:
     """The one-screen summary `make model` prints: the parameter table (each row
     with its range; a sourced one with its citation), the formula table (each
-    expression beside its value at the defaults, per scenario) and the two
-    crossovers. No clock, no key — the same fit always prints the same text."""
+    expression beside its value and unit at the defaults, per scenario) and the
+    two crossovers. No clock, no key — the same fit always prints the same text."""
     params = parameters(fit)
     values = {p.name: p.default for p in params}
     lines = [
@@ -534,8 +533,8 @@ def format_model(fit: Fit) -> str:
         )
         for f in POINT_FORMULAS:
             lines.append(f"  {f.name:16} = {f.expression}")
-            lines.append(f"  {'':16}   -> {outputs[f.name]}")
+            lines.append(f"  {'':16}   -> {outputs[f.name]} ({f.unit})")
         for f in CURVE_FORMULAS:
             lines.append(f"  {f.name:28} = {f.expression}")
-            lines.append(f"  {'':28}   -> {crossovers[f.name]}")
+            lines.append(f"  {'':28}   -> {crossovers[f.name]} ({f.unit})")
     return "\n".join(lines)

@@ -10,11 +10,14 @@ import math
 import pytest
 
 from models.cost_model import (
+    _ROUNDING,
     CURVE_FORMULAS,
     FLAG_RATE_GRID,
+    FORMULAS,
     POINT_FORMULAS,
     SCENARIOS,
     Fit,
+    Formula,
     Parameter,
     _apply_scenario,
     _crossover,
@@ -58,6 +61,37 @@ def test_make_model_prints_each_expression_beside_its_value():
         assert f.expression in out
     assert "-> 0.095" in out  # the baseline crossover
     assert "-> 0.05" in out  # the marginal crossover / the default marker
+
+
+def test_make_model_prints_the_unit_beside_each_value():
+    """The unit is part of the entry, so the terminal shows it beside the number
+    the way the mart stores it and the page will format it — one unit, one
+    place: `-> <value> (<unit>)` for every formula, curve rows included."""
+    out = format_model(FIT)
+    baseline = pins.COST_OUTPUTS["baseline"]
+    crossovers = pins.COST_CROSSOVERS["baseline"]
+    for f in POINT_FORMULAS:
+        assert f"-> {baseline[f.name]} ({f.unit})" in out, f.name
+    for f in CURVE_FORMULAS:
+        assert f"-> {crossovers[f.name]} ({f.unit})" in out, f.name
+    # A crossover that never happens (the `both` scenario) prints its absence
+    # with the unit it would have carried, never a bare `None`.
+    never = pins.COST_CROSSOVERS["both"]["crossover_flag_rate"]
+    assert never is None
+    assert "-> None (rate)" in out
+
+
+def test_every_formula_carries_a_rounding_unit():
+    """Every FORMULAS entry's unit is a key of the one rounding table and equals
+    its pin (the two curve formulas' `rate` included). On the point path
+    `rounded()` refuses an unknown unit at evaluation; the curve path never
+    rounds by `f.unit`, so for a curve formula this test is the guard."""
+    assert {f.name: f.unit for f in FORMULAS} == pins.COST_FORMULA_UNITS
+    for f in FORMULAS:
+        assert f.unit in _ROUNDING, f.name
+    # The field is required on the entry itself (no default, no map beside it).
+    with pytest.raises(TypeError):
+        Formula("x", "y", "point", lambda v: 0.0)  # type: ignore[call-arg]
 
 
 # --- every parameter: a closed sourcing set, a citation when sourced, a range -

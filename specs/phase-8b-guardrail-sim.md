@@ -371,8 +371,9 @@ tell a story; a change to one is a `PARAMETERS` cell with its range, recorded.
   `summarize`, `format_simulation`; the teaching docstring; imports `math`,
   `statistics`, `dataclasses`, `collections.abc` and `models.cost_model`.
 - `models/cost_model.py` — two `KNOB_PARAMETERS` rows, three `POINT_FORMULAS`
-  entries and their `_OUTPUT_UNIT` rows, one `_ROUNDING` row (`days`, two
-  places); nothing else moves. `models/__init__.py` — the docstring names
+  entries and their `_OUTPUT_UNIT` rows (the map became the `Formula.unit`
+  field in `fix/cost-outputs-unit`, 2026-09-09), one `_ROUNDING` row (`days`,
+  two places); nothing else moves. `models/__init__.py` — the docstring names
   both modules as landed.
 - `sql/marts/guardrail_sim.sql`, `sql/marts/sla_threshold.sql` — DDL only;
   headers name grain (and why the per-claim grain exists), provenance

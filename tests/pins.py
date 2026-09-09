@@ -350,6 +350,26 @@ COST_PARAM_ROWS = 15  # 4 scale + 3 fit + 6 knobs + 2 timer knobs (8b)
 COST_SCENARIOS = ("baseline", "contacts_once", "churn_halved", "both")
 FLAG_RATE_GRID_POINTS = 41  # 0.000..0.200 step 0.005
 COST_OUTPUT_ROWS = len(COST_SCENARIOS) * 14  # 12 point + 2 curve per scenario = 56
+# The unit each formula's value is rounded and displayed in — a field of the
+# Formula entry (fix/cost-outputs-unit), stored in cost_model_outputs.unit so the
+# page, `make model` and the dashboard format one number one way. Every key is
+# a rounding unit of models.cost_model._ROUNDING; a curve's value is a flag rate.
+COST_FORMULA_UNITS = {
+    "customer_value": "eur",
+    "mean_claim": "eur",
+    "median_cell": "eur",
+    "claims": "count",
+    "flagged": "count",
+    "false_pos": "count",
+    "fraud_saved": "eur",
+    "friction_cost": "eur",
+    "net": "eur",
+    "loop_days": "days",  # a day count, quoted in days (two places), not a tally
+    "friction_per_day": "eur",
+    "timer_amount_eur": "eur",
+    "crossover_flag_rate": "rate",
+    "marginal_crossover_flag_rate": "rate",
+}
 COST_CURVE_ROWS = len(COST_SCENARIOS) * FLAG_RATE_GRID_POINTS  # 164
 
 # mu/sigma sliders: the fit ± 2 standard errors (se_mu = sigma/√n, se_sigma =
@@ -368,7 +388,7 @@ COST_OUTPUTS = {
         "fraud_saved": 1318719.82,
         "friction_cost": 1132573.36,
         "net": 186146.45,
-        "loop_days": 21,
+        "loop_days": 21.0,  # days: two places, so the printed value is 21.0
         "friction_per_day": 3.05,
         "timer_amount_eur": 42.67,
     },
@@ -382,7 +402,7 @@ COST_OUTPUTS = {
         "fraud_saved": 1318719.82,
         "friction_cost": 849430.02,
         "net": 469289.79,
-        "loop_days": 7,
+        "loop_days": 7.0,
         "friction_per_day": 6.86,
         "timer_amount_eur": 48.0,
     },
@@ -396,7 +416,7 @@ COST_OUTPUTS = {
         "fraud_saved": 1318719.82,
         "friction_cost": 778644.19,
         "net": 540075.63,
-        "loop_days": 21,
+        "loop_days": 21.0,  # days: two places, so the printed value is 21.0
         "friction_per_day": 2.1,
         "timer_amount_eur": 29.33,
     },
@@ -410,7 +430,7 @@ COST_OUTPUTS = {
         "fraud_saved": 1318719.82,
         "friction_cost": 495500.85,
         "net": 823218.97,
-        "loop_days": 7,
+        "loop_days": 7.0,
         "friction_per_day": 4.0,
         "timer_amount_eur": 28.0,
     },
