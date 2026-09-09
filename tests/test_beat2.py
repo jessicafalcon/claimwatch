@@ -583,7 +583,9 @@ def test_every_query_the_export_runs_is_a_listed_study_query(captured_db):
 
 
 def test_every_study_query_passes_the_sql_lint():
-    for sql in STUDY_QUERIES:
+    # The two catalog reads the export runs beside STUDY_QUERIES are linted too
+    # (exit round, code-reviewer #3): invariant 5 is over every query it runs.
+    for sql in STUDY_QUERIES + tuple(sorted(_CATALOG_READS)):
         assert find_nonportable(sql) == [], sql
         assert find_clock(sql) == [], sql
 
