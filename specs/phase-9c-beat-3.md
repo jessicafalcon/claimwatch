@@ -1,4 +1,4 @@
-# Phase 9c — Beat 3: the first Modeled panels, the formulas beside their numbers (PROPOSED)
+# Phase 9c — Beat 3: the first Modeled panels, the formulas beside their numbers (APPROVED)
 
 Contract for the `phase-9c-beat-3` branch. Source: PROJECT_BRIEF.md §9 Phase 9
 ("The study"), sub-phase 9c of the permanent-artifact-first split (DECISIONS →
@@ -7,7 +7,7 @@ merged (PR #23, 2026-09-09) **and on the fix PR `fix/cost-outputs-unit`
 merged** (`cost_model_outputs` carries each formula's display unit; pinned
 decision 5).
 
-**Status: PROPOSED — do not start until approved.** No new dependencies: Beat 3
+**Status: APPROVED 2026-09-09 — in progress.** No new dependencies: Beat 3
 renders through the 9a contract (`duckdb` + stdlib, hand-written inline SVG); no
 script, no `<details>`, no new `make` target.
 Challenged: 2026-09-09, round 1, spec 8bc38392 — approve with amendments (all applied)
