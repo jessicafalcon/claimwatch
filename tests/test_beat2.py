@@ -155,6 +155,21 @@ def test_each_corpus_mart_carries_the_input_it_was_built_from(synthetic_db):
         ], mart
 
 
+def test_the_mart_probe_sees_only_the_default_schema():
+    # A same-named table in another schema is not the mart (the Snowflake
+    # portability case; exit round, functionality-tester #2): the probe filters
+    # on the engine's own default schema.
+    conn = connect("duckdb", database=":memory:")
+    try:
+        conn.execute("create schema other")
+        conn.execute("create table other.theme_share_by_month(run_id varchar)")
+        assert not panels._mart_exists(conn, "theme_share_by_month")
+        conn.execute("create table theme_share_by_month(run_id varchar)")
+        assert panels._mart_exists(conn, "theme_share_by_month")
+    finally:
+        conn.close()
+
+
 # --- Done-when 1: the honest baseline -----------------------------------------
 def test_b2_1_renders_the_pending_placeholder_with_no_value(synthetic_db):
     b21 = _panel(synthetic_db, "B2.1")
