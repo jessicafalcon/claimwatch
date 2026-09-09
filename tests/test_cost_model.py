@@ -74,17 +74,21 @@ def test_make_model_prints_the_unit_beside_each_value():
         assert f"-> {baseline[f.name]} ({f.unit})" in out, f.name
     for f in CURVE_FORMULAS:
         assert f"-> {crossovers[f.name]} ({f.unit})" in out, f.name
+    # A crossover that never happens (the `both` scenario) prints its absence
+    # with the unit it would have carried, never a bare `None`.
+    never = pins.COST_CROSSOVERS["both"]["crossover_flag_rate"]
+    assert never is None
+    assert "-> None (rate)" in out
 
 
 def test_every_formula_carries_a_rounding_unit():
     """Every FORMULAS entry's unit is a key of the one rounding table and equals
-    its pin — a formula added without a unit, or with a unit `rounded()` would
-    refuse, fails here before it reaches the writer. A curve's value is a flag
-    rate, so both curve formulas carry `rate`."""
+    its pin (the two curve formulas' `rate` included). On the point path
+    `rounded()` refuses an unknown unit at evaluation; the curve path never
+    rounds by `f.unit`, so for a curve formula this test is the guard."""
     assert {f.name: f.unit for f in FORMULAS} == pins.COST_FORMULA_UNITS
     for f in FORMULAS:
         assert f.unit in _ROUNDING, f.name
-    assert {f.unit for f in CURVE_FORMULAS} == {"rate"}
     # The field is required on the entry itself (no default, no map beside it).
     with pytest.raises(TypeError):
         Formula("x", "y", "point", lambda v: 0.0)  # type: ignore[call-arg]
