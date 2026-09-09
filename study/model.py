@@ -121,7 +121,8 @@ def check_panel(panel: Panel) -> None:
     """Refuse, in one line, a panel that breaks the contract: a tag that is not
     exactly one of `TAGS` (no tag, or two); a point whose tag is not in `TAGS`;
     a metric cell with both a value and a declared absence, or with neither (a
-    null cell no absence explains); a Pending panel carrying any value."""
+    null cell no absence explains); a Pending panel carrying any value; a
+    fixture-state panel carrying any value or declared absence."""
     if panel.tag not in TAGS:
         raise RenderRefused(
             f"{panel.id}: tag {panel.tag!r} is not exactly one of {TAGS}"
@@ -136,6 +137,14 @@ def check_panel(panel: Panel) -> None:
         raise RenderRefused(
             f"{panel.id}: a Pending panel shows no number — it carries a value "
             "(brief §2.4; never fake or fill a number)"
+        )
+    # A fixture state carries no value and no absence: the "no number" over a
+    # fixture input is the contract, not the builder's construction (Phase 9b,
+    # challenge round 2 amendment — the shape 9a closed for Pending).
+    if panel.fixture and has_content(panel):
+        raise RenderRefused(
+            f"{panel.id}: a fixture-state panel shows no number — it carries "
+            "content beside its fixture text (brief §2.4; never faked)"
         )
 
 

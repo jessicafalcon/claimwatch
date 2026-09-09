@@ -196,6 +196,33 @@ def test_corpus_panels_render_the_fixture_state_over_synthetic(synthetic_db):
         assert not any(ch.isdigit() for ch in body), (pid, body)  # no number
 
 
+def test_a_fixture_state_panel_with_content_is_refused():
+    # The contract, not the builder: a panel carrying both fixture text and a
+    # value (or a declared absence) is refused in one line naming the panel, as
+    # Pending-with-value is (challenge round 2 amendment). Fixture text with
+    # empty series — the committed state — passes.
+    def panel(points):
+        return Panel(
+            "B2.9",
+            "B2.9",
+            "t",
+            "b",
+            "Measured",
+            "line",
+            series=(Series("x", 0, points),),
+            fixture=panels._FIXTURE_NOTE,
+            domain=(0.0, 1.0),
+        )
+
+    check_panel(panel(()))
+    value = Point("m", 0.5, "Measured", "", "pct")
+    absence = Point("m", None, "Measured", "", "pct", absent="no held-out case")
+    for content in (value, absence):
+        with pytest.raises(RenderRefused) as exc:
+            check_panel(panel((content,)))
+        assert "B2.9" in str(exc.value) and "\n" not in str(exc.value)
+
+
 # --- Done-when 2: the corpus gate is data ------------------------------------
 def test_the_corpus_gate_reads_run_id_from_the_mart():
     assert set(INPUTS) == {"captured", "none", "synthetic", "samples"}

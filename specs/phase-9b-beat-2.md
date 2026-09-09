@@ -9,12 +9,12 @@ round 1, finding 3).
 **Status: APPROVED 2026-09-08 — in progress.** No new dependencies: Beat 2
 renders through the 9a contract (`duckdb` + stdlib, hand-written inline SVG); no
 script, no `<details>`, no new `make` target.
-Challenged: 2026-09-08, round 2, spec 4fbbdb1a — approve with amendments (all applied)
+Challenged: 2026-09-08, round 2, spec cb73412b — approve with amendments (all applied)
 Challenged: 2026-09-08, round 1, spec 198ff491 — rework (all findings applied)
 Fix amendment: 2026-09-08, round 1 — a panel's notes are a sequence
 (study-editor #2, #3); appended to Invariants below.
 Fix amendment: 2026-09-08, challenge round 2 — a fixture state carries no
-value (#2); appended to Invariants below, implemented on approval.
+value (#2); appended to Invariants below, approved and implemented.
 
 Four sections marked REQUIRED are mandatory; a spec without them is not
 approvable (CLAUDE.md → Workflow rules).
@@ -205,7 +205,7 @@ fixture state carries no value and no declared absence — `check_panel` refuses
 Pending with a value (brief §2.4, never faked).** Falsified by
 `tests/test_beat2.py::test_a_fixture_state_panel_with_content_is_refused`. No
 baseline change (the committed corpus panels carry the fixture text with empty
-series). Implemented on approval.
+series). Approved and implemented the same day.
 
 ## Pinned decisions (do not re-litigate)
 
