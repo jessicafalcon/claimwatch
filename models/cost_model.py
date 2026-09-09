@@ -360,7 +360,7 @@ POINT_FORMULAS = (
         _friction_cost,
     ),
     Formula("net", "fraud_saved - friction_cost", "point", "eur", _net),
-    Formula("loop_days", "contacts * days_per_round", "point", "count", _loop_days),
+    Formula("loop_days", "contacts * days_per_round", "point", "days", _loop_days),
     Formula(
         "friction_per_day",
         "(contacts * cost_per_contact + churn_prob * customer_value) / loop_days"
