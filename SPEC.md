@@ -116,7 +116,7 @@ traction, and coverage-and-price frustration (PROJECT_BRIEF.md §5).
   true cases it catches, measured against the hand labels and shown next to the
   charts it feeds. The classifier is graded only on reviews it never saw while it
   was built (the held-out fold), so the scores are not flattered. Tag: *Measured*.
-  A label the held-out fold carried no case of shows *no held-out case* — an
+  A label with no case in the held-out fold shows *no held-out case* — an
   empty denominator, not a zero score — with its counts. *Fixture state:* like
   B2.2, the committed page shows a labelled fixture state; the graded table
   appears only over captured reviews.

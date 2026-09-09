@@ -154,7 +154,7 @@ def test_corpus_panels_render_the_fixture_state_over_synthetic(synthetic_db):
         assert 'class="fixture"' in sec  # distinct from Pending and "no data yet"
         assert 'class="pending"' not in sec and 'class="nodata"' not in sec
         body = _fixture_body(page, pid)
-        assert "hand-written fixture reviews" in body
+        assert "hand-written example reviews" in body
         assert not any(ch.isdigit() for ch in body), (pid, body)  # no number
 
 
