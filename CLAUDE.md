@@ -755,6 +755,6 @@ README + the stranger acceptance test; 9g — the Metabase demonstration (the
 review-level drill, non-CI). Plus two pulled-out data phases: the claims
 sample-mean slider and data.ameli practitioner fees.
 
-Open BACKLOG rows: **40**.
+Open BACKLOG rows: **41**.
 
 (Update this section at the end of every working day.)

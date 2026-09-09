@@ -290,7 +290,10 @@ Freeze: none
   9f decides whether a captured render is the published page, and its brand-
   address and page-size questions); open *A per-review drill needs a
   per-review public address* (trigger: a source that yields one, or the
-  Metabase demonstration 9g); update the count.
+  Metabase demonstration 9g); re-point *`make idempotency-check` skips the
+  classify step* (its trigger named 9b and fired; the target is
+  `pipeline/build.py`, an earlier phase — a `fix/` PR at 9f or Phase 10);
+  update the count.
 - [ ] LESSONS.md — none until a review round reports a correctness finding; then backtick it and the fix commit writes the row
 - [ ] `CLAUDE.md` — Current status; Repo map (`study/model.py`, `study/panels.py`,
   Beat 2 rendered, 9c next); BACKLOG count; Commands unchanged.

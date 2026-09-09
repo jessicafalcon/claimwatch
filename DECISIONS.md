@@ -2329,3 +2329,26 @@ self-selection notes — the round-1 amendment had reused B2.2's line-chart
 wording on a bar chart — and the fixture label lost its mechanism words
 (`0d73ffc`). The study-editor's B2.5 rewrite named document-loop alone; the
 chart draws every theme per segment, so the note says "each theme's share".
+
+Challenge round 2 (2026-09-08, on the spec as amended, after review round 2):
+*approve with amendments* — 0 BLOCKER, 5 should-fix, 2 suggestion, 2
+question; the developer chose to fix all. The shared shape: the Invariants
+table named tests whose scenario was narrower than the for-all. Applied: the
+catalog probe filters on `warehouse.default_schema` (#9, `4e106c4`);
+invariant 5 is pinned on a recording connection — every query a render runs
+is a listed study query or one of the two catalog reads, so a reader that
+bypasses `_rows` fails by name (#1, `ff65c21`); the two remaining page-scoped
+assertions assert on their panel (#4, `7912825`, a `site-fix` instance); the
+self-selection caveat is derived for every Measured panel whose sources are
+the platform roots, not authored per id (#3, `a5f924e`); the CLI's binding of
+`database_for(rows)` to `run_id = rows` is pinned with every writer patched
+out (#6, `af2c015`); the gate's input-to-state mapping is one closed dict
+whose key set a test pins to `INPUTS` (#8, `b6fab49`). Recorded: BACKLOG row
+"`make idempotency-check` skips the classify step" re-pointed (#5 — the target
+is `pipeline/build.py`, an earlier phase, so a `fix/` PR at 9f or Phase 10);
+the tooltip-only trail as a BACKLOG row for 9f's stranger test (#7 — a visible
+denominator needs a `Point` field, a design change 9f owns). #2 — `check_panel`
+does not refuse a fixture-state panel that also carries content — is a
+contract extension: a fix amendment, written alone and stamped, implemented
+on approval. *Rejected for #7: parsing the denominator back out of the
+formatted `detail` string — a string round-trip where a field belongs.*
