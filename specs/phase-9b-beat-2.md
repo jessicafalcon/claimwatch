@@ -10,6 +10,9 @@ round 1, finding 3).
 renders through the 9a contract (`duckdb` + stdlib, hand-written inline SVG); no
 script, no `<details>`, no new `make` target.
 Challenged: 2026-09-08, round 1, spec 198ff491 — rework (all findings applied)
+Fix amendment: 2026-09-08, round 1 — a panel's notes are a sequence
+(study-editor #2, #3); appended to Invariants below. This makes the challenge
+stamp stale (the hash covers Invariants); re-challenge is the developer's call.
 
 Four sections marked REQUIRED are mandatory; a spec without them is not
 approvable (CLAUDE.md → Workflow rules).
@@ -159,6 +162,24 @@ panels; imports follow the module split.
 | For all metric cells, exactly one of value and declared absence is set; a zero-denominator cell renders its labelled absence with its counts; a table of absences is still a table. | `tests/test_beat2.py::test_a_point_with_both_value_and_absence_is_refused`; `::test_a_zero_denominator_metric_renders_a_labelled_absence_with_its_counts`; `::test_an_all_absent_table_renders_as_a_table_not_no_data`; `::test_a_null_cell_with_no_declared_absence_is_still_refused_by_name`. |
 | For all rendered Beat 2 numbers, the value equals its mart row and carries exactly one tag (9a's contract, extended to the new panels and the table kind). | `tests/test_beat2.py::test_beat2_values_equal_their_marts_over_a_captured_run_id`; 9a's `test_a_panel_with_no_tag_or_two_tags_is_refused` over a table panel. |
 | For all runs over the same DB, the output bytes are identical and match the committed baseline (9a, inherited). | `tests/test_export.py::test_make_study_is_byte_identical_on_rerun`; the DONE command's `git diff --exit-code`. |
+
+### Fix amendment — round 1 (2026-09-08): a panel's notes are a sequence
+
+Design change (the `Panel` data structure). `Panel.note: str` becomes
+`Panel.notes: tuple[str, ...]`, and `study/export.py` renders one
+`<p class="note">` per element (today it renders one). Round 1 found B2.5's
+single note packing four ideas (study-editor #2) and the two theme-share
+panels naming no sampling bias (study-editor #3); one string can neither
+separate the ideas nor host the caveat.
+
+Invariant restored: **for all panels, the second layer is a sequence of short
+notes, each rendered as its own block (brief §2.3 — rigor one layer down, kept
+scannable); and for all corpus panels drawn from the unsolicited review
+platforms (B2.2, B2.5), the negative-self-selection caveat is one of those
+notes (brief §2.5), as B1.2 already carries it beside the rating trend.**
+Falsified by `tests/test_beat2.py::test_a_panel_renders_one_block_per_note`
+and `tests/test_beat2.py::test_b2_2_and_b2_5_name_the_self_selection_bias`. The
+committed baseline gains the split notes and the caveat; byte-identical on rerun.
 
 ## Pinned decisions (do not re-litigate)
 
