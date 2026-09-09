@@ -246,7 +246,12 @@ def _render_grouped_bar(panel: Panel) -> list[str]:
 
 
 def _render_legend(panel: Panel) -> list[str]:
-    if len(panel.series) < 2:
+    """The legend: drawn when a panel has more than one series, and always when
+    it carries the neutral `unclassified` band — a corpus the rules sort into
+    positive/unclassified alone leaves one series, and the band's count must
+    still read in the legend (invariant 3; round 2, code-reviewer #2)."""
+    has_band = any(s.colour == NEUTRAL for s in panel.series)
+    if len(panel.series) < 2 and not has_band:
         return []
     out = ['<ul class="legend">']
     for s in panel.series:

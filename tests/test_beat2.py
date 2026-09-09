@@ -286,6 +286,42 @@ def test_the_unclassified_band_is_the_neutral_token_and_always_in_the_legend(
             export._series_var(bad)
 
 
+def test_a_band_only_panel_still_lists_the_band_in_the_legend():
+    # A corpus the rules sort into positive/unclassified alone leaves one series
+    # — the band — and the legend still names it with its count (invariant 3:
+    # never hidden; round 2, code-reviewer #2). A one-series Beat 1 panel keeps
+    # no legend.
+    rows = [
+        ("2026-01", "positive", 10, 3, 0.3),
+        ("2026-01", "unclassified", 10, 7, 0.7),
+    ]
+    panel = Panel(
+        "B2.9",
+        "B2.9",
+        "t",
+        "b",
+        "Measured",
+        "line",
+        series=panels._theme_series(rows, "B2.9", "period"),
+        domain=(0.0, 1.0),
+    )
+    check_panel(panel)
+    assert len(panel.series) == 1
+    legend = "\n".join(export._render_legend(panel))
+    assert 'style="background:var(--sN)"></span>Not yet classified (7)' in legend
+    one = Panel(
+        "B1.9",
+        "B1.9",
+        "t",
+        "b",
+        "Measured",
+        "line",
+        series=(Series("x", 0, (Point("m", 0.5, "Measured", "", "pct"),)),),
+        domain=(0.0, 1.0),
+    )
+    assert export._render_legend(one) == []
+
+
 def test_b2_2_plots_each_share_against_the_axis_not_stacked():
     # A cell whose shares sum past 1 (three themes, each 0.6) plots every point at
     # its own share — no cumulative stack — so the y of each is _y_of(0.6).
