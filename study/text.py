@@ -63,3 +63,91 @@ TRADITIONAL_CAVEAT = (
     "awaits a traditional-mutuelle source; the chart shows the segment the data "
     "has."
 )
+
+
+# --- Beat 3: the cost model's display names, marker labels and note templates --
+# Each formula's display name, keyed by its `FORMULAS` name and in `FORMULAS`
+# order (a test pins the key sequence equal), so the page reads line for line
+# with `make model`. A name the map does not know refuses by name in the reader
+# — a fifteenth formula added without a study name fails the render rather than
+# rendering its identifier as prose (Phase 9c, pinned decision 6).
+FORMULA_NAMES = {
+    "customer_value": "Revenue per member per year",
+    "mean_claim": "The mean claim, from the fit",
+    "median_cell": "The median reimbursement cell",
+    "claims": "Claims per year",
+    "flagged": "Claims flagged",
+    "false_pos": "Claims wrongly held",
+    "fraud_saved": "Fraud saved",
+    "friction_cost": "Friction cost",
+    "net": "Net: saved minus friction",
+    "loop_days": "Length of the document loop",
+    "friction_per_day": "Friction per day of hold",
+    "timer_amount_eur": "Hold-timer threshold amount",
+    "crossover_flag_rate": "Where the curves cross",
+    "marginal_crossover_flag_rate": "Where the next flag stops paying",
+}
+# Each parameter's display name and the display unit its default is read in
+# (`study.model.Unit`), keyed by its mart name and in `parameters()` order (a
+# test pins the key sequence equal). One closed choice per parameter beside its
+# name — never a second map (challenge round 1, #4).
+PARAMETER_NAMES = {
+    "arr_eur": ("Yearly revenue", "eur"),
+    "members": ("Members", "count"),
+    "fraud_pool_eur": ("Fraud pool per year", "eur"),
+    "refunded_eur": ("Refunds paid per year", "eur"),
+    "mu": ("Log-mean of the claim cost, from the fit", "logeur"),
+    "sigma": ("Log-spread of the claim cost, from the fit", "logeur"),
+    "emp_p50": ("Median reimbursement cell", "eur"),
+    "flag_rate": ("Flag rate", "pct"),
+    "fp_share": ("Share of flags that are wrong", "pct"),
+    "contacts": ("Contacts per stuck claim", "count"),
+    "cost_per_contact": ("Cost per contact", "eur"),
+    "churn_prob": ("Chance a stuck customer leaves", "pct"),
+    "k": ("How fast extra flags stop catching fraud", ""),
+    "days_per_round": ("Days per document round trip", "days"),
+    "timer_days": ("Days a hold may run before the clock", "days"),
+}
+# The three derived headline figures B3.3 shows above its parameter rows
+# (BACKING B3.3: revenue per member, the mean claim, the claim volume) — read
+# from the outputs mart at the baseline, never retyped.
+HEADLINE_FORMULAS = ("customer_value", "mean_claim", "claims")
+
+# The labels of a curve panel's three markers, in the order they are drawn:
+# the default flag rate, then the two crossovers. Two markers at one x stack
+# their labels by draw index, neither hidden (pinned decision 3).
+MARKER_DEFAULT = "you are here"
+MARKER_CROSSOVER = "the curves cross"
+MARKER_MARGINAL = "the next flag stops paying"
+# The declared absences: a crossover the grid never reaches (the mart stores
+# NULL), and a parameter whose range is one point (`low == default == high`).
+NEVER_CROSSES = "never crosses on this grid"
+FIXED_RANGE = "fixed — read from the fit"
+# What an unsourced parameter row says instead of a citation: a declared guess
+# to explore, never a fact (brief §7).
+UNSOURCED_LABEL = "declared unsourced — explore the range"
+
+
+# The B3.2 note that names the crossovers: a reading of the chart filled from
+# the outputs mart's rows, never a typed figure (pinned decision 4). Each half
+# has its present and its absent sentence, so a null crossover says so.
+def crossover_note(crossover: str | None, marginal: str | None, default: str) -> str:
+    """The note beneath the curve chart, from the three displayed rates (or
+    `None` where the mart stores NULL): where the curves cross, where the next
+    flag stops paying, and whether that is where the default sits."""
+    if crossover is None:
+        first = (
+            "On this grid the two curves never cross: at every flag rate drawn, "
+            "the flags as a whole recover more than they cost."
+        )
+    else:
+        first = (
+            f"At these defaults the two curves cross at a flag rate of {crossover}: "
+            "past it, the flags as a whole cost more than they recover."
+        )
+    if marginal is None:
+        second = "No point of the grid has the next flag costing more than it recovers."
+    else:
+        where = ", where the default sits" if marginal == default else ""
+        second = f"The next flag stops paying for itself at {marginal}{where}."
+    return f"{first} {second}"

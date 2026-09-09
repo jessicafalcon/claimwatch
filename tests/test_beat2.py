@@ -24,6 +24,7 @@ from study.model import (
     RenderRefused,
     Series,
     check_panel,
+    display,
     has_content,
 )
 from study.panels import ALLOWED_COLUMNS, STUDY_QUERIES, beat1_panels, beat2_panels
@@ -610,8 +611,8 @@ def test_a_zero_denominator_metric_renders_a_labelled_absence_with_its_counts(
     for label, (p_pct, p_cnt, r_pct, r_cnt) in pins.BEAT2_QUALITY_CELLS.items():
         precision, recall = cells[label]
         if p_pct.endswith("%"):
-            assert export._display(precision.value, "pct") == p_pct
-            assert export._display(recall.value, "pct") == r_pct
+            assert display(precision.value, "pct") == p_pct
+            assert display(recall.value, "pct") == r_pct
             assert precision.detail == p_cnt and recall.detail == r_cnt
 
 

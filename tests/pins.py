@@ -548,3 +548,38 @@ BEAT2_PEER_RATINGS = {
     "peer-traditional-1": (4.5, 3000),
     "peer-traditional-2": (3.25, None),
 }
+
+# --- Phase 9c: Beat 3 rendered — the first Modeled panels ---------------------
+# The rendered fragments are typed from `make study` over the synthetic marts
+# (whose Beat 3 figures are COST_OUTPUTS / COST_CROSSOVERS above, reused, not
+# retyped). The display names live in study/text.py; their counts are pinned.
+BEAT3_PANELS = ("B3.1", "B3.2", "B3.3", "B3.4")
+BEAT3_FORMULA_ROWS = 14  # twelve point + two curve formulas, the baseline scenario
+BEAT3_PARAMETER_ROWS = COST_PARAM_ROWS  # 15: 7 sourced + 8 unsourced
+BEAT3_SOURCED_ROWS = 7  # the four scale anchors + the three fit rows
+BEAT3_UNSOURCED_ROWS = 8  # the six knobs + the two hold-timer knobs
+BEAT3_HEADLINES = ("customer_value", "mean_claim", "claims")  # B3.3, BACKING
+# The outputs mart's rounding unit → the page's display unit (closed; a unit
+# outside it refuses). A curve formula's flag rate reads as a percentage.
+BEAT3_DISPLAY_UNIT = {"eur": "eur", "rate": "pct", "count": "count", "days": "days"}
+# The curve chart's three rules at the baseline, in draw order: the default and
+# the marginal crossover both at 0.05 — two labels stacked at one x.
+BEAT3_MARKERS = (
+    ("you are here", 0.05),
+    ("the curves cross", 0.095),
+    ("the next flag stops paying", 0.05),
+)
+# The y-domain rule over two inputs: the synthetic maximum (friction cost at a
+# 20% flag rate) rounds up to one significant figure; one cent past the bound
+# crosses to the next.
+BEAT3_CURVE_DOMAIN = {4_530_293.45: 5_000_000.0, 5_000_000.01: 6_000_000.0}
+BEAT3_FIXED_PARAMETER = "emp_p50"  # low == default == high: the fixed mark
+BEAT3_FRAGMENTS = {
+    "formula value (fraud_saved, eur)": ">€1,318,719.82<",
+    "curve euro tick": ">€1,250,000.00<",
+    "marker label": ">you are here (5.0%)<",
+    "sourced default (arr_eur, eur)": ">€800,000,000.00<",
+    "fit default (mu, logeur)": ">3.809814 log-euros<",
+    "unsourced default (flag_rate, pct)": ">5.0%<",
+    "crossover row (rate as pct)": ">9.5%<",
+}

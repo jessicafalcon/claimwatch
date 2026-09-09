@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import html
 import re
+from collections.abc import Callable
 from pathlib import Path
 
 from pipeline.warehouse import ROOT, connect, database_for
@@ -36,13 +37,15 @@ from study.model import (
     TAGS,
     Panel,
     RenderRefused,
-    Unit,
     _points,
     check_panel,
+    display,
     has_content,
     has_values,
+    x_key,
 )
-from study.panels import beat1_panels, beat2_panels
+from study.panels import beat1_panels, beat2_panels, beat3_panels
+from study.text import FIXED_RANGE
 
 # The render input is the frozen synthetic database: Beat 1's Documented points
 # are the anchors only (no manual/fetched snapshot — those are `captured`-only),
@@ -91,6 +94,13 @@ _DARK = {
 # One chart geometry for every plot, so coordinates are byte-stable constants.
 _W, _H = 680, 280
 _ML, _MR, _MT, _MB = 48, 16, 16, 40
+# The curve chart's left margin: room for a euro tick ("€1,250,000.00"), and
+# the vertical step between stacked marker labels — two markers at one x read
+# as two lines by draw index, neither hidden (Phase 9c, pinned decision 3).
+_ML_CURVE = 104
+_MARKER_DY = 14
+# The range mark's own small geometry (one per parameter row).
+_RW, _RH, _RPAD = 240, 30, 8
 
 
 # --- Number formatting (byte-stable, locale-independent) ----------------------
@@ -98,23 +108,6 @@ def _n(x: float) -> str:
     """A coordinate at fixed precision — `format` uses '.' in every locale, so
     the bytes do not shift with LANG."""
     return f"{x:.2f}"
-
-
-def _display(value: float, unit: str) -> str:
-    if unit == "stars":
-        return f"{value:.1f}★"
-    if unit == "pct":
-        # A fraction stored in the mart (0.231) shown as a percent (23.1%) — a
-        # unit conversion for display, not a recomputed study number; the mart
-        # value on the Point stays mart-equal (round 1, code-reviewer #10).
-        return f"{value * 100:.1f}%"
-    if unit == "days":
-        return f"{value:.1f} days"
-    if unit == "count":
-        return f"{int(round(value)):,}"
-    if unit == "":
-        return f"{value:.2f}"
-    raise RenderRefused(f"unknown display unit {unit!r} (not in {Unit})")
 
 
 def _esc(text: str) -> str:
@@ -144,12 +137,18 @@ def _detail(point) -> str:
 _AXIS_TICKS = 4  # one grid step count for every plot; a byte-stable constant
 
 
-def _axis(domain: tuple[float, float]) -> list[tuple[float, str]]:
+def _plain(value: float) -> str:
+    return f"{value:g}"
+
+
+def _axis(
+    domain: tuple[float, float], label_of: Callable[[float], str] = _plain
+) -> list[tuple[float, str]]:
     lo, hi = domain
     ticks: list[tuple[float, str]] = []
     for i in range(_AXIS_TICKS + 1):
         value = lo + (hi - lo) * i / _AXIS_TICKS
-        ticks.append((value, f"{value:g}"))
+        ticks.append((value, label_of(value)))
     return ticks
 
 
@@ -166,16 +165,20 @@ def _svg_open() -> list[str]:
     ]
 
 
-def _grid_and_axis(domain: tuple[float, float]) -> list[str]:
+def _grid_and_axis(
+    domain: tuple[float, float],
+    label_of: Callable[[float], str] = _plain,
+    left: int = _ML,
+) -> list[str]:
     out: list[str] = []
-    for value, label in _axis(domain):
+    for value, label in _axis(domain, label_of):
         y = _y_of(value, domain)
         out.append(
-            f'<line x1="{_n(_ML)}" y1="{_n(y)}" x2="{_n(_W - _MR)}" y2="{_n(y)}" '
+            f'<line x1="{_n(left)}" y1="{_n(y)}" x2="{_n(_W - _MR)}" y2="{_n(y)}" '
             'class="grid"/>'
         )
         out.append(
-            f'<text x="{_n(_ML - 6)}" y="{_n(y + 3)}" class="tick" '
+            f'<text x="{_n(left - 6)}" y="{_n(y + 3)}" class="tick" '
             f'text-anchor="end">{_esc(label)}</text>'
         )
     return out
@@ -204,7 +207,7 @@ def _render_line(panel: Panel) -> list[str]:
             out.append(
                 f'<circle cx="{_n(x)}" cy="{_n(y)}" r="4" fill="{colour_var}">'
                 f"<title>{_esc(s.name)} · {_esc(p.label)}: "
-                f"{_esc(_display(p.value, p.unit))}{_detail(p)}"
+                f"{_esc(display(p.value, p.unit))}{_detail(p)}"
                 f" ({_esc(p.tag)})</title></circle>"
             )
     for m in months:
@@ -231,7 +234,7 @@ def _render_grouped_bar(panel: Panel) -> list[str]:
             f'<rect x="{_n(x)}" y="{_n(y)}" width="{_n(width)}" '
             f'height="{_n(base - y)}" rx="4" fill="{_series_var(s.colour)}">'
             f"<title>{_esc(s.name)} · {_esc(p.label)}: "
-            f"{_esc(_display(p.value, p.unit))}{_detail(p)} "
+            f"{_esc(display(p.value, p.unit))}{_detail(p)} "
             f"({_esc(p.tag)})</title></rect>"
         )
         out.append(
@@ -240,7 +243,7 @@ def _render_grouped_bar(panel: Panel) -> list[str]:
         )
         out.append(
             f'<text x="{_n(x + width / 2)}" y="{_n(y - 6)}" class="barval" '
-            f'text-anchor="middle">{_esc(_display(p.value, p.unit))}</text>'
+            f'text-anchor="middle">{_esc(display(p.value, p.unit))}</text>'
         )
     out.append("</svg>")
     return out
@@ -271,7 +274,7 @@ def _render_stat_row(panel: Panel) -> list[str]:
     for p in _points(panel):
         out.append(
             '<div class="stat">'
-            f'<div class="stat-value">{_esc(_display(p.value, p.unit))}</div>'
+            f'<div class="stat-value">{_esc(display(p.value, p.unit))}</div>'
             f'<div class="stat-label">{_esc(p.label)}</div>'
             f"{_render_chip(p.tag)}</div>"
         )
@@ -286,7 +289,7 @@ def _metric_cell(point) -> str:
         absence = f'<span class="absent">{_esc(point.absent)}</span>'
         return f"{absence} ({_esc(point.detail)})"
     return (
-        f"{_esc(_display(point.value, point.unit))} "
+        f"{_esc(display(point.value, point.unit))} "
         f'<span class="cnt">({_esc(point.detail)})</span>'
     )
 
@@ -302,6 +305,168 @@ def _render_table(panel: Panel) -> list[str]:
         out.append(f'<tr><th scope="row">{_esc(s.name)}</th>')
         out += [f"<td>{_metric_cell(p)}</td>" for p in s.points]
         out.append("</tr>")
+    out.append("</tbody></table>")
+    return out
+
+
+# --- Beat 3: the formula list, the curve with its markers, the range marks -----
+def _formula_row(series) -> str:
+    """One formula row: the display name with the mart's own name beside it, the
+    expression as printed in `FORMULAS`, and the value in its display unit — or
+    the declared absence (a crossover the grid never reaches)."""
+    (cell,) = series.points
+    if cell.absent:
+        value = f'<span class="absent">{_esc(cell.absent)}</span>'
+    else:
+        value = _esc(display(cell.value, cell.unit))
+    return (
+        f'<tr><th scope="row">{_esc(series.name)} '
+        f'<code class="ident">{_esc(series.key)}</code></th>'
+        f'<td><code class="expr">{_esc(cell.label)}</code></td>'
+        f"<td>{value}</td></tr>"
+    )
+
+
+def _render_formulas(panel: Panel) -> list[str]:
+    out = ['<table class="metric formulas"><thead><tr>']
+    out += [f"<th>{_esc(col)}</th>" for col in ("Quantity", "Formula", "Value")]
+    out.append("</tr></thead><tbody>")
+    out += [_formula_row(s) for s in panel.series]
+    out.append("</tbody></table>")
+    return out
+
+
+def _curve_x(panel: Panel) -> dict[str, float]:
+    """The x of each grid label, evenly spaced in label order — the flag-rate
+    grid is uniform, and a marker sits at the x of the point whose label it
+    matches (`check_panel` refused one that matches none)."""
+    labels = sorted({p.label for s in panel.series for p in s.points})
+    step = (_W - _ML_CURVE - _MR) / max(len(labels) - 1, 1)
+    return {label: _ML_CURVE + i * step for i, label in enumerate(labels)}
+
+
+def _euro(value: float) -> str:
+    return display(value, "eur")
+
+
+def _render_curve(panel: Panel) -> list[str]:
+    x_of = _curve_x(panel)
+    out = _svg_open()
+    out += _grid_and_axis(panel.domain, _euro, _ML_CURVE)
+    for s in panel.series:
+        colour_var = _series_var(s.colour)
+        coords = [(x_of[p.label], _y_of(p.value, panel.domain), p) for p in s.points]
+        pts = " ".join(f"{_n(x)},{_n(y)}" for x, y, _ in coords)
+        out.append(
+            f'<polyline points="{pts}" fill="none" stroke="{colour_var}" '
+            'stroke-width="2"/>'
+        )
+        for x, y, p in coords:
+            out.append(
+                f'<circle cx="{_n(x)}" cy="{_n(y)}" r="3" fill="{colour_var}">'
+                f"<title>{_esc(s.name)} · flag rate {_esc(p.label)}: "
+                f"{_esc(display(p.value, p.unit))} ({_esc(p.tag)})</title></circle>"
+            )
+    labels = sorted(x_of)
+    last = len(labels) - 1
+    for i in range(_AXIS_TICKS + 1):
+        label = labels[round(i * last / _AXIS_TICKS)]
+        out.append(
+            f'<text x="{_n(x_of[label])}" y="{_n(_H - _MB + 16)}" class="tick" '
+            f'text-anchor="middle">{_esc(display(float(label), "pct"))}</text>'
+        )
+    out += _render_markers(panel, x_of)
+    out.append("</svg>")
+    return out
+
+
+def _render_markers(panel: Panel, x_of: dict[str, float]) -> list[str]:
+    """The labelled vertical rules, in tuple order, each label one step lower
+    than the previous by its index — so two rules at one x stack their labels."""
+    out: list[str] = []
+    middle = (_ML_CURVE + _W - _MR) / 2
+    for i, (label, x) in enumerate(panel.markers):
+        px = x_of[x_key(x)]
+        out.append(
+            f'<line x1="{_n(px)}" y1="{_n(_MT)}" x2="{_n(px)}" y2="{_n(_H - _MB)}" '
+            'class="marker"/>'
+        )
+        anchor, tx = ("end", px - 4) if px > middle else ("start", px + 4)
+        out.append(
+            f'<text x="{_n(tx)}" y="{_n(_MT + 10 + i * _MARKER_DY)}" '
+            f'class="marker-label" text-anchor="{anchor}">'
+            f"{_esc(label)} ({_esc(display(x, 'pct'))})</text>"
+        )
+    return out
+
+
+# The range mark's CSS class is a closed lookup keyed on the two sourcing words
+# the mart may carry, so the class attribute is safe by construction and a
+# third word refuses by name (Phase 9c, invariant 4).
+_SOURCING_CLASS = {"sourced": "range-sourced", "unsourced": "range-unsourced"}
+_RANGE_LABELS = frozenset({"low", "default", "high"})
+
+
+def _range_mark(series) -> str:
+    """The drawn range: low — default — high from the three cells, or the
+    labelled fixed mark when the range is one point (never a zero-width line
+    or a division by zero)."""
+    if series.sourcing not in _SOURCING_CLASS:
+        raise RenderRefused(
+            f"range {series.key!r}: sourcing {series.sourcing!r} is not one of "
+            f"{tuple(_SOURCING_CLASS)}"
+        )
+    cells = {p.label: p for p in series.points}
+    if set(cells) != _RANGE_LABELS:
+        raise RenderRefused(
+            f"range {series.key!r}: cells {sorted(cells)} are not low/default/high"
+        )
+    low, default, high = cells["low"], cells["default"], cells["high"]
+    if low.value == default.value == high.value:
+        return f'<span class="fixed">{_esc(FIXED_RANGE)}</span>'
+    span = _RW - 2 * _RPAD
+    pos = _RPAD + (default.value - low.value) / (high.value - low.value) * span
+    return (
+        f'<svg viewBox="0 0 {_RW} {_RH}" role="img" '
+        f'class="range {_SOURCING_CLASS[series.sourcing]}">'
+        f'<line x1="{_n(_RPAD)}" y1="12.00" x2="{_n(_RW - _RPAD)}" y2="12.00" '
+        'class="range-line"/>'
+        f'<circle cx="{_n(pos)}" cy="12.00" r="5" class="range-dot"/>'
+        f'<text x="{_n(_RPAD)}" y="27.00" class="tick">'
+        f"{_esc(display(low.value, low.unit))}</text>"
+        f'<text x="{_n(_RW - _RPAD)}" y="27.00" class="tick" text-anchor="end">'
+        f"{_esc(display(high.value, high.unit))}</text></svg>"
+    )
+
+
+def _parameter_row(series) -> str:
+    default = next(p for p in series.points if p.label == "default")
+    return (
+        f'<tr><th scope="row">{_esc(series.name)} '
+        f'<code class="ident">{_esc(series.key)}</code></th>'
+        f"<td>{_range_mark(series)}</td>"
+        f"<td>{_esc(display(default.value, default.unit))}</td>"
+        f'<td class="cnt">{_esc(default.detail)}</td></tr>'
+    )
+
+
+def _render_parameters(panel: Panel) -> list[str]:
+    out: list[str] = []
+    if panel.headline:
+        out.append('<table class="metric formulas headline"><thead><tr>')
+        out += [
+            f"<th>{_esc(col)}</th>" for col in ("Derived figure", "Formula", "Value")
+        ]
+        out.append("</tr></thead><tbody>")
+        out += [_formula_row(s) for s in panel.headline]
+        out.append("</tbody></table>")
+    out.append('<table class="metric params"><thead><tr>')
+    out += [
+        f"<th>{_esc(col)}</th>"
+        for col in ("Parameter", "Range explored", "Default", "Unit and source")
+    ]
+    out.append("</tr></thead><tbody>")
+    out += [_parameter_row(s) for s in panel.series]
     out.append("</tbody></table>")
     return out
 
@@ -342,19 +507,31 @@ def _render_body(panel: Panel) -> list[str]:
         return [f'<div class="fixture">{_esc(panel.fixture)}</div>']
     # A table dispatches on "any cell present" (value or absence), so a table of
     # absences still renders as a table, not "no data yet" (pinned decision 5).
-    if panel.kind == "table":
+    if panel.kind in _CONTENT_KINDS:
         if not has_content(panel):
             return _nodata()
-        return _render_table(panel)
+        return _CONTENT_KINDS[panel.kind](panel)
     if not has_values(panel):
         return _nodata()
     if panel.kind == "line":
         return _render_line(panel) + _render_legend(panel)
     if panel.kind == "grouped_bar":
         return _render_grouped_bar(panel) + _render_legend(panel)
+    if panel.kind == "curve":
+        return _render_curve(panel) + _render_legend(panel)
     if panel.kind == "stat_row":
         return _render_stat_row(panel)
     raise RenderRefused(f"{panel.id}: unknown panel kind {panel.kind!r}")
+
+
+# The kinds whose cells are a value xor a declared absence (a table of absences
+# still renders as a table, not "no data yet" — 9b's pinned decision 5, extended
+# to the formula list and the parameter rows in 9c).
+_CONTENT_KINDS = {
+    "table": _render_table,
+    "formulas": _render_formulas,
+    "parameters": _render_parameters,
+}
 
 
 def _nodata() -> list[str]:
@@ -460,6 +637,7 @@ def _beat_header(title: str) -> str:
 _BEATS = (
     ("Beat 1 — People are telling us what’s wrong, in public", beat1_panels),
     ("Beat 2 — The complaints have a shape", beat2_panels),
+    ("Beat 3 — What a wrongly held claim costs", beat3_panels),
 )
 
 
@@ -544,6 +722,21 @@ _CSS_TEMPLATE = (
     "vertical-align:middle}}"
     ".chip-pending{{background:var(--pending)}}"
     ".stat .chip{{margin-top:2px}}"
+    ".formulas .ident,.params .ident{{display:block;color:var(--muted);"
+    "font-size:11px;font-weight:400}}"
+    ".formulas .expr{{font-size:12px;white-space:pre-wrap;word-break:break-word}}"
+    ".formulas td:last-child{{white-space:nowrap;font-weight:600}}"
+    ".headline{{margin-bottom:14px}}"
+    ".marker{{stroke:var(--ink2);stroke-width:1;stroke-dasharray:3 3}}"
+    ".marker-label{{fill:var(--ink2);font-size:11px}}"
+    ".range{{width:240px;max-width:100%;height:auto;display:block}}"
+    ".range-line{{stroke-width:2}}"
+    ".range-sourced .range-line{{stroke:var(--ink2)}}"
+    ".range-sourced .range-dot{{fill:var(--ink)}}"
+    ".range-unsourced .range-line{{stroke:var(--muted);stroke-dasharray:4 3}}"
+    ".range-unsourced .range-dot{{fill:var(--surface);stroke:var(--ink2);"
+    "stroke-width:2}}"
+    ".params .fixed{{color:var(--muted);font-style:italic;font-size:12px}}"
 )
 
 _PAGE = (

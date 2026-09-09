@@ -27,9 +27,21 @@ from typing import Literal
 TAGS = ("Measured", "Documented", "Modeled", "Pending")
 # Closed sets a static checker can read too (round 1, code-reviewer #7): the
 # chart kind and the display unit. Their runtime guards are `_render_body`
-# (unknown kind refuses) and `_display` (unknown unit refuses).
-Kind = Literal["hero", "line", "grouped_bar", "stat_row", "table"]
-Unit = Literal["stars", "pct", "days", "count", ""]
+# (unknown kind refuses) and `display` (unknown unit refuses). Phase 9c adds
+# the three Beat 3 kinds — `formulas` (a list of expression / value rows),
+# `curve` (series over one numeric x axis with labelled markers), `parameters`
+# (range marks) — and the two units a cost-model figure is read in.
+Kind = Literal[
+    "hero",
+    "line",
+    "grouped_bar",
+    "stat_row",
+    "table",
+    "formulas",
+    "curve",
+    "parameters",
+]
+Unit = Literal["stars", "pct", "days", "count", "eur", "logeur", ""]
 
 # The `unclassified` band's colour: the palette's neutral token, not a sixth
 # categorical hue (the five-slot order is the CVD-safety mechanism; Phase 9b,
@@ -50,9 +62,11 @@ class Point:
     level, e.g. a computed share). `value is None` marks a Pending placeholder
     or a metric cell with no value — never rendered as a number. `absent`, when
     set, is the labelled reason a metric cell has no value (a zero-denominator
-    score); a cell carries a value xor an `absent` (`check_panel`). `detail` is
-    an optional inline note — the raw counts behind a share, shown so it can be
-    redone by hand (Phase 9b)."""
+    score, a crossover the grid never reaches); a cell carries a value xor an
+    `absent` (`check_panel`). `detail` is an optional inline note — the raw
+    counts behind a share (Phase 9b), or a parameter's prose unit with its
+    citation or unsourced label (Phase 9c), shown so the figure can be redone
+    by hand."""
 
     label: str
     value: float | None
@@ -68,11 +82,17 @@ class Series:
     """One line, one group of bars, or one table row, coloured by categorical
     slot `0..4` or the `NEUTRAL` token (the `unclassified` band). The colour is
     a closed choice on the type — the renderer refuses anything else by name
-    (Phase 9b, pinned decision 4)."""
+    (Phase 9b, pinned decision 4). `key` is the mart's own identifier for a
+    formula or parameter row, shown beside the display name so a reader matches
+    `make model` line for line; `sourcing` is a parameter row's mart word
+    (`sourced` | `unsourced`), the closed key the range mark's style is looked
+    up by (Phase 9c)."""
 
     name: str
     colour: int | str
     points: tuple[Point, ...]
+    key: str = ""
+    sourcing: str = ""
 
 
 @dataclass(frozen=True)
@@ -82,7 +102,11 @@ class Panel:
     is the labelled fixture-state text a corpus panel shows over a fixture input
     (no number) — distinct from Pending and from "no data yet" (Phase 9b).
     `columns` names a metric table's headers; `sources` are panel-level drill
-    addresses for a computed number whose points carry no per-row address."""
+    addresses for a computed number whose points carry no per-row address.
+    `markers` are a curve panel's labelled vertical rules, `(label, x)` pairs
+    read from a mart row and drawn at a grid x the panel's points carry;
+    `headline` is the derived figures a parameters panel shows above its rows
+    (B3.3's three), each a formula row (Phase 9c)."""
 
     id: str
     backing_row: str
@@ -97,10 +121,48 @@ class Panel:
     columns: tuple[str, ...] = ()  # a metric table's column headers (table kind)
     sources: tuple[str, ...] = ()  # panel-level drill addresses (computed numbers)
     domain: tuple[float, float] = (0.0, 5.0)
+    markers: tuple[tuple[str, float], ...] = ()  # a curve's labelled rules (label, x)
+    headline: tuple[Series, ...] = ()  # a parameters panel's derived figures above
 
 
 def _points(panel: Panel) -> list[Point]:
-    return [p for s in panel.series for p in s.points]
+    return [p for s in panel.headline + panel.series for p in s.points]
+
+
+# A curve point's label is its grid x at this many places — the flag-rate grid
+# steps by 0.005, so three places name each grid point exactly; a marker is
+# matched to a point by this key, never by float equality (Phase 9c).
+_X_PLACES = 3
+
+
+def x_key(x: float) -> str:
+    """The label a curve point carries for its grid x, and the key a marker's x
+    is matched against (`check_panel`)."""
+    return f"{x:.{_X_PLACES}f}"
+
+
+def display(value: float, unit: str) -> str:
+    """One number formatted for the page in its display unit — the `Unit` set's
+    runtime guard: a unit outside it refuses by name. Byte-stable and
+    locale-independent (`format` uses `.` and `,` in every locale)."""
+    if unit == "stars":
+        return f"{value:.1f}★"
+    if unit == "pct":
+        # A fraction stored in the mart (0.231) shown as a percent (23.1%) — a
+        # unit conversion for display, not a recomputed study number; the mart
+        # value on the Point stays mart-equal (round 1, code-reviewer #10).
+        return f"{value * 100:.1f}%"
+    if unit == "days":
+        return f"{value:.1f} days"
+    if unit == "count":
+        return f"{int(round(value)):,}"
+    if unit == "eur":
+        return f"€{value:,.2f}"  # the mart rounds euros to two places (8a)
+    if unit == "logeur":
+        return f"{value:.6f} log-euros"  # the fit's six places (8a)
+    if unit == "":
+        return f"{value:.2f}"
+    raise RenderRefused(f"unknown display unit {unit!r} (not in {Unit})")
 
 
 def has_values(panel: Panel) -> bool:
@@ -146,6 +208,27 @@ def check_panel(panel: Panel) -> None:
             f"{panel.id}: a fixture-state panel shows no number — it carries "
             "content beside its fixture text (brief §2.4; never faked)"
         )
+    _check_markers(panel)
+
+
+def _check_markers(panel: Panel) -> None:
+    """A marker is a rule at a grid x the mart holds: only a `curve` panel
+    carries one, and its x must be the label of a point the panel draws — a
+    marker placed between grid points would be a computed position, not a
+    mart row (Phase 9c, invariant 5)."""
+    if not panel.markers:
+        return
+    if panel.kind != "curve":
+        raise RenderRefused(
+            f"{panel.id}: a {panel.kind!r} panel carries markers — only a curve does"
+        )
+    on_grid = {p.label for p in _points(panel)}
+    for label, x in panel.markers:
+        if x_key(x) not in on_grid:
+            raise RenderRefused(
+                f"{panel.id}: marker {label!r} at x {x!r} is not a grid point the "
+                "panel draws"
+            )
 
 
 def _check_cell(panel: Panel, point: Point) -> None:
