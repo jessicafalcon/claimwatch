@@ -397,6 +397,43 @@ def test_every_export_query_projects_only_allowlisted_columns(captured_db):
     # name comes from the hardcoded `_CORPUS_MARTS` tuple (round 1, code-reviewer).
 
 
+class _Recording:
+    """A connection wrapper that records every SQL text `execute` receives, so
+    a render's queries are read off the connection, not off a hand-kept list."""
+
+    def __init__(self, conn):
+        self._conn = conn
+        self.seen: list[str] = []
+
+    def execute(self, sql: str, *args, **kwargs):
+        self.seen.append(sql)
+        return self._conn.execute(sql, *args, **kwargs)
+
+
+# The catalog reads a render runs beside STUDY_QUERIES: the mart probe and the
+# engine's schema (pipeline/warehouse.py::default_schema). Both project no data
+# column; every other query must be a listed study query.
+_CATALOG_READS = frozenset({panels._MART_PROBE, "select current_schema()"})
+
+
+def test_every_query_the_export_runs_is_a_listed_study_query(captured_db):
+    # Invariant 5's for-all is over the queries the export RUNS, so a reader that
+    # bypasses `_rows` (a direct `conn.execute("select body …")`) must fail by
+    # name — recorded on the connection, not asserted over STUDY_QUERIES alone
+    # (challenge round 2, #1).
+    conn = _Recording(connect("duckdb", database=captured_db))
+    try:
+        page = export.render(conn)
+    finally:
+        conn._conn.close()
+    assert "Evidence: B2.5" in page  # a full render, both beats
+    unlisted = [
+        sql for sql in conn.seen if sql not in set(STUDY_QUERIES) | _CATALOG_READS
+    ]
+    assert unlisted == [], unlisted
+    assert set(STUDY_QUERIES) <= set(conn.seen)  # and every listed query ran
+
+
 def test_every_study_query_passes_the_sql_lint():
     for sql in STUDY_QUERIES:
         assert find_nonportable(sql) == [], sql
