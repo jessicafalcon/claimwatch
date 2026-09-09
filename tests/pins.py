@@ -559,9 +559,9 @@ BEAT3_PARAMETER_ROWS = COST_PARAM_ROWS  # 15: 7 sourced + 8 unsourced
 BEAT3_SOURCED_ROWS = 7  # the four scale anchors + the three fit rows
 BEAT3_UNSOURCED_ROWS = 8  # the six knobs + the two hold-timer knobs
 BEAT3_HEADLINES = ("customer_value", "mean_claim", "claims")  # B3.3, BACKING
-# The outputs mart's rounding unit → the page's display unit (closed; a unit
-# outside it refuses). A curve formula's flag rate reads as a percentage.
-BEAT3_DISPLAY_UNIT = {"eur": "eur", "rate": "pct", "count": "count", "days": "days"}
+# The outputs-mart rounding unit → display unit is `panels._DISPLAY_UNIT`; the
+# test asserts against that one map, never a copy of it (round 1, code-reviewer
+# #5), so the pin cannot drift from the code it checks.
 # The curve chart's three rules at the baseline, in draw order: the default and
 # the marginal crossover both at 0.05 — two labels stacked at one x.
 BEAT3_MARKERS = (

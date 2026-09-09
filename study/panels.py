@@ -25,7 +25,7 @@ from typing import Literal
 
 from classify.eval.gate import ANSWER_KEY
 from classify.labels import POSITIVE, THEMES, UNCLASSIFIED
-from models.cost_model import FORMULAS, SCENARIOS
+from models.cost_model import FORMULAS, SCENARIOS, Formula
 from opendata.fit import ARTIFACT
 from opendata.sources import DATASET_API
 from pipeline.build import INPUTS
@@ -138,6 +138,10 @@ _Q_COST_OUTPUTS = (
     "select scenario, name, expression, value, unit, tag "
     "from cost_model_outputs order by scenario, name"
 )
+# `net` is projected and allowlisted but read by no Beat 3 reader: the marker is
+# the outputs mart's crossover row, never a scan of `net` (pinned decision 4).
+# SPEC Scope carries it in the allowlist for 9d's B4.1; a mutation to it moves
+# no page number (test_a_mutated_mart_cell_moves_the_page_and_the_expression_stays).
 _Q_COST_CURVES = (
     "select scenario, flag_rate, fraud_saved, friction_cost, net, is_default, tag "
     "from cost_curves order by scenario, flag_rate"
@@ -853,7 +857,7 @@ def _display_unit(unit: str | None, panel_id: str) -> str:
 
 
 def _formula_cell(
-    formula, row: tuple, panel_id: str
+    formula: Formula, row: tuple, panel_id: str
 ) -> Point:  # one outputs row → one cell
     """One formula row's cell: the expression as its label, the mart's value in
     its display unit — or, for a curve formula whose crossover the grid never
@@ -903,12 +907,12 @@ def _formula_rows(conn, scenario: str, panel_id: str) -> tuple[Series, ...]:
     return tuple(series)
 
 
-def _headline_rows(conn, panel_id: str) -> tuple[Series, ...]:
+def _headline_rows(formula_rows: tuple[Series, ...]) -> tuple[Series, ...]:
     """B3.3's three derived headline figures (BACKING: revenue per member, the
-    mean claim, the claim volume) — the baseline formula rows of those names,
-    through the same reader."""
-    rows = _formula_rows(conn, BASELINE, panel_id)
-    return tuple(s for s in rows if s.key in text.HEADLINE_FORMULAS)
+    mean claim, the claim volume) — the baseline formula rows of those names.
+    Filters the B3.1 rows the panel build already read, so the outputs mart is
+    read once, not once more for the headline (round 1, code-reviewer #6)."""
+    return tuple(s for s in formula_rows if s.key in text.HEADLINE_FORMULAS)
 
 
 def _curve_series(conn, scenario: str, panel_id: str) -> tuple[Series, ...]:
@@ -1070,6 +1074,7 @@ def beat3_panels(conn) -> list[Panel]:
     """The four Beat 3 panels, the study's first Modeled surface: every number a
     cell of the three cost-model marts, which fill on every rebuild input — so
     no corpus gate, and the committed page shows these numbers."""
+    formulas = _formula_rows(conn, BASELINE, "B3.1")
     curves = _curve_series(conn, BASELINE, "B3.2")
     markers = _curve_markers(conn, BASELINE, "B3.2")
     return [
@@ -1086,7 +1091,7 @@ def beat3_panels(conn) -> list[Panel]:
             ),
             tag="Modeled",
             kind="formulas",
-            series=_formula_rows(conn, BASELINE, "B3.1"),
+            series=formulas,
             sources=_FIT_SOURCES,
             notes=(
                 "How to read a row: the quantity, the model’s own name for it, the "
@@ -1144,7 +1149,7 @@ def beat3_panels(conn) -> list[Panel]:
             ),
             tag="Modeled",
             kind="parameters",
-            headline=_headline_rows(conn, "B3.3"),
+            headline=_headline_rows(formulas),
             series=_parameter_rows(conn, "sourced", "B3.3"),
             sources=_FIT_SOURCES,
             notes=(

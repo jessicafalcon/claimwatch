@@ -37,6 +37,7 @@ from study.model import (
     TAGS,
     Panel,
     RenderRefused,
+    Series,
     _points,
     check_panel,
     display,
@@ -310,7 +311,7 @@ def _render_table(panel: Panel) -> list[str]:
 
 
 # --- Beat 3: the formula list, the curve with its markers, the range marks -----
-def _formula_row(series) -> str:
+def _formula_row(series: Series) -> str:
     """One formula row: the display name with the mart's own name beside it, the
     expression as printed in `FORMULAS`, and the value in its display unit — or
     the declared absence (a crossover the grid never reaches)."""
@@ -350,6 +351,9 @@ def _euro(value: float) -> str:
 
 
 def _render_curve(panel: Panel) -> list[str]:
+    # Every curve point carries a value: `_curve_series` calls `_require` on each
+    # cell, so no None reaches `_y_of` here (unlike `_render_line`, whose Beat 1
+    # series can carry a gap month).
     x_of = _curve_x(panel)
     out = _svg_open()
     out += _grid_and_axis(panel.domain, _euro, _ML_CURVE)
@@ -407,7 +411,7 @@ _SOURCING_CLASS = {"sourced": "range-sourced", "unsourced": "range-unsourced"}
 _RANGE_LABELS = frozenset({"low", "default", "high"})
 
 
-def _range_mark(series) -> str:
+def _range_mark(series: Series) -> str:
     """The drawn range: low — default — high from the three cells, or the
     labelled fixed mark when the range is one point (never a zero-width line
     or a division by zero)."""
@@ -444,7 +448,7 @@ def _range_mark(series) -> str:
     )
 
 
-def _parameter_row(series) -> str:
+def _parameter_row(series: Series) -> str:
     default = next(p for p in series.points if p.label == "default")
     return (
         f'<tr><th scope="row">{_esc(series.name)} '

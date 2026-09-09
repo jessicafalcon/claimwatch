@@ -120,7 +120,7 @@ def test_b3_1_renders_the_baseline_formula_rows_each_expression_beside_its_value
     for s in b31.series:
         (cell,) = s.points
         assert cell.label == by_name[s.key].expression  # the expression is the label
-        assert cell.unit == pins.BEAT3_DISPLAY_UNIT[by_name[s.key].unit]
+        assert cell.unit == panels._DISPLAY_UNIT[by_name[s.key].unit]
         assert cell.tag == pins.COST_MODELED_TAG
     sec = _section(_html(synthetic_db), "B3.1")
     assert pins.BEAT3_FRAGMENTS["formula value (fraud_saved, eur)"] in sec
