@@ -166,6 +166,40 @@ def test_the_brief_citation_follows_the_documented_points_not_the_urls():
     assert documented == measured + " and PROJECT_BRIEF §6"
 
 
+def test_a_panel_source_is_an_address_or_a_repository_file_else_refused():
+    # Authored panel-level sources have a closed shape: an http(s) link, or a
+    # repository file named in plain text (never a link); anything else refuses
+    # by name. B2.4's answer key exists (exit round, coherence #2).
+    from pipeline.warehouse import ROOT
+    from study.panels import ANSWER_KEY_FILE
+
+    assert (ROOT / ANSWER_KEY_FILE).is_file()
+
+    def panel(sources, fixture=""):
+        return Panel(
+            "B9.4",
+            "B9.4",
+            "t",
+            "b",
+            "Measured",
+            "table",
+            series=(Series("s", 0, (Point("m", 1.0, "Measured", "", "pct"),)),),
+            sources=sources,
+            fixture=fixture,
+        )
+
+    drilled = export._drill(panel((ANSWER_KEY_FILE,)))
+    assert drilled == f"opens to the repository file {ANSWER_KEY_FILE}"
+    assert "href" not in drilled
+    for bad in ("../secrets", "/etc/passwd", "javascript:alert(1)", "a b"):
+        with pytest.raises(RenderRefused) as exc:
+            export._drill(panel((bad,)))
+        assert "B9.4" in str(exc.value)
+    # over a fixture input the footer says where the figures WILL open.
+    fixture = export._drill(panel(("https://x.example/",), fixture="fixture text"))
+    assert fixture.startswith("the counted figures will open to ")
+
+
 def test_svg_numbers_are_fixed_precision_and_locale_independent(synthetic_db):
     base = _html(synthetic_db)
     assert "48.00" in base  # a coordinate at fixed 2-decimal precision

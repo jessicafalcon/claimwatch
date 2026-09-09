@@ -27,6 +27,7 @@ recomputed here — each number is read from its mart."""
 from __future__ import annotations
 
 import html
+import re
 from pathlib import Path
 
 from pipeline.warehouse import ROOT, connect, database_for
@@ -391,9 +392,21 @@ def _drill(panel: Panel) -> str:
     # source is dropped, not rendered as a live link (round 1, security #16).
     # A computed number (a theme share) carries no per-row address; the panel
     # cites its platform roots at the panel level (`sources`) instead.
+    # A panel-level source is authored, so its shape is closed: an http(s)
+    # address (a link) or a repository file (plain text, never a link — the
+    # page is static); anything else refuses by name. B2.4's answer key and
+    # 9c's Open DAMIR fit are files, not addresses (exit round, coherence #2).
+    files = sorted(s for s in panel.sources if _is_repo_file(s))
+    for source in panel.sources:
+        if not (_is_http(source) or _is_repo_file(source)):
+            raise RenderRefused(
+                f"{panel.id}: source {source!r} is neither an http(s) address "
+                "nor a repository file"
+            )
     addresses = [p.source_url for p in _points(panel)] + list(panel.sources)
     urls = sorted({u for u in addresses if _is_http(u)})
     links = [f'<a href="{_esc(u)}" rel="noopener">{_esc(u)}</a>' for u in urls]
+    links += [f"the repository file {_esc(f)}" for f in files]
     # The brief citation is DERIVED from the points shown: a Documented point is
     # a brief §6 anchor, so the footer names §6 exactly when one is drawn — never
     # on any panel that happens to carry a URL (exit round, code-reviewer #1;
@@ -401,13 +414,25 @@ def _drill(panel: Panel) -> str:
     refs = ["PROJECT_BRIEF §6"] if "Documented" in _panel_tags(panel) else []
     if not links and not refs:
         return "source pending"
-    return "opens to " + " and ".join(
-        part for part in (", ".join(links), *refs) if part
-    )
+    # Over a fixture input the body shows no number, so the footer says where
+    # the counted figures WILL open — not "opens to" beside "not a result"
+    # (exit round, code-reviewer #5). `fixture` is set by the gate from the
+    # mart's own run_id, never by a caller.
+    verb = "the counted figures will open to" if panel.fixture else "opens to"
+    return f"{verb} " + " and ".join(part for part in (", ".join(links), *refs) if part)
 
 
 def _is_http(url: str) -> bool:
     return url.startswith(("http://", "https://"))
+
+
+# A repository file: relative, no parent step, one closed character set — the
+# shape an authored path must fit, checked here; that the file exists is a test.
+_REPO_FILE = re.compile(r"^(?!/)(?!.*(?:^|/)\.\.(?:/|$))[A-Za-z0-9_./-]+$")
+
+
+def _is_repo_file(source: str) -> bool:
+    return bool(_REPO_FILE.match(source))
 
 
 # --- The page -----------------------------------------------------------------

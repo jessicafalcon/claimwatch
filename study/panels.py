@@ -402,6 +402,9 @@ _FIXTURE_NOTE = (
     "works, not a result. The counted figures appear when the study is built "
     "over captured reviews."
 )
+# B2.4's source (BACKING): the hand-labelled answer key, a repository file the
+# footer names in plain text; the export never reads it (classify/eval does).
+ANSWER_KEY_FILE = "classify/eval/labels.csv"
 PLATFORM_ROOTS = (
     "https://apps.apple.com/",
     "https://play.google.com/",
@@ -765,6 +768,7 @@ def beat2_panels(conn) -> list[Panel]:
             kind="table",
             series=quality_series,
             fixture=quality_fixture,
+            sources=(ANSWER_KEY_FILE,),  # BACKING B2.4's source: the answer key
             columns=("Theme", "Precision", "Recall"),
             notes=(
                 "“No held-out case” means the held-out fold carried no review of "
