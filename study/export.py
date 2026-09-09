@@ -393,10 +393,17 @@ def _drill(panel: Panel) -> str:
     # cites its platform roots at the panel level (`sources`) instead.
     addresses = [p.source_url for p in _points(panel)] + list(panel.sources)
     urls = sorted({u for u in addresses if _is_http(u)})
-    if not urls:
+    links = [f'<a href="{_esc(u)}" rel="noopener">{_esc(u)}</a>' for u in urls]
+    # The brief citation is DERIVED from the points shown: a Documented point is
+    # a brief §6 anchor, so the footer names §6 exactly when one is drawn — never
+    # on any panel that happens to carry a URL (exit round, code-reviewer #1;
+    # BACKING B2.2/B2.5 list the platform roots alone).
+    refs = ["PROJECT_BRIEF §6"] if "Documented" in _panel_tags(panel) else []
+    if not links and not refs:
         return "source pending"
-    links = ", ".join(f'<a href="{_esc(u)}" rel="noopener">{_esc(u)}</a>' for u in urls)
-    return f"opens to {links} and PROJECT_BRIEF §6"
+    return "opens to " + " and ".join(
+        part for part in (", ".join(links), *refs) if part
+    )
 
 
 def _is_http(url: str) -> bool:

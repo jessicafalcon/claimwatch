@@ -141,6 +141,31 @@ def test_every_panel_renders_its_backing_row_id_and_source_link(synthetic_db):
     assert 'href="https://www.trustpilot.com/"' in page
 
 
+def test_the_brief_citation_follows_the_documented_points_not_the_urls():
+    # §6 is named exactly when a Documented anchor is drawn; a Measured panel over
+    # the platform roots cites the roots alone, as BACKING B2.2/B2.5 do (exit
+    # round, code-reviewer #1).
+    def panel(tag):
+        return Panel(
+            "B9.3",
+            "B9.3",
+            "t",
+            "b",
+            tag,
+            "line",
+            series=(Series("s", 0, (Point("m", 1.0, tag, "", "pct"),)),),
+            sources=("https://www.trustpilot.com/",),
+        )
+
+    measured = export._drill(panel("Measured"))
+    documented = export._drill(panel("Documented"))
+    assert (
+        measured
+        == 'opens to <a href="https://www.trustpilot.com/" rel="noopener">https://www.trustpilot.com/</a>'
+    )
+    assert documented == measured + " and PROJECT_BRIEF §6"
+
+
 def test_svg_numbers_are_fixed_precision_and_locale_independent(synthetic_db):
     base = _html(synthetic_db)
     assert "48.00" in base  # a coordinate at fixed 2-decimal precision
@@ -251,8 +276,8 @@ def test_drill_drops_a_non_http_source_url():
         ),
     )
     drilled = export._drill(panel)
-    assert "javascript:" not in drilled
-    assert drilled == "source pending"
+    assert "javascript:" not in drilled and "href" not in drilled
+    assert drilled == "opens to PROJECT_BRIEF §6"  # the Documented anchor's own source
 
 
 def _rating_trend_conn(rows: list[tuple]):
