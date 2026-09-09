@@ -331,6 +331,9 @@ Freeze: none
 - [x] `SPEC.md` — the Beat 2 sentences under Scope (panel details and one
   wording fix; row ids, tags and chart meanings unchanged).
 - [x] README — none (the repo has no README yet; Phase 9f).
+- [x] `PROJECT_BRIEF.md` — §3 Beat 2: the denominator and per-segment wording,
+  peer context tagged Documented (the exit round; the brief was last edited in
+  3a).
 - [x] `specs/phase-9b-beat-2.md` — the "Delivered" paragraph appended at exit.
 
 ## Threat model (REQUIRED when the phase adds a `make` target that takes a variable, deletes anything, calls a paid API, or touches the network)

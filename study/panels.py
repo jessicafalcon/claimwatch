@@ -22,6 +22,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Literal
 
+from classify.eval.gate import ANSWER_KEY
 from classify.labels import POSITIVE, THEMES, UNCLASSIFIED
 from pipeline.build import INPUTS
 from pipeline.warehouse import default_schema
@@ -404,8 +405,10 @@ _FIXTURE_NOTE = (
     "over captured reviews."
 )
 # B2.4's source (BACKING): the hand-labelled answer key, a repository file the
-# footer names in plain text; the export never reads it (classify/eval does).
-ANSWER_KEY_FILE = "classify/eval/labels.csv"
+# footer names in plain text. The export never reads it and never spells it —
+# the path is the constant its one reader, classify/eval, exports (the labels
+# wall, tests/test_labels_isolation.py), as pipeline/cli.py names it.
+ANSWER_KEY_FILE = ANSWER_KEY
 PLATFORM_ROOTS = (
     "https://apps.apple.com/",
     "https://play.google.com/",
