@@ -220,11 +220,11 @@ def test_two_run_ids_or_one_outside_inputs_refuse_one_line():
 # --- Done-when 3: values equal the marts; the band is counted -----------------
 def test_beat2_values_equal_their_marts_over_a_captured_run_id(captured_db):
     seg = {
-        label: (reviews, theme_rows, share)
-        for label, reviews, theme_rows, share in _mart(
+        label: (reviews, theme_rows, share, tag)
+        for label, reviews, theme_rows, share, tag in _mart(
             captured_db,
-            "select label, reviews, theme_rows, share from theme_share_by_segment "
-            "order by label",
+            "select label, reviews, theme_rows, share, tag "
+            "from theme_share_by_segment order by label",
         )
     }
     b25 = _panel(captured_db, "B2.5")
@@ -233,10 +233,23 @@ def test_beat2_values_equal_their_marts_over_a_captured_run_id(captured_db):
         label = _label_of(s)
         drawn[label] = s
         for point in s.points:
-            reviews, theme_rows, share = seg[label]
+            reviews, theme_rows, share, tag = seg[label]
             assert point.value == float(share)  # value equals its mart
+            assert point.tag == tag  # and so does its tag (round 2, CR#1)
             assert point.detail == f"{int(theme_rows)} of {int(reviews)} reviews"
     assert pins.BEAT2_POSITIVE_EXCLUDED not in drawn  # positive is not a bar
+    # B2.4's cells carry the classifier_quality row's tag, value or absence alike.
+    quality_tag = {
+        label: tag
+        for label, tag in _mart(
+            captured_db, "select label, tag from classifier_quality order by label"
+        )
+    }
+    b24 = _panel(captured_db, "B2.4")
+    assert b24.series  # the table renders over a captured input
+    for s in b24.series:
+        for cell in s.points:
+            assert cell.tag == quality_tag[_LABEL_OF[s.name]]
     # the pinned theme_rows behind each drawn bar
     for label, theme_rows in pins.BEAT2_SEGMENT_BARS.items():
         assert seg[label][1] == theme_rows
@@ -276,7 +289,7 @@ def test_the_unclassified_band_is_the_neutral_token_and_always_in_the_legend(
     )
     # an empty band still appears in the legend, at zero — never hidden.
     empty = panels._theme_series(
-        [("2026-01", "document-loop", 10, 3, 0.3)], "B2.9", "period"
+        [("2026-01", "document-loop", 10, 3, 0.3, "Measured")], "B2.9", "period"
     )
     band0 = next(s for s in empty if s.colour == NEUTRAL)
     assert band0.name == "Not yet classified (0)" and band0.points == ()
@@ -292,8 +305,8 @@ def test_a_band_only_panel_still_lists_the_band_in_the_legend():
     # never hidden; round 2, code-reviewer #2). A one-series Beat 1 panel keeps
     # no legend.
     rows = [
-        ("2026-01", "positive", 10, 3, 0.3),
-        ("2026-01", "unclassified", 10, 7, 0.7),
+        ("2026-01", "positive", 10, 3, 0.3, "Measured"),
+        ("2026-01", "unclassified", 10, 7, 0.7, "Measured"),
     ]
     panel = Panel(
         "B2.9",
@@ -326,9 +339,9 @@ def test_b2_2_plots_each_share_against_the_axis_not_stacked():
     # A cell whose shares sum past 1 (three themes, each 0.6) plots every point at
     # its own share — no cumulative stack — so the y of each is _y_of(0.6).
     rows = [
-        ("2026-01", "document-loop", 10, 6, 0.6),
-        ("2026-01", "silent-rejection", 10, 6, 0.6),
-        ("2026-01", "second-payer", 10, 6, 0.6),
+        ("2026-01", "document-loop", 10, 6, 0.6, "Measured"),
+        ("2026-01", "silent-rejection", 10, 6, 0.6, "Measured"),
+        ("2026-01", "second-payer", 10, 6, 0.6, "Measured"),
     ]
     panel = Panel(
         "B2.9",
@@ -352,7 +365,7 @@ def test_b2_2_plots_each_share_against_the_axis_not_stacked():
 def test_positive_rows_are_excluded_from_the_theme_series_and_stated(captured_db):
     rows = _mart(
         captured_db,
-        "select segment, label, reviews, theme_rows, share from "
+        "select segment, label, reviews, theme_rows, share, tag from "
         "theme_share_by_segment order by label",
     )
     series = panels._theme_series(rows, "B2.5", "theme")

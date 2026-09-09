@@ -80,15 +80,16 @@ _Q_PEER_RATINGS = (
     "from peer_ratings order by profile, source"
 )
 _Q_THEME_BY_MONTH = (
-    "select month, label, reviews, theme_rows, share from theme_share_by_month "
-    "where segment = 'digital-first' order by label, month"
+    "select month, label, reviews, theme_rows, share, tag "
+    "from theme_share_by_month where segment = 'digital-first' "
+    "order by label, month"
 )
 _Q_THEME_BY_SEGMENT = (
-    "select segment, label, reviews, theme_rows, share "
+    "select segment, label, reviews, theme_rows, share, tag "
     "from theme_share_by_segment order by label, segment"
 )
 _Q_CLASSIFIER_QUALITY = (
-    "select label, hits, predicted, actual, precision, recall "
+    "select label, hits, predicted, actual, precision, recall, tag "
     "from classifier_quality order by label"
 )
 
@@ -460,7 +461,7 @@ def _corpus_input(conn, mart: str, panel_id: str) -> str | None:
 def _theme_series(
     rows: list[tuple], panel_id: str, label_by: Literal["period", "theme"]
 ) -> tuple[Series, ...]:
-    """One series per label from `(x, label, reviews, theme_rows, share)` rows:
+    """One series per label from `(x, label, reviews, theme_rows, share, tag)` rows:
     each theme a coloured line/bar, the `unclassified` band the neutral token,
     `positive` excluded (a theme chart counts complaints). `label_by` names each
     point by its period (a month) or by its theme (a one-segment bar). The raw
@@ -470,7 +471,9 @@ def _theme_series(
     name carries its total count — so a small or empty band reads as zero, never
     as hidden (Phase 9b, invariant 3)."""
     by_label: dict[str, list[Point]] = {}
-    for x_key, label, reviews, theme_rows, share in rows:
+    # The tag is the mart row's own, as every Beat 1 reader reads it — never a
+    # literal in the reader (round 2, code-reviewer #1, the caller-sourced class).
+    for x_key, label, reviews, theme_rows, share, tag in rows:
         if label == POSITIVE:
             continue
         point_label = str(x_key) if label_by == "period" else _label_display(label)
@@ -478,7 +481,7 @@ def _theme_series(
             Point(
                 point_label,
                 float(_require(share, "share", panel_id)),
-                "Measured",
+                _require(tag, "tag", panel_id),
                 "",
                 "pct",
                 detail=f"{int(theme_rows)} of {int(reviews)} reviews",
@@ -488,7 +491,9 @@ def _theme_series(
     # — the band's legend total, not a recomputed study number: the shares
     # themselves are each read from a mart cell (round 1, code-reviewer).
     band_total = sum(
-        int(theme_rows) for _, label, _, theme_rows, _ in rows if label == UNCLASSIFIED
+        int(theme_rows)
+        for _, label, _, theme_rows, _, _ in rows
+        if label == UNCLASSIFIED
     )
     labels = sorted(set(by_label) | {UNCLASSIFIED}, key=_label_order)
     return tuple(
@@ -539,15 +544,18 @@ def _score_cell(
     hits: int,
     denominator: int,
     denominator_name: str,
+    *,
+    tag: str,
 ) -> Point:
     """One classifier-quality cell: a percentage with its raw counts, or — when
     the held-out denominator is zero — a labelled absence carrying that count
-    (value xor absence; Phase 9b, pinned decision 5)."""
+    (value xor absence; Phase 9b, pinned decision 5). `tag` is the mart row's
+    own, never a literal here."""
     if denominator == 0:
         return Point(
             name,
             None,
-            "Measured",
+            _require(tag, "tag", "B2.4"),
             "",
             "pct",
             absent="no held-out case",
@@ -556,7 +564,7 @@ def _score_cell(
     return Point(
         name,
         float(_require(value, name.lower(), "B2.4")),
-        "Measured",
+        _require(tag, "tag", "B2.4"),
         "",
         "pct",
         detail=f"{int(hits)}/{int(denominator)}",
@@ -573,11 +581,13 @@ def _classifier_table(conn) -> tuple[Series, ...]:
             _label_display(label),
             0,
             (
-                _score_cell("Precision", precision, hits, predicted, "predicted"),
-                _score_cell("Recall", recall, hits, actual, "actual"),
+                _score_cell(
+                    "Precision", precision, hits, predicted, "predicted", tag=tag
+                ),
+                _score_cell("Recall", recall, hits, actual, "actual", tag=tag),
             ),
         )
-        for label, hits, predicted, actual, precision, recall in rows
+        for label, hits, predicted, actual, precision, recall, tag in rows
     )
 
 
