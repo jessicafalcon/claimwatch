@@ -1142,10 +1142,10 @@ def beat3_panels(conn) -> list[Panel]:
             title="The sourced defaults",
             blurb=(
                 "The inputs anchored to public figures — revenue, members, the "
-                "fraud pool, refunds paid, and the shape of the claim-cost "
-                "distribution — each with the figure it derives and the range the "
-                "study explores. The three headline figures above the rows are "
-                "derived from these inputs, at the defaults."
+                "fraud pool, refunds paid, and the typical size of a claim — each "
+                "shown with the public figure behind it and the range the study "
+                "explores. The three headline figures above the rows are derived "
+                "from these inputs, at the defaults."
             ),
             tag="Modeled",
             kind="parameters",
@@ -1153,11 +1153,12 @@ def beat3_panels(conn) -> list[Panel]:
             series=_parameter_rows(conn, "sourced", "B3.3"),
             sources=_FIT_SOURCES,
             notes=(
-                "Each range is drawn, not dragged: low, default and high from the "
-                "model’s own table, so a reader redoes the arithmetic at any point "
-                "of the range by hand with the printed formula. A published figure "
-                "given as a floor spans the floor to twice it — the study’s stated "
-                "exploration bound, not a fact.",
+                "Each range is shown as a fixed mark, not a slider you drag: low, "
+                "default and high come from the model’s own table, so a reader "
+                "redoes the arithmetic at any point of the range by hand with the "
+                "printed formula. A published figure given as a floor spans the "
+                "floor to twice it — the study’s stated exploration bound, not a "
+                "fact.",
                 "Stated here: the four scale anchors are public disclosures cited "
                 "second-hand from the project brief, each a floor; the fit rows "
                 "span the fit plus and minus two standard errors, and the median "
@@ -1180,10 +1181,10 @@ def beat3_panels(conn) -> list[Panel]:
             series=_parameter_rows(conn, "unsourced", "B3.4"),
             sources=(MODEL_FILE,),
             notes=(
-                "Each range is drawn, not dragged: the printed formulas and these "
-                "spans let a reader redo the arithmetic at any point of the range "
-                "by hand. A control that recomputes on the page is a script, and "
-                "this page carries none.",
+                "The low, default and high are static marks, nothing to drag: the "
+                "printed formulas and these spans let a reader redo the arithmetic "
+                "at any point of the range by hand. A control that recomputes on "
+                "the page is a script, and this page carries none.",
                 "Stated here: the cost per contact is a declared guess awaiting a "
                 "public benchmark; if one is handed over, the row moves to the "
                 "sourced panel with its citation and nothing else changes.",

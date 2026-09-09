@@ -133,21 +133,25 @@ UNSOURCED_LABEL = "declared unsourced — explore the range"
 # has its present and its absent sentence, so a null crossover says so.
 def crossover_note(crossover: str | None, marginal: str | None, default: str) -> str:
     """The note beneath the curve chart, from the three displayed rates (or
-    `None` where the mart stores NULL): where the curves cross, where the next
-    flag stops paying, and whether that is where the default sits."""
+    `None` where the mart stores NULL): where the next flag stops paying (and
+    whether that is where the default sits), then where the curves cross. The
+    earlier point reads first, so a non-technical reader meets the default
+    before the whole-curve crossover (round 1, study-editor #3)."""
+    if marginal is None:
+        marginal_sentence = (
+            "No point of the grid has the next flag costing more than it recovers."
+        )
+    else:
+        where = ", where the default sits" if marginal == default else ""
+        marginal_sentence = f"The next flag stops paying for itself at {marginal}{where}."
     if crossover is None:
-        first = (
+        crossover_sentence = (
             "On this grid the two curves never cross: at every flag rate drawn, "
             "the flags as a whole recover more than they cost."
         )
     else:
-        first = (
+        crossover_sentence = (
             f"At these defaults the two curves cross at a flag rate of {crossover}: "
             "past it, the flags as a whole cost more than they recover."
         )
-    if marginal is None:
-        second = "No point of the grid has the next flag costing more than it recovers."
-    else:
-        where = ", where the default sits" if marginal == default else ""
-        second = f"The next flag stops paying for itself at {marginal}{where}."
-    return f"{first} {second}"
+    return f"{marginal_sentence} {crossover_sentence}"

@@ -382,7 +382,9 @@ def test_a_null_crossover_renders_a_declared_absence_and_no_marker(synthetic_db)
         text.MARKER_MARGINAL,
     ]
     note = panels._crossover_note(markers)
-    assert note.startswith("On this grid the two curves never cross")
+    # The marginal sentence leads (round 1, study-editor #3); the null crossover
+    # renders its declared-absence sentence after it.
+    assert "On this grid the two curves never cross" in note
     panel = Panel(
         "B3.9",
         "B3.9",

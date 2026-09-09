@@ -98,7 +98,7 @@ class Series:
 @dataclass(frozen=True)
 class Panel:
     """A study panel as data. `tag` is the BACKING-declared evidence tag; `kind`
-    is one of hero | line | grouped_bar | stat_row | table. `fixture`, when set,
+    is one of the `Kind` values above. `fixture`, when set,
     is the labelled fixture-state text a corpus panel shows over a fixture input
     (no number) — distinct from Pending and from "no data yet" (Phase 9b).
     `columns` names a metric table's headers; `sources` are panel-level drill

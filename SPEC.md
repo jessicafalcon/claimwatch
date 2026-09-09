@@ -140,10 +140,10 @@ A held claim that turns out to be legitimate is not free — it costs staff time
 answering calls and messages, and it costs lost customers. This part puts a
 number on that with plain
 arithmetic: every formula is printed above its chart, and every assumption is
-shown with its range, either sourced or openly marked as a guess. The range is
-drawn, not dragged: the permanent page carries no script, so each parameter
-shows its low, default and high as a static mark, and a reader redoes the
-arithmetic at any point of the range by hand with the printed formula.
+shown with its range, either sourced or openly marked as a guess. Each range is
+a static mark, not a slider you drag: the permanent page carries no script, so
+each parameter shows its low, default and high as a fixed mark, and a reader
+redoes the arithmetic at any point of the range by hand with the printed formula.
 
 *Under the hood:* the formulas live in `models/cost_model.py` and the study
 renders them from there, so the printed formula and the computed number cannot
