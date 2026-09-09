@@ -113,8 +113,9 @@ Delivered paragraph and `make help`, not here.
   including the hold timer's three, filled into the three Beat 3 marts inside
   `rebuild()`), `guardrail_sim.py::RULES` (Beat 4: the quantile draw, the hold
   and the share-under count, filled into the two Beat 4 marts inside
-  `rebuild()`); `study/` — the static HTML export, one direction `text.py` ←
-  `model.py` ← `panels.py` ← `export.py`: `text.py` (the display texts as
+  `rebuild()`); `study/` — the static HTML export, one direction
+  {`text.py`, `model.py`} ← `panels.py` ← `export.py` (`text.py` and `model.py`
+  are independent leaves; `panels.py` imports both): `text.py` (the display texts as
   data — the note texts, the closed display-name maps per formula and
   parameter, the marker and absence labels, the note templates), `model.py`
   (the panel types, `TAGS`, the render-time contract — one tag per number,
@@ -729,7 +730,8 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 **In progress: `phase-9c-beat-3`** (spec `specs/phase-9c-beat-3.md`, APPROVED
 2026-09-09, challenged once — approve with amendments, all applied). Beat 3
-built 2026-09-09, awaiting `/preflight` and review round 1: the study's first
+built 2026-09-09; review round 1 and the exit round (coherence-auditor,
+whole-repo) both complete, all findings fixed: the study's first
 Modeled panels. B3.1 the fourteen baseline formula rows, each expression beside
 its value and unit; B3.2 the two curves over the 41-point flag-rate grid with
 three markers read from the outputs mart (the default and the marginal
@@ -742,9 +744,10 @@ as data; the Beat 1–2 notes moved verbatim), three chart kinds, two units,
 `model.py`, the marker refusals in `check_panel`, `curve_domain`. Every Beat 3
 number is a mart cell (a mutated cell moves the page; a changed `net` moves
 nothing); every expression equals `FORMULAS`; a render over `ROWS=none` shows
-the same numbers. Next: `/preflight`, `/review-round 1`, the exit round with
-the coherence-auditor, the Delivered paragraph, `gh pr create` (`Phase 9c —
-Beat 3`).
+the same numbers. Round-1 fixes: the `_range_mark` zero-width and
+out-of-range geometry guards (`6b198b8`, `b3757cf`), the outputs mart read once,
+the crossover note reordered, the two range notes de-duplicated. Next: the
+Delivered paragraph, `gh pr create` (`Phase 9c — Beat 3`).
 
 **Merged:** Phases 0a–9b in order, each with its spec under `specs/` (the
 Delivered paragraph) and its DECISIONS appendix — 9b (PR #23, 2026-09-09) then
@@ -763,6 +766,6 @@ slider decision); 9g — the Metabase demonstration (the review-level drill,
 non-CI). Plus two pulled-out data phases: the claims
 sample-mean slider and data.ameli practitioner fees.
 
-Open BACKLOG rows: **43**.
+Open BACKLOG rows: **42**.
 
 (Update this section at the end of every working day.)

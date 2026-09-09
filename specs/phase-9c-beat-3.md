@@ -399,7 +399,7 @@ Freeze: none
 - [x] `specs/phase-9b-beat-2.md` — the one-word `run_id` correction under
   Scope (a records fix, batched with this phase's records commit).
 - [x] README — none (the repo has no README yet; Phase 9f).
-- [ ] `specs/phase-9c-beat-3.md` — the "Delivered" paragraph appended at exit.
+- [x] `specs/phase-9c-beat-3.md` — the "Delivered" paragraph appended at exit.
 
 ## Threat model (REQUIRED when the phase adds a `make` target that takes a variable, deletes anything, calls a paid API, or touches the network)
 
@@ -511,3 +511,39 @@ one word; nothing on the corpus-gate exclusion reads Beat 3's `run_id`. #18
 (the fix PR) — answered under Out of scope: this session writes it after
 approval, before the build, with findings #7 and #10 in its scope and the
 pins in `tests/test_cost_model.py`.
+
+## Delivered (2026-09-09)
+
+Beat 3 renders the study's first Modeled panels through the 9a/9b contract, the
+display texts split out one direction into `study/text.py` (the words as data,
+the Beat 1–2 notes moved verbatim, `3ee1468`) beside `study/model.py` — both
+independent leaves that `study/panels.py` imports; `panels.py` ← `export.py` as
+before. Three chart kinds join the contract: `formulas` (B3.1, the fourteen
+baseline rows, each `FORMULAS` expression beside its value in a display unit),
+`curve` (B3.2, the two euro curves over the 41-point flag-rate grid with three
+markers read from `cost_model_outputs` — the default and the marginal crossover
+coincident at 5.0%, their labels stacked, one line per distinct x), and
+`parameters` (B3.3 the seven sourced rows with the three derived headline
+figures above them, B3.4 the eight declared-unsourced rows, split by the mart's
+`sourcing` column, each a drawn range low—default—high or a labelled fixed mark
+when the range is one point). Every Beat 3 number is a cell of
+`cost_model_outputs`, `cost_curves` or `cost_model_params`, tagged Modeled from
+the mart's own `tag` column; a mutated cell moves the page while the printed
+expression does not; a render over `ROWS=none` shows the same numbers (no corpus
+gate on a Modeled panel). New model surface: `Series.key`/`sourcing`,
+`Panel.markers`/`headline`, `display` and `x_key` in `model.py`, the marker
+refusals in `check_panel`, `curve_domain` and the y-domain rule in `panels.py`;
+`Unit` gains `eur` and `logeur`. The permanent page carries no script — the
+drawn range plus the printed formula is the exploration, the live-slider
+question deferred to 9f (BACKLOG).
+
+Review round 1 and the exit round (coherence-auditor, whole-repo) found no
+BLOCKER. Fixes: `_range_mark` guards its geometry by shape — the zero-width span
+(`6b198b8`) and the out-of-range default (`b3757cf`), a `site-fix` completed
+across the function; the outputs mart is read once and the headline filters it
+(`2a31211`); `_render_markers` draws one line per distinct x (`b3fe768`); the
+crossover note leads with the default threshold and the two range notes read
+distinctly (`ea5a59c`); records reconciled at exit (the resolved B3.3-headline
+BACKLOG row struck, the study dep chain named as sibling leaves). One finding
+deferred: the shared `_drill` footer verb, cross-phase into 9b's B2.4, tracked
+in BACKLOG for its own fix PR.

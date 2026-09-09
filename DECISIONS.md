@@ -2510,7 +2510,8 @@ column), both merged first.
 - **`display` is the `Unit` set's runtime guard and lives in `study/model.py`
   beside the set.** 9a kept it private in `export.py`; the note templates need
   the same percent format for a figure the reader (not the renderer) fills,
-  and the direction `text.py` ← `model.py` ← `panels.py` ← `export.py` forbids
+  and the direction {`text.py`, `model.py`} ← `panels.py` ← `export.py` (text
+  and model are independent leaves) forbids
   panels importing export. One formatter, one place; `export.py` and the tests
   import it. *Rejected: a second percent formatter in `text.py` (a duplicate);
   filling the note in the renderer (a note is data on the panel).*
