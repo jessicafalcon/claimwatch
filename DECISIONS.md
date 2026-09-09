@@ -38,12 +38,14 @@ place and never deleted.
 - **Pattern-matching lives in `rules.yaml` and Python, never in SQL.** SQL that
   carries no regex carries no dialect, which is what keeps it portable.
   ([PLAN §4.10](docs/PLAN.md); [Phase 0a](#phase-0a))
-- **Formulas are data.** A printed expression and its callable are one entry in
-  the module that owns the quantity, and the printer prints from the entry, so the
-  shown formula and the computed number cannot drift; a test pins the outputs. Its
-  two instances are `models/cost_model.py::FORMULAS` (the model and the hold-timer
-  threshold) and `models/guardrail_sim.py::RULES` (the quantile draw and the hold).
-  ([PLAN §4](docs/PLAN.md); [Phase 0a](#phase-0a); restated [Phase 8b](#phase-8b))
+- **Formulas are data.** A printed expression, its unit and its callable are
+  one entry in the module that owns the quantity, and the printer prints from
+  the entry, so the shown formula, the number format and the computed number
+  cannot drift; a test pins the outputs. Its two instances are
+  `models/cost_model.py::FORMULAS` (the model and the hold-timer threshold) and
+  `models/guardrail_sim.py::RULES` (the quantile draw and the hold). ([PLAN
+  §4](docs/PLAN.md); [Phase 0a](#phase-0a); restated [Phase 8b](#phase-8b); the
+  unit joined the entry in [the cost-outputs-unit fix](#fix--cost_model_outputs-carries-the-formulas-unit-2026-09-09-branch-fixcost-outputs-unit))
 - **Classification grain: one row per review × theme.** A review carrying K
   themes writes K rows, a review with none writes one `positive`/`unclassified`
   row; a "theme share" counts theme rows. This is what a theme chart means.
@@ -2393,3 +2395,35 @@ grows further, not before; (3) the corpus gate stands — a Measured chip beside
 publishing a captured render is 9f's decision with its own Threat-model row
 (row 69); (4) "source pending" was the assumption 9c would break — the
 repository-file source now carries a Modeled panel's fit file and address.
+
+### Fix — `cost_model_outputs` carries the formula's unit (2026-09-09, branch `fix/cost-outputs-unit`)
+
+Not a phase (no spec; a one-finding fix PR from `main`, CLAUDE.md → Git
+workflow). The Phase 9c `/challenge` round (findings 7 and 10, and the spec's
+pinned decision 5) found that `cost_model_outputs` stores each formula's value
+with no unit, so the study could print "1318719.82" but not a euro figure, and
+that the unit lived in a private map beside `FORMULAS` (`_OUTPUT_UNIT`), covering
+the twelve point formulas only and named in no test — the parallel-map shape
+that lets a name and its unit drift apart (`name-drift`). A mart-shape change in
+an 8a file is its own PR before the 9c branch builds (the `run_id` fix's
+precedent).
+
+- **The unit is a field of the `Formula` entry, and the mart stores it.**
+  `Formula(name, expression, kind, unit, fn)`; `_run_points` rounds by `f.unit`;
+  the two curve formulas carry `rate` (their value is a flag rate); the private
+  map is gone. `cost_model_outputs` gains `unit varchar`, written from the entry
+  by `_insert_output`; a NULL crossover still carries `rate`. `make model`
+  prints the unit beside each value (`-> 1318719.82 (eur)`), so the terminal,
+  the mart and the page format one number one way; the header's reader rule is
+  corrected to what 9c renders (B3.1 the baseline scenario's fourteen rows,
+  point and curve; B4.1 the toggled scenarios'; B4.2 the three hold-timer rows
+  at baseline). *Rejected: a second public dict parallel to `FORMULAS` (the
+  same shape, only public); a unit map keyed on formula names in the study (a
+  second copy across a layer); free-text units as the params mart has (a
+  parameter's unit is prose for a person; an output's unit selects a number
+  format).* Pinned by
+  `tests/test_cost_model.py::test_every_formula_carries_a_rounding_unit`
+  (every entry's unit is a `_ROUNDING` key and equals `pins.COST_FORMULA_UNITS`;
+  the field is required), `::test_make_model_prints_the_unit_beside_each_value`,
+  and `tests/test_model_marts.py::test_outputs_mart_carries_each_formulas_unit`
+  (every row's unit equals its entry's, the NULL case included).

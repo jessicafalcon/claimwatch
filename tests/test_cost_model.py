@@ -10,11 +10,14 @@ import math
 import pytest
 
 from models.cost_model import (
+    _ROUNDING,
     CURVE_FORMULAS,
     FLAG_RATE_GRID,
+    FORMULAS,
     POINT_FORMULAS,
     SCENARIOS,
     Fit,
+    Formula,
     Parameter,
     _apply_scenario,
     _crossover,
@@ -58,6 +61,33 @@ def test_make_model_prints_each_expression_beside_its_value():
         assert f.expression in out
     assert "-> 0.095" in out  # the baseline crossover
     assert "-> 0.05" in out  # the marginal crossover / the default marker
+
+
+def test_make_model_prints_the_unit_beside_each_value():
+    """The unit is part of the entry, so the terminal shows it beside the number
+    the way the mart stores it and the page will format it — one unit, one
+    place: `-> <value> (<unit>)` for every formula, curve rows included."""
+    out = format_model(FIT)
+    baseline = pins.COST_OUTPUTS["baseline"]
+    crossovers = pins.COST_CROSSOVERS["baseline"]
+    for f in POINT_FORMULAS:
+        assert f"-> {baseline[f.name]} ({f.unit})" in out, f.name
+    for f in CURVE_FORMULAS:
+        assert f"-> {crossovers[f.name]} ({f.unit})" in out, f.name
+
+
+def test_every_formula_carries_a_rounding_unit():
+    """Every FORMULAS entry's unit is a key of the one rounding table and equals
+    its pin — a formula added without a unit, or with a unit `rounded()` would
+    refuse, fails here before it reaches the writer. A curve's value is a flag
+    rate, so both curve formulas carry `rate`."""
+    assert {f.name: f.unit for f in FORMULAS} == pins.COST_FORMULA_UNITS
+    for f in FORMULAS:
+        assert f.unit in _ROUNDING, f.name
+    assert {f.unit for f in CURVE_FORMULAS} == {"rate"}
+    # The field is required on the entry itself (no default, no map beside it).
+    with pytest.raises(TypeError):
+        Formula("x", "y", "point", lambda v: 0.0)  # type: ignore[call-arg]
 
 
 # --- every parameter: a closed sourcing set, a citation when sourced, a range -

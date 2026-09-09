@@ -128,6 +128,26 @@ def test_params_mart_has_one_row_per_parameter(tmp_path):
         )
 
 
+def test_outputs_mart_carries_each_formulas_unit(tmp_path):
+    """Every cost_model_outputs row's unit equals the FORMULAS entry's own unit
+    for that name, in every scenario — the column is written from the entry, so
+    the page's number format cannot drift from the model's rounding unit; a
+    NULL crossover still carries `rate`."""
+    conn = _built(tmp_path)
+    try:
+        rows = conn.execute(
+            "select scenario, name, unit, value from cost_model_outputs"
+        ).fetchall()
+    finally:
+        conn.close()
+    assert len(rows) == pins.COST_OUTPUT_ROWS
+    for scenario, name, unit, value in rows:
+        assert unit == pins.COST_FORMULA_UNITS[name], (scenario, name)
+        if value is None:
+            assert unit == "rate", (scenario, name)
+    assert any(value is None for *_, value in rows)  # the NULL case is exercised
+
+
 def test_three_marts_filled_on_every_input(tmp_path):
     """none, synthetic and samples each leave the three marts with their constant
     counts — the marts compute over the fit, not the input."""
@@ -151,7 +171,7 @@ def test_two_rebuilds_identical_model_mart_rows(tmp_path):
     """Two rebuilds with different run_ids into the same file give byte-identical
     model-mart rows (run_id aside) — run_id is provenance, in no key or sort."""
     param_cols = "name, default_value, unit, sourcing, citation, low, high, tag"
-    output_cols = "scenario, name, expression, value, tag"
+    output_cols = "scenario, name, expression, value, unit, tag"
     curve_cols = "scenario, flag_rate, fraud_saved, friction_cost, net, is_default, tag"
 
     conn = _built(tmp_path, run_id="run-1")

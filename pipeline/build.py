@@ -921,11 +921,21 @@ def write_model_marts(conn, fit: cost_model.Fit, run_id: str) -> None:
 
 def _insert_output(conn, scenario: str, formula, value, run_id: str) -> None:
     """One (scenario, formula) row of cost_model_outputs — the expression beside
-    its value. A curve whose crossover never happens inserts NULL."""
+    its value and the unit the entry carries. A curve whose crossover never
+    happens inserts NULL (its unit stays `rate`)."""
     conn.execute(
         "insert into cost_model_outputs "
-        "(scenario, name, expression, value, run_id, tag) values (?, ?, ?, ?, ?, ?)",
-        [scenario, formula.name, formula.expression, value, run_id, _MODEL_TAG],
+        "(scenario, name, expression, value, unit, run_id, tag) "
+        "values (?, ?, ?, ?, ?, ?, ?)",
+        [
+            scenario,
+            formula.name,
+            formula.expression,
+            value,
+            formula.unit,
+            run_id,
+            _MODEL_TAG,
+        ],
     )
 
 
