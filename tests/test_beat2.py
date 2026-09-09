@@ -26,7 +26,7 @@ from study.model import (
     check_panel,
     has_content,
 )
-from study.panels import ALLOWED_COLUMNS, STUDY_QUERIES, beat2_panels
+from study.panels import ALLOWED_COLUMNS, STUDY_QUERIES, beat1_panels, beat2_panels
 from tests import pins
 from tests.conftest import build_study_db
 
@@ -598,6 +598,29 @@ def test_b2_2_and_b2_5_name_the_self_selection_bias(synthetic_db):
     page = _html(synthetic_db)
     for pid in ("B2.2", "B2.5"):
         assert "negatively self-selected" in _section(page, pid), pid
+
+
+def test_every_measured_panel_over_the_platforms_names_the_self_selection(
+    synthetic_db,
+):
+    # The caveat's for-all is derived, not authored per id: every Measured panel
+    # whose panel-level sources are the review platforms (a computed share from
+    # unsolicited reviews) carries one note naming the negative self-selection —
+    # so a later corpus panel (the traditional split, B5.2) cannot omit it
+    # (challenge round 2, #3). Over synthetic the notes render the same.
+    conn = connect("duckdb", database=synthetic_db)
+    try:
+        built = beat1_panels(conn) + beat2_panels(conn)
+    finally:
+        conn.close()
+    over_platforms = [
+        p
+        for p in built
+        if p.tag == "Measured" and set(p.sources) & set(panels.PLATFORM_ROOTS)
+    ]
+    assert {p.id for p in over_platforms} == {"B2.2", "B2.5"}  # today's two
+    for p in over_platforms:
+        assert any("negatively self-selected" in note for note in p.notes), p.id
 
 
 # The `unclassified` band's label slug, so a rendered series maps back to its
