@@ -24,6 +24,7 @@ from typing import Literal
 
 from classify.labels import POSITIVE, THEMES, UNCLASSIFIED
 from pipeline.build import INPUTS
+from pipeline.warehouse import default_schema
 from study.model import NEUTRAL, Panel, Point, RenderRefused, Series, _require
 
 # The only columns any study query may project — a closed allowlist checked on
@@ -106,16 +107,23 @@ def _run_id_sql(mart: str) -> str:
     return f"select distinct run_id from {mart} order by run_id"
 
 
+# The catalog probe `_mart_exists` runs — the one query the export runs outside
+# STUDY_QUERIES (no data column, so no review text can leak); a test records
+# every query a render runs and refuses one that is neither (challenge round 2).
+_MART_PROBE = (
+    "select 1 from information_schema.tables where table_schema = ? and table_name = ?"
+)
+
+
 def _mart_exists(conn, mart: str) -> bool:
     # A catalog probe, not a data read (no review text, so it stays outside the
     # column allowlist): a Python-fed mart the classify step never built under
     # ROWS=none is absent, not empty, and its panel renders "no data yet".
-    # information_schema.tables is portable across DuckDB and Snowflake.
+    # information_schema.tables is portable across DuckDB and Snowflake; the
+    # schema is the engine's own (`warehouse.default_schema`, as the rebuild's
+    # catalog reads do), so a same-named table elsewhere never matches.
     return (
-        conn.execute(
-            "select 1 from information_schema.tables where table_name = ?", [mart]
-        ).fetchone()
-        is not None
+        conn.execute(_MART_PROBE, [default_schema(conn), mart]).fetchone() is not None
     )
 
 
