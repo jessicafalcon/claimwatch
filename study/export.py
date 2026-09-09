@@ -729,6 +729,7 @@ _CSS_TEMPLATE = (
     ".headline{{margin-bottom:14px}}"
     ".marker{{stroke:var(--ink2);stroke-width:1;stroke-dasharray:3 3}}"
     ".marker-label{{fill:var(--ink2);font-size:11px}}"
+    ".params td:nth-child(2){{min-width:256px}}"
     ".range{{width:240px;max-width:100%;height:auto;display:block}}"
     ".range-line{{stroke-width:2}}"
     ".range-sourced .range-line{{stroke:var(--ink2)}}"
