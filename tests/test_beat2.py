@@ -199,6 +199,8 @@ def test_corpus_panels_render_the_fixture_state_over_synthetic(synthetic_db):
 # --- Done-when 2: the corpus gate is data ------------------------------------
 def test_the_corpus_gate_reads_run_id_from_the_mart():
     assert set(INPUTS) == {"captured", "none", "synthetic", "samples"}
+    # the gate's state mapping is closed over exactly the inputs (no default arm).
+    assert set(panels._STATE_OF_INPUT) == set(INPUTS)
 
     # captured → numbers; a fixture input → the fixture state; none/empty → nodata.
     def build():

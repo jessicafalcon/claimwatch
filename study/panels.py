@@ -375,8 +375,18 @@ _LABEL_NAMES = {
 # per-review address leaves ingest — D1). The fixture-state text carries no
 # digit, so a fixture panel's body shows no number (Phase 9b, the brief's
 # "never faked" applied at render time).
-CAPTURED = "captured"
-FIXTURE_INPUTS = ("synthetic", "samples")
+# The gate's state per rebuild input, one closed mapping over `INPUTS` (a test
+# pins the key sets equal): counted numbers over the real corpus, the labelled
+# fixture state over a fixture input, "no data yet" over `none`. A run_id
+# outside it refuses by name in `_corpus_input`; a fifth input cannot fall into
+# a default arm (challenge round 2, #8).
+COUNTED, FIXTURE, NO_DATA = "counted", "fixture", "no-data"
+_STATE_OF_INPUT = {
+    "captured": COUNTED,
+    "synthetic": FIXTURE,
+    "samples": FIXTURE,
+    "none": NO_DATA,
+}
 _FIXTURE_NOTE = (
     "Built from hand-written example reviews: a check that the study’s machinery "
     "works, not a result. The counted figures appear when the study is built "
@@ -476,7 +486,7 @@ def _corpus_input(conn, mart: str, panel_id: str) -> str | None:
             "corpus panel counts rows from exactly one input"
         )
     run_id = run_ids[0]
-    if run_id not in INPUTS:
+    if run_id not in _STATE_OF_INPUT:
         raise RenderRefused(
             f"{panel_id}: run_id {run_id!r} in {mart} is not one of {INPUTS}"
         )
@@ -626,9 +636,12 @@ def _corpus_series(
     over a captured input, else empty series and the labelled fixture-state text
     over a fixture input (an empty mart leaves both empty — 9a's "no data yet")."""
     run_id = _corpus_input(conn, mart, panel_id)
-    if run_id == CAPTURED:
+    if run_id is None:
+        return (), ""
+    state = _STATE_OF_INPUT[run_id]  # closed: `_corpus_input` refused the rest
+    if state == COUNTED:
         return build(), ""
-    return (), (_FIXTURE_NOTE if run_id in FIXTURE_INPUTS else "")
+    return (), (_FIXTURE_NOTE if state == FIXTURE else "")
 
 
 def beat2_panels(conn) -> list[Panel]:
