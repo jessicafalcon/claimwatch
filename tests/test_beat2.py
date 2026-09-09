@@ -224,7 +224,7 @@ def test_beat2_values_equal_their_marts_over_a_captured_run_id(captured_db):
     b25 = _panel(captured_db, "B2.5")
     drawn = {}
     for s in b25.series:
-        label = UNCLASSIFIED_LABEL if s.colour == NEUTRAL else _LABEL_OF[s.name]
+        label = _label_of(s)
         drawn[label] = s
         for point in s.points:
             reviews, theme_rows, share = seg[label]
@@ -332,6 +332,9 @@ def test_every_export_query_projects_only_allowlisted_columns(captured_db):
     finally:
         conn.close()
     assert "non-allowlisted" in str(exc.value)
+    # STUDY_QUERIES excludes `_mart_exists`'s catalog probe by design: it projects
+    # a literal `1` (no data column), so no review text can leak, and its mart
+    # name comes from the hardcoded `_CORPUS_MARTS` tuple (round 1, code-reviewer).
 
 
 def test_every_study_query_passes_the_sql_lint():
@@ -447,7 +450,33 @@ def test_an_all_absent_table_renders_as_a_table_not_no_data():
     assert "no held-out case" in body
 
 
-# The label slug for `positive`, used to prove it is not drawn as a theme bar.
+def test_b2_2_and_b2_5_render_their_declared_kind_over_captured(captured_db):
+    # Over a captured input the corpus panels draw a real chart, not the fixture
+    # state: B2.2 a line, B2.5 grouped bars. The kind is pinned so a swap is
+    # caught — over synthetic they render the fixture state, so the bytes alone
+    # never cover it (round 1, functionality-tester).
+    b22 = _panel(captured_db, "B2.2")
+    b25 = _panel(captured_db, "B2.5")
+    assert b22.kind == "line" and b22.fixture == ""
+    assert b25.kind == "grouped_bar" and b25.fixture == ""
+    page = _html(captured_db)
+    assert "<circle" in _section(page, "B2.2")  # a line draws point circles
+    assert "<rect" in _section(page, "B2.5")  # grouped bars draw rects
+
+
+def test_corpus_panels_render_no_data_yet_over_none(none_db):
+    # ROWS=none never builds the Python-fed corpus marts, so B2.2/B2.4/B2.5 render
+    # the "no data yet" state — not the fixture state, not a fabricated number
+    # (round 1, functionality-tester).
+    page = _html(none_db)
+    for pid in ("B2.2", "B2.4", "B2.5"):
+        sec = _section(page, pid)
+        assert 'class="nodata"' in sec
+        assert 'class="fixture"' not in sec and 'class="pending"' not in sec
+
+
+# The `unclassified` band's label slug, so a rendered series maps back to its
+# mart label (the neutral band carries no theme name of its own).
 UNCLASSIFIED_LABEL = "unclassified"
 
 
