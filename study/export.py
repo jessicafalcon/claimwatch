@@ -56,6 +56,8 @@ OUTPUT = ROOT / "study" / "friction_ledger.html"
 # light / 8.4 dark); the chrome/ink and the Pending gray are the reference
 # chart-surface tokens. Emitted once as CSS custom properties; the SVG reads the
 # series hexes by slot. Never reordered — the order is the CVD-safety mechanism.
+# One hex per theme slot: `len(SERIES_*)` must cover `THEMES` (a sixth theme
+# maps to slot 5, which `_series_var` refuses loudly — fail-safe, not silent).
 SERIES_LIGHT = ("#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4")
 SERIES_DARK = ("#3987e5", "#d95926", "#199e70", "#c98500", "#d55181")
 # The `unclassified` band's neutral series colour (`var(--sN)`): a mid gray,

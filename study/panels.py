@@ -19,6 +19,7 @@ Two Phase 9b mechanisms live here:
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import Literal
 
 from classify.labels import POSITIVE, THEMES, UNCLASSIFIED
@@ -305,7 +306,6 @@ def beat1_panels(conn) -> list[Panel]:
                 "only a service change."
             ),
             domain=(1.0, 5.0),
-            axis_unit="stars",
         ),
         Panel(
             id="B1.3",
@@ -325,7 +325,6 @@ def beat1_panels(conn) -> list[Panel]:
                 "the gap is who gets asked, not only how the service performs."
             ),
             domain=(0.0, 5.0),
-            axis_unit="stars",
         ),
         Panel(
             id="B1.4",
@@ -371,7 +370,7 @@ CAPTURED = "captured"
 FIXTURE_INPUTS = ("synthetic", "samples")
 _FIXTURE_NOTE = (
     "Built from hand-written fixture reviews: the pipeline’s proof, not a "
-    "finding. The counted shares appear when the study is built over captured "
+    "finding. The counted figures appear when the study is built over captured "
     "reviews."
 )
 PLATFORM_ROOTS = (
@@ -470,6 +469,9 @@ def _theme_series(
                 detail=f"{int(theme_rows)} of {int(reviews)} reviews",
             )
         )
+    # A deterministic legend count summed from the mart's own `unclassified` rows
+    # — the band's legend total, not a recomputed study number: the shares
+    # themselves are each read from a mart cell (round 1, code-reviewer).
     band_total = sum(
         int(theme_rows) for _, label, _, theme_rows, _ in rows if label == UNCLASSIFIED
     )
@@ -516,7 +518,13 @@ def _peer_ratings(conn) -> tuple[Series, ...]:
     return (Series("Public rating", 0, tuple(points)),) if points else ()
 
 
-def _score_cell(name: str, value, hits, denominator, denominator_name: str) -> Point:
+def _score_cell(
+    name: str,
+    value: float | None,
+    hits: int,
+    denominator: int,
+    denominator_name: str,
+) -> Point:
     """One classifier-quality cell: a percentage with its raw counts, or — when
     the held-out denominator is zero — a labelled absence carrying that count
     (value xor absence; Phase 9b, pinned decision 5)."""
@@ -558,7 +566,12 @@ def _classifier_table(conn) -> tuple[Series, ...]:
     )
 
 
-def _corpus_series(conn, mart, panel_id, build) -> tuple[tuple[Series, ...], str]:
+def _corpus_series(
+    conn,
+    mart: str,
+    panel_id: str,
+    build: Callable[[], tuple[Series, ...]],
+) -> tuple[tuple[Series, ...], str]:
     """The (series, fixture-state) pair a corpus panel renders: the built series
     over a captured input, else empty series and the labelled fixture-state text
     over a fixture input (an empty mart leaves both empty — 9a's "no data yet")."""
@@ -623,7 +636,6 @@ def beat2_panels(conn) -> list[Panel]:
             sources=PLATFORM_ROOTS,
             note=_DENOMINATOR_NOTE,
             domain=(0.0, 1.0),
-            axis_unit="share",
         ),
         Panel(
             id="B2.3",
@@ -645,7 +657,6 @@ def beat2_panels(conn) -> list[Panel]:
                 "platform in the tooltip."
             ),
             domain=(0.0, 5.0),
-            axis_unit="stars",
         ),
         Panel(
             id="B2.4",
@@ -689,6 +700,5 @@ def beat2_panels(conn) -> list[Panel]:
                 "segment the data has. " + _DENOMINATOR_NOTE
             ),
             domain=(0.0, 1.0),
-            axis_unit="share",
         ),
     ]

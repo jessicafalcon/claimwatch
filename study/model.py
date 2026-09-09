@@ -97,7 +97,6 @@ class Panel:
     columns: tuple[str, ...] = ()  # a metric table's column headers (table kind)
     sources: tuple[str, ...] = ()  # panel-level drill addresses (computed numbers)
     domain: tuple[float, float] = (0.0, 5.0)
-    axis_unit: str = "stars"
 
 
 def _points(panel: Panel) -> list[Point]:
