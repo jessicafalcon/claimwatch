@@ -422,7 +422,12 @@ def _range_mark(series) -> str:
             f"range {series.key!r}: cells {sorted(cells)} are not low/default/high"
         )
     low, default, high = cells["low"], cells["default"], cells["high"]
-    if low.value == default.value == high.value:
+    # The fixed mark is the zero-width case, and the divide below is undefined
+    # exactly when high == low — so the guard keys on that span, not on the
+    # three cells being equal: a malformed row (high == low, default off it)
+    # draws the fixed mark, never a ZeroDivisionError out of render (round 1,
+    # code-reviewer #1; invariant 6).
+    if high.value == low.value:
         return f'<span class="fixed">{_esc(FIXED_RANGE)}</span>'
     span = _RW - 2 * _RPAD
     pos = _RPAD + (default.value - low.value) / (high.value - low.value) * span

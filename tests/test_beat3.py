@@ -417,6 +417,26 @@ def test_a_single_point_range_renders_a_labelled_fixed_mark(synthetic_db):
     assert len({p.value for p in fixed.points}) == 1
 
 
+def test_a_zero_width_range_with_an_off_centre_default_is_the_fixed_mark():
+    # high == low but default off it: the position arithmetic would divide by
+    # (high - low) == 0. The fixed-mark guard keys on the zero-width span, so
+    # the mark draws and no ZeroDivisionError escapes render (invariant 6;
+    # round 1, code-reviewer #1). check_parameter forbids this ordering upstream,
+    # so this pins the renderer's own guard-by-shape, not a reachable mart row.
+    series = Series(
+        "cost per contact",
+        0,
+        (
+            Point("low", 5.0, "Modeled", "", "eur"),
+            Point("default", 9.0, "Modeled", "", "eur"),
+            Point("high", 5.0, "Modeled", "", "eur"),
+        ),
+        key="k",
+        sourcing="unsourced",
+    )
+    assert text.FIXED_RANGE in export._range_mark(series)
+
+
 def test_a_sourcing_outside_the_two_words_refuses_by_name(synthetic_db, tmp_path):
     bad = _mutated(
         synthetic_db,
