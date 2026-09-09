@@ -117,6 +117,44 @@ def _gate_conn(run_ids: list[str]):
     return conn
 
 
+def test_the_cli_binds_the_file_it_builds_to_the_run_id_it_classifies_under(
+    monkeypatch,
+):
+    # The gate reads run_id off the mart; that value is what `make rebuild`
+    # stamped. The binding — the file `database_for(rows)` is the one the classify
+    # step stamps `run_id = rows` — lives in the CLI alone, so pin it there: every
+    # writer patched out, no data/ write (challenge round 2, #6).
+    import argparse
+
+    from pipeline import cli
+
+    calls: list[tuple] = []
+
+    class _Conn:
+        def close(self):
+            pass
+
+    monkeypatch.setattr(cli, "rebuild", lambda target, rows: {})
+    monkeypatch.setattr(cli, "connect", lambda target, database: _Conn())
+    monkeypatch.setattr(cli, "reviews_per_month", lambda conn: [])
+    monkeypatch.setattr(
+        cli, "_classify_and_print", lambda db, rows: calls.append((db, rows))
+    )
+    for rows in ("synthetic", "samples", "none"):  # captured needs pages on disk
+        args = argparse.Namespace(target="duckdb", rows=rows)
+        assert cli._do_rebuild(args) == 0
+        assert calls[-1] == (cli.database_for(rows), rows)
+    # and the classify step writes that very value: over a built warehouse each
+    # corpus mart carries run_id = rows (the conftest path mirrors _do_rebuild).
+
+
+def test_each_corpus_mart_carries_the_input_it_was_built_from(synthetic_db):
+    for mart in panels._CORPUS_MARTS:
+        assert _mart(synthetic_db, f"select distinct run_id from {mart}") == [
+            ("synthetic",)
+        ], mart
+
+
 # --- Done-when 1: the honest baseline -----------------------------------------
 def test_b2_1_renders_the_pending_placeholder_with_no_value(synthetic_db):
     b21 = _panel(synthetic_db, "B2.1")
