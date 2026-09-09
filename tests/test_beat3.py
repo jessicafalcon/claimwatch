@@ -439,6 +439,25 @@ def test_a_zero_width_range_with_an_off_centre_default_is_the_fixed_mark():
     assert text.FIXED_RANGE in export._range_mark(series)
 
 
+def test_a_default_outside_the_range_clamps_the_dot_to_the_edge():
+    # default > high with a non-zero span: the fraction exceeds 1 and would draw
+    # the dot past the range line; it clamps to the right edge (round 2, #2).
+    # Like the zero-width case, check_parameter forbids this ordering upstream,
+    # so this pins the renderer's guard-by-shape, not a reachable mart row.
+    series = Series(
+        "cost per contact",
+        0,
+        (
+            Point("low", 5.0, "Modeled", "", "eur"),
+            Point("default", 20.0, "Modeled", "", "eur"),
+            Point("high", 10.0, "Modeled", "", "eur"),
+        ),
+        key="k",
+        sourcing="unsourced",
+    )
+    assert f'cx="{export._n(export._RW - export._RPAD)}"' in export._range_mark(series)
+
+
 def test_a_sourcing_outside_the_two_words_refuses_by_name(synthetic_db, tmp_path):
     bad = _mutated(
         synthetic_db,

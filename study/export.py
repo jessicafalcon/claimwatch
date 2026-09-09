@@ -434,7 +434,11 @@ def _range_mark(series: Series) -> str:
     if high.value == low.value:
         return f'<span class="fixed">{_esc(FIXED_RANGE)}</span>'
     span = _RW - 2 * _RPAD
-    pos = _RPAD + (default.value - low.value) / (high.value - low.value) * span
+    # Clamp the fraction to [0, 1] so a default outside [low, high] cannot draw
+    # the dot past the range line — the geometry sibling of the zero-width guard
+    # above (check_parameter forbids the ordering upstream; round 2, #2).
+    frac = (default.value - low.value) / (high.value - low.value)
+    pos = _RPAD + min(max(frac, 0.0), 1.0) * span
     return (
         f'<svg viewBox="0 0 {_RW} {_RH}" role="img" '
         f'class="range {_SOURCING_CLASS[series.sourcing]}">'
