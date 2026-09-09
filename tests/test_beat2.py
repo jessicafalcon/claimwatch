@@ -32,11 +32,6 @@ from tests.conftest import build_study_db
 
 pytestmark = pytest.mark.slow  # slow: builds a warehouse; out of the edit-loop hook
 
-_CORPUS_MARTS = (
-    "theme_share_by_month",
-    "theme_share_by_segment",
-    "classifier_quality",
-)
 # Display name -> label slug, so a rendered series can be matched to its mart row.
 _LABEL_OF = {name: label for label, name in panels._LABEL_NAMES.items()}
 
@@ -59,7 +54,7 @@ def captured_db(tmp_path_factory, synthetic_db) -> Path:
     shutil.copy(synthetic_db, dst)
     con = duckdb.connect(str(dst))
     try:
-        for mart in _CORPUS_MARTS:
+        for mart in panels._CORPUS_MARTS:  # the export's own list, not a copy
             con.execute(f"update {mart} set run_id = 'captured'")
     finally:
         con.close()

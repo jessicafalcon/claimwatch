@@ -485,7 +485,6 @@ SIM_SUMMARY = {
 # B2.5 (theme_share_by_segment): each theme bar's share is theme_rows / reviews,
 # the mart's own; positive is excluded from the bars (still in the denominator),
 # unclassified is the neutral band. document-loop is the hypothesis subject.
-BEAT2_SEGMENT_DENOMINATOR = THEME_SHARE_BY_SEGMENT_REVIEWS  # 39
 BEAT2_SEGMENT_BARS = {  # the six drawn labels (positive excluded) → theme_rows
     "document-loop": 9,
     "silent-rejection": 4,
