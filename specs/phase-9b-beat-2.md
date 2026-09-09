@@ -9,10 +9,12 @@ round 1, finding 3).
 **Status: APPROVED 2026-09-08 — in progress.** No new dependencies: Beat 2
 renders through the 9a contract (`duckdb` + stdlib, hand-written inline SVG); no
 script, no `<details>`, no new `make` target.
+Challenged: 2026-09-08, round 2, spec 4fbbdb1a — approve with amendments (all applied)
 Challenged: 2026-09-08, round 1, spec 198ff491 — rework (all findings applied)
 Fix amendment: 2026-09-08, round 1 — a panel's notes are a sequence
-(study-editor #2, #3); appended to Invariants below. This makes the challenge
-stamp stale (the hash covers Invariants); re-challenge is the developer's call.
+(study-editor #2, #3); appended to Invariants below.
+Fix amendment: 2026-09-08, challenge round 2 — a fixture state carries no
+value (#2); appended to Invariants below, implemented on approval.
 
 Four sections marked REQUIRED are mandatory; a spec without them is not
 approvable (CLAUDE.md → Workflow rules).
@@ -180,6 +182,30 @@ notes (brief §2.5), as B1.2 already carries it beside the rating trend.**
 Falsified by `tests/test_beat2.py::test_a_panel_renders_one_block_per_note`
 and `tests/test_beat2.py::test_b2_2_and_b2_5_name_the_self_selection_bias`. The
 committed baseline gains the split notes and the caveat; byte-identical on rerun.
+*Challenge round 2, #3:* the tuple enforces the sequence — one block per
+element; "short" and "one idea per note" are the study-editor's check, not
+the type's. The caveat's for-all is derived, not authored per id:
+`tests/test_beat2.py::test_every_measured_panel_over_the_platforms_names_the_self_selection`
+walks every built panel and requires the note wherever the tag is Measured
+and the panel-level sources are the platform roots.
+
+### Fix amendment — challenge round 2 (2026-09-08): a fixture state carries no value
+
+Contract extension (`study/model.py::check_panel`). Today the fixture state's
+"no number" holds by construction — `_corpus_series` returns empty series
+beside the fixture text — and not by the render-time contract: `check_panel`
+refuses a Pending panel that carries a value but not a panel that carries both
+`fixture` text and content, so such a panel would render the fixture text,
+hide its values, and derive its footer chips from the hidden points — the
+shape 9a closed for Pending (challenge round 2, #2).
+
+Invariant restored: **for all panels whose numbers derive from the corpus, a
+fixture state carries no value and no declared absence — `check_panel` refuses
+`fixture` and content together in one line naming the panel, as it refuses
+Pending with a value (brief §2.4, never faked).** Falsified by
+`tests/test_beat2.py::test_a_fixture_state_panel_with_content_is_refused`. No
+baseline change (the committed corpus panels carry the fixture text with empty
+series). Implemented on approval.
 
 ## Pinned decisions (do not re-litigate)
 
