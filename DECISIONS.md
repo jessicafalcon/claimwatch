@@ -2427,3 +2427,20 @@ precedent).
   the field is required), `::test_make_model_prints_the_unit_beside_each_value`,
   and `tests/test_model_marts.py::test_outputs_mart_carries_each_formulas_unit`
   (every row's unit equals its entry's, the NULL case included).
+- **The unit names the dimension the number is read in, not a format bucket.**
+  Once printed beside the value, `loop_days -> 21 (count)` misstated a day
+  count (review round 1, code-reviewer #2); `loop_days` now carries `days`
+  (two places, the rounding table's own row — its value 21.0 unchanged, the
+  pins retyped from the built output, `ebcc556`). `friction_per_day` stays
+  `eur`: the unit is the currency the number is quoted in, and the entry's
+  name carries "per day", as 9c's display name will. *Rejected: printing no
+  unit (the terminal and the mart would disagree with the page); a display
+  unit distinct from the rounding unit (two fields for one fact).* The
+  study-format leg of the invariant — the page formats each value by this
+  column — is pinned in 9c when the reader lands (`tests/test_beat3.py`),
+  not here (code-reviewer #6). The mart header's reader rule names B3.2's
+  markers and leaves the toggled scenarios' rows to `make model` and the
+  dashboard until a BACKING row reads them (B4.1's mart of record is
+  `cost_curves`; #1). Round 1: code-reviewer 6 findings (2 should-fix),
+  functionality-tester "works", every hand-mutation caught, one display pin
+  added (`7a2ea22`).
