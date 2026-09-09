@@ -92,6 +92,12 @@ def _section(page: str, pid: str) -> str:
     return page[start : page.index("</section>", end)]
 
 
+def _legend(section: str) -> str:
+    """The `<ul class="legend">` block of one rendered panel section."""
+    start = section.index('<ul class="legend">')
+    return section[start : section.index("</ul>", start) + len("</ul>")]
+
+
 def _fixture_body(page: str, pid: str) -> str:
     sec = _section(page, pid)
     start = sec.index('<div class="fixture">')
@@ -256,8 +262,18 @@ def test_the_unclassified_band_is_the_neutral_token_and_always_in_the_legend(
         assert point.detail == f"{int(theme_rows)} of {int(reviews)} reviews"
     total = sum(theme_rows for _, theme_rows in rows.values())
     assert band.name == f"Not yet classified ({total})"  # counted in the legend
-    page = _html(captured_db)
-    assert f"Not yet classified ({total})" in page and "var(--sN)" in page
+    # The render mapping is pinned on the function and on the band's own legend
+    # swatch inside the panel — not on the page, whose `.fixture` CSS carries
+    # `var(--sN)` unconditionally (round 2, functionality-tester F1).
+    assert export._series_var(NEUTRAL) == "var(--sN)"
+    assert [export._series_var(slot) for slot in range(5)] == [
+        f"var(--s{slot})" for slot in range(5)
+    ]
+    legend = _legend(_section(_html(captured_db), "B2.2"))
+    assert (
+        f'<span class="swatch" style="background:var(--sN)"></span>'
+        f"Not yet classified ({total})</li>" in legend
+    )
     # an empty band still appears in the legend, at zero — never hidden.
     empty = panels._theme_series(
         [("2026-01", "document-loop", 10, 3, 0.3)], "B2.9", "period"
