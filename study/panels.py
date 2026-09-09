@@ -27,6 +27,14 @@ from classify.labels import POSITIVE, THEMES, UNCLASSIFIED
 from pipeline.build import INPUTS
 from pipeline.warehouse import default_schema
 from study.model import NEUTRAL, Panel, Point, RenderRefused, Series, _require
+from study.text import (
+    DENOMINATOR_NOTE,
+    FIXTURE_NOTE,
+    SEGMENT_DENOMINATOR_NOTE,
+    SEGMENT_SELF_SELECTION_NOTE,
+    SELF_SELECTION_NOTE,
+    TRADITIONAL_CAVEAT,
+)
 
 # The only columns any study query may project — a closed allowlist checked on
 # every cursor's description, so review text (`title`, `body`) can never reach
@@ -384,14 +392,12 @@ _LABEL_NAMES = {
 }
 
 # The corpus gate's states and the platform roots a computed share cites (no
-# per-review address leaves ingest — D1). The fixture-state text carries no
-# digit, so a fixture panel's body shows no number (Phase 9b, the brief's
-# "never faked" applied at render time).
-# The gate's state per rebuild input, one closed mapping over `INPUTS` (a test
-# pins the key sets equal): counted numbers over the real corpus, the labelled
-# fixture state over a fixture input, "no data yet" over `none`. A run_id
-# outside it refuses by name in `_corpus_input`; a fifth input cannot fall into
-# a default arm (challenge round 2, #8).
+# per-review address leaves ingest — D1); the fixture-state text itself lives in
+# study/text.py. The gate's state per rebuild input, one closed mapping over
+# `INPUTS` (a test pins the key sets equal): counted numbers over the real
+# corpus, the labelled fixture state over a fixture input, "no data yet" over
+# `none`. A run_id outside it refuses by name in `_corpus_input`; a fifth input
+# cannot fall into a default arm (challenge round 2, #8).
 COUNTED, FIXTURE, NO_DATA = "counted", "fixture", "no-data"
 _STATE_OF_INPUT = {
     "captured": COUNTED,
@@ -399,11 +405,6 @@ _STATE_OF_INPUT = {
     "samples": FIXTURE,
     "none": NO_DATA,
 }
-_FIXTURE_NOTE = (
-    "Built from hand-written example reviews: a check that the study’s machinery "
-    "works, not a result. The counted figures appear when the study is built "
-    "over captured reviews."
-)
 # B2.4's source (BACKING): the hand-labelled answer key, a repository file the
 # footer names in plain text. The export never reads it and never spells it —
 # the path is the constant its one reader, classify/eval, exports (the labels
@@ -414,51 +415,6 @@ PLATFORM_ROOTS = (
     "https://play.google.com/",
     "https://www.opinion-assurances.fr/",
     "https://www.trustpilot.com/",
-)
-# The denominator every theme share divides by — every classified review,
-# positive included — stated beside the chart so `positive`'s exclusion from
-# the bars is not read as a shrunk denominator (Phase 9b, pinned decision 4).
-# One note per chart shape: B2.2's lines (shares across themes in one month),
-# B2.5's bars (one theme's share in one segment) — round 2, study-editor #1.
-_DENOMINATOR_NOTE = (
-    "The share of each theme is theme rows over every classified review "
-    "(positive reviews included in the total, but not drawn as a theme bar — a "
-    "theme chart counts complaints). A review carrying two themes counts in two "
-    "bars, so the shares across themes can sum past one. The gray “not yet "
-    "classified” band is the reviews a language model would sort; when that "
-    "model is switched off it is largest, shown, never hidden."
-)
-_SEGMENT_DENOMINATOR_NOTE = (
-    "The bar is the document-loop share among every classified review in that "
-    "segment (positive reviews included in the total, never a bar); a review "
-    "carrying document-loop beside another theme counts once here. The gray "
-    "“not yet classified” band is the reviews a language model would sort; "
-    "when that model is switched off it is largest, shown, never hidden."
-)
-
-
-# The negative-self-selection caveat, the theme-share panels' own note beside the
-# counting method (brief §2.5; B1.2 carries the same caveat beside the rating
-# trend). A theme SHARE from unsolicited platforms is a mix among the
-# dissatisfied, not a census — stated where the chart shows it, naming what
-# that chart shows (round 2, study-editor #2).
-def _self_selection_note(shown: str) -> str:
-    return (
-        "Sampling bias, stated here: these reviews come from platforms customers "
-        "were not invited to (unsolicited), which are negatively self-selected — "
-        f"so {shown} is what dissatisfied customers chose to write about, not a "
-        "census of every claim."
-    )
-
-
-_SELF_SELECTION_NOTE = _self_selection_note("the theme mix")
-_SEGMENT_SELF_SELECTION_NOTE = _self_selection_note("the held-claim complaint share")
-# The corpus is one segment today — B2.2 and B2.5's own note, before the caveat:
-# B2.2's query filters on it and B2.5 draws it (BACKLOG "vs traditional").
-_TRADITIONAL_CAVEAT = (
-    "The corpus is digital-first only for now, so the traditional comparison "
-    "awaits a traditional-mutuelle source; the chart shows the segment the data "
-    "has."
 )
 
 
@@ -675,7 +631,7 @@ def _corpus_series(
     state = _STATE_OF_INPUT[run_id]  # closed: `_corpus_input` refused the rest
     if state == COUNTED:
         return build(), ""
-    return (), (_FIXTURE_NOTE if state == FIXTURE else "")
+    return (), (FIXTURE_NOTE if state == FIXTURE else "")
 
 
 def beat2_panels(conn) -> list[Panel]:
@@ -736,7 +692,7 @@ def beat2_panels(conn) -> list[Panel]:
             series=month_series,
             fixture=month_fixture,
             sources=PLATFORM_ROOTS,
-            notes=(_TRADITIONAL_CAVEAT, _SELF_SELECTION_NOTE, _DENOMINATOR_NOTE),
+            notes=(TRADITIONAL_CAVEAT, SELF_SELECTION_NOTE, DENOMINATOR_NOTE),
             domain=(0.0, 1.0),
         ),
         Panel(
@@ -798,9 +754,9 @@ def beat2_panels(conn) -> list[Panel]:
             fixture=segment_fixture,
             sources=PLATFORM_ROOTS,
             notes=(
-                _TRADITIONAL_CAVEAT,
-                _SEGMENT_SELF_SELECTION_NOTE,
-                _SEGMENT_DENOMINATOR_NOTE,
+                TRADITIONAL_CAVEAT,
+                SEGMENT_SELF_SELECTION_NOTE,
+                SEGMENT_DENOMINATOR_NOTE,
             ),
             domain=(0.0, 1.0),
         ),

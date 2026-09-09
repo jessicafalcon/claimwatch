@@ -16,7 +16,7 @@ import pytest
 from pipeline.build import INPUTS
 from pipeline.sql_lint import find_clock, find_nonportable
 from pipeline.warehouse import connect
-from study import export, panels
+from study import export, panels, text
 from study.model import (
     NEUTRAL,
     Panel,
@@ -225,7 +225,7 @@ def test_a_fixture_state_panel_with_content_is_refused():
             "Measured",
             "line",
             series=(Series("x", 0, points),),
-            fixture=panels._FIXTURE_NOTE,
+            fixture=text.FIXTURE_NOTE,
             domain=(0.0, 1.0),
         )
 
@@ -250,8 +250,8 @@ def test_the_corpus_gate_reads_run_id_from_the_mart():
 
     cases = {
         "captured": (True, ""),
-        "synthetic": (False, panels._FIXTURE_NOTE),
-        "samples": (False, panels._FIXTURE_NOTE),
+        "synthetic": (False, text.FIXTURE_NOTE),
+        "samples": (False, text.FIXTURE_NOTE),
         "none": (False, ""),
     }
     for run_id, (has_series, fixture) in cases.items():
@@ -772,7 +772,7 @@ def test_every_measured_panel_over_the_platforms_names_the_self_selection(
     for p in over_platforms:
         assert any("negatively self-selected" in note for note in p.notes), p.id
         # and, while the corpus is one segment, that the comparison waits (CA#1).
-        assert panels._TRADITIONAL_CAVEAT in p.notes, p.id
+        assert text.TRADITIONAL_CAVEAT in p.notes, p.id
 
 
 # The `unclassified` band's label slug, so a rendered series maps back to its
