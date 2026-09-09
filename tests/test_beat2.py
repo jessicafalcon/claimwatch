@@ -371,11 +371,11 @@ def test_positive_rows_are_excluded_from_the_theme_series_and_stated(captured_db
 
 
 def test_reviews_and_theme_rows_render_beside_each_share(captured_db):
-    page = _html(captured_db)
+    b22 = _section(_html(captured_db), "B2.2")  # the panel, never the whole page
     # document-loop's monthly counts ride on each point as "theme_rows of reviews".
     for month, theme_rows in pins.BEAT2_MONTH_DOCUMENT_LOOP.items():
         reviews = pins.THEME_SHARE_BY_MONTH_REVIEWS[month]
-        assert f"{theme_rows} of {reviews} reviews" in page
+        assert f"{theme_rows} of {reviews} reviews" in b22
 
 
 # --- Done-when 4: the column allowlist ----------------------------------------
@@ -454,8 +454,8 @@ def test_a_zero_denominator_metric_renders_a_labelled_absence_with_its_counts(
         precision, recall = cells[label]
         assert precision.value is None and precision.absent == "no held-out case"
         assert precision.detail == "0 predicted" and recall.detail == "0 actual"
-    page = _html(captured_db)
-    assert "no held-out case" in page and "0 predicted" in page
+    b24 = _section(_html(captured_db), "B2.4")  # the panel, never the whole page
+    assert "no held-out case" in b24 and "0 predicted" in b24
     # the graded labels show the percentage with the held-out counts.
     for label, (p_pct, p_cnt, r_pct, r_cnt) in pins.BEAT2_QUALITY_CELLS.items():
         precision, recall = cells[label]
