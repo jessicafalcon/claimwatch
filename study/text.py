@@ -143,7 +143,9 @@ def crossover_note(crossover: str | None, marginal: str | None, default: str) ->
         )
     else:
         where = ", where the default sits" if marginal == default else ""
-        marginal_sentence = f"The next flag stops paying for itself at {marginal}{where}."
+        marginal_sentence = (
+            f"The next flag stops paying for itself at {marginal}{where}."
+        )
     if crossover is None:
         crossover_sentence = (
             "On this grid the two curves never cross: at every flag rate drawn, "

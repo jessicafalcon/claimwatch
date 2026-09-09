@@ -388,8 +388,8 @@ Freeze: none
   declared guess* and *The four scale anchors cite `PROJECT_BRIEF.md §6`,
   second-hand* open, each stated beside the parameter it concerns; update the
   count.
-- [x] LESSONS.md — none until a review round reports a correctness finding;
-  then backtick it and the fix commit writes the row.
+- [x] `LESSONS.md` — round 1's correctness finding (#1, the zero-width range
+  guard) extends the `unshaped-input` row, citing the fix commit `6b198b8`.
 - [x] `CLAUDE.md` — Current status; Repo map (`study/text.py`, Beat 3
   rendered, the three kinds, 9d next); BACKLOG count; Commands unchanged.
 - [x] `BACKING.md` — B3.4's claim cell reworded to the drawn range (no tag,
