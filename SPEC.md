@@ -139,8 +139,11 @@ traction, and coverage-and-price frustration (PROJECT_BRIEF.md §5).
 A held claim that turns out to be legitimate is not free — it costs staff time
 answering calls and messages, and it costs lost customers. This part puts a
 number on that with plain
-arithmetic: every formula is printed above its chart, and every assumption is a
-slider that is either sourced or openly marked as a guess.
+arithmetic: every formula is printed above its chart, and every assumption is
+shown with its range, either sourced or openly marked as a guess. The range is
+drawn, not dragged: the permanent page carries no script, so each parameter
+shows its low, default and high as a static mark, and a reader redoes the
+arithmetic at any point of the range by hand with the printed formula.
 
 *Under the hood:* the formulas live in `models/cost_model.py` and the study
 renders them from there, so the printed formula and the computed number cannot
@@ -151,21 +154,30 @@ climbs; friction cost rises with the false positives that same rate creates.
   positives, fraud saved, friction cost, and the net — each formula shown beside
   the value it produces. The hold timer's three formulas (the loop length, the
   friction per day, and the threshold amount) print in the same list, used by
-  Beat 4 at the defaults. Tag: *Modeled*.
+  Beat 4 at the defaults. The list is the baseline scenario; the three toggled
+  scenarios are B4.1's. Tag: *Modeled*.
 - **B3.2 — The crossover chart.** Fraud euros saved and friction euros cost, both
   as curves over the flag rate, with a "you are here" marker. Where the two
   curves cross, the flagging as a whole starts to cost more than it recovers.
   *Under the hood:* an earlier point — where the next flag added costs more than
-  it saves — is marked on the chart too. Tag: *Modeled*.
+  it saves — is marked on the chart too. Each marker is a row of the model's
+  own output, never read off the drawing; a grid the curves never cross draws
+  no crossing marker and the note says "never crosses on this grid"; two
+  markers at one flag rate (the baseline's own case) stack their labels,
+  neither hidden. One channel the curves do not show, stated beside them: for
+  a company plan, one employee stuck in a document loop complains to HR, and
+  HR decides the renewal. Tag: *Modeled*.
 - **B3.3 — The sourced defaults.** The parameters anchored to public figures —
   revenue per member (~€800/year), the fraud pool (a published savings figure as
   a lower bound), and claim volume derived from published refund totals and open
-  reimbursement distributions. Tag: *Modeled*, each default cited.
-- **B3.4 — The declared-unsourced sliders.** The parameters with no public
+  reimbursement distributions. The three headline figures — revenue per
+  member, the mean claim, the claim volume — are derived from these inputs and
+  shown above the parameter rows. Tag: *Modeled*, each default cited.
+- **B3.4 — The declared-unsourced parameters.** The parameters with no public
   source — the false-positive share, the churn probability, contacts per stuck
   claim, the flag rate, how quickly extra flags stop catching new fraud, and the
-  cost per contact — shown as differently-styled "explore the range" sliders,
-  never as settled facts. Tag: *Modeled*.
+  cost per contact — each with its explore-the-range span drawn, styled apart
+  from the sourced rows, never as settled facts. Tag: *Modeled*.
 
 ## Beat 4 — Three small fixes, no rebuild required
 

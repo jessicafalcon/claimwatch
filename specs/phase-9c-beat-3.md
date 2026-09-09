@@ -340,8 +340,9 @@ extends it for `Formula.unit` and the mart's `unit` column before this branch.
 - `tests/test_beat3.py` — new: the Evidence rows above, including the
   test-owned mutated copies of the synthetic DB and the `both`-scenario panel.
 - `tests/test_export.py` — the panel-walk tests cover thirteen panels.
-- `tests/test_beat2.py` — the `none`-input test gains the Beat 3 assertion
-  (or it moves to `test_beat3.py`; named at exit).
+- `tests/test_beat2.py` — the `none`-input test stays; the Beat 3 assertion is
+  `tests/test_beat3.py::test_beat3_renders_numbers_over_a_none_input` (named
+  here: it moved).
 - `tests/pins.py` — the rendered Beat 3 fragments per kind; the unit lookup;
   the domain rule's two pinned outputs; the display-name counts (14 formulas,
   15 parameters). `COST_OUTPUTS` and `COST_CROSSOVERS` are reused, not retyped.
@@ -370,7 +371,7 @@ Freeze: none
 
 ## Record updates (REQUIRED)
 
-- [ ] `DECISIONS.md` — Phase 9c entry: the static range mark and the no-script
+- [x] `DECISIONS.md` — Phase 9c entry: the static range mark and the no-script
   page (the brief's "slider" met by the drawn range plus the BACKLOG trigger;
   a reader redoes the arithmetic by hand); B3.1 at baseline, the toggles Beat
   4's; B3.3's headline figures; the three kinds, the marker offset and the
@@ -378,7 +379,7 @@ Freeze: none
   mart column's fix PR; `study/text.py` and the display-name maps; the
   challenge dispositions (round 1, approve with amendments, all applied);
   supersede nothing.
-- [ ] `BACKLOG.md` — open *Live sliders need a script the permanent page does
+- [x] `BACKLOG.md` — open *Live sliders need a script the permanent page does
   not carry* (trigger: 9f decides whether the published page may carry an
   inline, CDN-free script that recomputes `FORMULAS`; if yes, the pinning test
   is the module ↔ script identity; if no, the Metabase demonstration 9g is the
@@ -387,17 +388,17 @@ Freeze: none
   declared guess* and *The four scale anchors cite `PROJECT_BRIEF.md §6`,
   second-hand* open, each stated beside the parameter it concerns; update the
   count.
-- [ ] LESSONS.md — none until a review round reports a correctness finding;
+- [x] LESSONS.md — none until a review round reports a correctness finding;
   then backtick it and the fix commit writes the row.
-- [ ] `CLAUDE.md` — Current status; Repo map (`study/text.py`, Beat 3
+- [x] `CLAUDE.md` — Current status; Repo map (`study/text.py`, Beat 3
   rendered, the three kinds, 9d next); BACKLOG count; Commands unchanged.
-- [ ] `BACKING.md` — B3.4's claim cell reworded to the drawn range (no tag,
+- [x] `BACKING.md` — B3.4's claim cell reworded to the drawn range (no tag,
   table, SQL or source change).
-- [ ] `SPEC.md` — the Beat 3 sentences under Scope (no row id, tag or chart
+- [x] `SPEC.md` — the Beat 3 sentences under Scope (no row id, tag or chart
   meaning changes).
-- [ ] `specs/phase-9b-beat-2.md` — the one-word `run_id` correction under
+- [x] `specs/phase-9b-beat-2.md` — the one-word `run_id` correction under
   Scope (a records fix, batched with this phase's records commit).
-- [ ] README — none (the repo has no README yet; Phase 9f).
+- [x] README — none (the repo has no README yet; Phase 9f).
 - [ ] `specs/phase-9c-beat-3.md` — the "Delivered" paragraph appended at exit.
 
 ## Threat model (REQUIRED when the phase adds a `make` target that takes a variable, deletes anything, calls a paid API, or touches the network)

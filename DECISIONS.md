@@ -2444,3 +2444,105 @@ precedent).
   `cost_curves`; #1). Round 1: code-reviewer 6 findings (2 should-fix),
   functionality-tester "works", every hand-mutation caught, one display pin
   added (`7a2ea22`).
+
+### Phase 9c
+
+Branch `phase-9c-beat-3`, spec `specs/phase-9c-beat-3.md`, challenged round 1
+(approve with amendments, all sixteen applied). Beat 3 of the study — the first
+Modeled panels. Depends on Phase 9b (PR #23) and the fix PR
+`fix/cost-outputs-unit` (PR #24: `Formula.unit`, the outputs mart's `unit`
+column), both merged first.
+
+- **The brief's "slider" is met by a drawn range plus a recorded trigger; the
+  permanent page carries no script.** Each parameter row draws low — default —
+  high as inline SVG from the mart's three cells, the default in its display
+  unit beside the mart's prose unit; a sourced row carries its citation as
+  escaped text and an unsourced row the label "declared unsourced — explore the
+  range", the two styled by a closed class lookup on the mart's `sourcing`
+  word. Because the formula is printed beside the range, a reader redoes the
+  arithmetic at any point of it by hand — that is the exploration the
+  permanent artifact offers. Whether the published page may carry an inline,
+  CDN-free script that recomputes `FORMULAS` is 9f's decision (BACKLOG *Live
+  sliders need a script the permanent page does not carry*). BACKING B3.4's
+  claim cell and SPEC.md's two "slider" phrases were amended to what ships.
+  *Rejected: an inline `<script>` recomputing the formulas (a second copy of
+  `FORMULAS` in a second language that no test pins against the module); an
+  `<input type="range">` with no script (a control that does nothing reads as
+  broken).*
+- **B3.1 renders the baseline scenario; the scenario is checked against the
+  imported `SCENARIOS`; the three toggled scenarios are Beat 4's (9d).** Each
+  model mart is read whole and the scenario picked in Python
+  (`_scenario_rows`), so no filter value is a literal in the SQL; B3.3's three
+  headline figures (`customer_value`, `mean_claim`, `claims` — the rows
+  BACKING assigns to it) come through the same reader at the baseline, above
+  its parameter rows (`Panel.headline`). 9d's B4.1 reuses `_formula_rows`,
+  `_curve_series` and `_curve_markers` with `contacts_once`. *Rejected: four
+  formula lists in Beat 3 (Beat 4's story told early); a `where scenario =
+  'baseline'` literal (caller-sourced).*
+- **Three closed additions to `Kind` — `formulas`, `curve`, `parameters` — and
+  two to `Unit` — `eur`, `logeur`; the curve's markers are `(label, x)` pairs
+  the contract checks.** A `formulas` panel is one `Series` per entry (the
+  display name, the mart's identifier as `Series.key`, one cell whose label is
+  the expression); a `curve` panel is series over one numeric x axis with
+  `Panel.markers` drawn as labelled vertical rules in tuple order, each label
+  one `_MARKER_DY` lower by its index, so the baseline's two rules at 0.05
+  read as stacked labels; a `parameters` panel is one `Series` per parameter
+  (three cells: low, default, high; `Series.sourcing` the closed style key).
+  `check_panel` refuses a marker on a non-curve panel and a marker whose x is
+  not the label of a point the panel draws (`x_key`, three places — the grid
+  step is 0.005), so a marker between grid points cannot render. The y domain
+  is a layout number by one pure rule (`curve_domain`: 0 to the maximum
+  rounded up to one significant figure; 4,530,293.45 → 5,000,000) and the
+  ticks are euros through `display`, never `{:g}`. Palette inherited; the
+  markers and range marks use the ink and muted chrome tokens, never a series
+  slot. *Rejected: reusing `table` for the formulas (its cells are metric cells
+  with counts); reusing `line` for the curve (no markers, no numeric ticks);
+  one generic kind with a mode flag; a fixed euro domain.*
+- **The markers and the note's figures are read from `cost_model_outputs`,
+  never found by scanning the curve.** The "you are here" rule is the
+  `is_default` row's flag rate (exactly one, else refuse); the two crossover
+  rules are the `crossover_flag_rate` and `marginal_crossover_flag_rate` rows,
+  each drawn only when the mart stores a value; the note beneath the chart is
+  `text.crossover_note` filled from those rules and says "never cross" when a
+  row is NULL. A test changes every baseline `net` cell to −1 and the page
+  does not move — `net` is read by no panel. *Rejected: computing the crossing
+  from the two polylines; typing the crossover into the note.*
+- **`display` is the `Unit` set's runtime guard and lives in `study/model.py`
+  beside the set.** 9a kept it private in `export.py`; the note templates need
+  the same percent format for a figure the reader (not the renderer) fills,
+  and the direction `text.py` ← `model.py` ← `panels.py` ← `export.py` forbids
+  panels importing export. One formatter, one place; `export.py` and the tests
+  import it. *Rejected: a second percent formatter in `text.py` (a duplicate);
+  filling the note in the renderer (a note is data on the panel).*
+- **The display texts are data in `study/text.py`, the maps closed and
+  ordered.** `FORMULA_NAMES` (14) and `PARAMETER_NAMES` (15, each `(display
+  name, Unit)`) are keyed by the mart's own name; a row the map does not know,
+  or a map name with no row, refuses by name, so the module, the mart and the
+  page are 1:1 in both directions (pinned at the page by
+  `tests/test_beat3.py::test_every_rendered_expression_equals_the_formulas_entry_of_that_name`).
+  Formula rows render in `FORMULAS` order by iterating the imported tuple;
+  parameter rows in the display map's order, which a test pins equal to
+  `parameters(read_model_fit())` — the static `PARAMETERS` tuple lacks the
+  three fit rows, so the map is the one ordered list the reader can iterate
+  without a fit. The Beat 1–2 note constants moved verbatim in their own
+  commit (`3ee1468`); the Beat 1–2 display maps (`_PROFILE_NAMES`,
+  `_LABEL_NAMES`, `_SEGMENT_NAMES`, `_STAT_LABELS`) stay in `panels.py` — the
+  9b exit record asked for the note texts and the *new* display tables, and
+  moving four working maps is churn with no invariant behind it. *Rejected: a
+  soft `.get(name, name)` (the empty-default class); alphabetical rows.*
+- **Two small fields the spec did not name: `Series.key` and
+  `Series.sourcing`; one on `Panel`: `headline`.** A formula or parameter row
+  needs its mart identifier beside its display name (so the page matches
+  `make model` and the identity test maps a rendered row back to `FORMULAS`),
+  and a parameter row needs its sourcing word for the closed class lookup; the
+  spec's `Point` fields (label, value, tag, unit, absent, detail) cannot carry
+  either without positional meaning across the three cells. `Panel.headline`
+  holds B3.3's derived figures as formula rows above the parameter rows;
+  `_points` walks headline and series alike, so the contract (tags, value xor
+  absence) covers both. *Rejected: encoding the identifier in a cell's
+  `detail` and the sourcing in another cell's (a tuple with positional
+  meaning); deriving sourcing from "detail equals the unsourced label" (a
+  text-equality arm, not the column).* Reported for review round 1.
+
+Challenge dispositions are recorded in the spec (round 1, 2026-09-09, approve
+with amendments). Supersedes nothing.
