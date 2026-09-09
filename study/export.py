@@ -1,18 +1,18 @@
 """Render the static HTML study from the marts and `FORMULAS` (PLAN §4.6, §4.7).
 
-The contract, checked at render time, not by editorial trust:
+The renderers, the palette and the page. The panel model and its render-time
+contract live in `study/model.py`; the readers that build panels from the marts
+live in `study/panels.py`; this file turns a built `Panel` into byte-stable
+inline-SVG HTML. The direction is one way: `model.py` ← `panels.py` ← this file.
 
-- A panel is data — `Panel(id, backing_row, tag, kind, series, note)`. Its `tag`
-  is the one BACKING evidence tag; a panel whose tag is not exactly one of
-  `TAGS` is refused (no tag, or two).
-- A **Pending** panel renders a labelled gray placeholder and carries no value;
-  a Pending panel handed a value is refused (brief §2.4; the render-time
-  no-number guard).
+The contract is enforced in `study/model.py::check_panel`, called here before a
+panel renders:
+
+- A **Pending** panel renders a labelled gray placeholder and carries no value.
 - A **Documented/Measured** panel whose mart is empty renders a distinct
   "no data yet" state — never a blank, a dropped panel, or a fabricated number.
-- Every rendered number carries exactly one tag (its point's own `tag`, in
-  `TAGS`), so a chart that mixes anchor (Documented) and captured (Measured)
-  points marks each point.
+- Every rendered number carries exactly one tag, so a chart that mixes anchor
+  (Documented) and captured (Measured) points marks each point.
 - The output loads no CDN and no external asset (charts are hand-written inline
   SVG) and carries no render timestamp, so two renders are byte-identical.
 
@@ -27,11 +27,22 @@ recomputed here — each number is read from its mart."""
 from __future__ import annotations
 
 import html
-from dataclasses import dataclass
+import re
 from pathlib import Path
-from typing import Literal
 
 from pipeline.warehouse import ROOT, connect, database_for
+from study.model import (
+    NEUTRAL,
+    TAGS,
+    Panel,
+    RenderRefused,
+    Unit,
+    _points,
+    check_panel,
+    has_content,
+    has_values,
+)
+from study.panels import beat1_panels, beat2_panels
 
 # The render input is the frozen synthetic database: Beat 1's Documented points
 # are the anchors only (no manual/fetched snapshot — those are `captured`-only),
@@ -40,28 +51,22 @@ from pipeline.warehouse import ROOT, connect, database_for
 DEFAULT_DB = database_for("synthetic")
 OUTPUT = ROOT / "study" / "friction_ledger.html"
 
-# The four evidence tags (brief §2.4). A panel's tag, and every point's tag, is
-# exactly one of these; anything else is refused (the runtime guard is `TAGS`).
-TAGS = ("Measured", "Documented", "Modeled", "Pending")
-# Closed sets a static checker can read too (round 1, code-reviewer #7): the
-# chart kind and the display unit. Their runtime guards are `_render_body`
-# (unknown kind refuses) and `_display` (unknown unit refuses).
-Kind = Literal["hero", "line", "grouped_bar", "stat_row"]
-Unit = Literal["stars", "pct", "days", "count", ""]
-
-
-class RenderRefused(Exception):
-    """A one-line render refusal: printed as-is, non-zero exit, never a
-    traceback (the same boundary policy as pipeline/cli.py's `Refused`)."""
-
 
 # --- The palette: the dataviz reference default "Ledger", light + dark. -------
 # Series slots are the validated categorical order (worst adjacent CVD ΔE 9.1
 # light / 8.4 dark); the chrome/ink and the Pending gray are the reference
 # chart-surface tokens. Emitted once as CSS custom properties; the SVG reads the
 # series hexes by slot. Never reordered — the order is the CVD-safety mechanism.
+# One hex per theme slot: `len(SERIES_*)` must cover `THEMES` (a sixth theme
+# maps to slot 5, which `_series_var` refuses loudly — fail-safe, not silent).
 SERIES_LIGHT = ("#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4")
 SERIES_DARK = ("#3987e5", "#d95926", "#199e70", "#c98500", "#d55181")
+# The `unclassified` band's neutral series colour (`var(--sN)`): a mid gray,
+# low-chroma by construction so it reads apart from all five hues without being
+# a sixth categorical slot (Phase 9b, pinned decision 4; dataviz: a neutral band
+# is not a series). Distinct from the recessive grid/baseline chrome.
+NEUTRAL_LIGHT = "#9a988f"
+NEUTRAL_DARK = "#7a7975"
 _LIGHT = {
     "surface": "#fcfcfb",
     "page": "#f9f9f7",
@@ -86,284 +91,6 @@ _DARK = {
 # One chart geometry for every plot, so coordinates are byte-stable constants.
 _W, _H = 680, 280
 _ML, _MR, _MT, _MB = 48, 16, 16, 40
-
-
-# --- The panel model ----------------------------------------------------------
-@dataclass(frozen=True)
-class Point:
-    """One marked number in a panel: its label (a month, a channel, a stat), its
-    value in the mart's own units, its evidence tag, and the platform-root
-    address it opens to. `value is None` marks a Pending placeholder — never
-    rendered as a number."""
-
-    label: str
-    value: float | None
-    tag: str
-    source_url: str
-    unit: Unit = ""
-
-
-@dataclass(frozen=True)
-class Series:
-    """One line or one group of bars, coloured by categorical slot."""
-
-    name: str
-    slot: int
-    points: tuple[Point, ...]
-
-
-@dataclass(frozen=True)
-class Panel:
-    """A study panel as data. `tag` is the BACKING-declared evidence tag; `kind`
-    is one of hero | line | grouped_bar | stat_row."""
-
-    id: str
-    backing_row: str
-    title: str
-    blurb: str
-    tag: str
-    kind: Kind
-    series: tuple[Series, ...] = ()
-    note: str = ""
-    placeholder: str = ""  # the Pending panel's labelled gray text
-    domain: tuple[float, float] = (0.0, 5.0)
-    axis_unit: str = "stars"
-
-
-def _points(panel: Panel) -> list[Point]:
-    return [p for s in panel.series for p in s.points]
-
-
-def has_values(panel: Panel) -> bool:
-    """True if any point carries a number — the test for a Pending panel that
-    must carry none."""
-    return any(p.value is not None for p in _points(panel))
-
-
-# --- The render-time contract -------------------------------------------------
-def check_panel(panel: Panel) -> None:
-    """Refuse, in one line, a panel that breaks the contract: a tag that is not
-    exactly one of `TAGS` (no tag, or two); a point whose tag is not in `TAGS`;
-    a Pending panel carrying any value."""
-    if panel.tag not in TAGS:
-        raise RenderRefused(
-            f"{panel.id}: tag {panel.tag!r} is not exactly one of {TAGS}"
-        )
-    for p in _points(panel):
-        if p.tag not in TAGS:
-            raise RenderRefused(
-                f"{panel.id}: point {p.label!r} tag {p.tag!r} is not one of {TAGS}"
-            )
-    if panel.tag == "Pending" and has_values(panel):
-        raise RenderRefused(
-            f"{panel.id}: a Pending panel shows no number — it carries a value "
-            "(brief §2.4; never fake or fill a number)"
-        )
-
-
-# --- Reading the Beat 1 marts (every query carries its own order by) ----------
-def _rows(conn, sql: str) -> list[tuple]:
-    return conn.execute(sql).fetchall()
-
-
-def _require(value: float | str | None, column: str, panel_id: str) -> float | str:
-    """A displayed number needs its value and provenance: a null mart cell is
-    refused by name at the boundary, never coerced into an uncaught traceback
-    (`float(None)`, `None.startswith`) that escapes `render` (round 2, SR#5)."""
-    if value is None:
-        raise RenderRefused(f"{panel_id}: mart column {column!r} is null")
-    return value
-
-
-def _rating_trend(conn) -> tuple[Series, ...]:
-    """B1.2: the studied segment's unsolicited rating over time, one line per
-    profile (a brand-free role slug). Anchors only under `synthetic`."""
-    # Segment-wide BY DESIGN (SPEC B1.2 is "the studied segment's rating"): no
-    # profile filter, unlike _channel_gap/_platform_stats which are the studied
-    # insurer's profile. The anchors carry one digital-first unsolicited profile
-    # today, so it renders one line; a second lands as a second line, no change.
-    # The grain is (source, profile, month), so `source` closes the order-by:
-    # two unsolicited sources with a rating in one profile+month append in a
-    # fixed order, not the engine's, and the bytes stay stable (round 2, CR#16).
-    rows = _rows(
-        conn,
-        "select profile, month, rating, tag, source_url from rating_trend "
-        "where channel = 'unsolicited' and segment = 'digital-first' "
-        "order by profile, month, source",
-    )
-    by_profile: dict[str, list[Point]] = {}
-    for profile, month, rating, tag, url in rows:
-        by_profile.setdefault(profile, []).append(
-            Point(
-                str(month),
-                float(_require(rating, "rating", "B1.2")),
-                tag,
-                _require(url, "source_url", "B1.2"),
-                "stars",
-            )
-        )
-    return tuple(
-        Series(_PROFILE_NAMES.get(profile, profile), slot, tuple(pts))
-        for slot, (profile, pts) in enumerate(sorted(by_profile.items()))
-    )
-
-
-def _channel_gap(conn) -> tuple[Series, ...]:
-    """B1.3: the studied insurer's rating on each invited channel and each
-    unsolicited one, one bar per (channel, source), coloured by channel."""
-    rows = _rows(
-        conn,
-        "select channel, source, rating, tag, source_url from channel_gap "
-        "where segment = 'digital-first' and profile = 'fr-digital-first' "
-        "order by channel, source",
-    )
-    channels = sorted({channel for channel, *_ in rows})
-    slot_of = {channel: i for i, channel in enumerate(channels)}
-    by_channel: dict[str, list[Point]] = {}
-    for channel, source, rating, tag, url in rows:
-        by_channel.setdefault(channel, []).append(
-            Point(
-                source,
-                float(_require(rating, "rating", "B1.3")),
-                tag,
-                _require(url, "source_url", "B1.3"),
-                "stars",
-            )
-        )
-    return tuple(
-        Series(channel, slot_of[channel], tuple(by_channel[channel]))
-        for channel in channels
-    )
-
-
-_STAT_LABELS = {
-    "review_count": ("Reviews", "count"),
-    "one_star_share": ("One-star share", "pct"),
-    "response_rate": ("Reviews answered", "pct"),
-    "response_delay_days": ("Typical answer time", "days"),
-}
-
-
-def _platform_stats(conn) -> tuple[Series, ...]:
-    """B1.4: the studied insurer's stat row, one tile per stat, from the one
-    platform that carries the full set (the comparison across platforms waits —
-    SPEC B1.4)."""
-    rows = _rows(
-        conn,
-        "select stat, value, tag, source_url from platform_stats "
-        "where segment = 'digital-first' and profile = 'fr-digital-first' "
-        "and source = 'opinion-assurances' order by stat",
-    )
-    order = list(_STAT_LABELS)
-    for stat, *_ in rows:
-        if stat not in _STAT_LABELS:  # a stat outside the closed set: refuse by name
-            raise RenderRefused(
-                f"B1.4: unknown platform stat {stat!r} (not in {tuple(_STAT_LABELS)})"
-            )
-    points = [
-        Point(
-            _STAT_LABELS[stat][0],
-            float(_require(value, "value", "B1.4")),
-            tag,
-            _require(url, "source_url", "B1.4"),
-            _STAT_LABELS[stat][1],
-        )
-        for stat, value, tag, url in sorted(rows, key=lambda r: order.index(r[0]))
-    ]
-    return (Series("stats", 0, tuple(points)),) if points else ()
-
-
-# Brand-free display names for the role slugs the marts carry (D1: no brand
-# token leaves ingest/sources.py; these are roles, not names).
-_PROFILE_NAMES = {
-    "fr-digital-first": "Studied digital-first insurer",
-    "peer-digital-challenger-1": "Digital challenger (peer)",
-}
-
-
-def beat1_panels(conn) -> list[Panel]:
-    """The four Beat 1 panels, built from the marts. B1.1 is Pending (the hero
-    case is not yet curated); B1.2–B1.4 are Documented under the anchors."""
-    return [
-        Panel(
-            id="B1.1",
-            backing_row="B1.1",
-            title="One refund, held for months",
-            blurb=(
-                "When a public case is curated here it will show the pattern in "
-                "one story: a refund put on hold pending extra documents, "
-                "followed for as long as it stays unresolved. The day count "
-                "will be frozen at the last publicly confirmed date, never a "
-                "live ticker we cannot verify."
-            ),
-            tag="Pending",
-            kind="hero",
-            placeholder=(
-                "Awaiting the curated public case and its link. A “Day N — claim "
-                "on hold” figure, frozen at the last confirmed date, lands here "
-                "with its source."
-            ),
-        ),
-        Panel(
-            id="B1.2",
-            backing_row="B1.2",
-            title="The public rating over time",
-            blurb=(
-                "Customers rate this segment’s digital-first insurers on platforms "
-                "they were not invited to — one line per insurer, not a segment "
-                "average. This is that rating, month by month, on the unsolicited "
-                "channel."
-            ),
-            tag="Documented",
-            kind="line",
-            series=_rating_trend(conn),
-            note=(
-                "Sampling bias, stated here: unsolicited review platforms are "
-                "negatively self-selected — a company that stops inviting reviews "
-                "drifts down — so part of any decline is a sampling choice, not "
-                "only a service change."
-            ),
-            domain=(1.0, 5.0),
-            axis_unit="stars",
-        ),
-        Panel(
-            id="B1.3",
-            backing_row="B1.3",
-            title="The channel gap",
-            blurb=(
-                "The same insurer looks very different on channels it invites and "
-                "channels it does not. Each bar is the latest rating on one "
-                "platform."
-            ),
-            tag="Documented",
-            kind="grouped_bar",
-            series=_channel_gap(conn),
-            note=(
-                "Stated here: invited channels (the app stores) are positively "
-                "self-selected and unsolicited platforms negatively, so part of "
-                "the gap is who gets asked, not only how the service performs."
-            ),
-            domain=(0.0, 5.0),
-            axis_unit="stars",
-        ),
-        Panel(
-            id="B1.4",
-            backing_row="B1.4",
-            title="The ratings in context",
-            blurb=(
-                "A few numbers that place the ratings in context: how many reviews, "
-                "how many one-star, how often and how fast the company answers."
-            ),
-            tag="Documented",
-            kind="stat_row",
-            series=_platform_stats(conn),
-            note=(
-                "Stated here: today the answer rate and time come from one profile "
-                "on one platform, so the comparison across platforms waits for a "
-                "second platform’s figures."
-            ),
-        ),
-    ]
 
 
 # --- Number formatting (byte-stable, locale-independent) ----------------------
@@ -392,6 +119,25 @@ def _display(value: float, unit: str) -> str:
 
 def _esc(text: str) -> str:
     return html.escape(text, quote=True)
+
+
+def _series_var(colour: int | str) -> str:
+    """The CSS colour for a series: a categorical slot `0..4` or the neutral
+    band token. Anything else is refused by name — never a sentinel integer
+    reaching an undefined `var(--sN)` slot (Phase 9b, pinned decision 4)."""
+    if colour == NEUTRAL:
+        return "var(--sN)"
+    if isinstance(colour, int) and 0 <= colour <= 4:
+        return f"var(--s{colour})"
+    raise RenderRefused(
+        f"series colour {colour!r} is not a slot 0..4 or the {NEUTRAL!r} token"
+    )
+
+
+def _detail(point) -> str:
+    """The tooltip suffix carrying a point's raw counts (the trail behind a
+    share), or empty when the point has none — so Beat 1 tooltips are unchanged."""
+    return f" · {_esc(point.detail)}" if point.detail else ""
 
 
 # --- SVG chart rendering ------------------------------------------------------
@@ -442,7 +188,7 @@ def _render_line(panel: Panel) -> list[str]:
     out = _svg_open()
     out += _grid_and_axis(panel.domain)
     for s in panel.series:
-        colour_var = f"var(--s{s.slot})"
+        colour_var = _series_var(s.colour)
         coords = [
             (x_of[p.label], _y_of(p.value, panel.domain), p)
             for p in s.points
@@ -458,7 +204,7 @@ def _render_line(panel: Panel) -> list[str]:
             out.append(
                 f'<circle cx="{_n(x)}" cy="{_n(y)}" r="4" fill="{colour_var}">'
                 f"<title>{_esc(s.name)} · {_esc(p.label)}: "
-                f"{_esc(_display(p.value, p.unit))}"
+                f"{_esc(_display(p.value, p.unit))}{_detail(p)}"
                 f" ({_esc(p.tag)})</title></circle>"
             )
     for m in months:
@@ -483,9 +229,10 @@ def _render_grouped_bar(panel: Panel) -> list[str]:
         base = _y_of(panel.domain[0], panel.domain)
         out.append(
             f'<rect x="{_n(x)}" y="{_n(y)}" width="{_n(width)}" '
-            f'height="{_n(base - y)}" rx="4" fill="var(--s{s.slot})">'
+            f'height="{_n(base - y)}" rx="4" fill="{_series_var(s.colour)}">'
             f"<title>{_esc(s.name)} · {_esc(p.label)}: "
-            f"{_esc(_display(p.value, p.unit))} ({_esc(p.tag)})</title></rect>"
+            f"{_esc(_display(p.value, p.unit))}{_detail(p)} "
+            f"({_esc(p.tag)})</title></rect>"
         )
         out.append(
             f'<text x="{_n(x + width / 2)}" y="{_n(base + 16)}" class="tick" '
@@ -500,13 +247,18 @@ def _render_grouped_bar(panel: Panel) -> list[str]:
 
 
 def _render_legend(panel: Panel) -> list[str]:
-    if len(panel.series) < 2:
+    """The legend: drawn when a panel has more than one series, and always when
+    it carries the neutral `unclassified` band — a corpus the rules sort into
+    positive/unclassified alone leaves one series, and the band's count must
+    still read in the legend (invariant 3; round 2, code-reviewer #2)."""
+    has_band = any(s.colour == NEUTRAL for s in panel.series)
+    if len(panel.series) < 2 and not has_band:
         return []
     out = ['<ul class="legend">']
     for s in panel.series:
         out.append(
-            f'<li><span class="swatch" style="background:var(--s{s.slot})"></span>'
-            f"{_esc(s.name)}</li>"
+            f'<li><span class="swatch" style="background:{_series_var(s.colour)}">'
+            f"</span>{_esc(s.name)}</li>"
         )
     out.append("</ul>")
     return out
@@ -524,6 +276,33 @@ def _render_stat_row(panel: Panel) -> list[str]:
             f"{_render_chip(p.tag)}</div>"
         )
     out.append("</div>")
+    return out
+
+
+def _metric_cell(point) -> str:
+    """One table cell: a value with its raw counts, or a labelled absence with
+    its counts — never both, never blank (`check_panel` guarantees the xor)."""
+    if point.absent:
+        absence = f'<span class="absent">{_esc(point.absent)}</span>'
+        return f"{absence} ({_esc(point.detail)})"
+    return (
+        f"{_esc(_display(point.value, point.unit))} "
+        f'<span class="cnt">({_esc(point.detail)})</span>'
+    )
+
+
+def _render_table(panel: Panel) -> list[str]:
+    # Reached only with content: _render_body returns "no data yet" first when a
+    # table has no present cell. One row per series (a label), its cells in the
+    # column order the panel declares.
+    out = ['<table class="metric"><thead><tr>']
+    out += [f"<th>{_esc(col)}</th>" for col in panel.columns]
+    out.append("</tr></thead><tbody>")
+    for s in panel.series:
+        out.append(f'<tr><th scope="row">{_esc(s.name)}</th>')
+        out += [f"<td>{_metric_cell(p)}</td>" for p in s.points]
+        out.append("</tr>")
+    out.append("</tbody></table>")
     return out
 
 
@@ -557,8 +336,18 @@ def _render_body(panel: Panel) -> list[str]:
     # not on B1.1 happening to be a hero (round 1, code-reviewer, caller-sourced).
     if panel.tag == "Pending":
         return [f'<div class="pending">{_esc(panel.placeholder)}</div>']
+    # A corpus panel over a fixture input renders a labelled state and no number
+    # — distinct from Pending and from "no data yet" (Phase 9b, the corpus gate).
+    if panel.fixture:
+        return [f'<div class="fixture">{_esc(panel.fixture)}</div>']
+    # A table dispatches on "any cell present" (value or absence), so a table of
+    # absences still renders as a table, not "no data yet" (pinned decision 5).
+    if panel.kind == "table":
+        if not has_content(panel):
+            return _nodata()
+        return _render_table(panel)
     if not has_values(panel):
-        return ['<p class="nodata">No data yet — this panel’s mart is empty.</p>']
+        return _nodata()
     if panel.kind == "line":
         return _render_line(panel) + _render_legend(panel)
     if panel.kind == "grouped_bar":
@@ -566,6 +355,10 @@ def _render_body(panel: Panel) -> list[str]:
     if panel.kind == "stat_row":
         return _render_stat_row(panel)
     raise RenderRefused(f"{panel.id}: unknown panel kind {panel.kind!r}")
+
+
+def _nodata() -> list[str]:
+    return ['<p class="nodata">No data yet — this panel’s mart is empty.</p>']
 
 
 def _render_panel(panel: Panel) -> list[str]:
@@ -577,8 +370,8 @@ def _render_panel(panel: Panel) -> list[str]:
         f'<p class="blurb">{_esc(panel.blurb)}</p>',
     ]
     out += _render_body(panel)
-    if panel.note:
-        out.append(f'<p class="note">{_esc(panel.note)}</p>')
+    for note in panel.notes:  # one <p> per note, so the second layer stays scannable
+        out.append(f'<p class="note">{_esc(note)}</p>')
     # The footer's tag is DERIVED from the points actually shown (the same
     # `_panel_tags` the header chips use), not the authored `panel.tag`, so the
     # two can never disagree and a mixed Documented+Measured panel names both
@@ -597,15 +390,49 @@ def _drill(panel: Panel) -> str:
     # Only an http(s) address becomes a clickable href: escaping neutralises
     # HTML metacharacters but not the URL scheme, so a `javascript:`/`data:`
     # source is dropped, not rendered as a live link (round 1, security #16).
-    urls = sorted({p.source_url for p in _points(panel) if _is_http(p.source_url)})
-    if not urls:
+    # A computed number (a theme share) carries no per-row address; the panel
+    # cites its platform roots at the panel level (`sources`) instead.
+    # A panel-level source is authored, so its shape is closed: an http(s)
+    # address (a link) or a repository file (plain text, never a link — the
+    # page is static); anything else refuses by name. B2.4's answer key and
+    # 9c's Open DAMIR fit are files, not addresses (exit round, coherence #2).
+    files = sorted(s for s in panel.sources if _is_repo_file(s))
+    for source in panel.sources:
+        if not (_is_http(source) or _is_repo_file(source)):
+            raise RenderRefused(
+                f"{panel.id}: source {source!r} is neither an http(s) address "
+                "nor a repository file"
+            )
+    addresses = [p.source_url for p in _points(panel)] + list(panel.sources)
+    urls = sorted({u for u in addresses if _is_http(u)})
+    links = [f'<a href="{_esc(u)}" rel="noopener">{_esc(u)}</a>' for u in urls]
+    links += [f"the repository file {_esc(f)}" for f in files]
+    # The brief citation is DERIVED from the points shown: a Documented point is
+    # a brief §6 anchor, so the footer names §6 exactly when one is drawn — never
+    # on any panel that happens to carry a URL (exit round, code-reviewer #1;
+    # BACKING B2.2/B2.5 list the platform roots alone).
+    refs = ["PROJECT_BRIEF §6"] if "Documented" in _panel_tags(panel) else []
+    if not links and not refs:
         return "source pending"
-    links = ", ".join(f'<a href="{_esc(u)}" rel="noopener">{_esc(u)}</a>' for u in urls)
-    return f"opens to {links} and PROJECT_BRIEF §6"
+    # Over a fixture input the body shows no number, so the footer says where
+    # the counted figures WILL open — not "opens to" beside "not a result"
+    # (exit round, code-reviewer #5). `fixture` is set by the gate from the
+    # mart's own run_id, never by a caller.
+    verb = "the counted figures will open to" if panel.fixture else "opens to"
+    return f"{verb} " + " and ".join(part for part in (", ".join(links), *refs) if part)
 
 
 def _is_http(url: str) -> bool:
     return url.startswith(("http://", "https://"))
+
+
+# A repository file: relative, no parent step, one closed character set — the
+# shape an authored path must fit, checked here; that the file exists is a test.
+_REPO_FILE = re.compile(r"^(?!/)(?!.*(?:^|/)\.\.(?:/|$))[A-Za-z0-9_./-]+$")
+
+
+def _is_repo_file(source: str) -> bool:
+    return bool(_REPO_FILE.match(source))
 
 
 # --- The page -----------------------------------------------------------------
@@ -613,22 +440,36 @@ def _css() -> str:
     def tokens(scope: dict[str, str]) -> str:
         pairs = [f"--{k}:{v};" for k, v in sorted(scope.items())]
         series = [f"--s{i}:{hex_};" for i, hex_ in enumerate(SERIES_LIGHT)]
-        return "".join(pairs + series)
+        return "".join(pairs + series) + f"--sN:{NEUTRAL_LIGHT};"
 
     def dark_series() -> str:
-        return "".join(f"--s{i}:{hex_};" for i, hex_ in enumerate(SERIES_DARK))
+        slots = "".join(f"--s{i}:{hex_};" for i, hex_ in enumerate(SERIES_DARK))
+        return slots + f"--sN:{NEUTRAL_DARK};"
 
     light = tokens(_LIGHT)
     dark = "".join(f"--{k}:{v};" for k, v in sorted(_DARK.items())) + dark_series()
     return _CSS_TEMPLATE.format(light=light, dark=dark)
 
 
+def _beat_header(title: str) -> str:
+    return f'<h2 class="beat">{_esc(title)}</h2>'
+
+
+# The beats in render order, each a (header, builder) pair. A new beat adds one
+# row; the render loop and the page do not change (9c–9e).
+_BEATS = (
+    ("Beat 1 — People are telling us what’s wrong, in public", beat1_panels),
+    ("Beat 2 — The complaints have a shape", beat2_panels),
+)
+
+
 def render(conn) -> str:
     """The full study HTML as one string, from the panels the marts fill."""
-    panels = beat1_panels(conn)
     body: list[str] = []
-    for panel in panels:
-        body += _render_panel(panel)
+    for header, builder in _BEATS:
+        body.append(_beat_header(header))
+        for panel in builder(conn):
+            body += _render_panel(panel)
     return _PAGE.format(css=_css(), body="\n".join(body))
 
 
@@ -659,6 +500,7 @@ _CSS_TEMPLATE = (
     ".wrap{{max-width:860px;margin:0 auto;padding:32px 20px}}"
     "h1{{font-size:26px;margin:0 0 4px}}"
     ".lede{{color:var(--ink2);margin:0 0 28px}}"
+    ".beat{{font-size:20px;margin:24px 0 12px}}"
     ".panel{{background:var(--surface);border:1px solid var(--grid);"
     "border-radius:10px;padding:20px 22px;margin:0 0 20px}}"
     "h3{{font-size:17px;margin:0 0 8px}}"
@@ -687,6 +529,16 @@ _CSS_TEMPLATE = (
     ".nodata{{background:var(--page);border:1px solid var(--grid);"
     "border-radius:8px;padding:18px;color:var(--muted);font-style:italic;"
     "font-size:14px}}"
+    ".fixture{{background:var(--page);border:1px solid var(--baseline);"
+    "border-left:3px solid var(--sN);border-radius:8px;padding:16px 18px;"
+    "color:var(--ink2);font-size:14px}}"
+    ".metric{{width:100%;border-collapse:collapse;font-size:13px;margin:4px 0 0}}"
+    ".metric th,.metric td{{text-align:left;padding:8px 10px;"
+    "border-bottom:1px solid var(--grid)}}"
+    ".metric thead th{{color:var(--muted);font-weight:600;font-size:12px}}"
+    ".metric tbody th{{font-weight:600;color:var(--ink)}}"
+    ".metric .cnt{{color:var(--muted)}}"
+    ".metric .absent{{color:var(--muted);font-style:italic}}"
     ".chip{{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;"
     "border-radius:99px;border:1px solid var(--baseline);color:var(--ink2);"
     "vertical-align:middle}}"
@@ -702,9 +554,7 @@ _PAGE = (
     '<style>{css}</style></head><body><main class="wrap">'
     "<h1>The Friction Ledger</h1>"
     '<p class="lede">Why health-insurance refunds get stuck — read from the '
-    "customer’s chair, every number tagged for where it came from.</p>"
-    '<h2 style="font-size:20px;margin:24px 0 12px">Beat 1 — People are telling '
-    "us what’s wrong, in public</h2>\n"
+    "customer’s chair, every number tagged for where it came from.</p>\n"
     "{body}\n"
     "</main></body></html>\n"
 )

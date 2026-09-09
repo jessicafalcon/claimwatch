@@ -2215,7 +2215,13 @@ of Phase 9 (the study).
   public source — brief §2.5), but Beat 1 ships no review text (B1.1 is
   Pending), so its enforcing test and the first text-drill surface land in 9b.
   The "Health details arrive in review bodies" BACKLOG row stays open,
-  re-scoped to 9b, not struck.
+  re-scoped to 9b, not struck. *Superseded in 9b (exit round): the export has no
+  render path for review text at all — the column allowlist and the recording
+  connection (`tests/test_beat2.py::test_every_export_query_projects_only_allowlisted_columns`,
+  `::test_every_query_the_export_runs_is_a_listed_study_query`) are the
+  enforcing tests, and the review-level drill is the Metabase demonstration
+  (9g); the paraphrase rule governs that surface and B2.1's documented
+  examples when they land.*
 
 Challenge dispositions: the scoping round returned *rework* (the split instinct
 right, the order and cut wrong) — the reorder, the excerpt-policy-first rule,
@@ -2227,3 +2233,163 @@ added to CI, the SVG byte-formatting rule pinned, invariant 3 split (the counted
 Measured/Documented/Pending, the empty-Documented-mart state specified, and the
 BACKLOG rows cited by title.
 
+### Phase 9b
+
+Branch `phase-9b-beat-2`, spec `specs/phase-9b-beat-2.md`, challenged round 1
+(rework, all twelve findings applied). Beat 2 of the study. Depends on the fix
+PR `fix/theme-marts-run-id` (the two theme marts carry `run_id`), merged first.
+
+- **The corpus gate: a number that derives from the review corpus renders only
+  over a `captured` input, read from the mart's own `run_id`.** The brief says
+  three times a share over fake reviews is never shown as a number (§3 Beat 2,
+  §10, §2.4), and the committed page renders over the frozen synthetic fixture.
+  So B2.2/B2.4/B2.5 read the classified rows' `run_id` against the imported
+  `pipeline.build.INPUTS`: `captured` renders the counted numbers, a fixture
+  input (`synthetic`, `samples`) renders a labelled fixture state and no number,
+  an absent or empty mart renders 9a's "no data yet". Two run_ids, or one outside
+  the set, refuse in one line naming the panel. The input is the mart's own row,
+  never the DB filename or a caller flag. A captured render is a local,
+  developer-run `write(db=…)`, never committed in 9b (whether the published page
+  is such a render is 9f's call — BACKLOG). *Rejected: a sentence beside a
+  Measured fixture number — the brief forbids the number, not the sentence;
+  deriving the input from the filename — caller-sourced (LESSONS).*
+- **The export's trail is the mart's `reviews`/`theme_rows` beside each share,
+  plus the structural no-text guarantee; the review-level drill is the Metabase
+  demonstration (9g).** No declared source yields a per-review public address
+  (every parser stores the brand-carrying page address — D1), so a row-per-review
+  list could be neither traced nor published, and each row's rating would be an
+  untagged number with no mart row. The counts ride on each point (redone by
+  hand). *Rejected: the per-review link list (challenge BLOCKER 2); a rule token
+  as the "one short marked phrase" — that re-runs the rules over text inside the
+  renderer.*
+- **The no-text guarantee is a column allowlist checked on the cursor's
+  description, not a denylist on query text.** One closed `ALLOWED_COLUMNS` the
+  export may read; `_rows` reads each cursor's own description and refuses any
+  other column by name, so `select *` cannot pass and `title`/`body` can never
+  reach the page. `STUDY_QUERIES` is every query the export runs, each linted for
+  portability and the clock by a test. *Rejected: grepping query text for
+  `title`/`body` — a denylist, the `unshaped-input` class; a four-word-run scan
+  — near vacuous against French bodies and English page prose.* This closes the
+  "Health details arrive in review bodies" BACKLOG row.
+- **The `unclassified` band is the palette's neutral token, always in the legend
+  with its count; the series colour is a closed choice on the type.** A
+  `Series.colour` is a categorical slot `0..4` or the `NEUTRAL` token, refused by
+  name outside it (never a sentinel integer reaching an undefined `var(--sN)`).
+  The band is emitted even when empty, its legend name carrying its total count,
+  so a small or absent band reads as zero, never as hidden. `positive` is
+  excluded from the theme bars (a theme chart counts complaints) and the
+  denominator — every classified review, `positive` included — is stated beside
+  the chart; SPEC and BACKING's "negative reviews" wording is corrected to the
+  mart's denominator. *Rejected: a sixth categorical hue (the five-slot order is
+  the CVD-safety mechanism); a stacked area (draws a cumulative number no mart
+  holds).*
+- **A metric cell is a value xor a declared absence.** `Point.absent` carries the
+  labelled reason a cell has no value; `check_panel` refuses both set and refuses
+  a null cell with neither (9a's null-cell refusal, extended). B2.4's table sets
+  the absence exactly when the held-out denominator is zero ("no held-out case")
+  and carries the integer count; the `table` kind dispatches on "any cell
+  present", so a table of absences renders as a table, not "no data yet".
+  *Rejected: rendering 0.0; a dash; a second optional field with no refusal.*
+- **The module split has one direction: `model.py` ← `panels.py` ← `export.py`,
+  moved verbatim in its own commit.** `model.py` the types and the contract,
+  `panels.py` the readers plus the allowlist and the corpus gate, `export.py` the
+  renderers and the page. The move is a separate commit so the diff shows the
+  rename and `check-pins` sees the moved symbols named in the changed tests.
+  *Rejected: builders importing from `export` (a cycle); one 1,100-line file.*
+
+Gotcha: `rebuild()` builds the generic and model/simulator marts but NOT the
+classify step (the theme marts B2.2/B2.5 and the filling of classifier_quality
+B2.4) — that is the CLI's `_do_rebuild` → `_classify_and_print`. So a test that
+needs the Beat 2 marts must run the classify step too; `tests/conftest.py::
+build_study_db` does (rebuild + the CLI step with the model decider and the
+decision cache neutralised, so it is rules-only, deterministic, and writes
+nothing under `data/`). A corpus panel over `ROWS=none` (no reviews, no classify)
+finds the theme marts absent, not empty, so the gate probes
+`information_schema.tables` and renders "no data yet".
+
+Challenge dispositions (round 1, 2026-09-08 — rework, all applied): BLOCKER 1
+(fixture shares under Measured) → the corpus gate. BLOCKER 2 (the per-review
+list) → the list dropped, the trail is counts. #3 (`run_id` on the theme marts)
+→ the fix PR this branch depends on. #4 (`positive`; "negative reviews") → the
+neutral-band decision and the two claim-cell fixes. #5 (allowlist not denylist)
+→ the column allowlist. #6 (value xor absence) → `Point.absent`. #7–#9 (module
+direction, lint the study queries, closed series colour) folded in. #10–#12
+(security-reviewer not triggered; a captured render is local and uncommitted;
+the band's legend entry with its count) answered in the spec.
+
+Review round 1 (2026-09-08; code-reviewer, functionality-tester, study-editor):
+no BLOCKER; fixed in full — the corpus chart kind and the `ROWS=none` render
+pinned (`013ebf6`), dead `axis_unit` dropped, the fixture note corrected, two
+findings deferred to the rows that own them (`b7a35ff`), and one fix
+amendment: a panel's notes are a sequence (`ce405cc`, `3c97ceb`). Round 2
+(2026-09-08; the same three agents, the security-reviewer and
+coherence-auditor not triggered): 11 rows, 0 BLOCKER, 5 should-fix,
+functionality-tester "partially" on one surviving mutation. No correctness
+row sat inside a round-1 fix (the cap did not fire); three sat on `900692c`
+code round 1 had passed over: the neutral-token render mapping was pinned by
+a page-scoped assertion the fixture CSS satisfied (`1b21215`, test-only), the
+legend vanished for a band-only panel against invariant 3 (`cee1d1a`), and the
+Beat 2 readers wrote the point tag as a literal instead of the mart's column
+(`505a5cf`, the `caller-sourced` class). B2.5 got its own denominator and
+self-selection notes — the round-1 amendment had reused B2.2's line-chart
+wording on a bar chart — and the fixture label lost its mechanism words
+(`0d73ffc`). The study-editor's B2.5 rewrite named document-loop alone; the
+chart draws every theme per segment, so the note says "each theme's share".
+
+Challenge round 2 (2026-09-08, on the spec as amended, after review round 2):
+*approve with amendments* — 0 BLOCKER, 5 should-fix, 2 suggestion, 2
+question; the developer chose to fix all. The shared shape: the Invariants
+table named tests whose scenario was narrower than the for-all. Applied: the
+catalog probe filters on `warehouse.default_schema` (#9, `4e106c4`);
+invariant 5 is pinned on a recording connection — every query a render runs
+is a listed study query or one of the two catalog reads, so a reader that
+bypasses `_rows` fails by name (#1, `ff65c21`); the two remaining page-scoped
+assertions assert on their panel (#4, `7912825`, a `site-fix` instance); the
+self-selection caveat is derived for every Measured panel whose sources are
+the platform roots, not authored per id (#3, `a5f924e`); the CLI's binding of
+`database_for(rows)` to `run_id = rows` is pinned with every writer patched
+out (#6, `af2c015`); the gate's input-to-state mapping is one closed dict
+whose key set a test pins to `INPUTS` (#8, `b6fab49`). Recorded: BACKLOG row
+"`make idempotency-check` skips the classify step" re-pointed (#5 — the target
+is `pipeline/build.py`, an earlier phase, so a `fix/` PR at 9f or Phase 10);
+the tooltip-only trail as a BACKLOG row for 9f's stranger test (#7 — a visible
+denominator needs a `Point` field, a design change 9f owns). #2 — `check_panel`
+does not refuse a fixture-state panel that also carries content — is a
+contract extension: a fix amendment, written alone and stamped, implemented
+on approval. *Rejected for #7: parsing the denominator back out of the
+formatted `detail` string — a string round-trip where a field belongs.*
+
+Exit round (2026-09-08; code-reviewer, functionality-tester "works", study-
+editor, coherence-auditor over the whole repo): 23 rows, 0 BLOCKER, 10
+should-fix; fixed in full. Correctness: B2.5 drew every theme where SPEC and
+BACKING claim the held-claim share per segment — `_theme_series` now takes a
+closed `themes` set and labels B2.5's points by segment through a closed
+`_SEGMENT_NAMES` lookup over ingest's `SEGMENTS`, so a traditional source is a
+second bar per series with no render change (`eb79c13`, `unpinned`); the
+footer's brief §6 citation hung on "any URL present" and is now derived from
+the Documented points shown (`a3822f3`, `caller-sourced`); a panel-level
+source the drill could not shape fell to "source pending" — now an http(s)
+address, a repository file in plain text, or a refusal by name, and B2.4 names
+the answer key (`92e29e6`, `empty-default`; the same shape carries 9c's Open
+DAMIR fit); three pins — the point tag against a non-Measured row, the probe's
+schema filter, the catalog reads through the SQL lint (`5c3b17b`, `b157daa`,
+`26264cc`). B2.2 carries the one-segment caveat and row 51 names its segment
+filter as the remaining render change (`7f3a78f`). Wording: "switched off"
+for "no key", the trail as a tooltip, the brief's Beat 2 line (`82ec471`).
+Records: the 9a excerpt-contract bullet superseded above; B1.2 keeps 9a's soft
+profile lookup while B2.3's reader refuses (kept deliberately in `9bb76bb` —
+a Beat 1 semantics change is out of 9b's scope); the Invariants' falsifier
+column extended with the round-2 and challenge-round tests and the round-2
+stamp re-hashed (the invariants themselves unchanged); BACKLOG row 69 loses
+its B2.4-drill sentence, row 71 gains the `site-fix` reminder and the PLAN §5
+split for the next `tooling/` branch. The auditor's four questions, answered:
+(1) the three-layer split holds — `_corpus_series` returning `(series,
+fixture_text)` is the builder's contract and `check_panel`'s fixture refusal
+is the render contract's; two checks, one property, kept; (2) `panels.py` at
+~800 lines holds readers, display names, the allowlist, the gate and the note
+texts — 9c splits the note texts and display tables into `study/text.py` if it
+grows further, not before; (3) the corpus gate stands — a Measured chip beside
+"not a result" is honest (the claim is Measured, the input is not real), and
+publishing a captured render is 9f's decision with its own Threat-model row
+(row 69); (4) "source pending" was the assumption 9c would break — the
+repository-file source now carries a Modeled panel's fit file and address.

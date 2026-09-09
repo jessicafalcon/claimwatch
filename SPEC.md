@@ -94,11 +94,20 @@ traction, and coverage-and-price frustration (PROJECT_BRIEF.md §5).
 - **B2.1 — The five kinds of complaint.** The five themes, each with
   paraphrased examples from public reviews. Tag: *Documented* (Pending until
   the examples are curated with links).
-- **B2.2 — Theme share over time, by segment.** The share of negative reviews in
-  each theme, month by month, split digital-first versus traditional. Counts
-  theme rows under the grain above. Tag: *Measured* via the gated classifier.
-  When the language model is switched off, the reviews it would have sorted stay
-  in a gray *not yet classified* band — shown, never hidden.
+- **B2.2 — Theme share over time, by segment.** The share of each theme among
+  every classified review, month by month, split digital-first versus
+  traditional. Counts theme rows under the grain above; the denominator is every
+  classified review (*positive* included, but never drawn as a theme bar — a
+  theme chart counts complaints). Tag: *Measured* via the gated classifier. When
+  the language model is switched off, the reviews it would have sorted stay in a
+  gray *not yet classified* band — shown, never hidden. *Fixture state:* a share
+  over the frozen synthetic reviews is never a number; the committed page shows a
+  labelled fixture state, and the counted shares appear only over captured
+  reviews. The counts (theme rows, reviews) ride in each share's tooltip so it
+  can be redone by hand; the review-level drill is the Metabase demonstration
+  (9g). *Placed beside the chart:* the corpus is digital-first only for now, so
+  the traditional split awaits a traditional-mutuelle source (BACKLOG); the
+  chart shows the segment the data has.
 - **B2.3 — Peer context.** Public ratings across the market segment, so no one
   insurer is read in isolation. Tag: *Documented* for the anchors, *Measured*
   for our own points (see *How to read a panel*). *Placed points, stated
@@ -110,13 +119,20 @@ traction, and coverage-and-price frustration (PROJECT_BRIEF.md §5).
   true cases it catches, measured against the hand labels and shown next to the
   charts it feeds. The classifier is graded only on reviews it never saw while it
   was built (the held-out fold), so the scores are not flattered. Tag: *Measured*.
+  A label with no case in the held-out fold shows *no held-out case* — an
+  empty denominator, not a zero score — with its counts. *Fixture state:* like
+  B2.2, the committed page shows a labelled fixture state; the graded table
+  appears only over captured reviews.
 - **B2.5 — Held-claim complaints, digital-first versus traditional.** The share
   of document-loop complaints at digital-first insurers next to the same share
-  at traditional mutuelles. This is the study's hypothesis, not its verdict: if
-  the data shows no gap, the chart says so and is published as-is. Tag:
-  *Measured*. *Placed beside the chart:* the corpus is digital-first only for
-  now, so the traditional column awaits a traditional-mutuelle source (BACKLOG);
-  the chart shows the segments the data has.
+  at traditional mutuelles, each share among every classified review in its
+  segment (*positive* included in the total, not drawn as a bar). This is the
+  study's hypothesis, not its verdict: if the data shows no gap, the chart says
+  so and is published as-is. Tag: *Measured*. *Placed beside the chart:* the
+  corpus is digital-first only for now, so the traditional column awaits a
+  traditional-mutuelle source (BACKLOG); the chart shows the segments the data
+  has. *Fixture state:* like B2.2, a share over the frozen synthetic reviews is a
+  labelled fixture state, not a number.
 
 ## Beat 3 — What a wrongly held claim costs
 

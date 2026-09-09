@@ -113,11 +113,15 @@ Delivered paragraph and `make help`, not here.
   including the hold timer's three, filled into the three Beat 3 marts inside
   `rebuild()`), `guardrail_sim.py::RULES` (Beat 4: the quantile draw, the hold
   and the share-under count, filled into the two Beat 4 marts inside
-  `rebuild()`); `study/` — the static HTML export: `export.py` (the render
-  contract as data — one tag per number, a Pending panel shows none — and the
-  hand-written inline-SVG charts), `__main__.py` (the `make study` entry), the
-  committed `friction_ledger.html`; Beat 1 renders (9a), Beats 2–5, the README
-  and the Metabase demonstration are later Phase 9 sub-phases.
+  `rebuild()`); `study/` — the static HTML export, one direction `model.py` ←
+  `panels.py` ← `export.py`: `model.py` (the panel types, `TAGS`, the
+  render-time contract — one tag per number, value xor declared absence, a
+  Pending panel shows none), `panels.py` (the readers that build panels from
+  the marts, the column allowlist, the corpus gate), `export.py` (the
+  hand-written inline-SVG charts, the metric table, the page), `__main__.py`
+  (the `make study` entry), the committed `friction_ledger.html`; Beats 1–2
+  render (9a, 9b), Beats 3–5, the README and the Metabase demonstration are
+  later Phase 9 sub-phases.
   `dags/` *(Phase 10)* — `friction_ledger.py`.
 - `fixtures/` — read-only after Phase 1, each set with a `MANIFEST.sha256`:
   `synthetic/` (hand-written fake reviews), `anchors/` (brief §6 figures with
@@ -718,24 +722,28 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 ## Current status
 
-**Active: `phase-9a-render-contract`** (spec `specs/phase-9a-render-contract.md`,
-challenged round 1 — approve with amendments, all applied). The first Phase 9
-sub-phase: Phase 9 (the study) is split permanent-artifact-first after two
-`/challenge` rounds (the scoping decision, then this spec), because the static
-HTML export — not Metabase — is the permanent, CI-checkable, deterministic
-artifact (DECISIONS decision 3; brief §4.4). Landed `study/export.py` (the
-render contract as data: one tag per number, a Pending panel shows none, a
-Documented panel with an empty mart shows "no data yet", all refused at render
-time by construction), `make study`, the committed `study/friction_ledger.html`,
-and Beat 1 rendered over the frozen synthetic marts (B1.1 Pending placeholder,
-B1.2 line, B1.3 grouped bar, B1.4 stat row); the palette is the dataviz
-reference default ("Ledger"). Byte-identical on rerun and locale-independent;
-CI diffs the committed bytes. Closed the render-time-no-number and §6-response-
-figures BACKLOG rows. Review rounds 1–2 complete, all findings fixed (round 2:
-CR#16, SR#4, SR#5 correctness; CR#17/#18/#21 craft+coverage; SE#5/#6 voice);
-gate 8/8, DONE green, spec Delivered. Next: PR, then merge.
+**Delivered, PR pending: `phase-9b-beat-2`** (spec `specs/phase-9b-beat-2.md`,
+APPROVED 2026-09-08, DELIVERED 2026-09-08; challenged twice — round 1 rework,
+round 2 approve with amendments — and reviewed three times, the exit round
+with the coherence-auditor; every finding fixed, two fix amendments). Beat 2
+rendered: the 9a export split into `study/model.py` ← `study/panels.py` ←
+`study/export.py`, then the five Beat 2 panels. B2.1 Pending; B2.3 the
+peer-ratings bars (Documented anchors); B2.2/B2.4/B2.5 behind the **corpus
+gate** — one closed mapping over `pipeline.build.INPUTS` read from each mart's
+own `run_id`: `captured` counts, a fixture input renders a labelled fixture
+state with no number (`check_panel` refuses a fixture state carrying content),
+`none` "no data yet". New: the metric `table` kind (B2.4, value xor declared
+absence); the `unclassified` neutral-token band, in the legend with its count
+even as the only series; `positive` excluded from the theme series; B2.5 the
+held-claim share per segment, points labelled by segment; the trail (mart
+`reviews`/`theme_rows` in each share's tooltip); the **column allowlist** on
+each cursor's description plus a recording connection (every query a render
+runs is listed; no review text reaches the page); a panel source is an address,
+a repository file (B2.4 names the answer key) or a refusal. Byte-identical on
+rerun; `make study` renders the committed baseline. Next: `gh pr create`
+(`Phase 9b — Beat 2`), the developer merges with a merge commit.
 
-**Merged:** Phases 0a–8b in order, each with its spec under `specs/` (the
+**Merged:** Phases 0a–9a in order, each with its spec under `specs/` (the
 Delivered paragraph) and its DECISIONS appendix; then `tooling/implementation-
 loop` (PR #20, 2026-09-07) — tagged comments as record pointers, the pin guard
 (`scripts/check_pins.py`) + `/preflight`, and `LESSONS.md` (nine classes, each
@@ -743,12 +751,12 @@ promoted). Phase 8b — the guardrail simulator (B4.1–B4.3, PR #19,
 2026-09-07) — landed `models/guardrail_sim.py::RULES`, the hold timer's three
 formulas in `models/cost_model.py`, the two simulator marts and `make simulate`.
 
-**Next (Phase 9 sub-phases, in order):** 9b — Beat 2 HTML (the counted
-`unclassified` series, drill-through-to-excerpts, applying 9a's excerpt rule);
-9c — Beat 3; 9d — Beat 4; 9e — Beat 5; 9f — the README + the stranger
-acceptance test; 9g — the Metabase demonstration (non-CI). Plus two pulled-out
-data phases: the claims sample-mean slider and data.ameli practitioner fees.
+**Next (Phase 9 sub-phases, in order):** 9c — Beat 3 (the first Modeled
+panels, `FORMULAS` `expression_text`); 9d — Beat 4; 9e — Beat 5; 9f — the
+README + the stranger acceptance test; 9g — the Metabase demonstration (the
+review-level drill, non-CI). Plus two pulled-out data phases: the claims
+sample-mean slider and data.ameli practitioner fees.
 
-Open BACKLOG rows: **38**.
+Open BACKLOG rows: **41**.
 
 (Update this section at the end of every working day.)

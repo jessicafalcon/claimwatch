@@ -15,37 +15,34 @@ from pathlib import Path
 
 import pytest
 
-from pipeline.build import rebuild
-from pipeline.warehouse import connect, database_for
-from study import export
-from study.export import (
+from pipeline.warehouse import connect
+from study import export, model, panels
+from study.export import render, write
+from study.model import (
     Panel,
     Point,
     RenderRefused,
     Series,
-    beat1_panels,
     check_panel,
     has_values,
-    render,
-    write,
 )
+from study.panels import beat1_panels
 from tests import pins
+from tests.conftest import build_study_db
 
 pytestmark = pytest.mark.slow  # slow: rebuilds a warehouse; out of the edit-loop hook
 
 
 @pytest.fixture(scope="module")
 def synthetic_db(tmp_path_factory) -> Path:
-    root = tmp_path_factory.mktemp("study")
-    rebuild("duckdb", "synthetic", root=root)
-    return database_for("synthetic", root)
+    # The full study warehouse (rebuild + the classify step), so the render walks
+    # all nine panels — Beat 2's theme marts and classifier_quality included.
+    return build_study_db(tmp_path_factory.mktemp("study"), "synthetic")
 
 
 @pytest.fixture(scope="module")
 def none_db(tmp_path_factory) -> Path:
-    root = tmp_path_factory.mktemp("study-none")
-    rebuild("duckdb", "none", root=root)
-    return database_for("none", root)
+    return build_study_db(tmp_path_factory.mktemp("study-none"), "none")
 
 
 def _html(db: Path) -> str:
@@ -137,10 +134,70 @@ def test_a_panel_with_no_tag_or_two_tags_is_refused():
 
 def test_every_panel_renders_its_backing_row_id_and_source_link(synthetic_db):
     page = _html(synthetic_db)
-    for pid in ("B1.1", "B1.2", "B1.3", "B1.4"):
+    # Nine panels after the split: Beat 1's four and Beat 2's five.
+    for pid in ("B1.1", "B1.2", "B1.3", "B1.4", "B2.1", "B2.2", "B2.3", "B2.4", "B2.5"):
         assert f"Evidence: {pid}" in page
     assert "PROJECT_BRIEF §6" in page
     assert 'href="https://www.trustpilot.com/"' in page
+
+
+def test_the_brief_citation_follows_the_documented_points_not_the_urls():
+    # §6 is named exactly when a Documented anchor is drawn; a Measured panel over
+    # the platform roots cites the roots alone, as BACKING B2.2/B2.5 do (exit
+    # round, code-reviewer #1).
+    def panel(tag):
+        return Panel(
+            "B9.3",
+            "B9.3",
+            "t",
+            "b",
+            tag,
+            "line",
+            series=(Series("s", 0, (Point("m", 1.0, tag, "", "pct"),)),),
+            sources=("https://www.trustpilot.com/",),
+        )
+
+    measured = export._drill(panel("Measured"))
+    documented = export._drill(panel("Documented"))
+    assert (
+        measured
+        == 'opens to <a href="https://www.trustpilot.com/" rel="noopener">https://www.trustpilot.com/</a>'
+    )
+    assert documented == measured + " and PROJECT_BRIEF §6"
+
+
+def test_a_panel_source_is_an_address_or_a_repository_file_else_refused():
+    # Authored panel-level sources have a closed shape: an http(s) link, or a
+    # repository file named in plain text (never a link); anything else refuses
+    # by name. B2.4's answer key exists (exit round, coherence #2).
+    from pipeline.warehouse import ROOT
+    from study.panels import ANSWER_KEY_FILE
+
+    assert (ROOT / ANSWER_KEY_FILE).is_file()
+
+    def panel(sources, fixture=""):
+        return Panel(
+            "B9.4",
+            "B9.4",
+            "t",
+            "b",
+            "Measured",
+            "table",
+            series=(Series("s", 0, (Point("m", 1.0, "Measured", "", "pct"),)),),
+            sources=sources,
+            fixture=fixture,
+        )
+
+    drilled = export._drill(panel((ANSWER_KEY_FILE,)))
+    assert drilled == f"opens to the repository file {ANSWER_KEY_FILE}"
+    assert "href" not in drilled
+    for bad in ("../secrets", "/etc/passwd", "javascript:alert(1)", "a b"):
+        with pytest.raises(RenderRefused) as exc:
+            export._drill(panel((bad,)))
+        assert "B9.4" in str(exc.value)
+    # over a fixture input the footer says where the figures WILL open.
+    fixture = export._drill(panel(("https://x.example/",), fixture="fixture text"))
+    assert fixture.startswith("the counted figures will open to ")
 
 
 def test_svg_numbers_are_fixed_precision_and_locale_independent(synthetic_db):
@@ -253,8 +310,8 @@ def test_drill_drops_a_non_http_source_url():
         ),
     )
     drilled = export._drill(panel)
-    assert "javascript:" not in drilled
-    assert drilled == "source pending"
+    assert "javascript:" not in drilled and "href" not in drilled
+    assert drilled == "opens to PROJECT_BRIEF §6"  # the Documented anchor's own source
 
 
 def _rating_trend_conn(rows: list[tuple]):
@@ -297,7 +354,7 @@ def test_rating_trend_orders_multi_source_points_deterministically():
     ]
     conn = _rating_trend_conn(rows)
     try:
-        (line,) = export._rating_trend(conn)
+        (line,) = panels._rating_trend(conn)
     finally:
         conn.close()
     assert [p.value for p in line.points] == [4.0, 3.0]
@@ -318,9 +375,9 @@ def test_a_null_mart_cell_is_refused_by_name_not_a_traceback():
     # A null value or provenance cell is refused in one line naming the column
     # and panel, never coerced into an uncaught float(None)/None.startswith that
     # escapes render (round 2, SR#5).
-    assert export._require(4.2, "rating", "B1.2") == 4.2
+    assert model._require(4.2, "rating", "B1.2") == 4.2
     with pytest.raises(RenderRefused) as exc:
-        export._require(None, "rating", "B1.2")
+        model._require(None, "rating", "B1.2")
     assert "rating" in str(exc.value) and "B1.2" in str(exc.value)
     null_rating = [
         (
@@ -337,7 +394,7 @@ def test_a_null_mart_cell_is_refused_by_name_not_a_traceback():
     conn = _rating_trend_conn(null_rating)
     try:
         with pytest.raises(RenderRefused) as exc:
-            export._rating_trend(conn)
+            panels._rating_trend(conn)
     finally:
         conn.close()
     assert "rating" in str(exc.value)
