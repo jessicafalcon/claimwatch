@@ -2310,3 +2310,22 @@ neutral-band decision and the two claim-cell fixes. #5 (allowlist not denylist)
 direction, lint the study queries, closed series colour) folded in. #10–#12
 (security-reviewer not triggered; a captured render is local and uncommitted;
 the band's legend entry with its count) answered in the spec.
+
+Review round 1 (2026-09-08; code-reviewer, functionality-tester, study-editor):
+no BLOCKER; fixed in full — the corpus chart kind and the `ROWS=none` render
+pinned (`013ebf6`), dead `axis_unit` dropped, the fixture note corrected, two
+findings deferred to the rows that own them (`b7a35ff`), and one fix
+amendment: a panel's notes are a sequence (`ce405cc`, `3c97ceb`). Round 2
+(2026-09-08; the same three agents, the security-reviewer and
+coherence-auditor not triggered): 11 rows, 0 BLOCKER, 5 should-fix,
+functionality-tester "partially" on one surviving mutation. No correctness
+row sat inside a round-1 fix (the cap did not fire); three sat on `900692c`
+code round 1 had passed over: the neutral-token render mapping was pinned by
+a page-scoped assertion the fixture CSS satisfied (`1b21215`, test-only), the
+legend vanished for a band-only panel against invariant 3 (`cee1d1a`), and the
+Beat 2 readers wrote the point tag as a literal instead of the mart's column
+(`505a5cf`, the `caller-sourced` class). B2.5 got its own denominator and
+self-selection notes — the round-1 amendment had reused B2.2's line-chart
+wording on a bar chart — and the fixture label lost its mechanism words
+(`0d73ffc`). The study-editor's B2.5 rewrite named document-loop alone; the
+chart draws every theme per segment, so the note says "each theme's share".
