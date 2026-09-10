@@ -2661,3 +2661,73 @@ via an f-string, never spelled, so `pipeline/build.py` is not a false match.
 Challenge dispositions are recorded in the spec (round 1, 2026-09-10, rework, all
 amendments applied). Supersedes the Phase 9d forward note on the classify-path
 idempotency class (extended to `pipeline_row_counts`).
+
+### Phase 9f
+
+The README — the third delivery format, telling the five beats in prose — and the
+stranger acceptance test that pins the walk from any figure to its BACKING row. No
+new dependency, `make` target, mart, chart `Kind` or BACKING row; the committed
+page does not change.
+
+- **The permanent artifact stays the byte-checked synthetic render; a captured
+  render is the reader's own `make rebuild ROWS=captured && make study`.** The
+  committed page is deterministic and CI byte-checks it (9a); a captured render
+  would carry corpus state that drifts with the weekly cron and could not be
+  byte-checked. This answers the two questions the 9b decision deferred: the
+  shipped page carries no per-review address (brand-address), and page size is
+  moot since the page is unchanged. No Threat-model row — 9f ships no captured
+  render. Closes the "corpus render" BACKLOG row. *Rejected: shipping a captured
+  render as the permanent artifact (breaks the byte-check, ships drifting corpus
+  state); a second committed captured page beside the synthetic one (two baselines
+  to maintain, a brand-address surface with no source that yields a per-review
+  address).*
+- **The permanent page carries no live slider; live exploration is the Metabase
+  demonstration (9g).** Beat 3 already draws each parameter's range as a static
+  mark with the formula printed, so a reader redoes the arithmetic by hand. A
+  browser control recomputing `FORMULAS` is an inline script — a second copy of
+  the formulas in a second language needing its own module↔script identity test —
+  and breaks the self-contained, byte-stable artifact (9a/9c). Pinned by the
+  existing `tests/test_export.py::test_export_has_no_cdn_no_external_asset_no_timestamp`;
+  the "live sliders" BACKLOG row closes at 9g. *Rejected: an inline CDN-free
+  `FORMULAS` recompute (a second formula surface and a page that is no longer
+  byte-stable).*
+- **The stranger test is a pytest over the README text, not a `check_docs`
+  check.** `check_docs` is for structural docs guards (links, banned words,
+  glossary, naming) and already scans the README; a content pin — a figure carries
+  its tag and its own resolving `B<beat>.<n>` — is a test, in
+  `tests/test_readme.py`. The tag check matches only unambiguous shapes (`€`, `%`)
+  with no date/version denylist (the `unshaped-input` class); the three Beat 5
+  counts sit on fixed template lines the test asserts by shape. *Rejected:
+  extending `scripts/check_docs.py` (duplicates link/naming coverage, puts a
+  content pin in a structural guard); a "multi-digit count minus dates/versions"
+  regex (the denylist is the trap).*
+- **The README's figures are the Modeled (Beat 3–4) and the Measured checkable
+  facts (Beat 5), not restated Beat 1–2 corpus numbers.** Beat 3–4 read the DAMIR
+  fit and fixed parameters, so their euros are corpus-independent and honest on the
+  synthetic page; Beat 1–2's counts are described qualitatively with the
+  `ROWS=captured` rebuild named, so the shipped synthetic figures are never
+  presented as findings. Beat 1's hero stays Pending (no number). *Rejected:
+  restating synthetic theme shares as findings (dishonest under the synthetic
+  render); a full numeric recap (every restated value a pin that drifts from the
+  mart).*
+
+Build amendment (2026-09-10): the challenge-round "Beat 1 Day N" clause was
+dropped — BACKING B1.1 is Pending, so the hero shows no number; Invariant 1 and
+the tag-template test cover Beat 5's counts only. Restores: a Pending claim shows
+no number.
+
+Challenge dispositions are recorded in the spec (round 1, 2026-09-10, approve with
+amendments — 5 should-fix and 2 suggestions applied).
+
+Exit reconciliation (2026-09-10, coherence-auditor): the study now ships **one
+glossary per delivery surface** — the README's ten reader terms (the four tags,
+"Held claim", "Theme share", "The gated classifier", "The crossover", …) and
+SPEC.md's chart terms ("Mart", "Provenance", "Eval set", …) — where the brief and
+CLAUDE.md's writing rule had said "one glossary". The two are content-coherent (no
+definition contradicts the other's) and serve distinct audiences: a stranger
+reading the README should not have to open SPEC.md to learn a term. The rule text
+in PROJECT_BRIEF §2.3 and CLAUDE.md → Writing rules was amended to "one glossary
+per delivery surface, ≤10 terms each"; `make check-docs` already enforces the ≤10
+per file. *Rejected: consolidating to a single canonical glossary — it costs the
+stranger-facing README its self-contained glossary, against the "reads the README
+first" goal.*
