@@ -594,9 +594,10 @@ BEAT4_NET_SERIES = 4  # baseline + the three toggled scenarios, ≤ 5-slot palet
 # and max (both) each round outward to one significant figure. A signed domain,
 # unlike curve_domain's 0-floor (net dips below zero — the crossover).
 BEAT4_NET_DOMAIN = (-2_000_000.0, 2_000_000.0)
-# The three fixes B4.3 draws (SIM_SCENARIO_MAP minus no_fix, the "before"); the
-# clock is the only one that releases claims early (SIM_SUMMARY).
-BEAT4_FIXES = ("ask_once", "hold_timer", "both_fixes")
+# B4.3 draws one bar per simulator scenario in SIM_SCENARIOS order — the no-fix
+# baseline (the "before") shown once, each fix beside it; the clock is the only
+# scenario that releases claims early (SIM_SUMMARY).
+BEAT4_SIM_SCENARIOS = ("no_fix", "ask_once", "hold_timer", "both_fixes")
 BEAT4_FRAGMENTS = {
     "threshold day (stat, days)": ">14.0 days<",
     "threshold amount (stat, eur)": ">€42.67<",

@@ -1288,11 +1288,6 @@ def _net_marker(conn, panel_id: str) -> tuple[tuple[str, float], ...]:
     return ((text.MARKER_DEFAULT, _default_flag_rate(conn, BASELINE, panel_id)),)
 
 
-# The simulator's "before" scenario — the hold with no fix applied, B4.3's
-# baseline bar. Named once here, not spelled as a literal at each use site.
-_NO_FIX = "no_fix"
-
-
 def _hold_summary(conn, panel_id: str) -> dict[str, tuple[float, float, str]]:
     """B4.3: the mean hold days and the timer-released share per simulator
     scenario, from one SQL aggregate over `guardrail_sim`, rounded at the model's
@@ -1331,31 +1326,22 @@ def _hold_summary(conn, panel_id: str) -> dict[str, tuple[float, float, str]]:
 def _hold_bars(
     summary: dict[str, tuple[float, float, str]], panel_id: str
 ) -> tuple[Series, ...]:
-    """B4.3: two bars per fix — the hold before (the `no_fix` scenario) and after
-    (the fix's own scenario), in `FIX_NAMES` order; the "before" is the same
-    `no_fix` hold for every fix (SPEC B4.3: two hold lengths per fix). Each bar
-    carries the mart's own tag (from the aggregate), never a literal."""
-    fixes = tuple(s.name for s in SIM_SCENARIOS if s.name != _NO_FIX)
-    if tuple(text.FIX_NAMES) != fixes:
+    """B4.3: one bar per simulator scenario (the spec's "scenario × hold days"),
+    in `SIM_SCENARIOS` order — the no-fix hold is the "before", each fix's hold
+    the "after" beside it, the before shown once rather than repeated per fix.
+    Each bar the scenario's mean hold, carrying the mart's own tag (from the
+    aggregate), labelled by the closed `SIM_HOLD_NAMES` map."""
+    names = tuple(s.name for s in SIM_SCENARIOS)
+    if tuple(text.SIM_HOLD_NAMES) != names:
         raise RenderRefused(
-            f"{panel_id}: FIX_NAMES {tuple(text.FIX_NAMES)} are not the fix "
-            f"scenarios {fixes}"
+            f"{panel_id}: SIM_HOLD_NAMES {tuple(text.SIM_HOLD_NAMES)} are not the "
+            f"simulator scenarios {names}"
         )
-    before, _b_share, before_tag = summary[_NO_FIX]
-    series = []
-    for slot, fix in enumerate(text.FIX_NAMES):
-        after, _share, after_tag = summary[fix]
-        series.append(
-            Series(
-                text.FIX_NAMES[fix],
-                slot,
-                (
-                    Point(text.HOLD_BEFORE, before, before_tag, "", "days"),
-                    Point(text.HOLD_AFTER, after, after_tag, "", "days"),
-                ),
-            )
-        )
-    return tuple(series)
+    points = tuple(
+        Point(text.SIM_HOLD_NAMES[name], summary[name][0], summary[name][2], "", "days")
+        for name in text.SIM_HOLD_NAMES
+    )
+    return (Series("holds", 0, points),)
 
 
 class _Threshold(NamedTuple):
@@ -1492,11 +1478,12 @@ def beat4_panels(conn) -> list[Panel]:
                 text.released_note(
                     display(summary["hold_timer"][1], "pct"),
                 ),
-                "The holds are the mean over a thousand synthetic claims — the "
+                "Each bar is the mean over a thousand synthetic claims — the "
                 "fitted distribution read at a thousand evenly spaced points, no "
-                "individual claim, none is public. Two hold lengths per fix, not a "
-                "distribution: the document loop, or the timer, whichever ends the "
-                "hold first.",
+                "individual claim, none is public. One hold per scenario, not a "
+                "distribution: the no-fix bar is the hold before any fix, each fix "
+                "beside it, the document loop or the timer, whichever ends the hold "
+                "first.",
             ),
         ),
         Panel(

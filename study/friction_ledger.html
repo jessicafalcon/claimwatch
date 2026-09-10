@@ -562,32 +562,21 @@
 <text x="42.00" y="75.00" class="tick" text-anchor="end">22.5</text>
 <line x1="48.00" y1="16.00" x2="664.00" y2="16.00" class="grid"/>
 <text x="42.00" y="19.00" class="tick" text-anchor="end">30</text>
-<rect x="68.53" y="83.20" width="61.60" height="156.80" rx="4" fill="var(--s0)"><title>Ask once · before: 21.0 days (Modeled)</title></rect>
-<text x="99.33" y="256.00" class="tick" text-anchor="middle">before</text>
-<text x="99.33" y="77.20" class="barval" text-anchor="middle">21.0 days</text>
-<rect x="171.20" y="187.73" width="61.60" height="52.27" rx="4" fill="var(--s0)"><title>Ask once · after: 7.0 days (Modeled)</title></rect>
-<text x="202.00" y="256.00" class="tick" text-anchor="middle">after</text>
-<text x="202.00" y="181.73" class="barval" text-anchor="middle">7.0 days</text>
-<rect x="273.87" y="83.20" width="61.60" height="156.80" rx="4" fill="var(--s1)"><title>A clock on every hold · before: 21.0 days (Modeled)</title></rect>
-<text x="304.67" y="256.00" class="tick" text-anchor="middle">before</text>
-<text x="304.67" y="77.20" class="barval" text-anchor="middle">21.0 days</text>
-<rect x="376.53" y="108.81" width="61.60" height="131.19" rx="4" fill="var(--s1)"><title>A clock on every hold · after: 17.6 days (Modeled)</title></rect>
-<text x="407.33" y="256.00" class="tick" text-anchor="middle">after</text>
-<text x="407.33" y="102.81" class="barval" text-anchor="middle">17.6 days</text>
-<rect x="479.20" y="83.20" width="61.60" height="156.80" rx="4" fill="var(--s2)"><title>Both fixes · before: 21.0 days (Modeled)</title></rect>
-<text x="510.00" y="256.00" class="tick" text-anchor="middle">before</text>
-<text x="510.00" y="77.20" class="barval" text-anchor="middle">21.0 days</text>
-<rect x="581.87" y="187.73" width="61.60" height="52.27" rx="4" fill="var(--s2)"><title>Both fixes · after: 7.0 days (Modeled)</title></rect>
-<text x="612.67" y="256.00" class="tick" text-anchor="middle">after</text>
-<text x="612.67" y="181.73" class="barval" text-anchor="middle">7.0 days</text>
+<rect x="78.80" y="83.20" width="92.40" height="156.80" rx="4" fill="var(--s0)"><title>holds · Today, no fix: 21.0 days (Modeled)</title></rect>
+<text x="125.00" y="256.00" class="tick" text-anchor="middle">Today, no fix</text>
+<text x="125.00" y="77.20" class="barval" text-anchor="middle">21.0 days</text>
+<rect x="232.80" y="187.73" width="92.40" height="52.27" rx="4" fill="var(--s0)"><title>holds · Ask once: 7.0 days (Modeled)</title></rect>
+<text x="279.00" y="256.00" class="tick" text-anchor="middle">Ask once</text>
+<text x="279.00" y="181.73" class="barval" text-anchor="middle">7.0 days</text>
+<rect x="386.80" y="108.81" width="92.40" height="131.19" rx="4" fill="var(--s0)"><title>holds · A clock on every hold: 17.6 days (Modeled)</title></rect>
+<text x="433.00" y="256.00" class="tick" text-anchor="middle">A clock on every hold</text>
+<text x="433.00" y="102.81" class="barval" text-anchor="middle">17.6 days</text>
+<rect x="540.80" y="187.73" width="92.40" height="52.27" rx="4" fill="var(--s0)"><title>holds · Both fixes: 7.0 days (Modeled)</title></rect>
+<text x="587.00" y="256.00" class="tick" text-anchor="middle">Both fixes</text>
+<text x="587.00" y="181.73" class="barval" text-anchor="middle">7.0 days</text>
 </svg>
-<ul class="legend">
-<li><span class="swatch" style="background:var(--s0)"></span>Ask once</li>
-<li><span class="swatch" style="background:var(--s1)"></span>A clock on every hold</li>
-<li><span class="swatch" style="background:var(--s2)"></span>Both fixes</li>
-</ul>
 <p class="note">The clock alone releases 49.0% of held claims early. With the document loop already cut to one round, ask-once and both-fixes leave the timer nothing to release — the same hold as ask-once.</p>
-<p class="note">The holds are the mean over a thousand synthetic claims — the fitted distribution read at a thousand evenly spaced points, no individual claim, none is public. Two hold lengths per fix, not a distribution: the document loop, or the timer, whichever ends the hold first.</p>
+<p class="note">Each bar is the mean over a thousand synthetic claims — the fitted distribution read at a thousand evenly spaced points, no individual claim, none is public. One hold per scenario, not a distribution: the no-fix bar is the hold before any fix, each fix beside it, the document loop or the timer, whichever ends the hold first.</p>
 <p class="evidence">Evidence: B4.3 · Modeled · opens to <a href="https://www.data.gouv.fr/api/1/datasets/open-damir-base-complete-sur-les-depenses-dassurance-maladie-interregimes/" rel="noopener">https://www.data.gouv.fr/api/1/datasets/open-damir-base-complete-sur-les-depenses-dassurance-maladie-interregimes/</a>; source file data/damir/claim_cost_fit.csv</p>
 </section>
 <section class="panel">

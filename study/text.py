@@ -171,17 +171,17 @@ SCENARIO_NAMES = {
     "churn_halved": "A clock on every hold",
     "both": "Both fixes",
 }
-# B4.3's three fixes, keyed by the simulator scenario each measures
-# (`models.guardrail_sim.SIM_SCENARIOS`, minus `no_fix` — the "before"); a test
-# pins these keys equal to the fix scenarios. The two hold lengths per fix are
-# labelled before/after (SPEC B4.3: "two hold lengths per fix").
-FIX_NAMES = {
+# B4.3's bars, one per simulator scenario (`models.guardrail_sim.SIM_SCENARIOS`,
+# in that order): the no-fix hold is the "before", each fix's hold the "after"
+# beside it — the spec's "scenario × hold days", the before shown once, not
+# repeated per fix. The display names match B4.1's for the paired scenarios. A
+# test pins these keys equal to the simulator scenario set.
+SIM_HOLD_NAMES = {
+    "no_fix": "Today, no fix",
     "ask_once": "Ask once",
     "hold_timer": "A clock on every hold",
     "both_fixes": "Both fixes",
 }
-HOLD_BEFORE = "before"
-HOLD_AFTER = "after"
 # B4.2's three stat labels, in the order of `sla_threshold`'s cells
 # (`timer_days`, `timer_amount_eur`, `share_under`), each with its display unit
 # — the closed display text as data, not literals in `panels.py`. "Claims small

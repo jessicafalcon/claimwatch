@@ -221,26 +221,27 @@ def test_b43_sql_aggregate_equals_summarize(synthetic_db):
         assert got[name][1] == cells["timer_released_share"]
 
 
-def test_b43_draws_two_holds_per_fix_and_names_the_released_share(synthetic_db):
+def test_b43_draws_one_bar_per_scenario_and_names_the_released_share(synthetic_db):
     b43 = _panel(synthetic_db, "B4.3")
     assert b43.kind == "grouped_bar"
-    assert tuple(text.FIX_NAMES) == pins.BEAT4_FIXES
-    before = pins.SIM_SUMMARY["no_fix"]["mean_hold_days"]
-    for fix, s in zip(pins.BEAT4_FIXES, b43.series, strict=True):
-        cells = {p.label: p.value for p in s.points}
-        assert cells == {
-            text.HOLD_BEFORE: before,
-            text.HOLD_AFTER: pins.SIM_SUMMARY[fix]["mean_hold_days"],
-        }
-        assert s.name == text.FIX_NAMES[fix]
+    # one series, one bar per simulator scenario in SIM_SCENARIOS order — the
+    # no-fix baseline shown once, each fix beside it (the spec's scenario × hold)
+    assert tuple(text.SIM_HOLD_NAMES) == pins.BEAT4_SIM_SCENARIOS
+    (series,) = b43.series
+    got = {p.label: p.value for p in series.points}
+    assert got == {
+        text.SIM_HOLD_NAMES[name]: pins.SIM_SUMMARY[name]["mean_hold_days"]
+        for name in pins.BEAT4_SIM_SCENARIOS
+    }
+    assert all(p.unit == "days" for p in series.points)
     sec = _section(_html(synthetic_db), "B4.3")
     assert pins.BEAT4_FRAGMENTS["released share (note, pct)"] in sec
     # the released-share note is filled from the clock's aggregate cell, never a
     # typed figure — the note text is in the section verbatim.
     clock_share = display(pins.SIM_SUMMARY["hold_timer"]["timer_released_share"], "pct")
     assert text.released_note(clock_share) in sec
-    # ask_once and both_fixes leave the timer nothing to release: the two fixes'
-    # "after" holds are the same (a one-round loop ends before the default timer).
+    # ask_once and both_fixes leave the timer nothing to release: their holds are
+    # equal (a one-round loop ends before the default timer).
     assert (
         pins.SIM_SUMMARY["ask_once"]["mean_hold_days"]
         == pins.SIM_SUMMARY["both_fixes"]["mean_hold_days"]
