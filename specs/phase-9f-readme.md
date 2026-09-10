@@ -9,12 +9,18 @@ merged.
 **Status: APPROVED 2026-09-10 — in progress.** No new dependencies (the
 allowlist is in CLAUDE.md → Conventions). No new `make` target, no new chart
 `Kind`, no new mart, no new BACKING row.
-Challenged: 2026-09-10, round 1, spec 89131ac9 — approve with amendments (5 should-fix + 2 suggestions applied)
+Challenged: 2026-09-10, round 1, spec 997535b0 — approve with amendments (5 should-fix + 2 suggestions applied)
 
 Amendment (2026-09-10, build): the challenge-round "Beat 1 Day N" clause is
 dropped — BACKING B1.1 is Pending, so the hero shows no number; Invariant 1 and
 the tag-template test (`test_beat5_counts_use_the_tagged_template`) cover Beat 5's
 counts only. Restores the provenance invariant a Pending claim shows no number.
+
+Amendment (2026-09-10, round 1 fix): Invariant 2's falsifier adds
+`test_modeled_figures_match_pins_and_cite_their_row` — each Modeled figure is bound
+to its `tests/pins.py` value and must cite its own mart row, so a wrong-but-real
+citation (round 1's BLOCKER, 49.0% → B4.3) fails. No property changed; the
+`unpinned` class's per-figure pin is now real (LESSONS).
 
 ## Why
 
@@ -84,7 +90,7 @@ make review-gate SPEC=specs/phase-9f-readme.md && make study && git diff --exit-
 |---|---|
 | 1 | `make check-docs` prints `ok banned words`, `ok glossary`, `ok naming the target`; study-editor confirms the two-layer opening per beat |
 | 2 | `tests/test_readme.py::test_every_euro_or_percent_wears_a_tag` (a `€`/`%` figure with no tag word in its sentence fails), `::test_beat5_counts_use_the_tagged_template` |
-| 3 | `tests/test_readme.py::test_every_tagged_figure_cites_a_resolving_row` (a figure whose sentence cites the wrong-but-real or no id fails), `::test_readme_cites_only_real_backing_rows`, `::test_first_paragraph_links_into_evidence`, `::test_readme_links_to_study_and_backing`; `make check-docs` prints `ok links` |
+| 3 | `tests/test_readme.py::test_modeled_figures_match_pins_and_cite_their_row` (a Modeled figure citing the wrong-but-real row, or drifting from its pinned value, fails), `::test_every_tagged_figure_cites_a_resolving_row`, `::test_readme_cites_only_real_backing_rows` (a non-existent id fails), `::test_first_paragraph_links_into_evidence`, `::test_readme_links_to_study_and_backing`; `make check-docs` prints `ok links` |
 | 4 | `make study && git diff --exit-code`; `tests/test_readme.py::test_readme_names_the_captured_rebuild_command` |
 | 5 | `tests/test_export.py::test_export_has_no_cdn_no_external_asset_no_timestamp` (already green); `DECISIONS.md` Phase 9f entry records the decision |
 
@@ -93,7 +99,7 @@ make review-gate SPEC=specs/phase-9f-readme.md && make study && git diff --exit-
 | Invariant ("for all …, … holds") | Falsified by (scenario test) |
 |---|---|
 | For every euro amount or percentage in the README's beat prose (outside code spans and links), the figure's sentence carries exactly one of the four tag words; Beat 5's three checkable counts are each written on a fixed, tested template line that carries its tag. | `tests/test_readme.py::test_every_euro_or_percent_wears_a_tag` (a `€`/`%` figure with no tag word fails), `::test_beat5_counts_use_the_tagged_template` |
-| For every tagged figure in the README, the figure's own sentence or list-item cites a `B<beat>.<n>` that resolves to a row in `BACKING.md` — following *that* figure's citation reaches *that* figure's backing row; beat-granular reachability is not enough. | `tests/test_readme.py::test_every_tagged_figure_cites_a_resolving_row` (a figure whose sentence cites no id, or a `B9.9` with no row, fails), `::test_readme_cites_only_real_backing_rows` |
+| For every tagged figure in the README, the figure's own sentence or list-item cites a `B<beat>.<n>` that resolves to a row in `BACKING.md` — following *that* figure's citation reaches *that* figure's backing row; beat-granular reachability is not enough. | `tests/test_readme.py::test_modeled_figures_match_pins_and_cite_their_row` (a Modeled figure citing the wrong-but-real row, or drifting from its `tests/pins.py` value, fails), `::test_every_tagged_figure_cites_a_resolving_row` (a non-existent id fails), `::test_readme_cites_only_real_backing_rows` |
 | For all links in the README, the link resolves; and the README links to `study/friction_ledger.html` and `BACKING.md`, and the first paragraph carries a link onward into the evidence. | `make check-docs` links check; `tests/test_readme.py::test_readme_links_to_study_and_backing`, `::test_first_paragraph_links_into_evidence` |
 | For all re-renders, the committed `study/friction_ledger.html` is byte-identical (the permanent artifact is the synthetic render, unchanged by this phase). | `make study && git diff --exit-code` (CI), `tests/test_export.py` |
 | For all renders of the permanent page, it carries no `<script>` and no external asset (no live slider). | `tests/test_export.py::test_export_has_no_cdn_no_external_asset_no_timestamp` |
@@ -202,9 +208,9 @@ Agents are selected by diff surface (CLAUDE.md → "Which review agents run").
   check is a test, not a `check_docs` change, by pinned decision).
 - **functionality-tester** (triggered): the DONE command; that
   `test_every_euro_or_percent_wears_a_tag` fails on an untagged figure, that
-  `test_every_tagged_figure_cites_a_resolving_row` fails when a figure's sentence
-  cites the *wrong-but-real* B-id or none (the cheapest check of the "any number
-  reaches its own evidence" claim), and `test_readme_cites_only_real_backing_rows`
+  `test_modeled_figures_match_pins_and_cite_their_row` fails when a Modeled figure
+  cites the *wrong-but-real* B-id or drifts from its `tests/pins.py` value (bound
+  to the mart the study renders), and `test_readme_cites_only_real_backing_rows`
   fails on a dangling id (hand-mutate the README in a worktree); that `make
   study` stays byte-identical.
 - **study-editor** (triggered — README is new prose): two-layer opening per beat,

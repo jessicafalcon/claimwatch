@@ -102,10 +102,11 @@ every document once; put a clock on every hold; and log how each hold ends.
 - Below about **€42.67** on a claim, a hold that long costs more than it saves,
   so small low-risk claims can auto-release once the clock fires *(Modeled — B4.2)*.
 - About **49.0%** of claims are small enough to fall under that threshold
-  *(Modeled — B4.3)*.
+  *(Modeled — B4.2)*.
 - The simulator shows hold durations before and after, on synthetic claims
-  calibrated to real public cost data, and the fixes lift the net line
-  *(Modeled — B4.1)*.
+  calibrated to real public cost data *(Modeled — B4.3)*.
+- As each fix is switched on, the net line — fraud saved minus friction cost —
+  lifts *(Modeled — B4.1)*.
 - Counting how each hold ends would give a false-positive rate per flag rule —
   it needs an outcome log that does not exist yet *(Pending — B4.4)*.
 
