@@ -185,6 +185,7 @@ Freeze: none
 - [ ] `LESSONS.md` — the `unpinned` row extended (round 1: the per-figure citation was membership-only, so a wrong-but-real B-id passed)
 - [ ] `CLAUDE.md` — Current status; Repo map; BACKLOG count
 - [ ] BACKING.md — none: the README cites existing rows and adds none; no tag changes
+- [ ] `PROJECT_BRIEF.md` — §2.3 writing rule reconciled to "one glossary per delivery surface" (exit audit)
 - [ ] SPEC.md — none: no chart or beat changed; the README is a new prose surface, not a new chart
 - [ ] `README.md` — the phase's own subject (new file)
 - [ ] this spec — the "Delivered" paragraph appended at exit
