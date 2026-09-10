@@ -231,6 +231,10 @@ def test_b43_draws_two_holds_per_fix_and_names_the_released_share(synthetic_db):
         assert s.name == text.FIX_NAMES[fix]
     sec = _section(_html(synthetic_db), "B4.3")
     assert pins.BEAT4_FRAGMENTS["released share (note, pct)"] in sec
+    # the released-share note is filled from the clock's aggregate cell, never a
+    # typed figure — the note text is in the section verbatim.
+    clock_share = display(pins.SIM_SUMMARY["hold_timer"]["timer_released_share"], "pct")
+    assert text.released_note(clock_share) in sec
     # ask_once and both_fixes leave the timer nothing to release (the same hold)
     assert cells[text.HOLD_AFTER] == pins.SIM_SUMMARY["both_fixes"]["mean_hold_days"]
 
