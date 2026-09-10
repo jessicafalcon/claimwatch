@@ -182,7 +182,7 @@ Freeze: none
 
 - [ ] `DECISIONS.md` — Phase 9f entry (captured-render decision; live-slider decision)
 - [ ] `BACKLOG.md` — "corpus render" row struck + "DONE Phase 9f"; "live sliders" trigger re-pointed at 9g; classify-path idempotency row's trigger re-pointed to Phase 10's DAG; open count updated
-- [ ] LESSONS.md — none until a review round reports a correctness finding; then backtick it and the fix commit writes the row
+- [ ] `LESSONS.md` — the `unpinned` row extended (round 1: the per-figure citation was membership-only, so a wrong-but-real B-id passed)
 - [ ] `CLAUDE.md` — Current status; Repo map; BACKLOG count
 - [ ] BACKING.md — none: the README cites existing rows and adds none; no tag changes
 - [ ] SPEC.md — none: no chart or beat changed; the README is a new prose surface, not a new chart

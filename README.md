@@ -23,25 +23,26 @@ insurer is named as the target of the study; insurers appear only as sourced
 data points.
 
 **About the shipped page.** The committed [study page](study/friction_ledger.html)
-is rendered from a small set of hand-written example reviews, so on it the Beat 1
-and Beat 2 counts are illustrative fixtures that show the machinery works, not
-findings. The measured findings come from your own rebuild over the captured
-reviews:
+is rendered from a small set of hand-written example reviews. The figures we
+*count from reviews* — Beat 2's theme shares and classifier quality (Measured) —
+are therefore illustrative fixtures on it, not findings; your own rebuild over
+the captured reviews fills them from real data:
 
 ```
 make rebuild ROWS=captured && make study
 ```
 
-Beat 3 and Beat 4 are **Modeled** from public claim-cost data and fixed
-parameters — they do not depend on the review corpus — so those numbers are the
-same on the shipped page and on your rebuild.
+Beat 1's rating, channel-gap and stat-row points are **Documented** from public
+sources, and Beat 3 and Beat 4 are **Modeled** from public claim-cost data and
+fixed parameters (independent of the review corpus) — all real either way. Only
+Beat 2's counts differ between the shipped page and your rebuild.
 
 ## Beat 1 — People are telling us what's wrong, in public
 
-On independent review platforms the studied digital-first insurer's rating has
-drifted down over the months, and it sits lower on the platforms nobody
-solicits than on the ones the company invites people to. The pattern is public
-and unprompted.
+On independent review platforms the studied segment — digital-first insurers —
+shows public ratings that have drifted down over the months, sitting lower on
+the platforms nobody solicits than on the ones these companies invite people to.
+The pattern is public and unprompted.
 
 - The rating over time, month by month *(Documented — B1.2)*.
 - The channel gap: invited channels versus unsolicited platforms *(Documented — B1.3)*.
@@ -49,7 +50,7 @@ and unprompted.
 - The hero — one refund held for months — is awaited as a documented case, so
   no number stands in for it yet *(Pending — B1.1)*.
 
-*How we made sure.* Name the bias beside the chart: unsolicited platforms are
+*How we made sure.* The bias sits beside the chart: unsolicited platforms are
 negatively self-selected — a company that stops inviting reviews drifts down —
 so part of any decline is a sampling choice, not only a change in service. The
 study states this where the rating trend is drawn.
@@ -147,15 +148,20 @@ we chose boring.
 - **Pending** — a claim we cannot back with a number yet, shown as a placeholder
   with no figure.
 - **Held claim** — a refund a legitimate customer is owed that is stuck awaiting
-  extra documents or review.
+  extra documents or review, like an emergency-room receipt paused for a second
+  copy of a prescription.
 - **Theme share** — of all classified reviews in a period, the fraction that
-  mention a given complaint theme.
+  mention a given complaint theme, like the slice of a month's reviews that name
+  a blocked refund.
 - **The gated classifier** — the rules-plus-model tagging step whose answers must
-  pass an accuracy gate before any chart uses them.
+  pass an accuracy gate before any chart uses them, like a proofreader checking
+  the tags against a hand-marked answer key.
 - **Digital-first versus traditional** — app-native insurers compared against
-  established mutuelles, the study's core comparison.
+  established mutuelles, the study's core comparison, like an app-only insurer set
+  beside a long-standing mutuelle.
 - **The crossover** — the flag rate where friction cost overtakes fraud saved, so
-  the next flag destroys more than it recovers.
+  the next flag destroys more than it recovers, like the point where checking one
+  more claim starts to lose money.
 
 ## Running it
 
