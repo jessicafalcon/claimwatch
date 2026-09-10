@@ -204,9 +204,10 @@ and "both fixes" show the same hold.
   threshold is computed from the Beat 3 model, not guessed, and the arithmetic
   is shown ("holds beyond N days on claims under €X are net-negative in
   expectation"). Tag: *Modeled*.
-- **B4.3 — Before and after.** For each fix, the mean hold in days and the share
-  of claims the clock released, with the Beat 3 curves beside them — two hold
-  lengths per fix, not a distribution. Tag: *Modeled*.
+- **B4.3 — Before and after.** One bar per scenario — the no-fix hold and each
+  fix beside it (scenario × hold days), so the before is shown once, not a
+  distribution — with the share of claims the clock released as a note figure.
+  Tag: *Modeled*.
 - **B4.4 — Count the mistakes.** Logging how each hold ends — fraud-confirmed or
   released-clean — yields a false-positive rate per flag rule, the metric the
   system otherwise lacks; the same event stream also triggers a status

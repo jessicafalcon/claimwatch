@@ -2592,10 +2592,12 @@ Beat 4 marts already existed from Phase 8b; this phase renders them.
   (`rounded`); `tests/test_beat4.py::test_b43_sql_aggregate_equals_summarize`
   pins it equal to `models/guardrail_sim.py::summarize` on all four scenarios,
   closing the Phase 8b BACKLOG row that named exactly this test. The released
-  share renders as a note figure (only the clock releases claims); the bars are
-  the two hold lengths per fix. *Rejected: a Python reduction in the reader (a
-  SQL aggregate is the shape the BACKLOG row named, and keeps the mart the one
-  source); `filter (where …)` (not portable to Snowflake).*
+  share renders as a note figure (only the clock releases claims); B4.3 draws
+  one bar per scenario (the shared no-fix baseline and each fix beside it —
+  round 1 #15 dropped the before/after pairs that repeated the baseline in three
+  colours). *Rejected: a Python reduction in the reader (a SQL aggregate is the
+  shape the BACKLOG row named, and keeps the mart the one source); `filter
+  (where …)` (not portable to Snowflake).*
 - **B4.4 stays Pending — a design panel, no number.** The false-positive rate it
   would show needs an outcome log that does not exist; `check_panel` refuses a
   value on a Pending panel. *Rejected: inventing a placeholder number (the
