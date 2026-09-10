@@ -588,14 +588,14 @@
 <h2 class="beat">Beat 5 — How this was built, and where the rigor lives</h2>
 <section class="panel">
 <h3>B5.1 · The facts you can check <span class="chip chip-measured">Measured</span></h3>
-<p class="blurb">Three facts about how this study is built, each a count you can verify in the code. A language model makes a decision in exactly one place; every formula is printed next to the number it gives; and every number on the page carries a tag saying where it came from.</p>
+<p class="blurb">Three facts about how this study is built, each a count you can verify in the code. A language model makes a decision in exactly one place; the cost model&#x27;s formulas are printed next to the numbers they give; and every number on the page carries a tag saying where it came from.</p>
 <div class="stat-row">
 <div class="stat"><div class="stat-value">1</div><div class="stat-label">Places a language model makes a decision</div><span class="chip chip-measured">Measured</span></div>
-<div class="stat"><div class="stat-value">14</div><div class="stat-label">Formulas shown on this page beside their output</div><span class="chip chip-measured">Measured</span></div>
-<div class="stat"><div class="stat-value">4</div><div class="stat-label">Evidence tags a number can carry</div><span class="chip chip-measured">Measured</span></div>
+<div class="stat"><div class="stat-value">14</div><div class="stat-label">Cost-model formulas shown beside their output</div><span class="chip chip-measured">Measured</span></div>
+<div class="stat"><div class="stat-value">4</div><div class="stat-label">Evidence tags in the study&#x27;s closed set</div><span class="chip chip-measured">Measured</span></div>
 </div>
-<p class="note">One place a model decides: every other tag comes from rules, SQL or arithmetic. The formulas are the ones printed next to their output in &quot;What a wrongly held claim costs&quot; above — redo any by hand. Every number on this page carries one of the four tags — Measured, Documented, Modeled or not-yet-classified — so none stands unsourced.</p>
-<p class="evidence">Evidence: B5.1 · Measured · source file classify/llm.py, models/cost_model.py, study/model.py</p>
+<p class="note">One place a model decides: every other tag comes from rules, SQL or arithmetic. The formulas are the cost-model ones printed next to their output in &quot;What a wrongly held claim costs&quot; above — redo any by hand. Every number on this page carries one of three tags — Measured, Documented or Modeled — and a panel with no number yet is marked Pending, so nothing stands unsourced.</p>
+<p class="evidence">Evidence: B5.1 · Measured · source files classify/llm.py, models/cost_model.py, study/model.py</p>
 </section>
 <section class="panel">
 <h3>B5.2 · Rerun it and the numbers hold <span class="chip chip-measured">Measured</span></h3>

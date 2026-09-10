@@ -246,16 +246,17 @@ BEAT4_PENDING = (
 # in the reader — the mart and the page name the same three facts.
 DETERMINISM_FACTS = {
     "model_call_sites": ("Places a language model makes a decision", "count"),
-    "formulas_shown": ("Formulas shown on this page beside their output", "count"),
-    "evidence_tags": ("Evidence tags a number can carry", "count"),
+    "formulas_shown": ("Cost-model formulas shown beside their output", "count"),
+    "evidence_tags": ("Evidence tags in the study's closed set", "count"),
 }
 # B5.1's note, second layer: what each fact means and how a reader checks it.
 DETERMINISM_NOTE = (
     "One place a model decides: every other tag comes from rules, SQL or "
-    "arithmetic. The formulas are the ones printed next to their output in "
-    '"What a wrongly held claim costs" above — redo any by hand. Every number on '
-    "this page carries one of the four tags — Measured, Documented, Modeled or "
-    "not-yet-classified — so none stands unsourced."
+    "arithmetic. The formulas are the cost-model ones printed next to their "
+    'output in "What a wrongly held claim costs" above — redo any by hand. Every '
+    "number on this page carries one of three tags — Measured, Documented or "
+    "Modeled — and a panel with no number yet is marked Pending, so nothing "
+    "stands unsourced."
 )
 # B5.2's stage display names, in flow order: the `pipeline_row_counts` stage key
 # (a table name) → what it is in plain words. A key outside this closed map

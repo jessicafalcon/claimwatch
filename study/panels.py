@@ -1641,9 +1641,9 @@ def beat5_panels(conn) -> list[Panel]:
             blurb=(
                 "Three facts about how this study is built, each a count you can "
                 "verify in the code. A language model makes a decision in exactly "
-                "one place; every formula is printed next to the number it gives; "
-                "and every number on the page carries a tag saying where it came "
-                "from."
+                "one place; the cost model's formulas are printed next to the "
+                "numbers they give; and every number on the page carries a tag "
+                "saying where it came from."
             ),
             tag="Measured",
             kind="stat_row",

@@ -43,8 +43,10 @@ The two rows differ in kind, and the phase treats them differently:
   code it describes: the model-decision count from the same import-tree walk that
   `tests/test_llm.py::test_only_llm_imports_anthropic` performs (a shared
   helper, so the fact and the guard read one source and the number cannot drift
-  from a literal), the formula count from `FORMULAS`/`RULES` bound by a test to
-  the formulas the study actually renders, the tag count from `study/model.py::TAGS`.
+  from a literal), the formula count from `FORMULAS` bound by a test to the
+  formulas the study actually renders (B3.1, the only formulas-kind panel — the
+  simulator's `RULES` are not printed as formulas on the page), the tag count
+  from `study/model.py::TAGS`.
 - **B5.2 — reproducibility** is row counts at each pipeline stage: a
   review-corpus surface like Beat 2. It is **Measured behind the corpus gate** —
   real counts over a captured input, the labelled fixture-state note over the
@@ -171,10 +173,12 @@ make review-gate SPEC=specs/phase-9e-beat-5.md && make rebuild ROWS=synthetic &&
   `tests/test_llm.py::test_only_llm_imports_anthropic` already performs — extracted
   to a shared helper so the fact is counted, not a literal, and cannot drift from
   the guard that keeps it 1 (Classification contract: one model call site,
-  `classify/llm.py`). The formula count is `len(FORMULAS) + len(RULES)`, bound by
-  a test to the number of formula entries the Beat 3/4 panels render, so
-  "defined" equals "displayed" (SPEC B5.1: "every formula displayed next to its
-  output"). The tag count is `len(study/model.py::TAGS)`. All Measured — measured
+  `classify/llm.py`). The formula count is `len(FORMULAS)` (the cost-model
+  formulas), bound by a test to the formula entries B3.1 renders — the study's
+  only formulas-kind panel, so "defined" equals "displayed" (SPEC B5.1: "every
+  formula displayed next to its output"); the simulator's `RULES` drive Beat 4's
+  curves and bars, not a formulas panel, so they are not counted here. The tag
+  count is `len(study/model.py::TAGS)`. All Measured — measured
   facts about the repository, whose upstream source is the code they are counted
   from (a backticked repo path, the `check_backing` `_DATASET` shape), the
   study's subject here being the repository itself. Rejected: a prose/hero panel
