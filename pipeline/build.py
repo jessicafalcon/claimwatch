@@ -28,6 +28,7 @@ fetcher: no network on the data path."""
 
 from __future__ import annotations
 
+import ast
 import csv
 import hashlib
 import re
@@ -1163,37 +1164,71 @@ def reviews_per_month(conn) -> list[tuple[str, str, int]]:
     ]
 
 
-# The model SDK the classifier calls. The import needle is BUILT from this, never
-# spelled as a literal, so this module is not itself a false match for the
-# one-call-site walk below (and so tests/test_llm.py's guard, which reads the same
-# walk, does not flag build.py) — putting the literal "import <sdk>" in a non-test
-# module would count it and break that guard.
+# The model SDK the classifier calls, matched by module name (not a substring), so
+# a comment or string mentioning it never counts — the needle is the name itself.
 _MODEL_CLIENT = "anthropic"
+# The repository's code packages — the closed set the one-call-site walk scans, so
+# a gitignored data/ file or a scratch script cannot feed the B5.1 fact (round 1,
+# security-reviewer #9). llm.py lives under classify/.
+_CODE_PACKAGES = (
+    "classify",
+    "ingest",
+    "models",
+    "opendata",
+    "pipeline",
+    "study",
+    "dags",
+)
+
+
+def _imports_model(tree: ast.Module) -> bool:
+    """True if a parsed module imports the model client — `import anthropic[.x]` or
+    `from anthropic[.x] import …`, matched on the dotted module name, so a comment
+    or string is never a false match (round 1, code-reviewer #8)."""
+    prefix = _MODEL_CLIENT + "."
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            if any(
+                a.name == _MODEL_CLIENT or a.name.startswith(prefix) for a in node.names
+            ):
+                return True
+        elif isinstance(node, ast.ImportFrom):
+            module = node.module or ""
+            if module == _MODEL_CLIENT or module.startswith(prefix):
+                return True
+    return False
 
 
 def model_call_sites() -> list[str]:
-    """The repository modules that import the model client — the one place a model
-    makes a decision (Classification contract: classify/llm.py, and nowhere else).
-    B5.1's fact counts these, so it is counted from the source, not a literal, and
-    cannot drift; tests/test_llm.py's guard reads the same walk. Tests and the
-    virtualenv are not repository modules and are skipped."""
-    needle_import = f"import {_MODEL_CLIENT}"
-    needle_from = f"from {_MODEL_CLIENT}"
+    """The repository code modules that import the model client — the one place a
+    model makes a decision (Classification contract: classify/llm.py, and nowhere
+    else). B5.1's fact counts these, parsed from the source (not a literal), and
+    cannot drift; tests/test_llm.py's guard reads the same walk. Only the code
+    packages are scanned (not the gitignored data/ tree); a `.py` that is not
+    parseable Python refuses by name at the boundary, never a traceback (round 1,
+    code-reviewer #4 / security-reviewer #1)."""
     sites: list[str] = []
-    for path in sorted(ROOT.rglob("*.py")):
-        posix = path.as_posix()
-        if "/.venv/" in posix or "/tests/" in posix:
-            continue
-        try:
-            source = path.read_text(encoding="utf-8")
-        except UnicodeDecodeError as exc:  # a boundary: a non-text .py refuses by name
-            raise ValueError(f"{path.relative_to(ROOT)}: not UTF-8 text") from exc
-        if needle_import in source or needle_from in source:
-            sites.append(path.relative_to(ROOT).as_posix())
-    return sites
+    for package in _CODE_PACKAGES:
+        for path in sorted((ROOT / package).rglob("*.py")):
+            if "/tests/" in path.as_posix():
+                continue
+            try:
+                tree = ast.parse(path.read_text(encoding="utf-8"))
+            except (UnicodeDecodeError, SyntaxError, ValueError) as exc:
+                raise PageShapeError(
+                    f"{path.relative_to(ROOT)}: not parseable Python"
+                ) from exc
+            if _imports_model(tree):
+                sites.append(path.relative_to(ROOT).as_posix())
+    return sorted(sites)
 
 
-def write_determinism_facts(conn, run_id: str, *, tag: str = "Measured") -> None:
+# The Beat 5 marts are direct counts of the repository and the pipeline stages, so
+# their tag is fixed, not a caller's choice (round 1, code-reviewer #10).
+_BEAT5_TAG = "Measured"
+
+
+def write_determinism_facts(conn, run_id: str) -> None:
     """Fill the `determinism_facts` mart (B5.1): the checkable facts about the
     repository, each counted from the code it describes. Not corpus-gated — a repo
     fact is constant on any input — so this runs inside rebuild() on every input.
@@ -1217,7 +1252,7 @@ def write_determinism_facts(conn, run_id: str, *, tag: str = "Measured") -> None
             conn.execute(
                 "insert into determinism_facts (fact, value, run_id, tag) "
                 "values (?, ?, ?, ?)",
-                [fact, value, run_id, tag],
+                [fact, value, run_id, _BEAT5_TAG],
             )
     except BaseException:
         conn.execute("rollback")
@@ -1232,7 +1267,7 @@ def write_determinism_facts(conn, run_id: str, *, tag: str = "Measured") -> None
 _ROW_COUNT_STAGES = ("raw_reviews", "stg_reviews", "stg_classified_reviews")
 
 
-def write_pipeline_row_counts(conn, run_id: str, *, tag: str = "Measured") -> None:
+def write_pipeline_row_counts(conn, run_id: str) -> None:
     """Fill the `pipeline_row_counts` mart (B5.2): one row per review-pipeline
     stage, each value a direct count(*) of that stage's table. Runs in the CLI
     classify path (after stg_classified_reviews is filled), so the classified
@@ -1247,7 +1282,7 @@ def write_pipeline_row_counts(conn, run_id: str, *, tag: str = "Measured") -> No
             conn.execute(
                 "insert into pipeline_row_counts (stage, value, run_id, tag) "
                 "values (?, ?, ?, ?)",
-                [stage, value, run_id, tag],
+                [stage, value, run_id, _BEAT5_TAG],
             )
     except BaseException:
         conn.execute("rollback")

@@ -316,6 +316,20 @@ def test_metrics_module_is_gone_query_relocated():
     assert "stg_reviews" in REVIEWS_PER_MONTH and callable(reviews_per_month)
 
 
+def test_writer_and_display_key_maps_agree(synthetic_db):
+    # The writer's keys and the display maps are one set, pinned directly — not
+    # only via the render guard, which fires over a captured input `make study`
+    # never builds (round 1, code-reviewer #6).
+    from pipeline import build
+    from study import text
+
+    assert set(build._ROW_COUNT_STAGES) == set(text.ROW_COUNT_STAGES)
+    fact_keys = {
+        fact for (fact,) in _mart(synthetic_db, "select fact from determinism_facts")
+    }
+    assert fact_keys == set(text.DETERMINISM_FACTS)
+
+
 def test_the_allowlist_and_queries_gain_the_beat_five_marts():
     for column in ("fact", "stage"):
         assert column in panels.ALLOWED_COLUMNS
