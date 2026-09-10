@@ -129,8 +129,10 @@ Delivered paragraph and `make help`, not here.
   `export.py` (the hand-written inline-SVG charts — line, grouped bars, the
   stat row, the metric table, the formula list, the curve with its markers,
   the range marks — and the page), `__main__.py` (the `make study` entry), the
-  committed `friction_ledger.html`; Beats 1–5 render (9a–9e), the README
-  and the Metabase demonstration are later Phase 9 sub-phases.
+  committed `friction_ledger.html`; Beats 1–5 render (9a–9e). `README.md` (9f)
+  tells the five beats in prose and links every figure to its BACKING row, the
+  third delivery format beside the page; `tests/test_readme.py` pins the stranger
+  walk. The Metabase demonstration (9g) is the last Phase 9 sub-phase.
   `dags/` *(Phase 10)* — `friction_ledger.py`.
 - `fixtures/` — read-only after Phase 1, each set with a `MANIFEST.sha256`:
   `synthetic/` (hand-written fake reviews), `anchors/` (brief §6 figures with
@@ -731,20 +733,25 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 ## Current status
 
-**In progress: Phase 9e — Beat 5** (branch `phase-9e`, spec
-`specs/phase-9e-beat-5.md`, challenged round 1, spec `757bbe04` — rework, all
-amendments applied). Beat 5 renders through the 9a/9c contract, adding two
-single-grain Python-fed marts: B5.1 the checkable repo facts (`determinism_facts`,
-filled in `rebuild()`, a `stat_row`, Measured and NOT corpus-gated — the model
-site counted via the import-tree walk, the formulas via `FORMULAS`, the tags via
-`TAGS`), B5.2 the per-stage row counts (`pipeline_row_counts`, filled in the
-classify path, a `table`, Measured behind the corpus gate like Beat 2). The
-`reviews_per_month` query relocated from the deleted `pipeline/metrics.py` into
-`pipeline/build.py`. BACKING B5.1/B5.2 flipped Pending → Measured. No new
-dependency, no `make` target, no new chart `Kind`.
+**In progress: Phase 9f — the README + the stranger acceptance test** (branch
+`phase-9f`, spec `specs/phase-9f-readme.md`, challenged round 1, spec `89131ac9`
+— approve with amendments, all applied, plus one build amendment dropping the
+Beat 1 "Day N" clause since B1.1 is Pending). The README tells the five beats in
+the two-layer voice and links every figure to its BACKING row; `tests/test_readme.py`
+pins the walk (each euro/percent figure wears one tag and cites a resolving
+`B<beat>.<n>`, the three Beat 5 counts on tagged template lines, the
+first-paragraph and page/BACKING links resolve). Decided: the permanent artifact
+stays the byte-checked **synthetic** render (a captured render is the reader's own
+`make rebuild ROWS=captured && make study`), and the permanent page carries no
+live-slider script (live exploration is 9g). No new dependency, `make` target,
+mart, chart `Kind` or BACKING row; Beat 3–4 numbers are Modeled and
+corpus-independent, so they hold on the shipped page.
 
-**Merged:** Phases 0a–9d in order, each with its spec under `specs/` (the
-Delivered paragraph) and its DECISIONS appendix — 9d (PR #27, 2026-09-10: Beat 4,
+**Merged:** Phases 0a–9e in order, each with its spec under `specs/` (the
+Delivered paragraph) and its DECISIONS appendix — 9e (PR #28, 2026-09-10: Beat 5,
+the checkable facts B5.1 `determinism_facts` and the reproducibility row-counts
+B5.2 `pipeline_row_counts`; the `reviews_per_month` query relocated into
+`pipeline/build.py`, `pipeline/metrics.py` deleted) then 9d (PR #27, 2026-09-10: Beat 4,
 the three fixes drawn beside the Beat 3 curves — B4.1 the four-scenario net curve,
 B4.2 a computed `stat_row` threshold, B4.3 one bar per scenario pinned to
 `summarize`, B4.4 Pending) then 9c (PR #25, 2026-09-09: Beat
@@ -759,11 +766,10 @@ promoted). Phase 8b — the guardrail simulator (B4.1–B4.3, PR #19,
 2026-09-07) — landed `models/guardrail_sim.py::RULES`, the hold timer's three
 formulas in `models/cost_model.py`, the two simulator marts and `make simulate`.
 
-**Next (Phase 9 sub-phases, in order):** 9f — the README + the stranger
-acceptance test (and the live-slider decision); 9g — the Metabase demonstration
+**Next (Phase 9 sub-phases, in order):** 9g — the Metabase demonstration
 (the review-level drill, non-CI). Plus two pulled-out data phases: the claims
 sample-mean slider and data.ameli practitioner fees.
 
-Open BACKLOG rows: **41**.
+Open BACKLOG rows: **40**.
 
 (Update this section at the end of every working day.)
