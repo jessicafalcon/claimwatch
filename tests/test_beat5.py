@@ -221,6 +221,34 @@ def test_beat_five_render_is_byte_stable(synthetic_db):
     assert _html(synthetic_db) == _html(synthetic_db)
 
 
+# --- the two mart writers, named and exercised directly -----------------------
+def test_the_two_mart_writers_fill_their_marts(tmp_path):
+    """write_determinism_facts and write_pipeline_row_counts fill their marts (a
+    re-populate over an already-built warehouse is idempotent: delete + insert)."""
+    from pipeline.build import (
+        rebuild,
+        write_determinism_facts,
+        write_pipeline_row_counts,
+    )
+    from pipeline.warehouse import database_for
+
+    root = tmp_path / "writers"
+    rebuild("duckdb", "synthetic", root=root)  # builds the marts empty + facts
+    db = database_for("synthetic", root)
+    conn = connect("duckdb", database=db)
+    try:
+        write_determinism_facts(conn, "t")
+        write_pipeline_row_counts(conn, "t")
+        facts = conn.execute("select count(*) from determinism_facts").fetchone()[0]
+        counts = conn.execute("select count(*) from pipeline_row_counts").fetchone()[0]
+        (tag,) = conn.execute("select distinct tag from pipeline_row_counts").fetchone()
+    finally:
+        conn.close()
+    assert facts == pins.DETERMINISM_FACT_ROWS
+    assert counts == len(pins.BEAT5_STAGE_COUNTS)
+    assert tag == "Measured"
+
+
 # --- invariant 1: every Beat 5 number is a tagged mart cell -------------------
 _OTHER_SECTIONS = ("B3.1", "B4.2", "B5.2")
 

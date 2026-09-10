@@ -289,7 +289,7 @@ Freeze: none
   source `` `pipeline/build.py` `` / Measured.
 - [ ] `SPEC.md` — the "(Pending until …)" clauses on B5.1/B5.2 removed now that
   they render (a wording reconciliation, not a design change).
-- [ ] `README.md` — none (the README is Phase 9f).
+- [ ] README — none (the README is Phase 9f).
 - [ ] `docs/PLAN.md` — the stale line-239 mention ("the metric is a pinned query
   in `pipeline/metrics.py` … until B5.2 lands") updated: B5.2 landed; the query
   lives in `pipeline/build.py`, still not a mart.
