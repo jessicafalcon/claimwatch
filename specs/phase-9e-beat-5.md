@@ -280,9 +280,11 @@ Freeze: none
   third uncovered classify-path mart, its stability proven by
   `test_pipeline_row_counts_stable_across_reclassify`; count decremented; the
   9f/9g rows stand.
-- [ ] LESSONS.md — none until a review round reports a correctness finding; then
-  backtick it and the fix commit writes the row. (The `site-fix` open class is
-  the reason the deletion's full reference set is enumerated in Scope.)
+- [x] `LESSONS.md` — round 1's error-policy finding (#7: `model_call_sites` raised
+  a bare `ValueError` at a read boundary) extended the promoted
+  `traceback-at-boundary` row with the 9e recurrence and its fix (caught in
+  review, the mechanism holding — not reopened). (The `site-fix` open class is the
+  reason the deletion's full reference set is enumerated in Scope.)
 - [ ] `CLAUDE.md` — Current status; Repo map (`study/` renders Beats 1–5; the two
   new single-grain Python-fed marts named beside `classifier_quality`;
   `pipeline/metrics.py` removed and the `reviews_per_month` mention re-pointed to
