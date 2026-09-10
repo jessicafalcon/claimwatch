@@ -183,6 +183,9 @@ make review-gate SPEC=specs/phase-9d-beat-4.md && make rebuild ROWS=synthetic &&
 - `study/friction_ledger.html` — the regenerated committed page.
 - `tests/test_beat4.py` — the phase's tests (Evidence rows above).
 - `tests/pins.py` — the Beat 4 pinned numbers.
+- `tests/test_beat3.py` — the `net` sub-assertion updated: B4.1 becomes the
+  reader of `net`, so a mutated `net` cell now moves B4.1 while every Beat 3
+  section stays put (the `_Q_COST_CURVES` comment anticipated this).
 - `SPEC.md` — the one B4.1 reconciling sentence (Record updates).
 
 Freeze: none

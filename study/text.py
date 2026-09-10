@@ -182,6 +182,17 @@ FIX_NAMES = {
 }
 HOLD_BEFORE = "before"
 HOLD_AFTER = "after"
+# B4.2's three stat labels, in the order of `sla_threshold`'s cells
+# (`timer_days`, `timer_amount_eur`, `share_under`), each with its display unit
+# — the closed display text as data, not literals in `panels.py`. "Claims small
+# enough to auto-release" names the share as what it is (the small claims the
+# clock releases), so B4.2's 49% reads as the same quantity B4.3 reports
+# released, not a second coincidental figure.
+THRESHOLD_STATS = (
+    ("Clock fires after", "days"),
+    ("Not worth holding below", "eur"),
+    ("Claims small enough to auto-release", "pct"),
+)
 
 
 # The B4.2 note: the clock's arithmetic, filled from the `sla_threshold`
@@ -222,5 +233,5 @@ BEAT4_PENDING = (
     "No number yet: a false-positive rate per flag rule needs an outcome log — "
     "each hold recorded as fraud-confirmed or released-clean — that the system "
     "does not keep. The same event stream would also trigger a status "
-    "notification, which fixes silent rejections for free."
+    "notification, which would end silent rejections at no extra cost."
 )

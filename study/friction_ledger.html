@@ -338,7 +338,7 @@
 <h2 class="beat">Beat 4 — Three small fixes, no rebuild required</h2>
 <section class="panel">
 <h3>B4.1 · The curves move <span class="chip chip-modeled">Modeled</span></h3>
-<p class="blurb">The first fix ends the back-and-forth for documents: one request returns the whole list. Fewer stuck claims means less friction, so the net line — fraud saved minus friction cost — lifts. Each line is one scenario; the fraud caught is unchanged, so what moves is the cost.</p>
+<p class="blurb">The first fix collapses the back-and-forth for documents: one request returns the whole list. Fewer stuck claims means less friction, so the net line — fraud saved minus friction cost — lifts. Each line is one scenario; the fraud caught is unchanged, so what moves is the cost.</p>
 <svg viewBox="0 0 680 280" role="img" preserveAspectRatio="xMidYMid meet" class="chart">
 <line x1="104.00" y1="240.00" x2="664.00" y2="240.00" class="grid"/>
 <text x="98.00" y="243.00" class="tick" text-anchor="end">€-2,000,000.00</text>
@@ -541,8 +541,8 @@
 <p class="blurb">The second fix puts a timer on each held claim: past a threshold, a small low-risk claim releases itself and a large one goes to a person. The threshold is computed from the Beat 3 model, not guessed — the day and amount below which a hold that long costs more than it saves.</p>
 <div class="stat-row">
 <div class="stat"><div class="stat-value">14.0 days</div><div class="stat-label">Clock fires after</div><span class="chip chip-modeled">Modeled</span></div>
-<div class="stat"><div class="stat-value">€42.67</div><div class="stat-label">Net-negative below</div><span class="chip chip-modeled">Modeled</span></div>
-<div class="stat"><div class="stat-value">49.0%</div><div class="stat-label">Claims under that amount</div><span class="chip chip-modeled">Modeled</span></div>
+<div class="stat"><div class="stat-value">€42.67</div><div class="stat-label">Not worth holding below</div><span class="chip chip-modeled">Modeled</span></div>
+<div class="stat"><div class="stat-value">49.0%</div><div class="stat-label">Claims small enough to auto-release</div><span class="chip chip-modeled">Modeled</span></div>
 </div>
 <p class="note">Holds beyond 14.0 days on claims under €42.67 are net-negative in expectation — the friction they add outweighs the fraud they still catch — so past 14.0 days a small claim auto-releases and a large one goes to a person. 49.0% of synthetic claims fall under that amount.</p>
 <p class="note">The threshold is the amount at which the friction of a hold that long equals the fraud it could still catch, read from the cost model’s own rows — the same arithmetic printed in Beat 3, at the baseline defaults.</p>
@@ -592,8 +592,8 @@
 </section>
 <section class="panel">
 <h3>B4.4 · Count the mistakes <span class="chip chip-pending">Pending</span></h3>
-<p class="blurb">The third fix records how each hold ends — fraud confirmed, or released clean. That log is the false-positive rate per flag rule the system otherwise never learns, and the same events power a status notification that ends silent rejections.</p>
-<div class="pending">No number yet: a false-positive rate per flag rule needs an outcome log — each hold recorded as fraud-confirmed or released-clean — that the system does not keep. The same event stream would also trigger a status notification, which fixes silent rejections for free.</div>
+<p class="blurb">The third fix records how each hold ends — fraud confirmed, or released clean. That log would be the false-positive rate per flag rule the system otherwise never learns, and the same events would drive a status notification against silent rejections.</p>
+<div class="pending">No number yet: a false-positive rate per flag rule needs an outcome log — each hold recorded as fraud-confirmed or released-clean — that the system does not keep. The same event stream would also trigger a status notification, which would end silent rejections at no extra cost.</div>
 <p class="evidence">Evidence: B4.4 · Pending · source pending</p>
 </section>
 </main></body></html>

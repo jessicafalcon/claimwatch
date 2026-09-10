@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable
 from math import ceil, floor, log10
-from typing import Literal
+from typing import Literal, NamedTuple
 
 from classify.eval.gate import ANSWER_KEY
 from classify.labels import POSITIVE, THEMES, UNCLASSIFIED
@@ -982,11 +982,10 @@ def _curve_series(conn, scenario: str, panel_id: str) -> tuple[Series, ...]:
     )
 
 
-def _curve_markers(conn, scenario: str, panel_id: str) -> tuple[tuple[str, float], ...]:
-    """The curve chart's labelled rules, each read from a mart row and never
-    found by scanning the curve (pinned decision 4): the `is_default` row's flag
-    rate ("you are here"), then the two crossover rows of `cost_model_outputs`,
-    each present only when the mart stores a value. Exactly one default row."""
+def _default_flag_rate(conn, scenario: str, panel_id: str) -> float:
+    """The one `is_default` flag rate of a scenario's `cost_curves` rows — the
+    "you are here" grid x, read from the mart, exactly one else refuse. Shared by
+    B3.2's `_curve_markers` and B4.1's `_net_marker`."""
     defaults = [
         float(_require(flag_rate, "flag_rate", panel_id))
         for flag_rate, *_rest, is_default, _tag in _scenario_rows(
@@ -999,13 +998,21 @@ def _curve_markers(conn, scenario: str, panel_id: str) -> tuple[tuple[str, float
             f"{panel_id}: cost_curves marks {len(defaults)} default rows for "
             f'{scenario} — exactly one is the "you are here" rule'
         )
+    return defaults[0]
+
+
+def _curve_markers(conn, scenario: str, panel_id: str) -> tuple[tuple[str, float], ...]:
+    """The curve chart's labelled rules, each read from a mart row and never
+    found by scanning the curve (pinned decision 4): the `is_default` row's flag
+    rate ("you are here"), then the two crossover rows of `cost_model_outputs`,
+    each present only when the mart stores a value. Exactly one default row."""
     outputs = {
         name: value
         for name, _expression, value, _unit, _tag in _scenario_rows(
             conn, _Q_COST_OUTPUTS, scenario, panel_id
         )
     }
-    markers = [(text.MARKER_DEFAULT, defaults[0])]
+    markers = [(text.MARKER_DEFAULT, _default_flag_rate(conn, scenario, panel_id))]
     for label, name in (
         (text.MARKER_CROSSOVER, "crossover_flag_rate"),
         (text.MARKER_MARGINAL, "marginal_crossover_flag_rate"),
@@ -1275,22 +1282,15 @@ def _net_curves(conn, panel_id: str) -> tuple[Series, ...]:
 
 
 def _net_marker(conn, panel_id: str) -> tuple[tuple[str, float], ...]:
-    """B4.1's single "you are here" rule: the default flag rate, read from the
-    baseline scenario's `is_default` row (every scenario shares the grid and the
-    default). Exactly one default row, on a grid x the curves draw."""
-    defaults = [
-        float(_require(flag_rate, "flag_rate", panel_id))
-        for flag_rate, *_rest, is_default, _tag in _scenario_rows(
-            conn, _Q_COST_CURVES, BASELINE, panel_id
-        )
-        if is_default
-    ]
-    if len(defaults) != 1:
-        raise RenderRefused(
-            f"{panel_id}: cost_curves marks {len(defaults)} default rows for "
-            f'{BASELINE} — exactly one is the "you are here" rule'
-        )
-    return ((text.MARKER_DEFAULT, defaults[0]),)
+    """B4.1's single "you are here" rule: the baseline scenario's default flag
+    rate (every scenario shares the grid and the default), on a grid x the curves
+    draw."""
+    return ((text.MARKER_DEFAULT, _default_flag_rate(conn, BASELINE, panel_id)),)
+
+
+# The simulator's "before" scenario — the hold with no fix applied, B4.3's
+# baseline bar. Named once here, not spelled as a literal at each use site.
+_NO_FIX = "no_fix"
 
 
 def _hold_summary(conn, panel_id: str) -> dict[str, tuple[float, float, str]]:
@@ -1335,13 +1335,13 @@ def _hold_bars(
     (the fix's own scenario), in `FIX_NAMES` order; the "before" is the same
     `no_fix` hold for every fix (SPEC B4.3: two hold lengths per fix). Each bar
     carries the mart's own tag (from the aggregate), never a literal."""
-    fixes = tuple(s.name for s in SIM_SCENARIOS if s.name != "no_fix")
+    fixes = tuple(s.name for s in SIM_SCENARIOS if s.name != _NO_FIX)
     if tuple(text.FIX_NAMES) != fixes:
         raise RenderRefused(
             f"{panel_id}: FIX_NAMES {tuple(text.FIX_NAMES)} are not the fix "
             f"scenarios {fixes}"
         )
-    before, _b_share, before_tag = summary["no_fix"]
+    before, _b_share, before_tag = summary[_NO_FIX]
     series = []
     for slot, fix in enumerate(text.FIX_NAMES):
         after, _share, after_tag = summary[fix]
@@ -1358,9 +1358,20 @@ def _hold_bars(
     return tuple(series)
 
 
-def _threshold_row(conn, panel_id: str) -> tuple:
-    """B4.2: the one `is_default` row of `sla_threshold` — the timer day, the
-    net-negative amount, the share under it, its tag. Exactly one default row."""
+class _Threshold(NamedTuple):
+    """B4.2's default `sla_threshold` row, validated once: the timer day, the
+    net-negative amount, the share of claims under it, and the row's tag — named
+    fields so the stat row and the note read the same cells without re-checking."""
+
+    timer_days: float
+    amount: float
+    share: float
+    tag: str
+
+
+def _threshold_row(conn, panel_id: str) -> _Threshold:
+    """B4.2: the one `is_default` row of `sla_threshold`, validated into a
+    `_Threshold`. Exactly one default row, else refuse."""
     rows = [
         (timer_days, amount, share, tag)
         for timer_days, amount, share, is_default, tag in _rows(conn, _Q_SLA_THRESHOLD)
@@ -1370,36 +1381,23 @@ def _threshold_row(conn, panel_id: str) -> tuple:
         raise RenderRefused(
             f"{panel_id}: sla_threshold marks {len(rows)} default rows — exactly one"
         )
-    return rows[0]
+    timer_days, amount, share, tag = rows[0]
+    return _Threshold(
+        float(_require(timer_days, "timer_days", panel_id)),
+        float(_require(amount, "timer_amount_eur", panel_id)),
+        float(_require(share, "share_under", panel_id)),
+        str(_require(tag, "tag", panel_id)),
+    )
 
 
-def _threshold_stats(row: tuple, panel_id: str) -> tuple[Series, ...]:
-    """B4.2's stat row: the three cells of the default threshold row, each a
-    `sla_threshold` cell in its display unit, all carrying the row's own tag."""
-    timer_days, amount, share, tag = row
-    tag = str(_require(tag, "tag", panel_id))
-    points = (
-        Point(
-            "Clock fires after",
-            float(_require(timer_days, "timer_days", panel_id)),
-            tag,
-            "",
-            "days",
-        ),
-        Point(
-            "Net-negative below",
-            float(_require(amount, "timer_amount_eur", panel_id)),
-            tag,
-            "",
-            "eur",
-        ),
-        Point(
-            "Claims under that amount",
-            float(_require(share, "share_under", panel_id)),
-            tag,
-            "",
-            "pct",
-        ),
+def _threshold_stats(threshold: _Threshold) -> tuple[Series, ...]:
+    """B4.2's stat row: the three cells of the default threshold row, each in its
+    display unit and carrying the row's own tag; the labels and units are the
+    closed `text.THRESHOLD_STATS` map."""
+    values = (threshold.timer_days, threshold.amount, threshold.share)
+    points = tuple(
+        Point(label, value, threshold.tag, "", unit)
+        for (label, unit), value in zip(text.THRESHOLD_STATS, values, strict=True)
     )
     return (Series("threshold", 0, points),)
 
@@ -1412,7 +1410,6 @@ def beat4_panels(conn) -> list[Panel]:
     and the committed page shows these numbers."""
     net = _net_curves(conn, "B4.1")
     threshold = _threshold_row(conn, "B4.2")
-    t_days, t_amount, t_share, _t_tag = threshold
     summary = _hold_summary(conn, "B4.3")
     bars = _hold_bars(summary, "B4.3")
     return [
@@ -1421,8 +1418,9 @@ def beat4_panels(conn) -> list[Panel]:
             backing_row="B4.1",
             title="The curves move",
             blurb=(
-                "The first fix ends the back-and-forth for documents: one request "
-                "returns the whole list. Fewer stuck claims means less friction, "
+                "The first fix collapses the back-and-forth for documents: one "
+                "request returns the whole list. Fewer stuck claims means less "
+                "friction, "
                 "so the net line — fraud saved minus friction cost — lifts. Each "
                 "line is one scenario; the fraud caught is unchanged, so what "
                 "moves is the cost."
@@ -1458,15 +1456,13 @@ def beat4_panels(conn) -> list[Panel]:
             ),
             tag="Modeled",
             kind="stat_row",
-            series=_threshold_stats(threshold, "B4.2"),
+            series=_threshold_stats(threshold),
             sources=_FIT_SOURCES,
             notes=(
                 text.threshold_note(
-                    display(float(_require(t_days, "timer_days", "B4.2")), "days"),
-                    display(
-                        float(_require(t_amount, "timer_amount_eur", "B4.2")), "eur"
-                    ),
-                    display(float(_require(t_share, "share_under", "B4.2")), "pct"),
+                    display(threshold.timer_days, "days"),
+                    display(threshold.amount, "eur"),
+                    display(threshold.share, "pct"),
                 ),
                 "The threshold is the amount at which the friction of a hold that "
                 "long equals the fraud it could still catch, read from the cost "
@@ -1487,6 +1483,9 @@ def beat4_panels(conn) -> list[Panel]:
             tag="Modeled",
             kind="grouped_bar",
             series=bars,
+            # the bar's y domain is the same 0-floor, one-significant-figure rule
+            # the curves use (holds are non-negative days) — `curve_domain` names
+            # the rule, reused here rather than a second copy of it.
             domain=curve_domain(p.value for s in bars for p in s.points),
             sources=_FIT_SOURCES,
             notes=(
@@ -1506,9 +1505,9 @@ def beat4_panels(conn) -> list[Panel]:
             title="Count the mistakes",
             blurb=(
                 "The third fix records how each hold ends — fraud confirmed, or "
-                "released clean. That log is the false-positive rate per flag "
-                "rule the system otherwise never learns, and the same events "
-                "power a status notification that ends silent rejections."
+                "released clean. That log would be the false-positive rate per "
+                "flag rule the system otherwise never learns, and the same events "
+                "would drive a status notification against silent rejections."
             ),
             tag="Pending",
             kind="hero",

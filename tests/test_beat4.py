@@ -164,10 +164,14 @@ def test_b42_threshold_reads_the_default_sla_row(synthetic_db):
     timer_days, amount, share, tag = row
     assert timer_days == pins.TIMER_DEFAULT_DAY
     (series,) = _panel(synthetic_db, "B4.2").series
-    values = {p.label: (p.value, p.unit, p.tag) for p in series.points}
-    assert values["Clock fires after"] == (float(timer_days), "days", tag)
-    assert values["Net-negative below"] == (amount, "eur", tag)
-    assert values["Claims under that amount"] == (share, "pct", tag)
+    # the three cells in the order of the closed text.THRESHOLD_STATS map, each
+    # value/unit from the mart, all carrying the row's tag
+    cells = [(float(timer_days), "days"), (amount, "eur"), (share, "pct")]
+    assert tuple((label, unit) for label, unit in text.THRESHOLD_STATS) == tuple(
+        (p.label, p.unit) for p in series.points
+    )
+    for point, (value, unit) in zip(series.points, cells, strict=True):
+        assert (point.value, point.unit, point.tag) == (value, unit, tag)
     sec = _section(_html(synthetic_db), "B4.2")
     assert pins.BEAT4_FRAGMENTS["threshold day (stat, days)"] in sec
     assert pins.BEAT4_FRAGMENTS["threshold amount (stat, eur)"] in sec
@@ -235,8 +239,12 @@ def test_b43_draws_two_holds_per_fix_and_names_the_released_share(synthetic_db):
     # typed figure — the note text is in the section verbatim.
     clock_share = display(pins.SIM_SUMMARY["hold_timer"]["timer_released_share"], "pct")
     assert text.released_note(clock_share) in sec
-    # ask_once and both_fixes leave the timer nothing to release (the same hold)
-    assert cells[text.HOLD_AFTER] == pins.SIM_SUMMARY["both_fixes"]["mean_hold_days"]
+    # ask_once and both_fixes leave the timer nothing to release: the two fixes'
+    # "after" holds are the same (a one-round loop ends before the default timer).
+    assert (
+        pins.SIM_SUMMARY["ask_once"]["mean_hold_days"]
+        == pins.SIM_SUMMARY["both_fixes"]["mean_hold_days"]
+    )
 
 
 def test_b43_refuses_an_unknown_or_missing_simulator_scenario(synthetic_db, tmp_path):
@@ -250,6 +258,49 @@ def test_b43_refuses_an_unknown_or_missing_simulator_scenario(synthetic_db, tmp_
         with pytest.raises(RenderRefused) as exc:
             panels._hold_summary(conn, "B4.3")
         assert "mystery" in str(exc.value) and "B4.3" in str(exc.value)
+    finally:
+        conn.close()
+
+
+def test_b43_refuses_a_scenario_carrying_two_tags(synthetic_db, tmp_path):
+    # Half of one scenario's rows relabelled: the aggregate groups by (scenario,
+    # tag) and yields two rows for that scenario, which _hold_summary refuses in
+    # one line — a mart cannot give one scenario two evidence tags.
+    split = _mutated(
+        synthetic_db,
+        tmp_path,
+        (
+            "update guardrail_sim set tag = 'Measured' where scenario = 'no_fix' "
+            "and claim_rank <= 500",
+        ),
+    )
+    conn = connect("duckdb", database=split)
+    try:
+        with pytest.raises(RenderRefused) as exc:
+            panels._hold_summary(conn, "B4.3")
+        assert "two tags" in str(exc.value) and "B4.3" in str(exc.value)
+        assert "\n" not in str(exc.value)
+    finally:
+        conn.close()
+
+
+def test_b41_refuses_when_not_exactly_one_default_flag_rate(synthetic_db, tmp_path):
+    # The B4.1 marker reads the baseline's single is_default row; two default
+    # rows refuse in one line (the B4.2 analogue is test_b42_refuses…).
+    two = _mutated(
+        synthetic_db,
+        tmp_path,
+        (
+            "update cost_curves set is_default = true where scenario = 'baseline' "
+            "and flag_rate = 0.1",
+        ),
+    )
+    conn = connect("duckdb", database=two)
+    try:
+        with pytest.raises(RenderRefused) as exc:
+            panels._net_marker(conn, "B4.1")
+        assert "B4.1" in str(exc.value) and "2 default" in str(exc.value)
+        assert "\n" not in str(exc.value)
     finally:
         conn.close()
 
