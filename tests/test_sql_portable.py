@@ -35,9 +35,10 @@ def test_clock_in_sql_is_rejected():
 
 
 def test_metric_query_is_portable_and_clock_free():
-    """The Phase 2 metric is a query in Python, not a `sql/` file, so the lint
-    is applied to its text here (spec Phase 2, invariant 4)."""
-    from pipeline.metrics import REVIEWS_PER_MONTH
+    """The reviews-per-month metric is a query in Python (pipeline/build.py since
+    Phase 9e folded pipeline/metrics.py away), not a `sql/` file, so the lint is
+    applied to its text here (spec Phase 2, invariant 4)."""
+    from pipeline.build import REVIEWS_PER_MONTH
 
     assert find_nonportable(REVIEWS_PER_MONTH) == []
     assert find_clock(REVIEWS_PER_MONTH) == []

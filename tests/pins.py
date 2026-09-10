@@ -604,3 +604,30 @@ BEAT4_FRAGMENTS = {
     "threshold share (stat, pct)": ">49.0%<",
     "released share (note, pct)": "releases 49.0% of synthetic claims",
 }
+
+# --- Phase 9e: Beat 5 rendered — the facts you can check, and reproducibility --
+# B5.1's three repo facts are counted from the code, so the tests assert each
+# rendered value equals its source (len(model_call_sites()), len(FORMULAS),
+# len(TAGS)); these pins are the regression fragments, updated deliberately when
+# the code changes the count.
+BEAT5_PANELS = ("B5.1", "B5.2")
+# determinism_facts fills by construction in rebuild() (three facts, on every
+# input including none); pipeline_row_counts fills in the classify path, so it is
+# empty over a rebuild()-only `none` build.
+DETERMINISM_FACT_ROWS = 3
+BEAT5_MODEL_SITES = 1  # one place a model decides: classify/llm.py (== len(sites))
+BEAT5_EVIDENCE_TAGS = 4  # Measured, Documented, Modeled, Pending (== len(TAGS))
+BEAT5_FRAGMENTS = {
+    "model sites (stat, count)": ">1<",
+    "formulas shown (stat, count)": ">14<",  # == len(cost_model.FORMULAS)
+    "evidence tags (stat, count)": ">4<",
+}
+# The per-stage row counts over the synthetic corpus (pipeline_row_counts): as
+# scraped, after dedup, after tagging (one theme row per review). B5.2 is
+# corpus-gated, so these render only over a captured input; the mart holds them
+# on the synthetic build and a direct count(*) must equal each.
+BEAT5_STAGE_COUNTS = {
+    "raw_reviews": 40,
+    "stg_reviews": 39,
+    "stg_classified_reviews": 39,
+}

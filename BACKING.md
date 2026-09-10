@@ -66,8 +66,8 @@ every rule below except the last sentence, which is editorial (PROJECT_BRIEF.md
 | B4.2 Fix 2 a clock on every hold: the computed hold-length threshold | sla_threshold | `sql/marts/sla_threshold.sql` | `open-damir` | Modeled |
 | B4.3 Before and after hold durations from the simulator on calibrated synthetic claims | guardrail_sim | `sql/marts/guardrail_sim.sql` | `open-damir` | Modeled |
 | B4.4 Fix 3 count the mistakes: a false-positive rate per flag rule (eventual Modeled) | — (outcome log) | — | — | Pending |
-| B5.1 Determinism facts: one model decision, formulas shown, no untagged number (eventual Measured) | — (repo facts) | — | — | Pending |
-| B5.2 Reproducibility: row counts per stage, eval scores, the one rebuild command (eventual Measured) | pipeline_row_counts | `sql/marts/pipeline_row_counts.sql` | — | Pending |
+| B5.1 Determinism facts: one place a model decides, the formulas shown next to their output, the closed set of evidence tags every number wears | determinism_facts | `sql/marts/determinism_facts.sql` | `classify/llm.py`; `models/cost_model.py`; `study/model.py` | Measured |
+| B5.2 Reproducibility: row counts per pipeline stage, the eval scores (B2.4), the one rebuild command | pipeline_row_counts | `sql/marts/pipeline_row_counts.sql` | `pipeline/build.py` | Measured |
 
 **On the `open-damir` upstream (B3.3, B4.3).** Phase 7b landed that source: a
 small, real, brand-free slice of Open DAMIR's reimbursed-amount column

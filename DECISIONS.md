@@ -682,10 +682,14 @@ mart, no model.
   runs the frozen sample through the real parser (CI does, offline). `run_id`
   is the capture id in cache mode, the fixture name otherwise — no clock.
   Rejected: a second variable; keeping `empty` as the default.
-- **Reviews per month is a query, not a mart** (`pipeline/metrics.py`, printed
-  by `rebuild`, pinned by a test). No SPEC.md panel shows it, so a
-  `sql/marts/` file would be an orphan under BACKING.md's rule; it surfaces in
-  Beat 5 through B5.2 `pipeline_row_counts` (BACKLOG row). **This narrows the
+- **Reviews per month is a query, not a mart** (since Phase 9e in
+  `pipeline/build.py` beside `table_counts`, printed by `rebuild`, pinned by a
+  test — `pipeline/metrics.py` deleted). No SPEC.md panel shows it, so a
+  `sql/marts/` file would be an orphan under BACKING.md's rule. *(Phase 9e
+  update: the decision stands — the query was NOT folded into B5.2
+  `pipeline_row_counts` as the old BACKLOG trigger proposed; the 9e challenge
+  (#6) found that fold would make the mart two-grain, and that a query is not an
+  orphan, so the query relocated and stays a query.)* **This narrows the
   brief's Phase 2 "one trivial mart (reviews per month)" to the brief's own
   Done-when wording, "one queryable metric".** On the developer's call at the
   exit audit (2026-09-02) PROJECT_BRIEF.md §9 Phase 2 was reworded to match,
@@ -2605,3 +2609,55 @@ Beat 4 marts already existed from Phase 8b; this phase renders them.
 
 Challenge dispositions are recorded in the spec (round 1, 2026-09-09, rework
 scoped to B4.1). Supersedes the Phase 9c forward note on B4.1's readers (above).
+
+### Phase 9e
+
+Beat 5 — the checkable facts and the reproducibility counts — renders through the
+9a/9c contract (no new chart `Kind`, no `make` target, no dependency), adding two
+single-grain Python-fed marts.
+
+- **Two marts, two homes, by what the number is about.** `determinism_facts`
+  (B5.1) is filled in `rebuild()` beside the model/simulator marts — keyless, on
+  every input including `none`, covered by `idempotency-check` — and is **not**
+  corpus-gated, because a repo fact is constant whatever data is loaded, so the
+  committed synthetic page shows the numbers. `pipeline_row_counts` (B5.2) is
+  filled in the CLI classify path (after `stg_classified_reviews` exists, so the
+  classified stage is counted) and **is** corpus-gated like Beat 2 (the fixture
+  note over the frozen synthetic input). *Rejected: one mart for both (they
+  differ in gate and fill site); filling B5.2 in `rebuild()` (the classified
+  stage is not built yet there).*
+- **B5.1 facts are build-time counts of the code, each bound to its guard.** The
+  model-decision count is the length of `pipeline/build.py::model_call_sites`, the
+  same import-tree walk `tests/test_llm.py::test_only_llm_imports_anthropic` now
+  reads (shared, so the fact cannot drift from a literal); the formula count is
+  `len(models/cost_model.py::FORMULAS)`, bound by a test to the formulas B3.1
+  renders (defined == displayed); the tag count is `len(study/model.py::TAGS)` (a
+  leaf import, no cycle). All Measured — measured facts about the repository,
+  whose upstream source (BACKING) is the code they are counted from. *Rejected: a
+  prose panel with no numbers (SPEC B5.1's tag is Measured); a bare literal `1`
+  (the challenge showed it carried a "cannot drift" claim no constant backs).*
+- **B5.2 renders the stage counts; eval scores are B2.4, referenced not copied;
+  the rebuild command is prose.** The mart is single-grain (one row per review
+  stage — as scraped, deduped, classified). *Rejected: a second eval table (one
+  system, no duplication); a live "Day N" counter (writing rules).*
+- **`pipeline/metrics.py` deleted, its `reviews_per_month` query relocated to
+  `pipeline/build.py`, not martified.** The challenge (#6) settled that folding it
+  into `pipeline_row_counts` would make that mart two-grain, and that a query is
+  not an orphan (the rule bites marts only). Closes the Phase 2 BACKLOG row.
+  *Rejected: fold into the mart (two-grain, half-unrendered); a new
+  `reviews_by_month` mart (a third mart plus a BACKING row for a non-study
+  number).*
+- **Idempotency of a classify-path mart.** `pipeline_row_counts` is outside
+  `make idempotency-check` (which runs `rebuild()` only), like the theme marts, so
+  `tests/test_beat5.py::test_pipeline_row_counts_stable_across_reclassify` proves
+  its stability; BACKLOG line 52 grows to name it. *Rejected: moving the fill into
+  `rebuild()` (the classified stage does not exist there).*
+
+Gotcha (build-time): the one-call-site walk reads every non-test `.py`, so the
+literal string `import <sdk>` in a non-test module would count that module and
+break `test_only_llm_imports_anthropic`; the needle is built from `_MODEL_CLIENT`
+via an f-string, never spelled, so `pipeline/build.py` is not a false match.
+
+Challenge dispositions are recorded in the spec (round 1, 2026-09-10, rework, all
+amendments applied). Supersedes the Phase 9d forward note on the classify-path
+idempotency class (extended to `pipeline_row_counts`).

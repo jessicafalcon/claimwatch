@@ -224,12 +224,16 @@ facts plainly and shows how anyone can reproduce every number.
 one place a model makes a decision is a single module, gated against hand labels.
 
 - **B5.1 — The facts you can check.** One place a model makes a decision, every
-  formula displayed next to its output, and no number anywhere without a source
-  or a Modeled label. Tag: *Measured* (Pending until the pipeline is complete
-  enough to count).
-- **B5.2 — Reproducibility.** Row counts at each pipeline stage, the eval scores,
-  and the one command that rebuilds everything from raw data. Tag: *Measured*
-  (Pending until the rebuild produces counts).
+  formula displayed next to its output, and the closed set of evidence tags every
+  number wears — each a count read from the code (`determinism_facts`), so a
+  displayed fact cannot drift from the repository. Not corpus-gated: a repo fact
+  is constant on any input, so the committed page shows the numbers. Tag:
+  *Measured*.
+- **B5.2 — Reproducibility.** Row counts at each pipeline stage
+  (`pipeline_row_counts`), the eval scores (B2.4's `classifier_quality`), and the
+  one command that rebuilds everything from raw data (`make rebuild`). Measured
+  behind the corpus gate, like Beat 2 — real counts over a captured input, the
+  fixture-state note over the frozen synthetic input. Tag: *Measured*.
 
 ## Glossary
 

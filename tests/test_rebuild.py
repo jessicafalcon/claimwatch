@@ -37,9 +37,11 @@ _INSERT_RAW = (
 
 def test_zero_row_rebuild(tmp_path):
     """`none`: every input-driven table exists and is empty — the anchors seed
-    every other input, not this one. The three cost-model marts and the two
-    simulator marts fill by construction (they compute over the tracked fit, not
-    the input), so they are the exception and carry their constant counts."""
+    every other input, not this one. The three cost-model marts, the two
+    simulator marts and determinism_facts fill by construction (they compute over
+    the tracked fit or the repository, not the input), so they are the exception
+    and carry their constant counts. pipeline_row_counts fills in the classify
+    path, not rebuild(), so over a rebuild()-only `none` build it is empty."""
     counts = rebuild("duckdb", "none", root=tmp_path)
     assert set(counts) >= {"raw_reviews", "stg_reviews", "raw_platform_snapshots"}
     model_marts = {
@@ -48,6 +50,7 @@ def test_zero_row_rebuild(tmp_path):
         "cost_curves": pins.COST_CURVE_ROWS,
         "guardrail_sim": pins.GUARDRAIL_SIM_ROWS,
         "sla_threshold": pins.SLA_THRESHOLD_ROWS,
+        "determinism_facts": pins.DETERMINISM_FACT_ROWS,
     }
     assert all(n == 0 for name, n in counts.items() if name not in model_marts), counts
     for mart, expected in model_marts.items():

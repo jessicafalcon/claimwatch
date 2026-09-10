@@ -585,4 +585,23 @@
 <div class="pending">No number yet: a false-positive rate per flag rule needs an outcome log — each hold recorded as fraud-confirmed or released-clean — that the system does not keep. The same event stream would also trigger a status notification against silent rejections, from the events already recorded.</div>
 <p class="evidence">Evidence: B4.4 · Pending · source pending</p>
 </section>
+<h2 class="beat">Beat 5 — How this was built, and where the rigor lives</h2>
+<section class="panel">
+<h3>B5.1 · The facts you can check <span class="chip chip-measured">Measured</span></h3>
+<p class="blurb">Three facts about how this study is built, each a count you can verify in the code. A language model makes a decision in exactly one place; the cost model&#x27;s formulas are printed next to the numbers they give; and every number on the page carries a tag saying where it came from.</p>
+<div class="stat-row">
+<div class="stat"><div class="stat-value">1</div><div class="stat-label">Places a language model makes a decision</div><span class="chip chip-measured">Measured</span></div>
+<div class="stat"><div class="stat-value">14</div><div class="stat-label">Cost-model formulas shown beside their output</div><span class="chip chip-measured">Measured</span></div>
+<div class="stat"><div class="stat-value">4</div><div class="stat-label">Evidence tags in the study&#x27;s closed set</div><span class="chip chip-measured">Measured</span></div>
+</div>
+<p class="note">One place a model decides: every other tag comes from rules, SQL or arithmetic. The formulas are the cost-model ones printed next to their output in &quot;What a wrongly held claim costs&quot; above — redo any by hand. Every number on this page carries one of three tags — Measured, Documented or Modeled — and a panel with no number yet is marked Pending, so nothing stands unsourced.</p>
+<p class="evidence">Evidence: B5.1 · Measured · source files classify/llm.py, models/cost_model.py, study/model.py</p>
+</section>
+<section class="panel">
+<h3>B5.2 · Rerun it and the numbers hold <span class="chip chip-measured">Measured</span></h3>
+<p class="blurb">The same reviews always produce the same numbers. This is how many reviews the pipeline holds at each step — as scraped, after removing duplicates, and after tagging by theme — so anyone can rebuild the study from the raw data and check every count.</p>
+<div class="fixture">Built from hand-written example reviews: a check that the study’s machinery works, not a result. The counted figures appear when the study is built over captured reviews.</div>
+<p class="note">How good the tagging is — precision and recall on reviews the classifier never saw — is the classifier-quality table above. One command rebuilds every number in this study from the raw reviews: `make rebuild`. Run it twice and the counts do not move.</p>
+<p class="evidence">Evidence: B5.2 · Measured · source file pipeline/build.py</p>
+</section>
 </main></body></html>

@@ -84,13 +84,16 @@ Delivered paragraph and `make help`, not here.
   the header names the grain, the provenance columns and the BACKING rows
   fed. A Python-fed mart (`classifier_quality`, `stg_classified_reviews`, the
   three cost-model marts and the two simulator marts — `guardrail_sim`,
-  `sla_threshold`, five in all — plus the two theme-share marts) has a DDL-only
+  `sla_threshold`, five in all — the two theme-share marts, and the two Beat 5
+  marts — `determinism_facts` filled in `rebuild()` on every input, and
+  `pipeline_row_counts` filled in the classify path) has a DDL-only
   `.sql` and one writer in `pipeline/build.py`; the two theme-share marts are
   additionally excluded from the generic marts loop (run after classify).
 - `pipeline/` — `warehouse.py` (the one place that knows DuckDB from
   Snowflake), `build.py` (raw → staging → marts; the review load stamps
-  `segment`), `cli.py` (the validating `make` entry), `sql_lint.py` (the
-  portability/clock denylist), `metrics.py`, `label_sample.py`.
+  `segment`; also `reviews_per_month`, a printed pipeline-health query, and the
+  two Beat 5 mart writers), `cli.py` (the validating `make` entry), `sql_lint.py`
+  (the portability/clock denylist), `label_sample.py`.
 - `ingest/` — the scrapers: `politeness.py`, `robots.py` (RFC 9309),
   `sources.py` (every source as one declaration; the one place a
   brand-carrying address may appear; the one binding of the cache root),
@@ -126,7 +129,7 @@ Delivered paragraph and `make help`, not here.
   `export.py` (the hand-written inline-SVG charts — line, grouped bars, the
   stat row, the metric table, the formula list, the curve with its markers,
   the range marks — and the page), `__main__.py` (the `make study` entry), the
-  committed `friction_ledger.html`; Beats 1–4 render (9a–9d), Beat 5, the README
+  committed `friction_ledger.html`; Beats 1–5 render (9a–9e), the README
   and the Metabase demonstration are later Phase 9 sub-phases.
   `dags/` *(Phase 10)* — `friction_ledger.py`.
 - `fixtures/` — read-only after Phase 1, each set with a `MANIFEST.sha256`:
@@ -728,16 +731,23 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 ## Current status
 
-**In progress: Phase 9d — Beat 4** (branch `phase-9d`, spec
-`specs/phase-9d-beat-4.md`, challenged round 1, spec `50966c34` — rework scoped
-to B4.1, all amendments applied). Beat 4 renders through the 9a/9c contract: B4.1
-the net curve across the four scenarios (`cost_curves`), B4.2 the computed
-hold-length threshold (`sla_threshold`, a `stat_row`), B4.3 the before/after
-holds per fix (`guardrail_sim` aggregated in SQL, pinned to `summarize`), B4.4
-Pending. No new dependency, no `make` target, no new chart `Kind`.
+**In progress: Phase 9e — Beat 5** (branch `phase-9e`, spec
+`specs/phase-9e-beat-5.md`, challenged round 1, spec `757bbe04` — rework, all
+amendments applied). Beat 5 renders through the 9a/9c contract, adding two
+single-grain Python-fed marts: B5.1 the checkable repo facts (`determinism_facts`,
+filled in `rebuild()`, a `stat_row`, Measured and NOT corpus-gated — the model
+site counted via the import-tree walk, the formulas via `FORMULAS`, the tags via
+`TAGS`), B5.2 the per-stage row counts (`pipeline_row_counts`, filled in the
+classify path, a `table`, Measured behind the corpus gate like Beat 2). The
+`reviews_per_month` query relocated from the deleted `pipeline/metrics.py` into
+`pipeline/build.py`. BACKING B5.1/B5.2 flipped Pending → Measured. No new
+dependency, no `make` target, no new chart `Kind`.
 
-**Merged:** Phases 0a–9c in order, each with its spec under `specs/` (the
-Delivered paragraph) and its DECISIONS appendix — 9c (PR #25, 2026-09-09: Beat
+**Merged:** Phases 0a–9d in order, each with its spec under `specs/` (the
+Delivered paragraph) and its DECISIONS appendix — 9d (PR #27, 2026-09-10: Beat 4,
+the three fixes drawn beside the Beat 3 curves — B4.1 the four-scenario net curve,
+B4.2 a computed `stat_row` threshold, B4.3 one bar per scenario pinned to
+`summarize`, B4.4 Pending) then 9c (PR #25, 2026-09-09: Beat
 3, the first Modeled panels — the formula list, the crossover curve with its
 markers, the drawn parameter ranges; `study/text.py`) then 9b (PR #23,
 2026-09-09) and the fix PR `fix/cost-outputs-unit` (PR #24, 2026-09-09:
@@ -749,11 +759,11 @@ promoted). Phase 8b — the guardrail simulator (B4.1–B4.3, PR #19,
 2026-09-07) — landed `models/guardrail_sim.py::RULES`, the hold timer's three
 formulas in `models/cost_model.py`, the two simulator marts and `make simulate`.
 
-**Next (Phase 9 sub-phases, in order):** 9e — Beat 5; 9f — the README + the
-stranger acceptance test (and the live-slider decision); 9g — the Metabase
-demonstration (the review-level drill, non-CI). Plus two pulled-out data phases:
-the claims sample-mean slider and data.ameli practitioner fees.
+**Next (Phase 9 sub-phases, in order):** 9f — the README + the stranger
+acceptance test (and the live-slider decision); 9g — the Metabase demonstration
+(the review-level drill, non-CI). Plus two pulled-out data phases: the claims
+sample-mean slider and data.ameli practitioner fees.
 
-Open BACKLOG rows: **41**.
+Open BACKLOG rows: **40**.
 
 (Update this section at the end of every working day.)

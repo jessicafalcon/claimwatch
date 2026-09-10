@@ -238,3 +238,40 @@ BEAT4_PENDING = (
     "does not keep. The same event stream would also trigger a status "
     "notification against silent rejections, from the events already recorded."
 )
+
+
+# --- Beat 5: the facts you can check, and reproducibility ----------------------
+# B5.1's three facts, in render order: the display label and unit for each
+# `determinism_facts` key (a count). A key outside this closed map refuses by name
+# in the reader — the mart and the page name the same three facts.
+DETERMINISM_FACTS = {
+    "model_call_sites": ("Places a language model makes a decision", "count"),
+    "formulas_shown": ("Cost-model formulas shown beside their output", "count"),
+    "evidence_tags": ("Evidence tags in the study's closed set", "count"),
+}
+# B5.1's note, second layer: what each fact means and how a reader checks it.
+DETERMINISM_NOTE = (
+    "One place a model decides: every other tag comes from rules, SQL or "
+    "arithmetic. The formulas are the cost-model ones printed next to their "
+    'output in "What a wrongly held claim costs" above — redo any by hand. Every '
+    "number on this page carries one of three tags — Measured, Documented or "
+    "Modeled — and a panel with no number yet is marked Pending, so nothing "
+    "stands unsourced."
+)
+# B5.2's stage display names, in flow order: the `pipeline_row_counts` stage key
+# (a table name) → what it is in plain words. A key outside this closed map
+# refuses by name.
+ROW_COUNT_STAGES = {
+    "raw_reviews": "Reviews as scraped",
+    "stg_reviews": "After removing duplicates",
+    "stg_classified_reviews": "Tagged by theme (one row per review × theme)",
+}
+# B5.2's note: the eval scores live in the classifier-quality panel above (B2.4,
+# not copied here), and the one command that rebuilds everything from raw data.
+# `make rebuild` is named as text, never a live counter.
+ROW_COUNTS_NOTE = (
+    "How good the tagging is — precision and recall on reviews the classifier "
+    "never saw — is the classifier-quality table above. One command rebuilds "
+    "every number in this study from the raw reviews: `make rebuild`. Run it "
+    "twice and the counts do not move."
+)

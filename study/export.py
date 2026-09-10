@@ -45,7 +45,13 @@ from study.model import (
     has_values,
     x_key,
 )
-from study.panels import beat1_panels, beat2_panels, beat3_panels, beat4_panels
+from study.panels import (
+    beat1_panels,
+    beat2_panels,
+    beat3_panels,
+    beat4_panels,
+    beat5_panels,
+)
 from study.text import FIXED_RANGE
 
 # The render input is the frozen synthetic database: Beat 1's Documented points
@@ -284,15 +290,17 @@ def _render_stat_row(panel: Panel) -> list[str]:
 
 
 def _metric_cell(point) -> str:
-    """One table cell: a value with its raw counts, or a labelled absence with
-    its counts — never both, never blank (`check_panel` guarantees the xor)."""
+    """One table cell: a value, or a labelled absence — never both, never blank
+    (`check_panel` guarantees the xor). Its raw counts ride in a `cnt` span when
+    the point carries a `detail` (B2.4's hits/denominator); a cell with no detail
+    shows the bare value (B5.2's stage counts)."""
     if point.absent:
         absence = f'<span class="absent">{_esc(point.absent)}</span>'
-        return f"{absence} ({_esc(point.detail)})"
-    return (
-        f"{_esc(display(point.value, point.unit))} "
-        f'<span class="cnt">({_esc(point.detail)})</span>'
-    )
+        return f"{absence} ({_esc(point.detail)})" if point.detail else absence
+    value = _esc(display(point.value, point.unit))
+    if not point.detail:
+        return value
+    return f'{value} <span class="cnt">({_esc(point.detail)})</span>'
 
 
 def _render_table(panel: Panel) -> list[str]:
@@ -618,9 +626,9 @@ def _drill(panel: Panel) -> str:
         verb = "the counted figures will open to" if panel.fixture else "opens to"
         clauses.append(f"{verb} {opened}")
     if files:
-        # No panel carries two file sources today; a plural form is added with
-        # the first that does (fix/drill-footer-verb, round 1 #3).
-        clauses.append("source file " + ", ".join(_esc(f) for f in files))
+        # B5.1 is the first panel with more than one file source (9e round 1 #1).
+        label = "source file" if len(files) == 1 else "source files"
+        clauses.append(f"{label} " + ", ".join(_esc(f) for f in files))
     if not clauses:
         return "source pending"
     return "; ".join(clauses)
@@ -666,6 +674,7 @@ _BEATS = (
     ("Beat 2 — The complaints have a shape", beat2_panels),
     ("Beat 3 — What a wrongly held claim costs", beat3_panels),
     ("Beat 4 — Three small fixes, no system overhaul", beat4_panels),
+    ("Beat 5 — How this was built, and where the rigor lives", beat5_panels),
 )
 
 
