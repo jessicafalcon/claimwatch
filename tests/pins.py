@@ -583,3 +583,23 @@ BEAT3_FRAGMENTS = {
     "unsourced default (flag_rate, pct)": ">5.0%<",
     "crossover row (rate as pct)": ">9.5%<",
 }
+
+# --- Phase 9d: Beat 4 rendered — the three fixes beside the Beat 3 curves ------
+# Every Beat 4 number is a mart cell filled on every rebuild input (SIM_SUMMARY,
+# SLA_THRESHOLD_SAMPLE, TIMER_DEFAULT_DAY above are its source, reused not
+# retyped). The committed page shows these; the tests prove the readers.
+BEAT4_PANELS = ("B4.1", "B4.2", "B4.3", "B4.4")
+BEAT4_NET_SERIES = 4  # baseline + the three toggled scenarios, ≤ 5-slot palette
+# B4.1's net curves span all four scenarios: the min (baseline, deep negative)
+# and max (both) each round outward to one significant figure. A signed domain,
+# unlike curve_domain's 0-floor (net dips below zero — the crossover).
+BEAT4_NET_DOMAIN = (-2_000_000.0, 2_000_000.0)
+# The three fixes B4.3 draws (SIM_SCENARIO_MAP minus no_fix, the "before"); the
+# clock is the only one that releases claims early (SIM_SUMMARY).
+BEAT4_FIXES = ("ask_once", "hold_timer", "both_fixes")
+BEAT4_FRAGMENTS = {
+    "threshold day (stat, days)": ">14.0 days<",
+    "threshold amount (stat, eur)": ">€42.67<",
+    "threshold share (stat, pct)": ">49.0%<",
+    "released share (note, pct)": "releases 49.0% of held claims",
+}

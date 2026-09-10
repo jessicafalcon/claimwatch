@@ -25,7 +25,8 @@ from typing import Literal
 
 from classify.eval.gate import ANSWER_KEY
 from classify.labels import POSITIVE, THEMES, UNCLASSIFIED
-from models.cost_model import FORMULAS, SCENARIOS, Formula
+from models.cost_model import FORMULAS, SCENARIOS, Formula, rounded
+from models.guardrail_sim import SIM_SCENARIOS
 from opendata.fit import ARTIFACT
 from opendata.sources import DATASET_API
 from pipeline.build import INPUTS
@@ -94,6 +95,17 @@ ALLOWED_COLUMNS = frozenset(
         "friction_cost",
         "net",
         "is_default",
+        # Beat 4 (9d): sla_threshold (B4.2) and the guardrail_sim aggregate
+        # (B4.3). `mean_hold_days`/`released`/`claim_count` are the aggregate's
+        # own aliases; the raw per-claim columns (hold_days, outcome, quantile,
+        # amount_eur, loop_days, claim_rank, curves_scenario) are never
+        # projected to the page — the reduction happens in the query.
+        "timer_days",
+        "timer_amount_eur",
+        "share_under",
+        "mean_hold_days",
+        "released",
+        "claim_count",
     }
 )
 
@@ -138,10 +150,11 @@ _Q_COST_OUTPUTS = (
     "select scenario, name, expression, value, unit, tag "
     "from cost_model_outputs order by scenario, name"
 )
-# `net` is projected and allowlisted but read by no Beat 3 reader: the marker is
-# the outputs mart's crossover row, never a scan of `net` (pinned decision 4).
-# SPEC Scope carries it in the allowlist for 9d's B4.1; a mutation to it moves
-# no page number (test_a_mutated_mart_cell_moves_the_page_and_the_expression_stays).
+# `net` is read by no Beat 3 reader — B3.2's marker is the outputs mart's
+# crossover row, never a scan of `net` (pinned decision 4), so a mutated `net`
+# cell moves no Beat 3 number. Beat 4's B4.1 (9d) is the reader of `net`: the
+# net curve per scenario. `tests/test_beat3.py` pins both (Beat 3 unmoved, Beat
+# 4 moved); `tests/test_beat4.py` pins the curve.
 _Q_COST_CURVES = (
     "select scenario, flag_rate, fraud_saved, friction_cost, net, is_default, tag "
     "from cost_curves order by scenario, flag_rate"
@@ -149,6 +162,24 @@ _Q_COST_CURVES = (
 _Q_COST_PARAMS = (
     "select name, default_value, unit, sourcing, citation, low, high, tag "
     "from cost_model_params order by name"
+)
+# Beat 4 (9d). B4.3 reads guardrail_sim through one SQL aggregate — the mean
+# hold and the timer-released share per scenario — the shape Phase 8b's BACKLOG
+# row named and a test pins equal to `models.guardrail_sim.summarize` (pinned
+# decision 4). The `case` idiom is the portable conditional count (Snowflake has
+# no `filter`); no clock, no pattern, so `sql_lint` passes. The per-claim
+# columns stay in the query — only the reduced aliases reach the page.
+_Q_GUARDRAIL_AGG = (
+    "select scenario, tag, avg(hold_days) as mean_hold_days, "
+    "sum(case when outcome = 'timer_released' then 1 else 0 end) as released, "
+    "count(*) as claim_count "
+    "from guardrail_sim group by scenario, tag order by scenario, tag"
+)
+# B4.2 reads sla_threshold whole and picks the is_default row in Python (no
+# filter literal in the SQL, the Beat 3 pattern); exactly one row is the default.
+_Q_SLA_THRESHOLD = (
+    "select timer_days, timer_amount_eur, share_under, is_default, tag "
+    "from sla_threshold order by timer_days"
 )
 
 # The marts a corpus panel gates on: it reads their `run_id` to decide numbers
@@ -196,6 +227,8 @@ STUDY_QUERIES = (
     _Q_COST_OUTPUTS,
     _Q_COST_CURVES,
     _Q_COST_PARAMS,
+    _Q_GUARDRAIL_AGG,
+    _Q_SLA_THRESHOLD,
 ) + tuple(_run_id_sql(mart) for mart in _CORPUS_MARTS)
 
 
@@ -999,16 +1032,21 @@ def _crossover_note(markers: tuple[tuple[str, float], ...]) -> str:
     )
 
 
+def _sig_ceil(value: float) -> float:
+    """A positive value rounded up to one significant figure (4,530,293.45 →
+    5,000,000) — the curve charts' domain-bound rule, shared by `curve_domain`
+    (Beat 3) and `net_domain` (Beat 4, mirrored downward)."""
+    magnitude = 10 ** floor(log10(value))
+    return float(ceil(value / magnitude) * magnitude)
+
+
 def curve_domain(values: Iterable[float]) -> tuple[float, float]:
     """The curve chart's y domain — a layout number by one fixed rule: lower
     bound 0, upper bound the largest value rounded up to one significant figure
     (4,530,293.45 → 5,000,000). The same cells give the same domain; no
     displayed figure derives from it (invariant 9)."""
     top = max(values, default=0.0)
-    if top <= 0:
-        return (0.0, 1.0)
-    magnitude = 10 ** floor(log10(top))
-    return (0.0, float(ceil(top / magnitude) * magnitude))
+    return (0.0, 1.0) if top <= 0 else (0.0, _sig_ceil(top))
 
 
 def _parameter_rows(conn, sourcing: Sourcing, panel_id: str) -> tuple[Series, ...]:
@@ -1189,5 +1227,291 @@ def beat3_panels(conn) -> list[Panel]:
                 "public benchmark; if one is handed over, the row moves to the "
                 "sourced panel with its citation and nothing else changes.",
             ),
+        ),
+    ]
+
+
+# --- Beat 4 readers (Phase 9d): the three fixes, drawn beside the Beat 3 curves --
+def net_domain(values: Iterable[float]) -> tuple[float, float]:
+    """B4.1's y domain — the net curve dips below zero (the crossover), so unlike
+    `curve_domain` the lower bound follows the data: each non-zero bound rounded
+    outward to one significant figure (−1,337,879.52 → −2,000,000; 1,309,102.82
+    → 2,000,000). A layout number by one fixed rule; no displayed figure derives
+    from it (the `curve_domain` invariant, mirrored)."""
+    vals = list(values)
+    lo, hi = min(vals, default=0.0), max(vals, default=0.0)
+    bottom = -_sig_ceil(-lo) if lo < 0 else 0.0
+    top = _sig_ceil(hi) if hi > 0 else 0.0
+    return (0.0, 1.0) if top == bottom else (bottom, top)
+
+
+def _net_curves(conn, panel_id: str) -> tuple[Series, ...]:
+    """B4.1: one net (fraud − friction) curve per cost-model scenario, in
+    `SCENARIOS` order — baseline the reference — four series within the
+    five-slot palette, each a series of `cost_curves` `net` cells keyed on
+    `scenario`. The display names are the closed `SCENARIO_NAMES` map, pinned
+    equal to the scenario set."""
+    if tuple(text.SCENARIO_NAMES) != tuple(SCENARIOS):
+        raise RenderRefused(
+            f"{panel_id}: SCENARIO_NAMES {tuple(text.SCENARIO_NAMES)} are not the "
+            f"cost-model scenarios {tuple(SCENARIOS)}"
+        )
+    series = []
+    for slot, scenario in enumerate(text.SCENARIO_NAMES):
+        points = [
+            Point(
+                x_key(float(_require(flag_rate, "flag_rate", panel_id))),
+                float(_require(net, "net", panel_id)),
+                str(_require(tag, "tag", panel_id)),
+                "",
+                "eur",
+            )
+            for flag_rate, _fraud, _friction, net, _is_default, tag in _scenario_rows(
+                conn, _Q_COST_CURVES, scenario, panel_id
+            )
+        ]
+        series.append(Series(text.SCENARIO_NAMES[scenario], slot, tuple(points)))
+    return tuple(series)
+
+
+def _net_marker(conn, panel_id: str) -> tuple[tuple[str, float], ...]:
+    """B4.1's single "you are here" rule: the default flag rate, read from the
+    baseline scenario's `is_default` row (every scenario shares the grid and the
+    default). Exactly one default row, on a grid x the curves draw."""
+    defaults = [
+        float(_require(flag_rate, "flag_rate", panel_id))
+        for flag_rate, *_rest, is_default, _tag in _scenario_rows(
+            conn, _Q_COST_CURVES, BASELINE, panel_id
+        )
+        if is_default
+    ]
+    if len(defaults) != 1:
+        raise RenderRefused(
+            f"{panel_id}: cost_curves marks {len(defaults)} default rows for "
+            f'{BASELINE} — exactly one is the "you are here" rule'
+        )
+    return ((text.MARKER_DEFAULT, defaults[0]),)
+
+
+def _hold_summary(conn, panel_id: str) -> dict[str, tuple[float, float, str]]:
+    """B4.3: the mean hold days and the timer-released share per simulator
+    scenario, from one SQL aggregate over `guardrail_sim`, rounded at the model's
+    one site (`rounded`) — the reduction a test pins equal to
+    `guardrail_sim.summarize` (pinned decision 4). The share is `released` /
+    `claim_count`, exact. A scenario outside the closed `SIM_SCENARIOS` set, a
+    scenario carrying two tags, or a missing one, refuses by name."""
+    known = {s.name for s in SIM_SCENARIOS}
+    summary: dict[str, tuple[float, float, str]] = {}
+    for scenario, tag, mean_hold, released, claim_count in _rows(
+        conn, _Q_GUARDRAIL_AGG
+    ):
+        if scenario not in known:
+            raise RenderRefused(
+                f"{panel_id}: guardrail_sim scenario {scenario!r} is not one of "
+                f"{tuple(sorted(known))}"
+            )
+        if scenario in summary:
+            raise RenderRefused(
+                f"{panel_id}: guardrail_sim scenario {scenario!r} carries two tags"
+            )
+        n = int(_require(claim_count, "claim_count", panel_id))
+        summary[scenario] = (
+            rounded("days", float(_require(mean_hold, "mean_hold_days", panel_id))),
+            rounded("rate", int(_require(released, "released", panel_id)) / n),
+            str(_require(tag, "tag", panel_id)),
+        )
+    for name in known:
+        if name not in summary:
+            raise RenderRefused(
+                f"{panel_id}: guardrail_sim has no rows for scenario {name!r}"
+            )
+    return summary
+
+
+def _hold_bars(
+    summary: dict[str, tuple[float, float, str]], panel_id: str
+) -> tuple[Series, ...]:
+    """B4.3: two bars per fix — the hold before (the `no_fix` scenario) and after
+    (the fix's own scenario), in `FIX_NAMES` order; the "before" is the same
+    `no_fix` hold for every fix (SPEC B4.3: two hold lengths per fix). Each bar
+    carries the mart's own tag (from the aggregate), never a literal."""
+    fixes = tuple(s.name for s in SIM_SCENARIOS if s.name != "no_fix")
+    if tuple(text.FIX_NAMES) != fixes:
+        raise RenderRefused(
+            f"{panel_id}: FIX_NAMES {tuple(text.FIX_NAMES)} are not the fix "
+            f"scenarios {fixes}"
+        )
+    before, _b_share, before_tag = summary["no_fix"]
+    series = []
+    for slot, fix in enumerate(text.FIX_NAMES):
+        after, _share, after_tag = summary[fix]
+        series.append(
+            Series(
+                text.FIX_NAMES[fix],
+                slot,
+                (
+                    Point(text.HOLD_BEFORE, before, before_tag, "", "days"),
+                    Point(text.HOLD_AFTER, after, after_tag, "", "days"),
+                ),
+            )
+        )
+    return tuple(series)
+
+
+def _threshold_row(conn, panel_id: str) -> tuple:
+    """B4.2: the one `is_default` row of `sla_threshold` — the timer day, the
+    net-negative amount, the share under it, its tag. Exactly one default row."""
+    rows = [
+        (timer_days, amount, share, tag)
+        for timer_days, amount, share, is_default, tag in _rows(conn, _Q_SLA_THRESHOLD)
+        if is_default
+    ]
+    if len(rows) != 1:
+        raise RenderRefused(
+            f"{panel_id}: sla_threshold marks {len(rows)} default rows — exactly one"
+        )
+    return rows[0]
+
+
+def _threshold_stats(row: tuple, panel_id: str) -> tuple[Series, ...]:
+    """B4.2's stat row: the three cells of the default threshold row, each a
+    `sla_threshold` cell in its display unit, all carrying the row's own tag."""
+    timer_days, amount, share, tag = row
+    tag = str(_require(tag, "tag", panel_id))
+    points = (
+        Point(
+            "Clock fires after",
+            float(_require(timer_days, "timer_days", panel_id)),
+            tag,
+            "",
+            "days",
+        ),
+        Point(
+            "Net-negative below",
+            float(_require(amount, "timer_amount_eur", panel_id)),
+            tag,
+            "",
+            "eur",
+        ),
+        Point(
+            "Claims under that amount",
+            float(_require(share, "share_under", panel_id)),
+            tag,
+            "",
+            "pct",
+        ),
+    )
+    return (Series("threshold", 0, points),)
+
+
+def beat4_panels(conn) -> list[Panel]:
+    """The four Beat 4 panels: B4.1 the net curve across the four scenarios, B4.2
+    the computed hold-length threshold, B4.3 the before/after holds per fix, B4.4
+    the Pending outcome-log panel. Every number a `cost_curves`, `sla_threshold`
+    or `guardrail_sim` cell, filled on every rebuild input — so no corpus gate,
+    and the committed page shows these numbers."""
+    net = _net_curves(conn, "B4.1")
+    threshold = _threshold_row(conn, "B4.2")
+    t_days, t_amount, t_share, _t_tag = threshold
+    summary = _hold_summary(conn, "B4.3")
+    bars = _hold_bars(summary, "B4.3")
+    return [
+        Panel(
+            id="B4.1",
+            backing_row="B4.1",
+            title="The curves move",
+            blurb=(
+                "The first fix ends the back-and-forth for documents: one request "
+                "returns the whole list. Fewer stuck claims means less friction, "
+                "so the net line — fraud saved minus friction cost — lifts. Each "
+                "line is one scenario; the fraud caught is unchanged, so what "
+                "moves is the cost."
+            ),
+            tag="Modeled",
+            kind="curve",
+            series=net,
+            markers=_net_marker(conn, "B4.1"),
+            domain=net_domain(p.value for s in net for p in s.points),
+            sources=_FIT_SOURCES,
+            notes=(
+                "Each line is the net at the same defaults with one or two inputs "
+                "changed — ask-once sets contacts to one, the clock is modelled as "
+                "halving the customers lost, both apply together. The fixes do not "
+                "change the fraud caught, only the friction, so the fraud-saved "
+                "curve of Beat 3 is the same under every scenario.",
+                "The rule is the default flag rate, read from the model’s own "
+                "row, not the drawing (the crossover of Beat 3 above). Where a net "
+                "line stays above zero across the grid, that scenario never "
+                "reaches a rate at which the flags cost more than they recover.",
+            ),
+        ),
+        Panel(
+            id="B4.2",
+            backing_row="B4.2",
+            title="A clock on every hold",
+            blurb=(
+                "The second fix puts a timer on each held claim: past a threshold, "
+                "a small low-risk claim releases itself and a large one goes to a "
+                "person. The threshold is computed from the Beat 3 model, not "
+                "guessed — the day and amount below which a hold that long costs "
+                "more than it saves."
+            ),
+            tag="Modeled",
+            kind="stat_row",
+            series=_threshold_stats(threshold, "B4.2"),
+            sources=_FIT_SOURCES,
+            notes=(
+                text.threshold_note(
+                    display(float(_require(t_days, "timer_days", "B4.2")), "days"),
+                    display(
+                        float(_require(t_amount, "timer_amount_eur", "B4.2")), "eur"
+                    ),
+                    display(float(_require(t_share, "share_under", "B4.2")), "pct"),
+                ),
+                "The threshold is the amount at which the friction of a hold that "
+                "long equals the fraud it could still catch, read from the cost "
+                "model’s own rows — the same arithmetic printed in Beat 3, at the "
+                "baseline defaults.",
+            ),
+        ),
+        Panel(
+            id="B4.3",
+            backing_row="B4.3",
+            title="Before and after",
+            blurb=(
+                "What the fixes do to how long a claim waits: the mean hold in "
+                "days before any fix and after each one. Ask-once cuts the "
+                "document loop to a single round; the clock releases the small "
+                "low-risk claims early."
+            ),
+            tag="Modeled",
+            kind="grouped_bar",
+            series=bars,
+            domain=curve_domain(p.value for s in bars for p in s.points),
+            sources=_FIT_SOURCES,
+            notes=(
+                text.released_note(
+                    display(summary["hold_timer"][1], "pct"),
+                ),
+                "The holds are the mean over a thousand synthetic claims — the "
+                "fitted distribution read at a thousand evenly spaced points, no "
+                "individual claim, none is public. Two hold lengths per fix, not a "
+                "distribution: the document loop, or the timer, whichever ends the "
+                "hold first.",
+            ),
+        ),
+        Panel(
+            id="B4.4",
+            backing_row="B4.4",
+            title="Count the mistakes",
+            blurb=(
+                "The third fix records how each hold ends — fraud confirmed, or "
+                "released clean. That log is the false-positive rate per flag "
+                "rule the system otherwise never learns, and the same events "
+                "power a status notification that ends silent rejections."
+            ),
+            tag="Pending",
+            kind="hero",
+            placeholder=text.BEAT4_PENDING,
         ),
     ]

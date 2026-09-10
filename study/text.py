@@ -157,3 +157,70 @@ def crossover_note(crossover: str | None, marginal: str | None, default: str) ->
             "past it, the flags as a whole cost more than they recover."
         )
     return f"{marginal_sentence} {crossover_sentence}"
+
+
+# --- Beat 4 (Phase 9d): the three fixes, drawn beside the Beat 3 curves --------
+# B4.1's four net curves, keyed by the cost-model scenario each draws
+# (`models.cost_model.SCENARIOS`) and in that draw order — baseline first, the
+# reference. `churn_halved` is the cost-curve effect the hold timer is modelled
+# as (fewer customers lost), which is why its display name names the clock.
+# A test pins these keys equal to `SCENARIOS` (the B4.1 palette is ≤ 5 series).
+SCENARIO_NAMES = {
+    "baseline": "Today, no fix",
+    "contacts_once": "Ask once",
+    "churn_halved": "A clock on every hold",
+    "both": "Both fixes",
+}
+# B4.3's three fixes, keyed by the simulator scenario each measures
+# (`models.guardrail_sim.SIM_SCENARIOS`, minus `no_fix` — the "before"); a test
+# pins these keys equal to the fix scenarios. The two hold lengths per fix are
+# labelled before/after (SPEC B4.3: "two hold lengths per fix").
+FIX_NAMES = {
+    "ask_once": "Ask once",
+    "hold_timer": "A clock on every hold",
+    "both_fixes": "Both fixes",
+}
+HOLD_BEFORE = "before"
+HOLD_AFTER = "after"
+
+
+# The B4.2 note: the clock's arithmetic, filled from the `sla_threshold`
+# is_default row's three cells (a reading of the mart, never a typed figure) —
+# the timer day, the claim amount below which a hold that long is net-negative,
+# and the share of synthetic claims under it.
+def threshold_note(timer_days: str, amount: str, share: str) -> str:
+    """The sentence beneath B4.2, from the three displayed cells of the default
+    threshold row: a hold beyond the timer day on a claim under the amount costs
+    more in friction than the fraud it could still catch, so it auto-releases;
+    the share names how many claims fall under that amount."""
+    return (
+        f"Holds beyond {timer_days} on claims under {amount} are net-negative in "
+        f"expectation — the friction they add outweighs the fraud they still "
+        f"catch — so past {timer_days} a small claim auto-releases and a large "
+        f"one goes to a person. {share} of synthetic claims fall under that "
+        "amount."
+    )
+
+
+# The B4.3 note figure: where the released share renders (a note, not a bar —
+# the bars are the two hold lengths per fix). Only the clock releases claims;
+# once the document loop is already one round, the timer has nothing left to
+# release, so ask-once and both-fixes release none (SPEC Beat 4).
+def released_note(clock_share: str) -> str:
+    """The sentence naming the clock's released share, from the `hold_timer`
+    scenario's aggregate cell."""
+    return (
+        f"The clock alone releases {clock_share} of held claims early. With the "
+        "document loop already cut to one round, ask-once and both-fixes leave "
+        "the timer nothing to release — the same hold as ask-once."
+    )
+
+
+# B4.4 is Pending: a design panel with no number, because the outcome log a
+# false-positive rate needs does not exist yet (SPEC B4.4).
+BEAT4_PENDING = (
+    "No number yet: a false-positive rate per flag rule needs an outcome log — "
+    "each hold recorded as fraud-confirmed or released-clean — that the system "
+    "does not keep. The same event stream would also trigger a status "
+    "notification, which fixes silent rejections for free."
+)

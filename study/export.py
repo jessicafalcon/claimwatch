@@ -45,7 +45,7 @@ from study.model import (
     has_values,
     x_key,
 )
-from study.panels import beat1_panels, beat2_panels, beat3_panels
+from study.panels import beat1_panels, beat2_panels, beat3_panels, beat4_panels
 from study.text import FIXED_RANGE
 
 # The render input is the frozen synthetic database: Beat 1's Documented points
@@ -665,6 +665,7 @@ _BEATS = (
     ("Beat 1 — People are telling us what’s wrong, in public", beat1_panels),
     ("Beat 2 — The complaints have a shape", beat2_panels),
     ("Beat 3 — What a wrongly held claim costs", beat3_panels),
+    ("Beat 4 — Three small fixes, no rebuild required", beat4_panels),
 )
 
 

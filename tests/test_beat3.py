@@ -315,14 +315,20 @@ def test_a_mutated_mart_cell_moves_the_page_and_the_expression_stays(
     assert _FORMULA_ROW.findall(_section(after, "B3.1")) == _FORMULA_ROW.findall(
         _section(before, "B3.1")
     )
-    # `net` is read by no panel: the crossover marker comes from the outputs row,
-    # never from a scan of the curve, so a changed net cell moves nothing.
+    # `net` is read by no Beat 3 panel: B3.2's crossover marker comes from the
+    # outputs row, never a scan of the curve, so a changed net cell leaves every
+    # Beat 3 section unmoved. Beat 4's B4.1 (9d) *is* the reader of `net`, so the
+    # same mutation moves B4.1 — both directions pinned (the _Q_COST_CURVES
+    # comment; test_beat4 pins the curve).
     net_only = _mutated(
         synthetic_db,
         tmp_path / "net",
         ("update cost_curves set net = -1 where scenario = 'baseline'",),
     )
-    assert _html(net_only) == before
+    after_net = _html(net_only)
+    for pid in ("B3.1", "B3.2", "B3.3", "B3.4"):
+        assert _section(after_net, pid) == _section(before, pid), pid
+    assert _section(after_net, "B4.1") != _section(before, "B4.1")
 
 
 def test_every_rendered_expression_equals_the_formulas_entry_of_that_name(
