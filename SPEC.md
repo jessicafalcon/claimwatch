@@ -194,8 +194,11 @@ and "both fixes" show the same hold.
 
 - **B4.1 — Ask for everything once.** A lookup that returns the complete document
   list for a claim type and flag reason in one request, ending the serial
-  document loop — contacts per stuck claim drop to one, and the curves move. Tag:
-  *Modeled*.
+  document loop — contacts per stuck claim drop to one, and the curves move. The
+  chart draws the net (fraud saved minus friction cost) over the flag rate for
+  the baseline and all three toggled scenarios of B3.1/B3.2 — one net line each,
+  the fixes lifting the line; the fraud caught is unchanged, so what moves is the
+  cost. Tag: *Modeled*.
 - **B4.2 — A clock on every hold.** A timer on each held claim: past a threshold,
   small low-risk claims auto-release and large ones escalate to a person. The
   threshold is computed from the Beat 3 model, not guessed, and the arithmetic
