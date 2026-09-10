@@ -303,7 +303,10 @@ study names no insurer as its subject.
   for a non-technical reader; technical detail follows under a signpost.
   Rigor is never removed to simplify — it moves one layer down.
 - Name things by what they mean, not what they are.
-- One glossary, ten terms max, one sentence each with an everyday example.
+- One glossary per delivery surface (the README's for the arriving reader,
+  SPEC.md's for the chart reader), ten terms max each, one sentence each with an
+  everyday example; no term's definition contradicts the other's (DECISIONS →
+  Phase 9f).
 - Every number in prose wears its tag. No live counters: a "Day N since…"
   figure is frozen at the last publicly confirmed date and says so.
 - Hypothesis, not verdict: the study tests whether held-claim complaints are
@@ -734,7 +737,7 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 ## Current status
 
 **In progress: Phase 9f — the README + the stranger acceptance test** (branch
-`phase-9f`, spec `specs/phase-9f-readme.md`, challenged round 1, spec `89131ac9`
+`phase-9f`, spec `specs/phase-9f-readme.md`, challenged round 1, spec `997535b0`
 — approve with amendments, all applied, plus one build amendment dropping the
 Beat 1 "Day N" clause since B1.1 is Pending). The README tells the five beats in
 the two-layer voice and links every figure to its BACKING row; `tests/test_readme.py`

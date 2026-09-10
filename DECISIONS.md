@@ -2718,3 +2718,16 @@ no number.
 
 Challenge dispositions are recorded in the spec (round 1, 2026-09-10, approve with
 amendments — 5 should-fix and 2 suggestions applied).
+
+Exit reconciliation (2026-09-10, coherence-auditor): the study now ships **one
+glossary per delivery surface** — the README's ten reader terms (the four tags,
+"Held claim", "Theme share", "The gated classifier", "The crossover", …) and
+SPEC.md's chart terms ("Mart", "Provenance", "Eval set", …) — where the brief and
+CLAUDE.md's writing rule had said "one glossary". The two are content-coherent (no
+definition contradicts the other's) and serve distinct audiences: a stranger
+reading the README should not have to open SPEC.md to learn a term. The rule text
+in PROJECT_BRIEF §2.3 and CLAUDE.md → Writing rules was amended to "one glossary
+per delivery surface, ≤10 terms each"; `make check-docs` already enforces the ≤10
+per file. *Rejected: consolidating to a single canonical glossary — it costs the
+stranger-facing README its self-contained glossary, against the "reads the README
+first" goal.*

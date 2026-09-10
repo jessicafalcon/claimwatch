@@ -49,7 +49,7 @@ Why: trust is the bottleneck. If a reader has to take our word for a number, the
 - **Two-layer writing:** every document section and every dashboard panel opens with 2–3 sentences a non-technical person fully understands. Technical detail goes below, clearly signposted. If the plain layer can't be written, the section isn't understood well enough yet.
 - **Name things by what they mean, not what they are.** The metric is "days a legitimate claim spends blocked," not `fp_hold_duration_p90`. The dashboard tab is "What customers complain about," not "Classification Output." Table and column names follow the same spirit.
 - **Banned words** in the README and study: orchestration, leverage, robust, scalable, cutting-edge, LLM-powered (in headlines), state-of-the-art, seamless. Use instead: "runs every night," "handles new reviews without redoing old work," "a language model reads each review and tags what it's about."
-- **One glossary, ten terms max** (claim, hold, flag, false positive, first-pass rejection, second payer, etc.), each defined in one sentence with an everyday example.
+- **One glossary per delivery surface, ten terms max each** (claim, hold, flag, false positive, first-pass rejection, second payer, etc.), each defined in one sentence with an everyday example (the README and SPEC.md each carry one for their own audience — Phase 9f).
 - **The elevator test:** the repo's one-line description must work at a dinner table.
 - **Rigor stays visible.** Simple language never means removing the validation, the sensitivity analysis, or the bias checks. They live one layer down, plainly written, under headings like "How we made sure the numbers are trustworthy." Simplicity in presentation, not in method.
 
