@@ -7,7 +7,7 @@ study"), sub-phase 9e of the permanent-artifact-first split (DECISIONS → Phase
 closing part — the checkable facts and the reproducibility counts — and flips
 BACKING B5.1 and B5.2 from Pending to Measured.
 
-**Status: PROPOSED — do not start until approved.** No new dependencies: Beat 5
+**Status: APPROVED 2026-09-10 — in progress.** No new dependencies: Beat 5
 renders through the 9a/9c contract (`duckdb` + stdlib, hand-written inline SVG);
 no script, no new `make` target, no new chart `Kind`. Two new Python-fed marts
 (`determinism_facts`, `pipeline_row_counts`), each a DDL-only `.sql` filled by a
