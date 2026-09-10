@@ -599,20 +599,31 @@ def _drill(panel: Panel) -> str:
     addresses = [p.source_url for p in _points(panel)] + list(panel.sources)
     urls = sorted({u for u in addresses if _is_http(u)})
     links = [f'<a href="{_esc(u)}" rel="noopener">{_esc(u)}</a>' for u in urls]
-    links += [f"the repository file {_esc(f)}" for f in files]
     # The brief citation is DERIVED from the points shown: a Documented point is
     # a brief §6 anchor, so the footer names §6 exactly when one is drawn — never
-    # on any panel that happens to carry a URL (exit round, code-reviewer #1;
+    # on any panel that happens to carry a URL (9b exit round, code-reviewer #1;
     # BACKING B2.2/B2.5 list the platform roots alone).
     refs = ["PROJECT_BRIEF §6"] if "Documented" in _panel_tags(panel) else []
-    if not links and not refs:
+    # The verb applies to what the reader OPENS — an http address or the brief
+    # citation. A repository file is named as a source in its own clause, never
+    # "opened to": the page is static and a file is not a link
+    # (fix/drill-footer-verb).
+    opened = " and ".join(part for part in (", ".join(links), *refs) if part)
+    clauses: list[str] = []
+    if opened:
+        # Over a fixture input the body shows no number, so the footer says where
+        # the counted figures WILL open — not "opens to" beside "not a result"
+        # (9b exit round, code-reviewer #5). `fixture` is set by the gate from
+        # the mart's own run_id, never by a caller.
+        verb = "the counted figures will open to" if panel.fixture else "opens to"
+        clauses.append(f"{verb} {opened}")
+    if files:
+        # No panel carries two file sources today; a plural form is added with
+        # the first that does (fix/drill-footer-verb, round 1 #3).
+        clauses.append("source file " + ", ".join(_esc(f) for f in files))
+    if not clauses:
         return "source pending"
-    # Over a fixture input the body shows no number, so the footer says where
-    # the counted figures WILL open — not "opens to" beside "not a result"
-    # (exit round, code-reviewer #5). `fixture` is set by the gate from the
-    # mart's own run_id, never by a caller.
-    verb = "the counted figures will open to" if panel.fixture else "opens to"
-    return f"{verb} " + " and ".join(part for part in (", ".join(links), *refs) if part)
+    return "; ".join(clauses)
 
 
 def _is_http(url: str) -> bool:

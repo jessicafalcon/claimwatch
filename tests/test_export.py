@@ -192,7 +192,7 @@ def test_a_panel_source_is_an_address_or_a_repository_file_else_refused():
         )
 
     drilled = export._drill(panel((ANSWER_KEY_FILE,)))
-    assert drilled == f"opens to the repository file {ANSWER_KEY_FILE}"
+    assert drilled == f"source file {ANSWER_KEY_FILE}"  # a file, not "opened to"
     assert "href" not in drilled
     for bad in ("../secrets", "/etc/passwd", "javascript:alert(1)", "a b"):
         with pytest.raises(RenderRefused) as exc:
@@ -201,6 +201,14 @@ def test_a_panel_source_is_an_address_or_a_repository_file_else_refused():
     # over a fixture input the footer says where the figures WILL open.
     fixture = export._drill(panel(("https://x.example/",), fixture="fixture text"))
     assert fixture.startswith("the counted figures will open to ")
+    # address + file: two clauses joined by "; " — the address is "opened to",
+    # the file named as its own source (round 1 #1/#2, the "; " separator the
+    # page byte-check alone left unpinned).
+    both = export._drill(panel(("https://x.example/", ANSWER_KEY_FILE)))
+    assert both == (
+        'opens to <a href="https://x.example/" rel="noopener">https://x.example/</a>'
+        f"; source file {ANSWER_KEY_FILE}"
+    )
 
 
 def test_svg_numbers_are_fixed_precision_and_locale_independent(synthetic_db):

@@ -728,31 +728,18 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 ## Current status
 
-**In progress: `phase-9c-beat-3`** (spec `specs/phase-9c-beat-3.md`, APPROVED
-2026-09-09, challenged once — approve with amendments, all applied). Beat 3
-built 2026-09-09; review round 1 and the exit round (coherence-auditor,
-whole-repo) both complete, all findings fixed: the study's first
-Modeled panels. B3.1 the fourteen baseline formula rows, each expression beside
-its value and unit; B3.2 the two curves over the 41-point flag-rate grid with
-three markers read from the outputs mart (the default and the marginal
-crossover stack at one x); B3.3 the three headline figures above the sourced
-parameter rows; B3.4 the unsourced rows — each parameter a drawn range (low,
-default, high) with its display unit, prose unit and citation or the unsourced
-label, split by the mart's `sourcing` column. New: `study/text.py` (the words
-as data; the Beat 1–2 notes moved verbatim), three chart kinds, two units,
-`Series.key`/`sourcing`, `Panel.markers`/`headline`, `display` and `x_key` in
-`model.py`, the marker refusals in `check_panel`, `curve_domain`. Every Beat 3
-number is a mart cell (a mutated cell moves the page; a changed `net` moves
-nothing); every expression equals `FORMULAS`; a render over `ROWS=none` shows
-the same numbers. Round-1 fixes: the `_range_mark` zero-width and
-out-of-range geometry guards (`6b198b8`, `b3757cf`), the outputs mart read once,
-the crossover note reordered, the two range notes de-duplicated. Next: the
-Delivered paragraph, `gh pr create` (`Phase 9c — Beat 3`).
+**In progress: none — between phases.** The active branch is the hotfix
+`fix/drill-footer-verb` (the study footer names a repository file as its own
+"source file" clause, never "opened to" — the finding deferred from Phase 9c
+review round 1 #8, cross-phase into 9b's B2.4). Next phase: 9d — Beat 4.
 
-**Merged:** Phases 0a–9b in order, each with its spec under `specs/` (the
-Delivered paragraph) and its DECISIONS appendix — 9b (PR #23, 2026-09-09) then
-the fix PR `fix/cost-outputs-unit` (PR #24, 2026-09-09: `Formula.unit` and the
-outputs mart's `unit` column); before those, `tooling/implementation-
+**Merged:** Phases 0a–9c in order, each with its spec under `specs/` (the
+Delivered paragraph) and its DECISIONS appendix — 9c (PR #25, 2026-09-09: Beat
+3, the first Modeled panels — the formula list, the crossover curve with its
+markers, the drawn parameter ranges; `study/text.py`) then 9b (PR #23,
+2026-09-09) and the fix PR `fix/cost-outputs-unit` (PR #24, 2026-09-09:
+`Formula.unit` and the outputs mart's `unit` column); before those,
+`tooling/implementation-
 loop` (PR #20, 2026-09-07) — tagged comments as record pointers, the pin guard
 (`scripts/check_pins.py`) + `/preflight`, and `LESSONS.md` (nine classes, each
 promoted). Phase 8b — the guardrail simulator (B4.1–B4.3, PR #19,
@@ -766,6 +753,6 @@ slider decision); 9g — the Metabase demonstration (the review-level drill,
 non-CI). Plus two pulled-out data phases: the claims
 sample-mean slider and data.ameli practitioner fees.
 
-Open BACKLOG rows: **42**.
+Open BACKLOG rows: **41**.
 
 (Update this section at the end of every working day.)
