@@ -232,7 +232,9 @@ make review-gate SPEC=specs/phase-9e-beat-5.md && make rebuild ROWS=synthetic &&
   corpus-gated `pipeline_row_counts` reader; the two marts added to the
   read-column allowlist and (for B5.2) to the corpus-gate mart set; the stale
   `pipeline/metrics.py` mention at line 113 re-pointed to the query's new home.
-- `study/export.py` — one `_BEATS` row for Beat 5.
+- `study/export.py` — one `_BEATS` row for Beat 5; `_metric_cell` omits the
+  empty `(detail)` count span so B5.2's plain stage counts render as a bare value
+  (B2.4 always carries a detail, so its bytes are unchanged).
 - `study/text.py` — the Beat 5 display texts (fact labels, stage names, the B5.2
   note with the rebuild command, the blurbs).
 - `study/model.py` — only if a Beat 5 label or absence word is needed the
@@ -247,6 +249,13 @@ make review-gate SPEC=specs/phase-9e-beat-5.md && make rebuild ROWS=synthetic &&
   at its new home).
 - `tests/test_beat2.py` — the `monkeypatch.setattr(cli, "reviews_per_month", …)`
   target confirmed still resolvable after the relocation (cli re-exports it).
+- `tests/test_rules.py` — the `test_no_new_mart` pinned mart-file set gains the
+  two Beat 5 marts.
+- `tests/test_rebuild.py` — `test_zero_row_rebuild`'s by-construction exception
+  set gains `determinism_facts` (fills in `rebuild()`); `pipeline_row_counts`
+  stays in the empty group (classify-path).
+- `tests/test_llm.py` — `test_only_llm_imports_anthropic` reuses
+  `pipeline.build.model_call_sites` (the shared walk B5.1 counts from).
 - `BACKING.md`, `SPEC.md`, `DECISIONS.md`, `BACKLOG.md`, `CLAUDE.md`,
   `docs/PLAN.md` — records (below).
 

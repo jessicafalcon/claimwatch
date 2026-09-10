@@ -169,4 +169,8 @@ def test_no_new_mart():
         # the simulator marts land in 8b (DDL fed by models/guardrail_sim.py).
         "guardrail_sim.sql",
         "sla_threshold.sql",
+        # Beat 5 marts land in 9e (DDL fed by Python): the repo facts (B5.1) and
+        # the per-stage row counts (B5.2).
+        "determinism_facts.sql",
+        "pipeline_row_counts.sql",
     }

@@ -106,11 +106,16 @@ ALLOWED_COLUMNS = frozenset(
         "mean_hold_days",
         "released",
         "claim_count",
+        # Beat 5 (9e): determinism_facts (B5.1) and pipeline_row_counts (B5.2).
+        # `value` (a count) is already allowed; `fact` and `stage` are the keys.
+        "fact",
+        "stage",
     }
 )
 
 # Every query the export runs, in one tuple, so a test lints each for portability
-# and the clock (the pipeline/metrics.py pattern; Phase 9b, pinned decision 3).
+# and the clock (the reviews-per-month query pattern in pipeline/build.py; Phase
+# 9b, pinned decision 3).
 _Q_RATING_TREND = (
     "select profile, month, rating, tag, source_url from rating_trend "
     "where channel = 'unsolicited' and segment = 'digital-first' "
@@ -181,13 +186,23 @@ _Q_SLA_THRESHOLD = (
     "select timer_days, timer_amount_eur, share_under, is_default, tag "
     "from sla_threshold order by timer_days"
 )
+# Beat 5 (9e). B5.1 reads the repo facts whole and re-orders by the closed
+# DETERMINISM_FACTS map (the FORMULAS pattern); B5.2 reads the per-stage counts
+# and re-orders by the ROW_COUNT_STAGES map. `value` is a count in both.
+_Q_DETERMINISM_FACTS = "select fact, value, tag from determinism_facts order by fact"
+_Q_PIPELINE_ROW_COUNTS = (
+    "select stage, value, tag from pipeline_row_counts order by stage"
+)
 
 # The marts a corpus panel gates on: it reads their `run_id` to decide numbers
-# vs the fixture state (Phase 9b, the corpus gate).
+# vs the fixture state (Phase 9b, the corpus gate). B5.2's pipeline_row_counts
+# is corpus-gated too (9e); B5.1's determinism_facts is not (a repo fact is
+# constant on any input, so it reads directly, no gate).
 _CORPUS_MARTS = (
     "theme_share_by_month",
     "theme_share_by_segment",
     "classifier_quality",
+    "pipeline_row_counts",
 )
 
 
@@ -229,6 +244,8 @@ STUDY_QUERIES = (
     _Q_COST_PARAMS,
     _Q_GUARDRAIL_AGG,
     _Q_SLA_THRESHOLD,
+    _Q_DETERMINISM_FACTS,
+    _Q_PIPELINE_ROW_COUNTS,
 ) + tuple(_run_id_sql(mart) for mart in _CORPUS_MARTS)
 
 
@@ -1528,5 +1545,128 @@ def beat4_panels(conn) -> list[Panel]:
             tag="Pending",
             kind="hero",
             placeholder=text.BEAT4_PENDING,
+        ),
+    ]
+
+
+# --- Beat 5: the facts you can check, and reproducibility ----------------------
+# B5.1's sources are the repository files the facts are counted from; B5.2's is
+# the pipeline that produces the counts — the same cells BACKING B5.1/B5.2 name.
+_B5_1_SOURCES = ("classify/llm.py", "models/cost_model.py", "study/model.py")
+_B5_2_SOURCES = ("pipeline/build.py",)
+
+
+def _determinism_facts(conn) -> tuple[Series, ...]:
+    """B5.1: the checkable repo facts as a stat row, in the display order of the
+    closed `text.DETERMINISM_FACTS` map, each carrying the mart row's own tag.
+    Every mart fact must be in the map and every map fact must have a row — the
+    writer ↔ mart ↔ page identity (the `_formula_rows` pattern). Not corpus-gated:
+    a repo fact is constant on any input, so this reads the mart directly."""
+    by_fact = {
+        fact: (value, tag) for fact, value, tag in _rows(conn, _Q_DETERMINISM_FACTS)
+    }
+    for fact in by_fact:
+        if fact not in text.DETERMINISM_FACTS:
+            raise RenderRefused(
+                f"B5.1: determinism_facts row {fact!r} has no display label "
+                "(not in the closed map)"
+            )
+    points = []
+    for fact, (label, unit) in text.DETERMINISM_FACTS.items():
+        if fact not in by_fact:
+            raise RenderRefused(f"B5.1: determinism_facts has no {fact!r} row")
+        value, tag = by_fact[fact]
+        points.append(
+            Point(
+                label,
+                float(_require(value, "value", "B5.1")),
+                str(_require(tag, "tag", "B5.1")),
+                "",
+                unit,
+            )
+        )
+    return (Series("facts", 0, tuple(points)),)
+
+
+def _row_counts_table(conn) -> tuple[Series, ...]:
+    """B5.2: one table row per pipeline stage, the count in its cell, in the flow
+    order of the closed `text.ROW_COUNT_STAGES` map, each carrying the mart row's
+    tag. Writer ↔ mart ↔ page identity, as B5.1. Built only over a captured input
+    (the corpus gate calls this; a fixture input renders the fixture note)."""
+    by_stage = {
+        stage: (value, tag) for stage, value, tag in _rows(conn, _Q_PIPELINE_ROW_COUNTS)
+    }
+    for stage in by_stage:
+        if stage not in text.ROW_COUNT_STAGES:
+            raise RenderRefused(
+                f"B5.2: pipeline_row_counts row {stage!r} has no display name "
+                "(not in the closed map)"
+            )
+    series = []
+    for stage, name in text.ROW_COUNT_STAGES.items():
+        if stage not in by_stage:
+            raise RenderRefused(f"B5.2: pipeline_row_counts has no {stage!r} row")
+        value, tag = by_stage[stage]
+        series.append(
+            Series(
+                name,
+                0,
+                (
+                    Point(
+                        "Rows",
+                        float(_require(value, "value", "B5.2")),
+                        str(_require(tag, "tag", "B5.2")),
+                        "",
+                        "count",
+                    ),
+                ),
+            )
+        )
+    return tuple(series)
+
+
+def beat5_panels(conn) -> list[Panel]:
+    """The two Beat 5 panels. B5.1 is Measured and NOT corpus-gated — a repo fact
+    is constant on any input, so the committed synthetic page shows the numbers.
+    B5.2 is Measured behind the corpus gate (like Beat 2): counted over a captured
+    input, the labelled fixture state over the frozen synthetic input."""
+    counts_series, counts_fixture = _corpus_series(
+        conn, "pipeline_row_counts", "B5.2", lambda: _row_counts_table(conn)
+    )
+    return [
+        Panel(
+            id="B5.1",
+            backing_row="B5.1",
+            title="The facts you can check",
+            blurb=(
+                "Three facts about how this study is built, each a count you can "
+                "verify in the code. A language model makes a decision in exactly "
+                "one place; every formula is printed next to the number it gives; "
+                "and every number on the page carries a tag saying where it came "
+                "from."
+            ),
+            tag="Measured",
+            kind="stat_row",
+            series=_determinism_facts(conn),
+            sources=_B5_1_SOURCES,
+            notes=(text.DETERMINISM_NOTE,),
+        ),
+        Panel(
+            id="B5.2",
+            backing_row="B5.2",
+            title="Rerun it and the numbers hold",
+            blurb=(
+                "The same reviews always produce the same numbers. This is how "
+                "many reviews the pipeline holds at each step — as scraped, after "
+                "removing duplicates, and after tagging by theme — so anyone can "
+                "rebuild the study from the raw data and check every count."
+            ),
+            tag="Measured",
+            kind="table",
+            series=counts_series,
+            fixture=counts_fixture,
+            sources=_B5_2_SOURCES,
+            columns=("Pipeline stage", "Rows"),
+            notes=(text.ROW_COUNTS_NOTE,),
         ),
     ]

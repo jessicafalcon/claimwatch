@@ -1137,6 +1137,124 @@ def _load_reviews(conn, rows: list[dict[str, str]], run_id: str) -> None:
         )
 
 
+# Reviews per month — a pipeline-health query, not a study number and not a mart
+# (no SPEC panel shows it, so a sql/marts/ file would be an orphan). It lived in
+# pipeline/metrics.py until Phase 9e folded that module away; the query moves here
+# beside table_counts (a query is not an orphan — the orphan rule bites marts),
+# still printed by `make rebuild`, still portability-linted (tests/test_sql_portable).
+# Plain ANSI: substr on the review's own ISO date, group by, count(*). No clock
+# (time is review_date), no dialect. `order by` is fine — a query, not a table.
+REVIEWS_PER_MONTH = """
+select
+    source,
+    substr(review_date, 1, 7) as month,
+    count(*) as n
+from stg_reviews
+group by source, substr(review_date, 1, 7)
+order by source, month
+"""
+
+
+def reviews_per_month(conn) -> list[tuple[str, str, int]]:
+    """(source, 'YYYY-MM', reviews) per month over the deduplicated reviews."""
+    return [
+        (str(s), str(m), int(n))
+        for s, m, n in conn.execute(REVIEWS_PER_MONTH).fetchall()
+    ]
+
+
+# The model SDK the classifier calls. The import needle is BUILT from this, never
+# spelled as a literal, so this module is not itself a false match for the
+# one-call-site walk below (and so tests/test_llm.py's guard, which reads the same
+# walk, does not flag build.py) — putting the literal "import <sdk>" in a non-test
+# module would count it and break that guard.
+_MODEL_CLIENT = "anthropic"
+
+
+def model_call_sites() -> list[str]:
+    """The repository modules that import the model client — the one place a model
+    makes a decision (Classification contract: classify/llm.py, and nowhere else).
+    B5.1's fact counts these, so it is counted from the source, not a literal, and
+    cannot drift; tests/test_llm.py's guard reads the same walk. Tests and the
+    virtualenv are not repository modules and are skipped."""
+    needle_import = f"import {_MODEL_CLIENT}"
+    needle_from = f"from {_MODEL_CLIENT}"
+    sites: list[str] = []
+    for path in sorted(ROOT.rglob("*.py")):
+        posix = path.as_posix()
+        if "/.venv/" in posix or "/tests/" in posix:
+            continue
+        try:
+            source = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError as exc:  # a boundary: a non-text .py refuses by name
+            raise ValueError(f"{path.relative_to(ROOT)}: not UTF-8 text") from exc
+        if needle_import in source or needle_from in source:
+            sites.append(path.relative_to(ROOT).as_posix())
+    return sites
+
+
+def write_determinism_facts(conn, run_id: str, *, tag: str = "Measured") -> None:
+    """Fill the `determinism_facts` mart (B5.1): the checkable facts about the
+    repository, each counted from the code it describes. Not corpus-gated — a repo
+    fact is constant on any input — so this runs inside rebuild() on every input.
+    The tag-set size is study/model.py::TAGS, the render contract's own tag set (a
+    leaf module: no warehouse import, so importing it here makes no cycle); the
+    formula count is the FORMULAS the study displays beside their output in B3.1;
+    the model-decision count is the one-call-site walk. The table is cleared first
+    so a re-populate is idempotent; rows go in a fixed order, so a re-run is
+    byte-identical."""
+    from study.model import TAGS  # a leaf constant (the four evidence tags)
+
+    facts = (
+        ("model_call_sites", len(model_call_sites())),
+        ("formulas_shown", len(cost_model.FORMULAS)),
+        ("evidence_tags", len(TAGS)),
+    )
+    conn.execute("begin transaction")
+    try:
+        conn.execute("delete from determinism_facts")
+        for fact, value in facts:
+            conn.execute(
+                "insert into determinism_facts (fact, value, run_id, tag) "
+                "values (?, ?, ?, ?)",
+                [fact, value, run_id, tag],
+            )
+    except BaseException:
+        conn.execute("rollback")
+        raise
+    conn.execute("commit")
+
+
+# The review-pipeline stages B5.2 counts, in flow order: as-scraped, deduped,
+# classified (one row per review x theme). Each key is a table name, so a count
+# equals a direct count(*) of that stage; the closed tuple is the only source of
+# the names interpolated below (no user input reaches the SQL).
+_ROW_COUNT_STAGES = ("raw_reviews", "stg_reviews", "stg_classified_reviews")
+
+
+def write_pipeline_row_counts(conn, run_id: str, *, tag: str = "Measured") -> None:
+    """Fill the `pipeline_row_counts` mart (B5.2): one row per review-pipeline
+    stage, each value a direct count(*) of that stage's table. Runs in the CLI
+    classify path (after stg_classified_reviews is filled), so the classified
+    stage is counted; corpus-gated at render like classifier_quality. The table is
+    cleared first so a re-populate is idempotent; the stages go in flow order, so a
+    re-run is byte-identical."""
+    conn.execute("begin transaction")
+    try:
+        conn.execute("delete from pipeline_row_counts")
+        for stage in _ROW_COUNT_STAGES:
+            value = conn.execute(f"select count(*) from {stage}").fetchone()[0]
+            conn.execute(
+                "insert into pipeline_row_counts (stage, value, run_id, tag) "
+                "values (?, ?, ?, ?)",
+                [stage, value, run_id, tag],
+            )
+    except BaseException:
+        conn.execute("rollback")
+        raise
+    conn.execute("commit")
+
+
 def table_counts(conn) -> dict[str, int]:
     """Row count per table in the default schema — the reproducibility signal
     `idempotency-check` diffs. The schema is the engine's own answer
@@ -1302,6 +1420,10 @@ def rebuild(
         fit = read_model_fit()
         write_model_marts(conn, fit, run_id or "model")
         write_sim_marts(conn, fit, run_id or "model")
+        # The repo facts (B5.1) are constant on any input and need no key, no
+        # reviews and no classify step, so they fill here beside the model marts —
+        # on every ROWS input, none included, and covered by idempotency-check.
+        write_determinism_facts(conn, run_id or "model")
         return table_counts(conn)
     finally:
         conn.close()

@@ -63,11 +63,12 @@ from pipeline.build import (
     rebuild,
     record_snapshots,
     reset,
+    reviews_per_month,
     write_classified_reviews,
     write_classifier_quality,
+    write_pipeline_row_counts,
 )
 from pipeline.label_sample import SHEET, label_sample
-from pipeline.metrics import reviews_per_month
 from pipeline.warehouse import ROOT, TARGETS, connect, database_for
 
 # The one binding of the confirmation stamp: under the gitignored data/ root,
@@ -274,6 +275,11 @@ def _classify_and_print(db, rows_input: str) -> None:
     try:
         write_classified_reviews(conn, classified, run_id=rows_input)
         build_theme_share_marts(conn)
+        # B5.2: the per-stage row counts, after the classified stage exists, so
+        # pipeline_row_counts counts it too (corpus-gated at render like the theme
+        # marts). Idempotency-check runs rebuild() only, so a named test proves
+        # this mart's stability instead of that target (spec invariant 5).
+        write_pipeline_row_counts(conn, run_id=rows_input)
         if graded:
             write_classifier_quality(
                 conn,

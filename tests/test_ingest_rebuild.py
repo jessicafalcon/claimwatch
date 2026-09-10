@@ -16,8 +16,7 @@ import pytest
 from ingest.captures import capture_pages, read_captures
 from ingest.parsed import PageShapeError
 from ingest.sources import SOURCES, by_name, sample_source
-from pipeline.build import idempotency_check, rebuild
-from pipeline.metrics import reviews_per_month
+from pipeline.build import idempotency_check, rebuild, reviews_per_month
 from pipeline.warehouse import connect, database_for
 from tests import pins
 

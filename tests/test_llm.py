@@ -42,17 +42,12 @@ def _reviews(conn):
 
 
 def test_only_llm_imports_anthropic():
-    # A language model is called from classify/llm.py and nowhere else.
-    offenders = []
-    for path in ROOT.rglob("*.py"):
-        if path.name == "llm.py" and path.parent.name == "classify":
-            continue
-        if "/.venv/" in path.as_posix() or "/tests/" in path.as_posix():
-            continue
-        text = repo_text(path)
-        if "import anthropic" in text or "from anthropic" in text:
-            offenders.append(path.relative_to(ROOT).as_posix())
-    assert not offenders, f"anthropic imported outside classify/llm.py: {offenders}"
+    # A language model is called from classify/llm.py and nowhere else. The walk
+    # is `pipeline.build.model_call_sites` — the one Beat 5's B5.1 fact counts from
+    # (9e), so the guard and the displayed "one model site" read the same source.
+    from pipeline.build import model_call_sites
+
+    assert model_call_sites() == ["classify/llm.py"]
 
 
 def test_anthropic_import_is_lazy():
