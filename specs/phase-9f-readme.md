@@ -9,7 +9,12 @@ merged.
 **Status: APPROVED 2026-09-10 — in progress.** No new dependencies (the
 allowlist is in CLAUDE.md → Conventions). No new `make` target, no new chart
 `Kind`, no new mart, no new BACKING row.
-Challenged: 2026-09-10, round 1, spec 9d690e59 — approve with amendments (5 should-fix + 2 suggestions applied)
+Challenged: 2026-09-10, round 1, spec 89131ac9 — approve with amendments (5 should-fix + 2 suggestions applied)
+
+Amendment (2026-09-10, build): the challenge-round "Beat 1 Day N" clause is
+dropped — BACKING B1.1 is Pending, so the hero shows no number; Invariant 1 and
+the tag-template test (`test_beat5_counts_use_the_tagged_template`) cover Beat 5's
+counts only. Restores the provenance invariant a Pending claim shows no number.
 
 ## Why
 
@@ -78,7 +83,7 @@ make review-gate SPEC=specs/phase-9f-readme.md && make study && git diff --exit-
 | Done-when | Proof (test id / `make` target / output line) |
 |---|---|
 | 1 | `make check-docs` prints `ok banned words`, `ok glossary`, `ok naming the target`; study-editor confirms the two-layer opening per beat |
-| 2 | `tests/test_readme.py::test_every_euro_or_percent_wears_a_tag` (a `€`/`%` figure with no tag word in its sentence fails), `::test_beat5_counts_and_day_n_use_the_tagged_template` |
+| 2 | `tests/test_readme.py::test_every_euro_or_percent_wears_a_tag` (a `€`/`%` figure with no tag word in its sentence fails), `::test_beat5_counts_use_the_tagged_template` |
 | 3 | `tests/test_readme.py::test_every_tagged_figure_cites_a_resolving_row` (a figure whose sentence cites the wrong-but-real or no id fails), `::test_readme_cites_only_real_backing_rows`, `::test_first_paragraph_links_into_evidence`, `::test_readme_links_to_study_and_backing`; `make check-docs` prints `ok links` |
 | 4 | `make study && git diff --exit-code`; `tests/test_readme.py::test_readme_names_the_captured_rebuild_command` |
 | 5 | `tests/test_export.py::test_export_has_no_cdn_no_external_asset_no_timestamp` (already green); `DECISIONS.md` Phase 9f entry records the decision |
@@ -87,7 +92,7 @@ make review-gate SPEC=specs/phase-9f-readme.md && make study && git diff --exit-
 
 | Invariant ("for all …, … holds") | Falsified by (scenario test) |
 |---|---|
-| For every euro amount or percentage in the README's beat prose (outside code spans and links), the figure's sentence carries exactly one of the four tag words; Beat 5's three checkable counts and Beat 1's frozen "Day N on hold" are each written on a fixed, tested template line that carries its tag. | `tests/test_readme.py::test_every_euro_or_percent_wears_a_tag` (a `€`/`%` figure with no tag word fails), `::test_beat5_counts_and_day_n_use_the_tagged_template` |
+| For every euro amount or percentage in the README's beat prose (outside code spans and links), the figure's sentence carries exactly one of the four tag words; Beat 5's three checkable counts are each written on a fixed, tested template line that carries its tag. | `tests/test_readme.py::test_every_euro_or_percent_wears_a_tag` (a `€`/`%` figure with no tag word fails), `::test_beat5_counts_use_the_tagged_template` |
 | For every tagged figure in the README, the figure's own sentence or list-item cites a `B<beat>.<n>` that resolves to a row in `BACKING.md` — following *that* figure's citation reaches *that* figure's backing row; beat-granular reachability is not enough. | `tests/test_readme.py::test_every_tagged_figure_cites_a_resolving_row` (a figure whose sentence cites no id, or a `B9.9` with no row, fails), `::test_readme_cites_only_real_backing_rows` |
 | For all links in the README, the link resolves; and the README links to `study/friction_ledger.html` and `BACKING.md`, and the first paragraph carries a link onward into the evidence. | `make check-docs` links check; `tests/test_readme.py::test_readme_links_to_study_and_backing`, `::test_first_paragraph_links_into_evidence` |
 | For all re-renders, the committed `study/friction_ledger.html` is byte-identical (the permanent artifact is the synthetic render, unchanged by this phase). | `make study && git diff --exit-code` (CI), `tests/test_export.py` |
@@ -132,9 +137,9 @@ make review-gate SPEC=specs/phase-9f-readme.md && make study && git diff --exit-
   amounts and `%` percentages in beat prose (outside code spans and links) —
   with no date/version denylist** (the promoted `unshaped-input` class: a loose
   pattern plus an exclusion list false-negatives silently). Beat 5's three
-  checkable counts and Beat 1's frozen "Day N on hold" are the only other
-  bare-number figures; each is written on a fixed template line the test asserts
-  by shape, so a bare count needs no digit-sniffing regex. A bare number outside
+  checkable counts are the only other bare-number figures; each is written on a
+  fixed template line the test asserts by shape, so a bare count needs no
+  digit-sniffing regex. A bare number outside
   these forms is a study-editor / `/selfcheck` (c) finding, as today. *Rejected:
   a "multi-digit count minus dates/versions/code" shape — the denylist is the
   trap. Rejected: a catch-all "any digit" check — false-positives on dates and
@@ -149,7 +154,7 @@ make review-gate SPEC=specs/phase-9f-readme.md && make study && git diff --exit-
   §9.3); a glossary ≤ 10 terms if one is added.
 - `tests/test_readme.py` — new. The `€`/`%` tag test, the per-figure citation
   test (each tagged figure's own sentence cites a resolving `B<beat>.<n>`), the
-  Beat 5 count / Beat 1 "Day N" template tests, the link, first-paragraph and
+  Beat 5 count template test, the link, first-paragraph and
   rebuild-command tests; reads README/BACKING through `tests/repo_text.py`.
 - `tests/repo_text.py` — extended only if the reader needs a README/BACKING
   accessor it does not already expose.
