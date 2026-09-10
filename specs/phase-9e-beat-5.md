@@ -1,4 +1,4 @@
-# Phase 9e — Beat 5: how this was built, and where the rigor lives (PROPOSED)
+# Phase 9e — Beat 5: how this was built, and where the rigor lives (APPROVED)
 
 Contract for the `phase-9e` branch. Source: PROJECT_BRIEF.md §9 Phase 9 ("The
 study"), sub-phase 9e of the permanent-artifact-first split (DECISIONS → Phase
@@ -267,14 +267,14 @@ Freeze: none
 
 ## Record updates (REQUIRED)
 
-- [ ] `DECISIONS.md` — Phase 9e entry (the two single-grain marts and their two
+- [x] `DECISIONS.md` — Phase 9e entry (the two single-grain marts and their two
   homes; B5.1 facts as build-time counts bound to their guards; B5.2
   corpus-gated with the eval scores referenced not copied and stability proven by
   a named test not `idempotency-check`; `reviews_per_month` relocated not
   martified and `pipeline/metrics.py` deleted). A supersede pointer on the
   existing entry at line 685 ("Reviews per month is a query, not a mart") — the
   module is gone, the query lives in `pipeline/build.py`.
-- [ ] `BACKLOG.md` — line 19 (`reviews_per_month` … not a mart) struck (DONE
+- [x] `BACKLOG.md` — line 19 (`reviews_per_month` … not a mart) struck (DONE
   Phase 9e — module deleted, query relocated, no mart made); line 52 (classify
   step outside `idempotency-check`) extended to name `pipeline_row_counts` as the
   third uncovered classify-path mart, its stability proven by
@@ -285,21 +285,21 @@ Freeze: none
   `traceback-at-boundary` row with the 9e recurrence and its fix (caught in
   review, the mechanism holding — not reopened). (The `site-fix` open class is the
   reason the deletion's full reference set is enumerated in Scope.)
-- [ ] `CLAUDE.md` — Current status; Repo map (`study/` renders Beats 1–5; the two
+- [x] `CLAUDE.md` — Current status; Repo map (`study/` renders Beats 1–5; the two
   new single-grain Python-fed marts named beside `classifier_quality`;
   `pipeline/metrics.py` removed and the `reviews_per_month` mention re-pointed to
   `pipeline/build.py`); BACKLOG count.
-- [ ] `BACKING.md` — B5.1 → `determinism_facts` / `sql/marts/determinism_facts.sql`
+- [x] `BACKING.md` — B5.1 → `determinism_facts` / `sql/marts/determinism_facts.sql`
   / source `` `classify/llm.py`; `models/cost_model.py`; `study/model.py` `` /
   Measured; B5.2 → `pipeline_row_counts` / `sql/marts/pipeline_row_counts.sql` /
   source `` `pipeline/build.py` `` / Measured.
-- [ ] `SPEC.md` — the "(Pending until …)" clauses on B5.1/B5.2 removed now that
+- [x] `SPEC.md` — the "(Pending until …)" clauses on B5.1/B5.2 removed now that
   they render (a wording reconciliation, not a design change).
-- [ ] README — none (the README is Phase 9f).
-- [ ] `docs/PLAN.md` — the stale line-239 mention ("the metric is a pinned query
+- [x] README — none (the README is Phase 9f).
+- [x] `docs/PLAN.md` — the stale line-239 mention ("the metric is a pinned query
   in `pipeline/metrics.py` … until B5.2 lands") updated: B5.2 landed; the query
   lives in `pipeline/build.py`, still not a mart.
-- [ ] this spec — the "Delivered" paragraph appended at exit.
+- [x] this spec — the "Delivered" paragraph appended at exit.
 
 ## Threat model (REQUIRED when the phase adds a `make` target that takes a variable, deletes anything, calls a paid API, or touches the network)
 
@@ -359,3 +359,52 @@ Agents are selected by diff surface (CLAUDE.md → "Which review agents run").
 - A B5.1 fact that scans the rendered page for untagged numbers — self-referential
   and unnecessary; `check_panel` already enforces one tag per number, so the
   tag-count fact stands in for that guarantee, not a page scan.
+
+## Delivered (2026-09-10)
+
+Beat 5 renders the study's closing part through the 9a/9c contract — no new chart
+`Kind`, no `make` target, no dependency — adding two single-grain Python-fed
+marts. **B5.1** (`determinism_facts`) is a `stat_row` of three facts counted from
+the code, Measured and NOT corpus-gated (a repo fact is constant on any input, so
+the committed page shows the numbers): the one place a model decides (`1`, counted
+by `pipeline/build.py::model_call_sites`, an `ast` walk over the code packages
+that `tests/test_llm.py`'s guard now shares), the cost-model formulas shown beside
+their output (`14` = `len(FORMULAS)`, bound by a test to what B3.1 renders), and
+the evidence-tag set (`4` = `len(study/model.py::TAGS)`); filled in `rebuild()` on
+every input including `none`, covered by `idempotency-check`. **B5.2**
+(`pipeline_row_counts`) is a `table` of per-stage row counts (raw → deduped →
+classified), Measured behind the Phase 9b corpus gate like Beat 2 — the
+fixture-state note over the frozen synthetic input, real counts only over a
+captured input — filled in the CLI classify path (so the classified stage is
+counted); the eval scores are B2.4's `classifier_quality` (referenced in the note,
+not copied) and the one rebuild command (`make rebuild`) is prose. Because the
+classify path is outside `idempotency-check`, a named `rebuild-then-classify twice`
+test proves the mart's stability. `pipeline/metrics.py` was deleted and its
+`reviews_per_month` query relocated to `pipeline/build.py` beside `table_counts`
+(a query is not an orphan — the challenge #6 synthesis over the developer's "add
+the scope"), keeping `pipeline_row_counts` single-grain. BACKING B5.1/B5.2 flipped
+Pending → Measured, their upstream-source cells naming the repository files the
+facts are counted from. Every Beat 5 number is a tagged mart cell; a mutated cell
+moves the page, the B5.1 facts are identical over `none`/`synthetic`, and the
+bytes are stable on a re-render.
+
+Challenged round 1 (2026-09-10, spec `757bbe04` — rework, all amendments
+applied). Review round 1 found no BLOCKER: code-reviewer 7, functionality-tester
+works, security-reviewer 2 notes, study-editor 2. All dispositioned "fix all":
+`model_call_sites` rewritten to an `ast` walk over a closed source-package list
+raising `PageShapeError` at the boundary (the promoted `traceback-at-boundary`
+class, LESSONS row extended — caught in review, the mechanism holding); the two
+writers' tag made a `_BEAT5_TAG` constant; a direct writer↔display key-set pin;
+the spec's stale `+RULES`/"Beat 3/4" wording corrected to `len(FORMULAS)`/B3.1;
+the B5.1 note's fourth tag fixed (`Pending`, not "not-yet-classified"), its label
+and blurb scoped honestly; the footer pluralized for the first >1-file panel
+(`6dd9c07`, `f2c95f6`). The exit round's whole-repo coherence-auditor passed with
+3 minor findings (0 BLOCKER): the spec title `(PROPOSED)`→`(APPROVED)` and
+BACKLOG line 69's fixture-note enumeration gaining B5.2 were fixed; the
+counterfactual past-phase `specs/phase-2-scraper.md` text was left as historical
+record (out of this phase's scope). Two forward notes to 9f, both recorded in
+BACKLOG: the captured-render decision (B5.2 now joins B2.2/B2.4/B2.5 as a
+fixture-note panel on the shipped page, line 69) and the classify-path idempotency
+class (extended to `pipeline_row_counts`, line 52). One tidy candidate the auditor
+raised for later: `pipeline/build.py` now carries the relocated query and the two
+Beat 5 writers alongside raw→staging→marts.
