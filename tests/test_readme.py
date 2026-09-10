@@ -90,7 +90,9 @@ def test_readme_cites_only_real_backing_rows() -> None:
     body = re.sub(r"```.*?```", "", repo_text(README), flags=re.S)
     cited = set(BID.findall(body))
     assert cited, "the README cites no BACKING row"
-    assert cited <= real, f"the README cites rows not in BACKING.md: {sorted(cited - real)}"
+    assert cited <= real, (
+        f"the README cites rows not in BACKING.md: {sorted(cited - real)}"
+    )
 
 
 def test_first_paragraph_links_into_evidence() -> None:
@@ -103,11 +105,15 @@ def test_first_paragraph_links_into_evidence() -> None:
 
 def test_readme_links_to_study_and_backing() -> None:
     text = repo_text(README)
-    assert "](study/friction_ledger.html)" in text, "no link to the permanent study page"
+    assert "](study/friction_ledger.html)" in text, (
+        "no link to the permanent study page"
+    )
     assert "](BACKING.md)" in text, "no link to BACKING.md"
 
 
 def test_readme_names_the_captured_rebuild_command() -> None:
     text = repo_text(README)
-    assert "make rebuild ROWS=captured" in text, "the captured-render rebuild command is not named"
+    assert "make rebuild ROWS=captured" in text, (
+        "the captured-render rebuild command is not named"
+    )
     assert "make study" in text, "`make study` is not named"
