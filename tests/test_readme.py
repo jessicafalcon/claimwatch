@@ -83,7 +83,9 @@ def test_every_euro_or_percent_wears_a_tag() -> None:
     assert figure_units, "the README shows no euro or percent figure to check"
     for unit in figure_units:
         cites = CITATION.findall(unit)
-        assert len(cites) == 1, f"figure unit needs exactly one tag→row citation: {unit!r}"
+        assert len(cites) == 1, (
+            f"figure unit needs exactly one tag→row citation: {unit!r}"
+        )
 
 
 def test_every_tagged_figure_cites_a_resolving_row() -> None:
@@ -107,7 +109,9 @@ def test_modeled_figures_match_pins_and_cite_their_row() -> None:
         unit = next((u for u in text_units if figure in u), None)
         assert unit is not None, f"README is missing the pinned figure {figure}"
         rows = [r for _, r in CITATION.findall(unit)]
-        assert rows == [row], f"{figure} must cite exactly {row}, its own mart row: {unit!r}"
+        assert rows == [row], (
+            f"{figure} must cite exactly {row}, its own mart row: {unit!r}"
+        )
         assert row in real
 
 
@@ -126,7 +130,9 @@ def test_readme_cites_only_real_backing_rows() -> None:
     body = re.sub(r"```.*?```", "", repo_text(README), flags=re.S)
     cited = set(BID.findall(body))
     assert cited, "the README cites no BACKING row"
-    assert cited <= real, f"the README cites rows not in BACKING.md: {sorted(cited - real)}"
+    assert cited <= real, (
+        f"the README cites rows not in BACKING.md: {sorted(cited - real)}"
+    )
 
 
 def test_first_paragraph_links_into_evidence() -> None:
@@ -139,11 +145,15 @@ def test_first_paragraph_links_into_evidence() -> None:
 
 def test_readme_links_to_study_and_backing() -> None:
     text = repo_text(README)
-    assert "](study/friction_ledger.html)" in text, "no link to the permanent study page"
+    assert "](study/friction_ledger.html)" in text, (
+        "no link to the permanent study page"
+    )
     assert "](BACKING.md)" in text, "no link to BACKING.md"
 
 
 def test_readme_names_the_captured_rebuild_command() -> None:
     text = repo_text(README)
-    assert "make rebuild ROWS=captured" in text, "the captured-render rebuild command is not named"
+    assert "make rebuild ROWS=captured" in text, (
+        "the captured-render rebuild command is not named"
+    )
     assert "make study" in text, "`make study` is not named"
