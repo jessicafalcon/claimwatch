@@ -764,6 +764,6 @@ acceptance test (and the live-slider decision); 9g — the Metabase demonstratio
 (the review-level drill, non-CI). Plus two pulled-out data phases: the claims
 sample-mean slider and data.ameli practitioner fees.
 
-Open BACKLOG rows: **40**.
+Open BACKLOG rows: **41**.
 
 (Update this section at the end of every working day.)
