@@ -113,15 +113,21 @@ Delivered paragraph and `make help`, not here.
   including the hold timer's three, filled into the three Beat 3 marts inside
   `rebuild()`), `guardrail_sim.py::RULES` (Beat 4: the quantile draw, the hold
   and the share-under count, filled into the two Beat 4 marts inside
-  `rebuild()`); `study/` — the static HTML export, one direction `model.py` ←
-  `panels.py` ← `export.py`: `model.py` (the panel types, `TAGS`, the
-  render-time contract — one tag per number, value xor declared absence, a
-  Pending panel shows none), `panels.py` (the readers that build panels from
-  the marts, the column allowlist, the corpus gate), `export.py` (the
-  hand-written inline-SVG charts, the metric table, the page), `__main__.py`
-  (the `make study` entry), the committed `friction_ledger.html`; Beats 1–2
-  render (9a, 9b), Beats 3–5, the README and the Metabase demonstration are
-  later Phase 9 sub-phases.
+  `rebuild()`); `study/` — the static HTML export, one direction
+  {`text.py`, `model.py`} ← `panels.py` ← `export.py` (`text.py` and `model.py`
+  are independent leaves; `panels.py` imports both): `text.py` (the display texts as
+  data — the note texts, the closed display-name maps per formula and
+  parameter, the marker and absence labels, the note templates), `model.py`
+  (the panel types, `TAGS`, the render-time contract — one tag per number,
+  value xor declared absence, a Pending panel shows none, a marker only on a
+  curve at a grid point it draws; `display`, the unit set's formatter),
+  `panels.py` (the readers that build panels from the marts, the column
+  allowlist, the corpus gate, the Beat 3 readers and the y-domain rule),
+  `export.py` (the hand-written inline-SVG charts — line, grouped bars, the
+  stat row, the metric table, the formula list, the curve with its markers,
+  the range marks — and the page), `__main__.py` (the `make study` entry), the
+  committed `friction_ledger.html`; Beats 1–3 render (9a, 9b, 9c), Beats 4–5,
+  the README and the Metabase demonstration are later Phase 9 sub-phases.
   `dags/` *(Phase 10)* — `friction_ledger.py`.
 - `fixtures/` — read-only after Phase 1, each set with a `MANIFEST.sha256`:
   `synthetic/` (hand-written fake reviews), `anchors/` (brief §6 figures with
@@ -722,41 +728,44 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 ## Current status
 
-**Delivered, PR pending: `phase-9b-beat-2`** (spec `specs/phase-9b-beat-2.md`,
-APPROVED 2026-09-08, DELIVERED 2026-09-08; challenged twice — round 1 rework,
-round 2 approve with amendments — and reviewed three times, the exit round
-with the coherence-auditor; every finding fixed, two fix amendments). Beat 2
-rendered: the 9a export split into `study/model.py` ← `study/panels.py` ←
-`study/export.py`, then the five Beat 2 panels. B2.1 Pending; B2.3 the
-peer-ratings bars (Documented anchors); B2.2/B2.4/B2.5 behind the **corpus
-gate** — one closed mapping over `pipeline.build.INPUTS` read from each mart's
-own `run_id`: `captured` counts, a fixture input renders a labelled fixture
-state with no number (`check_panel` refuses a fixture state carrying content),
-`none` "no data yet". New: the metric `table` kind (B2.4, value xor declared
-absence); the `unclassified` neutral-token band, in the legend with its count
-even as the only series; `positive` excluded from the theme series; B2.5 the
-held-claim share per segment, points labelled by segment; the trail (mart
-`reviews`/`theme_rows` in each share's tooltip); the **column allowlist** on
-each cursor's description plus a recording connection (every query a render
-runs is listed; no review text reaches the page); a panel source is an address,
-a repository file (B2.4 names the answer key) or a refusal. Byte-identical on
-rerun; `make study` renders the committed baseline. Next: `gh pr create`
-(`Phase 9b — Beat 2`), the developer merges with a merge commit.
+**In progress: `phase-9c-beat-3`** (spec `specs/phase-9c-beat-3.md`, APPROVED
+2026-09-09, challenged once — approve with amendments, all applied). Beat 3
+built 2026-09-09; review round 1 and the exit round (coherence-auditor,
+whole-repo) both complete, all findings fixed: the study's first
+Modeled panels. B3.1 the fourteen baseline formula rows, each expression beside
+its value and unit; B3.2 the two curves over the 41-point flag-rate grid with
+three markers read from the outputs mart (the default and the marginal
+crossover stack at one x); B3.3 the three headline figures above the sourced
+parameter rows; B3.4 the unsourced rows — each parameter a drawn range (low,
+default, high) with its display unit, prose unit and citation or the unsourced
+label, split by the mart's `sourcing` column. New: `study/text.py` (the words
+as data; the Beat 1–2 notes moved verbatim), three chart kinds, two units,
+`Series.key`/`sourcing`, `Panel.markers`/`headline`, `display` and `x_key` in
+`model.py`, the marker refusals in `check_panel`, `curve_domain`. Every Beat 3
+number is a mart cell (a mutated cell moves the page; a changed `net` moves
+nothing); every expression equals `FORMULAS`; a render over `ROWS=none` shows
+the same numbers. Round-1 fixes: the `_range_mark` zero-width and
+out-of-range geometry guards (`6b198b8`, `b3757cf`), the outputs mart read once,
+the crossover note reordered, the two range notes de-duplicated. Next: the
+Delivered paragraph, `gh pr create` (`Phase 9c — Beat 3`).
 
-**Merged:** Phases 0a–9a in order, each with its spec under `specs/` (the
-Delivered paragraph) and its DECISIONS appendix; then `tooling/implementation-
+**Merged:** Phases 0a–9b in order, each with its spec under `specs/` (the
+Delivered paragraph) and its DECISIONS appendix — 9b (PR #23, 2026-09-09) then
+the fix PR `fix/cost-outputs-unit` (PR #24, 2026-09-09: `Formula.unit` and the
+outputs mart's `unit` column); before those, `tooling/implementation-
 loop` (PR #20, 2026-09-07) — tagged comments as record pointers, the pin guard
 (`scripts/check_pins.py`) + `/preflight`, and `LESSONS.md` (nine classes, each
 promoted). Phase 8b — the guardrail simulator (B4.1–B4.3, PR #19,
 2026-09-07) — landed `models/guardrail_sim.py::RULES`, the hold timer's three
 formulas in `models/cost_model.py`, the two simulator marts and `make simulate`.
 
-**Next (Phase 9 sub-phases, in order):** 9c — Beat 3 (the first Modeled
-panels, `FORMULAS` `expression_text`); 9d — Beat 4; 9e — Beat 5; 9f — the
-README + the stranger acceptance test; 9g — the Metabase demonstration (the
-review-level drill, non-CI). Plus two pulled-out data phases: the claims
+**Next (Phase 9 sub-phases, in order):** 9d — Beat 4 (the toggled scenarios
+over the 9c readers, the hold timer from `sla_threshold`, `guardrail_sim`);
+9e — Beat 5; 9f — the README + the stranger acceptance test (and the live-
+slider decision); 9g — the Metabase demonstration (the review-level drill,
+non-CI). Plus two pulled-out data phases: the claims
 sample-mean slider and data.ameli practitioner fees.
 
-Open BACKLOG rows: **41**.
+Open BACKLOG rows: **42**.
 
 (Update this section at the end of every working day.)

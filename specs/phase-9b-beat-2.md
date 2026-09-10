@@ -479,7 +479,7 @@ the cost-mart columns (`expression`, `citation`, `sourcing` are varchar — inva
 5's "no text column" means no review-text column; say so in 9c's spec); `Unit`
 and `_display` need a euro unit; a Modeled mart's source is the Open DAMIR fit
 (a repository file plus the source address — the `_drill` shapes exist);
-Modeled marts carry `run_id = 'synthetic'` on the baseline and must NOT be
+Modeled marts carry `run_id = 'model'` on the baseline (corrected in 9c: `rebuild()` passes no run_id, so `run_id or "model"`) and must NOT be
 corpus-gated (`_corpus_series` is opt-in per builder); `_render_line` places x
 by sorted label index, so B3.2's curves over `flag_rate` need a uniform grid or
 a numeric-x kind; `_BEATS` takes one row. 9f owns rows 69 and 72; 9g row 70.

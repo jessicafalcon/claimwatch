@@ -19,14 +19,36 @@ Two Phase 9b mechanisms live here:
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
+from math import ceil, floor, log10
 from typing import Literal
 
 from classify.eval.gate import ANSWER_KEY
 from classify.labels import POSITIVE, THEMES, UNCLASSIFIED
+from models.cost_model import FORMULAS, SCENARIOS, Formula
+from opendata.fit import ARTIFACT
+from opendata.sources import DATASET_API
 from pipeline.build import INPUTS
-from pipeline.warehouse import default_schema
-from study.model import NEUTRAL, Panel, Point, RenderRefused, Series, _require
+from pipeline.warehouse import ROOT, default_schema
+from study import text
+from study.model import (
+    NEUTRAL,
+    Panel,
+    Point,
+    RenderRefused,
+    Series,
+    _require,
+    display,
+    x_key,
+)
+from study.text import (
+    DENOMINATOR_NOTE,
+    FIXTURE_NOTE,
+    SEGMENT_DENOMINATOR_NOTE,
+    SEGMENT_SELF_SELECTION_NOTE,
+    SELF_SELECTION_NOTE,
+    TRADITIONAL_CAVEAT,
+)
 
 # The only columns any study query may project — a closed allowlist checked on
 # every cursor's description, so review text (`title`, `body`) can never reach
@@ -57,6 +79,21 @@ ALLOWED_COLUMNS = frozenset(
         "actual",
         "precision",
         "recall",
+        # Beat 3: the three cost-model marts (no review column among them)
+        "scenario",
+        "name",
+        "expression",
+        "unit",
+        "default_value",
+        "sourcing",
+        "citation",
+        "low",
+        "high",
+        "flag_rate",
+        "fraud_saved",
+        "friction_cost",
+        "net",
+        "is_default",
     }
 )
 
@@ -93,6 +130,25 @@ _Q_THEME_BY_SEGMENT = (
 _Q_CLASSIFIER_QUALITY = (
     "select label, hits, predicted, actual, precision, recall, tag "
     "from classifier_quality order by label"
+)
+# Beat 3 reads each model mart whole and picks the scenario in Python, so no
+# filter value is a literal in the SQL (pinned decision 2); `name` is the
+# tie-free read key and the rows are re-ordered by the imported tuples.
+_Q_COST_OUTPUTS = (
+    "select scenario, name, expression, value, unit, tag "
+    "from cost_model_outputs order by scenario, name"
+)
+# `net` is projected and allowlisted but read by no Beat 3 reader: the marker is
+# the outputs mart's crossover row, never a scan of `net` (pinned decision 4).
+# SPEC Scope carries it in the allowlist for 9d's B4.1; a mutation to it moves
+# no page number (test_a_mutated_mart_cell_moves_the_page_and_the_expression_stays).
+_Q_COST_CURVES = (
+    "select scenario, flag_rate, fraud_saved, friction_cost, net, is_default, tag "
+    "from cost_curves order by scenario, flag_rate"
+)
+_Q_COST_PARAMS = (
+    "select name, default_value, unit, sourcing, citation, low, high, tag "
+    "from cost_model_params order by name"
 )
 
 # The marts a corpus panel gates on: it reads their `run_id` to decide numbers
@@ -137,6 +193,9 @@ STUDY_QUERIES = (
     _Q_THEME_BY_MONTH,
     _Q_THEME_BY_SEGMENT,
     _Q_CLASSIFIER_QUALITY,
+    _Q_COST_OUTPUTS,
+    _Q_COST_CURVES,
+    _Q_COST_PARAMS,
 ) + tuple(_run_id_sql(mart) for mart in _CORPUS_MARTS)
 
 
@@ -384,14 +443,12 @@ _LABEL_NAMES = {
 }
 
 # The corpus gate's states and the platform roots a computed share cites (no
-# per-review address leaves ingest — D1). The fixture-state text carries no
-# digit, so a fixture panel's body shows no number (Phase 9b, the brief's
-# "never faked" applied at render time).
-# The gate's state per rebuild input, one closed mapping over `INPUTS` (a test
-# pins the key sets equal): counted numbers over the real corpus, the labelled
-# fixture state over a fixture input, "no data yet" over `none`. A run_id
-# outside it refuses by name in `_corpus_input`; a fifth input cannot fall into
-# a default arm (challenge round 2, #8).
+# per-review address leaves ingest — D1); the fixture-state text itself lives in
+# study/text.py. The gate's state per rebuild input, one closed mapping over
+# `INPUTS` (a test pins the key sets equal): counted numbers over the real
+# corpus, the labelled fixture state over a fixture input, "no data yet" over
+# `none`. A run_id outside it refuses by name in `_corpus_input`; a fifth input
+# cannot fall into a default arm (challenge round 2, #8).
 COUNTED, FIXTURE, NO_DATA = "counted", "fixture", "no-data"
 _STATE_OF_INPUT = {
     "captured": COUNTED,
@@ -399,11 +456,6 @@ _STATE_OF_INPUT = {
     "samples": FIXTURE,
     "none": NO_DATA,
 }
-_FIXTURE_NOTE = (
-    "Built from hand-written example reviews: a check that the study’s machinery "
-    "works, not a result. The counted figures appear when the study is built "
-    "over captured reviews."
-)
 # B2.4's source (BACKING): the hand-labelled answer key, a repository file the
 # footer names in plain text. The export never reads it and never spells it —
 # the path is the constant its one reader, classify/eval, exports (the labels
@@ -414,51 +466,6 @@ PLATFORM_ROOTS = (
     "https://play.google.com/",
     "https://www.opinion-assurances.fr/",
     "https://www.trustpilot.com/",
-)
-# The denominator every theme share divides by — every classified review,
-# positive included — stated beside the chart so `positive`'s exclusion from
-# the bars is not read as a shrunk denominator (Phase 9b, pinned decision 4).
-# One note per chart shape: B2.2's lines (shares across themes in one month),
-# B2.5's bars (one theme's share in one segment) — round 2, study-editor #1.
-_DENOMINATOR_NOTE = (
-    "The share of each theme is theme rows over every classified review "
-    "(positive reviews included in the total, but not drawn as a theme bar — a "
-    "theme chart counts complaints). A review carrying two themes counts in two "
-    "bars, so the shares across themes can sum past one. The gray “not yet "
-    "classified” band is the reviews a language model would sort; when that "
-    "model is switched off it is largest, shown, never hidden."
-)
-_SEGMENT_DENOMINATOR_NOTE = (
-    "The bar is the document-loop share among every classified review in that "
-    "segment (positive reviews included in the total, never a bar); a review "
-    "carrying document-loop beside another theme counts once here. The gray "
-    "“not yet classified” band is the reviews a language model would sort; "
-    "when that model is switched off it is largest, shown, never hidden."
-)
-
-
-# The negative-self-selection caveat, the theme-share panels' own note beside the
-# counting method (brief §2.5; B1.2 carries the same caveat beside the rating
-# trend). A theme SHARE from unsolicited platforms is a mix among the
-# dissatisfied, not a census — stated where the chart shows it, naming what
-# that chart shows (round 2, study-editor #2).
-def _self_selection_note(shown: str) -> str:
-    return (
-        "Sampling bias, stated here: these reviews come from platforms customers "
-        "were not invited to (unsolicited), which are negatively self-selected — "
-        f"so {shown} is what dissatisfied customers chose to write about, not a "
-        "census of every claim."
-    )
-
-
-_SELF_SELECTION_NOTE = _self_selection_note("the theme mix")
-_SEGMENT_SELF_SELECTION_NOTE = _self_selection_note("the held-claim complaint share")
-# The corpus is one segment today — B2.2 and B2.5's own note, before the caveat:
-# B2.2's query filters on it and B2.5 draws it (BACKLOG "vs traditional").
-_TRADITIONAL_CAVEAT = (
-    "The corpus is digital-first only for now, so the traditional comparison "
-    "awaits a traditional-mutuelle source; the chart shows the segment the data "
-    "has."
 )
 
 
@@ -534,10 +541,10 @@ def _theme_series(
     by_label: dict[str, list[Point]] = {}
     # The tag is the mart row's own, as every Beat 1 reader reads it — never a
     # literal in the reader (round 2, code-reviewer #1, the caller-sourced class).
-    for x_key, label, reviews, theme_rows, share, tag in rows:
+    for x_label, label, reviews, theme_rows, share, tag in rows:
         if label == POSITIVE or (label in _THEME_SLOTS and label not in themes):
             continue
-        point_label = str(x_key) if label_by == "period" else _segment_name(x_key)
+        point_label = str(x_label) if label_by == "period" else _segment_name(x_label)
         by_label.setdefault(label, []).append(
             Point(
                 point_label,
@@ -675,7 +682,7 @@ def _corpus_series(
     state = _STATE_OF_INPUT[run_id]  # closed: `_corpus_input` refused the rest
     if state == COUNTED:
         return build(), ""
-    return (), (_FIXTURE_NOTE if state == FIXTURE else "")
+    return (), (FIXTURE_NOTE if state == FIXTURE else "")
 
 
 def beat2_panels(conn) -> list[Panel]:
@@ -736,7 +743,7 @@ def beat2_panels(conn) -> list[Panel]:
             series=month_series,
             fixture=month_fixture,
             sources=PLATFORM_ROOTS,
-            notes=(_TRADITIONAL_CAVEAT, _SELF_SELECTION_NOTE, _DENOMINATOR_NOTE),
+            notes=(TRADITIONAL_CAVEAT, SELF_SELECTION_NOTE, DENOMINATOR_NOTE),
             domain=(0.0, 1.0),
         ),
         Panel(
@@ -798,10 +805,389 @@ def beat2_panels(conn) -> list[Panel]:
             fixture=segment_fixture,
             sources=PLATFORM_ROOTS,
             notes=(
-                _TRADITIONAL_CAVEAT,
-                _SEGMENT_SELF_SELECTION_NOTE,
-                _SEGMENT_DENOMINATOR_NOTE,
+                TRADITIONAL_CAVEAT,
+                SEGMENT_SELF_SELECTION_NOTE,
+                SEGMENT_DENOMINATOR_NOTE,
             ),
             domain=(0.0, 1.0),
+        ),
+    ]
+
+
+# --- Beat 3: the cost model, every number a cell of its three marts ------------
+# The outputs mart's rounding unit (models/cost_model.py::_ROUNDING's keys) → the
+# display unit the page formats it in; a unit outside the closed lookup refuses
+# by name (pinned decision 5). A curve formula's value is a flag rate, read as a
+# percentage.
+_DISPLAY_UNIT = {"eur": "eur", "rate": "pct", "count": "count", "days": "days"}
+# The sourcing words a parameter row may carry (`models.cost_model.SOURCING`,
+# restated as the closed key of the render class): any other word refuses.
+Sourcing = Literal["sourced", "unsourced"]
+_SOURCINGS: tuple[Sourcing, ...] = ("sourced", "unsourced")
+# The panel-level sources: B3.1–B3.3 name the tracked fit artifact (a repository
+# file) and the Open DAMIR dataset it was fitted from (an address); B3.4 names
+# the module that declares the guesses. The params mart's citation string is
+# rendered as text, never passed as a source (its "… ← open-damir" shape is
+# neither a file nor an address).
+FIT_FILE = str(ARTIFACT.relative_to(ROOT))
+MODEL_FILE = "models/cost_model.py"
+_FIT_SOURCES = (FIT_FILE, DATASET_API)
+# The scenario B3.1–B3.3 read; the three toggled scenarios are Beat 4's (9d).
+BASELINE = "baseline"
+
+
+def _scenario_rows(conn, sql: str, scenario: str, panel_id: str) -> list[tuple]:
+    """The rows of one scenario from a scenario-keyed model mart, the scenario
+    checked against the imported `SCENARIOS` and refused by name outside it —
+    never a literal in the SQL, never a caller's free string."""
+    if scenario not in SCENARIOS:
+        raise RenderRefused(
+            f"{panel_id}: scenario {scenario!r} is not one of {tuple(SCENARIOS)}"
+        )
+    return [row[1:] for row in _rows(conn, sql) if row[0] == scenario]
+
+
+def _display_unit(unit: str | None, panel_id: str) -> str:
+    unit = _require(unit, "unit", panel_id)
+    if unit not in _DISPLAY_UNIT:
+        raise RenderRefused(
+            f"{panel_id}: outputs unit {unit!r} is not one of {tuple(_DISPLAY_UNIT)}"
+        )
+    return _DISPLAY_UNIT[unit]
+
+
+def _formula_cell(
+    formula: Formula, row: tuple, panel_id: str
+) -> Point:  # one outputs row → one cell
+    """One formula row's cell: the expression as its label, the mart's value in
+    its display unit — or, for a curve formula whose crossover the grid never
+    reaches (the mart stores NULL), the declared absence. A null value on a
+    point formula, or a null expression, refuses by name."""
+    expression, value, unit, tag = row
+    label = str(_require(expression, "expression", panel_id))
+    unit = _display_unit(unit, panel_id)
+    tag = str(_require(tag, "tag", panel_id))
+    if value is None and formula.kind == "curve":
+        return Point(label, None, tag, "", unit, absent=text.NEVER_CROSSES)
+    return Point(label, float(_require(value, "value", panel_id)), tag, "", unit)
+
+
+def _formula_rows(conn, scenario: str, panel_id: str) -> tuple[Series, ...]:
+    """B3.1 (and B3.3's headline, 9d's B4.1): one series per `FORMULAS` entry,
+    in the tuple's order so the page reads line for line with `make model`,
+    each the display name, the mart's own name as `key`, and one cell. Every
+    mart row must be a `FORMULAS` name with a display name, and every
+    `FORMULAS` name must have a row — the module ↔ mart ↔ page identity."""
+    by_name = {
+        name: row
+        for name, *row in _scenario_rows(conn, _Q_COST_OUTPUTS, scenario, panel_id)
+    }
+    known = {f.name for f in FORMULAS}
+    for name in by_name:
+        if name not in known or name not in text.FORMULA_NAMES:
+            raise RenderRefused(
+                f"{panel_id}: formula {name!r} in cost_model_outputs has no "
+                "display name (not in the closed map)"
+            )
+    series = []
+    for f in FORMULAS:
+        if f.name not in by_name:
+            raise RenderRefused(
+                f"{panel_id}: formula {f.name!r} has no {scenario} row in "
+                "cost_model_outputs"
+            )
+        series.append(
+            Series(
+                text.FORMULA_NAMES[f.name],
+                0,
+                (_formula_cell(f, by_name[f.name], panel_id),),
+                key=f.name,
+            )
+        )
+    return tuple(series)
+
+
+def _headline_rows(formula_rows: tuple[Series, ...]) -> tuple[Series, ...]:
+    """B3.3's three derived headline figures (BACKING: revenue per member, the
+    mean claim, the claim volume) — the baseline formula rows of those names.
+    Filters the B3.1 rows the panel build already read, so the outputs mart is
+    read once, not once more for the headline (round 1, code-reviewer #6)."""
+    return tuple(s for s in formula_rows if s.key in text.HEADLINE_FORMULAS)
+
+
+def _curve_series(conn, scenario: str, panel_id: str) -> tuple[Series, ...]:
+    """B3.2 (and 9d's B4.1): the two curves over the flag-rate grid, one point
+    per mart row, labelled by its grid x. Fraud saved takes slot 0 and friction
+    cost slot 1 — the first slots in series order, never a semantic colour."""
+    saved: list[Point] = []
+    cost: list[Point] = []
+    for row in _scenario_rows(conn, _Q_COST_CURVES, scenario, panel_id):
+        flag_rate, fraud_saved, friction_cost, _net, _is_default, tag = row
+        label = x_key(float(_require(flag_rate, "flag_rate", panel_id)))
+        tag = str(_require(tag, "tag", panel_id))
+        saved.append(
+            Point(
+                label,
+                float(_require(fraud_saved, "fraud_saved", panel_id)),
+                tag,
+                "",
+                "eur",
+            )
+        )
+        cost.append(
+            Point(
+                label,
+                float(_require(friction_cost, "friction_cost", panel_id)),
+                tag,
+                "",
+                "eur",
+            )
+        )
+    return (
+        Series(text.FORMULA_NAMES["fraud_saved"], 0, tuple(saved)),
+        Series(text.FORMULA_NAMES["friction_cost"], 1, tuple(cost)),
+    )
+
+
+def _curve_markers(conn, scenario: str, panel_id: str) -> tuple[tuple[str, float], ...]:
+    """The curve chart's labelled rules, each read from a mart row and never
+    found by scanning the curve (pinned decision 4): the `is_default` row's flag
+    rate ("you are here"), then the two crossover rows of `cost_model_outputs`,
+    each present only when the mart stores a value. Exactly one default row."""
+    defaults = [
+        float(_require(flag_rate, "flag_rate", panel_id))
+        for flag_rate, *_rest, is_default, _tag in _scenario_rows(
+            conn, _Q_COST_CURVES, scenario, panel_id
+        )
+        if is_default
+    ]
+    if len(defaults) != 1:
+        raise RenderRefused(
+            f"{panel_id}: cost_curves marks {len(defaults)} default rows for "
+            f'{scenario} — exactly one is the "you are here" rule'
+        )
+    outputs = {
+        name: value
+        for name, _expression, value, _unit, _tag in _scenario_rows(
+            conn, _Q_COST_OUTPUTS, scenario, panel_id
+        )
+    }
+    markers = [(text.MARKER_DEFAULT, defaults[0])]
+    for label, name in (
+        (text.MARKER_CROSSOVER, "crossover_flag_rate"),
+        (text.MARKER_MARGINAL, "marginal_crossover_flag_rate"),
+    ):
+        if name not in outputs:
+            raise RenderRefused(
+                f"{panel_id}: formula {name!r} has no {scenario} row in "
+                "cost_model_outputs"
+            )
+        if outputs[name] is not None:
+            markers.append((label, float(outputs[name])))
+    return tuple(markers)
+
+
+def _crossover_note(markers: tuple[tuple[str, float], ...]) -> str:
+    """The B3.2 note, filled from the markers (themselves mart rows): a rule that
+    is absent reads as the grid never reaching it."""
+    by_label = dict(markers)
+    shown = {label: display(x, "pct") for label, x in markers}
+    return text.crossover_note(
+        shown.get(text.MARKER_CROSSOVER),
+        shown.get(text.MARKER_MARGINAL),
+        shown[text.MARKER_DEFAULT] if text.MARKER_DEFAULT in by_label else "",
+    )
+
+
+def curve_domain(values: Iterable[float]) -> tuple[float, float]:
+    """The curve chart's y domain — a layout number by one fixed rule: lower
+    bound 0, upper bound the largest value rounded up to one significant figure
+    (4,530,293.45 → 5,000,000). The same cells give the same domain; no
+    displayed figure derives from it (invariant 9)."""
+    top = max(values, default=0.0)
+    if top <= 0:
+        return (0.0, 1.0)
+    magnitude = 10 ** floor(log10(top))
+    return (0.0, float(ceil(top / magnitude) * magnitude))
+
+
+def _parameter_rows(conn, sourcing: Sourcing, panel_id: str) -> tuple[Series, ...]:
+    """B3.3 (sourced) and B3.4 (unsourced): one series per parameter whose mart
+    `sourcing` is the given word — the split is that column, never an id list
+    — in the display map's order (pinned equal to `parameters()` order), each
+    three cells: low, default (its citation or the unsourced label in `detail`,
+    beside the mart's prose unit), high, all in the parameter's display unit.
+    A row whose word is neither, or whose name the map does not know, refuses."""
+    if sourcing not in _SOURCINGS:
+        raise RenderRefused(
+            f"{panel_id}: sourcing {sourcing!r} is not one of {_SOURCINGS}"
+        )
+    by_name = {name: row for name, *row in _rows(conn, _Q_COST_PARAMS)}
+    for name, (*_cells, word, _citation, _low, _high, _tag) in by_name.items():
+        if name not in text.PARAMETER_NAMES:
+            raise RenderRefused(
+                f"{panel_id}: parameter {name!r} in cost_model_params has no display "
+                "name (not in the closed map)"
+            )
+        if word not in _SOURCINGS:
+            raise RenderRefused(
+                f"{panel_id}: parameter {name!r} sourcing {word!r} is not one of "
+                f"{_SOURCINGS}"
+            )
+    series = []
+    for name, (display_name, unit) in text.PARAMETER_NAMES.items():
+        if name not in by_name:
+            raise RenderRefused(
+                f"{panel_id}: parameter {name!r} has no row in cost_model_params"
+            )
+        default, prose_unit, word, citation, low, high, tag = by_name[name]
+        if word != sourcing:
+            continue
+        tag = str(_require(tag, "tag", panel_id))
+        told = citation if word == "sourced" else text.UNSOURCED_LABEL
+        series.append(
+            Series(
+                display_name,
+                0,
+                (
+                    Point("low", float(_require(low, "low", panel_id)), tag, "", unit),
+                    Point(
+                        "default",
+                        float(_require(default, "default_value", panel_id)),
+                        tag,
+                        "",
+                        unit,
+                        detail=f"{_require(prose_unit, 'unit', panel_id)} · {told}",
+                    ),
+                    Point(
+                        "high", float(_require(high, "high", panel_id)), tag, "", unit
+                    ),
+                ),
+                key=name,
+                sourcing=word,
+            )
+        )
+    return tuple(series)
+
+
+def beat3_panels(conn) -> list[Panel]:
+    """The four Beat 3 panels, the study's first Modeled surface: every number a
+    cell of the three cost-model marts, which fill on every rebuild input — so
+    no corpus gate, and the committed page shows these numbers."""
+    formulas = _formula_rows(conn, BASELINE, "B3.1")
+    curves = _curve_series(conn, BASELINE, "B3.2")
+    markers = _curve_markers(conn, BASELINE, "B3.2")
+    return [
+        Panel(
+            id="B3.1",
+            backing_row="B3.1",
+            title="The formulas, next to their output",
+            blurb=(
+                "What a wrongly held claim costs, as arithmetic you can redo by "
+                "hand: each row is one formula of the cost model, printed exactly "
+                "as the code holds it, beside the number it gives at the "
+                "defaults. Nothing here is measured — it is the model’s own "
+                "output, and every input is listed in the two panels below."
+            ),
+            tag="Modeled",
+            kind="formulas",
+            series=formulas,
+            sources=_FIT_SOURCES,
+            notes=(
+                "How to read a row: the quantity, the model’s own name for it, the "
+                "formula as printed in the repository file models/cost_model.py, "
+                "and its value at the defaults of the baseline scenario. The "
+                "three fixes of Beat 4 rerun the same formulas with one or two "
+                "inputs changed.",
+                "The mean claim comes from a lognormal fitted to public "
+                "reimbursement cells (Open DAMIR); a cell sums one or more "
+                "claims, so the mean overstates a single claim and understates "
+                "the claim count and the friction cost — the row says so, and "
+                "the median cell is printed beside it as the contrast.",
+            ),
+        ),
+        Panel(
+            id="B3.2",
+            backing_row="B3.2",
+            title="The crossover chart",
+            blurb=(
+                "Flag more claims and you catch more fraud, with diminishing "
+                "returns; you also hold more legitimate claims, and each of those "
+                "costs staff time and lost customers. The two curves put both in "
+                "euros over the share of claims flagged. Where they cross, "
+                "flagging as a whole costs more than it recovers."
+            ),
+            tag="Modeled",
+            kind="curve",
+            series=curves,
+            markers=markers,
+            domain=curve_domain(p.value for s in curves for p in s.points),
+            sources=_FIT_SOURCES,
+            notes=(
+                _crossover_note(markers),
+                "The rules are read off the model’s own rows, not from the "
+                "drawing: the default flag rate, the first grid point where the "
+                "net turns negative, and the first where the next flag costs more "
+                "than it recovers. A grid the curves never cross draws no rule "
+                "and says so.",
+                "One channel the curves do not show: for a company plan, one "
+                "employee stuck in a document loop complains to their HR "
+                "department, and it is HR that decides the renewal — so the "
+                "customer lost can be a whole account.",
+            ),
+        ),
+        Panel(
+            id="B3.3",
+            backing_row="B3.3",
+            title="The sourced defaults",
+            blurb=(
+                "The inputs anchored to public figures — revenue, members, the "
+                "fraud pool, refunds paid, and the typical size of a claim — each "
+                "shown with the public figure behind it and the range the study "
+                "explores. The three headline figures above the rows are derived "
+                "from these inputs, at the defaults."
+            ),
+            tag="Modeled",
+            kind="parameters",
+            headline=_headline_rows(formulas),
+            series=_parameter_rows(conn, "sourced", "B3.3"),
+            sources=_FIT_SOURCES,
+            notes=(
+                "Each range is shown as a fixed mark, not a slider you drag: low, "
+                "default and high come from the model’s own table, so a reader "
+                "redoes the arithmetic at any point of the range by hand with the "
+                "printed formula. A published figure given as a floor spans the "
+                "floor to twice it — the study’s stated exploration bound, not a "
+                "fact.",
+                "Stated here: the four scale anchors are public disclosures cited "
+                "second-hand from the project brief, each a floor; the fit rows "
+                "span the fit plus and minus two standard errors, and the median "
+                "cell is a read figure with no range of its own.",
+            ),
+        ),
+        Panel(
+            id="B3.4",
+            backing_row="B3.4",
+            title="The declared-unsourced parameters",
+            blurb=(
+                "The inputs with no public source — how many claims are flagged, "
+                "how many of those are wrong, what a stuck claim costs in contacts "
+                "and lost customers, and the two hold-timer settings. Each is a "
+                "declared guess with the range worth exploring, styled apart from "
+                "the sourced rows, never a settled fact."
+            ),
+            tag="Modeled",
+            kind="parameters",
+            series=_parameter_rows(conn, "unsourced", "B3.4"),
+            sources=(MODEL_FILE,),
+            notes=(
+                "The low, default and high are static marks, nothing to drag: the "
+                "printed formulas and these spans let a reader redo the arithmetic "
+                "at any point of the range by hand. A control that recomputes on "
+                "the page is a script, and this page carries none.",
+                "Stated here: the cost per contact is a declared guess awaiting a "
+                "public benchmark; if one is handed over, the row moves to the "
+                "sourced panel with its citation and nothing else changes.",
+            ),
         ),
     ]

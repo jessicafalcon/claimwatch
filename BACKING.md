@@ -61,7 +61,7 @@ every rule below except the last sentence, which is editorial (PROJECT_BRIEF.md
 | B3.1 Cost-model formulas printed next to their output | cost_model_outputs | `sql/marts/cost_model_outputs.sql` | `open-damir` | Modeled |
 | B3.2 Fraud saved vs friction cost curves over the flag rate, with the crossover | cost_curves | `sql/marts/cost_curves.sql` | `open-damir` | Modeled |
 | B3.3 Sourced defaults: revenue per member, fraud pool, claim volume | cost_model_params | `sql/marts/cost_model_params.sql` | `open-damir` | Modeled |
-| B3.4 Declared-unsourced parameters as explore-the-range sliders | cost_model_params | `sql/marts/cost_model_params.sql` | — | Modeled |
+| B3.4 Declared-unsourced parameters with their explore-the-range span drawn, styled apart | cost_model_params | `sql/marts/cost_model_params.sql` | — | Modeled |
 | B4.1 Fix 1 ask once: contacts per stuck claim drop to one, the curves move | cost_curves | `sql/marts/cost_curves.sql` | `open-damir` | Modeled |
 | B4.2 Fix 2 a clock on every hold: the computed hold-length threshold | sla_threshold | `sql/marts/sla_threshold.sql` | `open-damir` | Modeled |
 | B4.3 Before and after hold durations from the simulator on calibrated synthetic claims | guardrail_sim | `sql/marts/guardrail_sim.sql` | `open-damir` | Modeled |
