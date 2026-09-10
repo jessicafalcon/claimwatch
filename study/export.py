@@ -618,8 +618,9 @@ def _drill(panel: Panel) -> str:
         verb = "the counted figures will open to" if panel.fixture else "opens to"
         clauses.append(f"{verb} {opened}")
     if files:
-        noun = "source file" if len(files) == 1 else "source files"
-        clauses.append(f"{noun} " + ", ".join(_esc(f) for f in files))
+        # No panel carries two file sources today; a plural form is added with
+        # the first that does (fix/drill-footer-verb, round 1 #3).
+        clauses.append("source file " + ", ".join(_esc(f) for f in files))
     if not clauses:
         return "source pending"
     return "; ".join(clauses)
