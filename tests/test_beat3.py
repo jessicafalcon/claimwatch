@@ -231,9 +231,9 @@ def test_no_beat3_panel_prints_source_pending(synthetic_db):
         assert "source pending" not in _section(page, pid), pid
     for pid in ("B3.1", "B3.2", "B3.3"):
         sec = _section(page, pid)
-        assert f"the repository file {panels.FIT_FILE}" in sec
+        assert f"source file {panels.FIT_FILE}" in sec  # a file, not "opened to"
         assert f'href="{panels._FIT_SOURCES[1]}"' in sec  # the Open DAMIR address
-    assert f"the repository file {panels.MODEL_FILE}" in _section(page, "B3.4")
+    assert f"source file {panels.MODEL_FILE}" in _section(page, "B3.4")
     assert (ROOT / panels.FIT_FILE).is_file() and (ROOT / panels.MODEL_FILE).is_file()
 
 

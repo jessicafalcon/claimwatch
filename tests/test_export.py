@@ -192,7 +192,7 @@ def test_a_panel_source_is_an_address_or_a_repository_file_else_refused():
         )
 
     drilled = export._drill(panel((ANSWER_KEY_FILE,)))
-    assert drilled == f"opens to the repository file {ANSWER_KEY_FILE}"
+    assert drilled == f"source file {ANSWER_KEY_FILE}"  # a file, not "opened to"
     assert "href" not in drilled
     for bad in ("../secrets", "/etc/passwd", "javascript:alert(1)", "a b"):
         with pytest.raises(RenderRefused) as exc:
