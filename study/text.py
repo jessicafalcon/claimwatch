@@ -213,17 +213,20 @@ def threshold_note(timer_days: str, amount: str, share: str) -> str:
     )
 
 
-# The B4.3 note figure: where the released share renders (a note, not a bar —
-# the bars are the two hold lengths per fix). Only the clock releases claims;
+# The B4.3 note figure: where the released share renders (a note figure, not a
+# bar — the bars are one mean hold per scenario). Only the clock releases claims;
 # once the document loop is already one round, the timer has nothing left to
-# release, so ask-once and both-fixes release none (SPEC Beat 4).
+# release, so ask-once and both-fixes release none (SPEC Beat 4). The "same hold
+# as ask-once" claim is prose; the ask_once == both_fixes equality it rests on is
+# pinned in tests/test_beat4.py, so a parameter change that broke it fails there.
 def released_note(clock_share: str) -> str:
     """The sentence naming the clock's released share, from the `hold_timer`
-    scenario's aggregate cell."""
+    scenario's aggregate cell — the same "synthetic claims" population B4.2's
+    threshold note counts, so the shared figure reads as one quantity."""
     return (
-        f"The clock alone releases {clock_share} of held claims early. With the "
-        "document loop already cut to one round, ask-once and both-fixes leave "
-        "the timer nothing to release — the same hold as ask-once."
+        f"The clock alone releases {clock_share} of synthetic claims early. With "
+        "the document loop already cut to one round, ask-once and both-fixes "
+        "leave the timer nothing to release — the same hold as ask-once."
     )
 
 
@@ -233,5 +236,5 @@ BEAT4_PENDING = (
     "No number yet: a false-positive rate per flag rule needs an outcome log — "
     "each hold recorded as fraud-confirmed or released-clean — that the system "
     "does not keep. The same event stream would also trigger a status "
-    "notification, which would end silent rejections at no extra cost."
+    "notification against silent rejections, from the events already recorded."
 )

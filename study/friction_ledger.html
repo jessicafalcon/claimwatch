@@ -335,7 +335,7 @@
 <p class="note">Stated here: the cost per contact is a declared guess awaiting a public benchmark; if one is handed over, the row moves to the sourced panel with its citation and nothing else changes.</p>
 <p class="evidence">Evidence: B3.4 · Modeled · source file models/cost_model.py</p>
 </section>
-<h2 class="beat">Beat 4 — Three small fixes, no rebuild required</h2>
+<h2 class="beat">Beat 4 — Three small fixes, no system overhaul</h2>
 <section class="panel">
 <h3>B4.1 · The curves move <span class="chip chip-modeled">Modeled</span></h3>
 <p class="blurb">The first fix collapses the back-and-forth for documents: one request returns the whole list. Fewer stuck claims means less friction, so the net line — fraud saved minus friction cost — lifts. Each line is one scenario; the fraud caught is unchanged, so what moves is the cost.</p>
@@ -550,7 +550,7 @@
 </section>
 <section class="panel">
 <h3>B4.3 · Before and after <span class="chip chip-modeled">Modeled</span></h3>
-<p class="blurb">What the fixes do to how long a claim waits: the mean hold in days before any fix and after each one. Ask-once cuts the document loop to a single round; the clock releases the small low-risk claims early.</p>
+<p class="blurb">What the fixes do to how long a claim waits: the average hold in days before any fix and after each one. Ask-once cuts the document loop to a single round; the clock releases the small low-risk claims early.</p>
 <svg viewBox="0 0 680 280" role="img" preserveAspectRatio="xMidYMid meet" class="chart">
 <line x1="48.00" y1="240.00" x2="664.00" y2="240.00" class="grid"/>
 <text x="42.00" y="243.00" class="tick" text-anchor="end">0</text>
@@ -562,27 +562,27 @@
 <text x="42.00" y="75.00" class="tick" text-anchor="end">22.5</text>
 <line x1="48.00" y1="16.00" x2="664.00" y2="16.00" class="grid"/>
 <text x="42.00" y="19.00" class="tick" text-anchor="end">30</text>
-<rect x="78.80" y="83.20" width="92.40" height="156.80" rx="4" fill="var(--s0)"><title>holds · Today, no fix: 21.0 days (Modeled)</title></rect>
+<rect x="78.80" y="83.20" width="92.40" height="156.80" rx="4" fill="var(--s0)"><title>Mean hold · Today, no fix: 21.0 days (Modeled)</title></rect>
 <text x="125.00" y="256.00" class="tick" text-anchor="middle">Today, no fix</text>
 <text x="125.00" y="77.20" class="barval" text-anchor="middle">21.0 days</text>
-<rect x="232.80" y="187.73" width="92.40" height="52.27" rx="4" fill="var(--s0)"><title>holds · Ask once: 7.0 days (Modeled)</title></rect>
+<rect x="232.80" y="187.73" width="92.40" height="52.27" rx="4" fill="var(--s0)"><title>Mean hold · Ask once: 7.0 days (Modeled)</title></rect>
 <text x="279.00" y="256.00" class="tick" text-anchor="middle">Ask once</text>
 <text x="279.00" y="181.73" class="barval" text-anchor="middle">7.0 days</text>
-<rect x="386.80" y="108.81" width="92.40" height="131.19" rx="4" fill="var(--s0)"><title>holds · A clock on every hold: 17.6 days (Modeled)</title></rect>
+<rect x="386.80" y="108.81" width="92.40" height="131.19" rx="4" fill="var(--s0)"><title>Mean hold · A clock on every hold: 17.6 days (Modeled)</title></rect>
 <text x="433.00" y="256.00" class="tick" text-anchor="middle">A clock on every hold</text>
 <text x="433.00" y="102.81" class="barval" text-anchor="middle">17.6 days</text>
-<rect x="540.80" y="187.73" width="92.40" height="52.27" rx="4" fill="var(--s0)"><title>holds · Both fixes: 7.0 days (Modeled)</title></rect>
+<rect x="540.80" y="187.73" width="92.40" height="52.27" rx="4" fill="var(--s0)"><title>Mean hold · Both fixes: 7.0 days (Modeled)</title></rect>
 <text x="587.00" y="256.00" class="tick" text-anchor="middle">Both fixes</text>
 <text x="587.00" y="181.73" class="barval" text-anchor="middle">7.0 days</text>
 </svg>
-<p class="note">The clock alone releases 49.0% of held claims early. With the document loop already cut to one round, ask-once and both-fixes leave the timer nothing to release — the same hold as ask-once.</p>
+<p class="note">The clock alone releases 49.0% of synthetic claims early. With the document loop already cut to one round, ask-once and both-fixes leave the timer nothing to release — the same hold as ask-once.</p>
 <p class="note">Each bar is the mean over a thousand synthetic claims — the fitted distribution read at a thousand evenly spaced points, no individual claim, none is public. One hold per scenario, not a distribution: the no-fix bar is the hold before any fix, each fix beside it, the document loop or the timer, whichever ends the hold first.</p>
 <p class="evidence">Evidence: B4.3 · Modeled · opens to <a href="https://www.data.gouv.fr/api/1/datasets/open-damir-base-complete-sur-les-depenses-dassurance-maladie-interregimes/" rel="noopener">https://www.data.gouv.fr/api/1/datasets/open-damir-base-complete-sur-les-depenses-dassurance-maladie-interregimes/</a>; source file data/damir/claim_cost_fit.csv</p>
 </section>
 <section class="panel">
 <h3>B4.4 · Count the mistakes <span class="chip chip-pending">Pending</span></h3>
 <p class="blurb">The third fix records how each hold ends — fraud confirmed, or released clean. That log would be the false-positive rate per flag rule the system otherwise never learns, and the same events would drive a status notification against silent rejections.</p>
-<div class="pending">No number yet: a false-positive rate per flag rule needs an outcome log — each hold recorded as fraud-confirmed or released-clean — that the system does not keep. The same event stream would also trigger a status notification, which would end silent rejections at no extra cost.</div>
+<div class="pending">No number yet: a false-positive rate per flag rule needs an outcome log — each hold recorded as fraud-confirmed or released-clean — that the system does not keep. The same event stream would also trigger a status notification against silent rejections, from the events already recorded.</div>
 <p class="evidence">Evidence: B4.4 · Pending · source pending</p>
 </section>
 </main></body></html>

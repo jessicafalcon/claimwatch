@@ -95,7 +95,7 @@ def test_beat_four_renders_all_four_panels(synthetic_db):
     got = {p.id: (p.tag, p.kind) for p in _panels(synthetic_db)}
     assert got == kinds
     page = _html(synthetic_db)
-    assert "Beat 4 — Three small fixes, no rebuild required" in page
+    assert "Beat 4 — Three small fixes, no system overhaul" in page
     for pid in pins.BEAT4_PANELS:
         assert f"Evidence: {pid}" in page
 
@@ -298,8 +298,9 @@ def test_b41_refuses_when_not_exactly_one_default_flag_rate(synthetic_db, tmp_pa
     )
     conn = connect("duckdb", database=two)
     try:
+        curve_rows = panels._rows(conn, panels._Q_COST_CURVES)
         with pytest.raises(RenderRefused) as exc:
-            panels._net_marker(conn, "B4.1")
+            panels._net_marker(curve_rows, "B4.1")
         assert "B4.1" in str(exc.value) and "2 default" in str(exc.value)
         assert "\n" not in str(exc.value)
     finally:
@@ -346,27 +347,46 @@ def test_beat_four_render_is_byte_stable(synthetic_db):
 
 
 # --- invariant 1: every Beat 4 number is a tagged mart cell -------------------
+# Each Beat 4 mart feeds exactly one panel; a mutated cell moves that panel and
+# leaves every other Beat 3/4 section byte-identical (the number is the mart's,
+# and each beat reads only its own mart).
+_OTHER_BEATS = ("B3.1", "B3.2", "B4.1", "B4.2", "B4.3")
+
+
+def _moves_only(before: str, after: str, moved: str) -> None:
+    assert _section(after, moved) != _section(before, moved), moved
+    for pid in (p for p in _OTHER_BEATS if p != moved):
+        assert _section(after, pid) == _section(before, pid), (moved, pid)
+
+
 def test_every_beat_four_number_is_a_tagged_mart_cell(synthetic_db, tmp_path):
-    # A mutated cell in each Beat 4 mart moves its panel and no other.
     before = _html(synthetic_db)
-    curve = _mutated(
-        synthetic_db,
-        tmp_path / "curve",
-        ("update cost_curves set net = 777777.0 where scenario = 'both'",),
+    curve = _html(
+        _mutated(
+            synthetic_db,
+            tmp_path / "curve",
+            ("update cost_curves set net = 777777.0 where scenario = 'both'",),
+        )
     )
-    assert "€777,777.00" in _section(_html(curve), "B4.1")
-    sla = _mutated(
-        synthetic_db,
-        tmp_path / "sla",
-        ("update sla_threshold set timer_amount_eur = 99.99 where is_default",),
+    assert "€777,777.00" in _section(curve, "B4.1")
+    _moves_only(before, curve, "B4.1")
+    sla = _html(
+        _mutated(
+            synthetic_db,
+            tmp_path / "sla",
+            ("update sla_threshold set timer_amount_eur = 99.99 where is_default",),
+        )
     )
-    assert ">€99.99<" in _section(_html(sla), "B4.2")
-    sim = _mutated(
-        synthetic_db,
-        tmp_path / "sim",
-        ("update guardrail_sim set hold_days = 5 where scenario = 'no_fix'",),
+    assert ">€99.99<" in _section(sla, "B4.2")
+    _moves_only(before, sla, "B4.2")
+    sim = _html(
+        _mutated(
+            synthetic_db,
+            tmp_path / "sim",
+            ("update guardrail_sim set hold_days = 5 where scenario = 'no_fix'",),
+        )
     )
-    assert _section(_html(sim), "B4.3") != _section(before, "B4.3")
+    _moves_only(before, sim, "B4.3")
     # a Beat 4 point with no tag is refused (the render contract over the kinds)
     with pytest.raises(RenderRefused):
         check_panel(
@@ -382,14 +402,30 @@ def test_every_beat_four_number_is_a_tagged_mart_cell(synthetic_db, tmp_path):
         )
 
 
-def test_beat_four_bars_carry_the_marts_tag_not_a_literal(synthetic_db, tmp_path):
-    mixed = _mutated(
+def test_beat_four_points_carry_the_marts_tag_not_a_literal(synthetic_db, tmp_path):
+    # B4.3 (guardrail_sim) and B4.1 (cost_curves): a scenario relabelled to a
+    # second tag renders two chips — the chip is the mart's tag, not a literal.
+    mixed_sim = _mutated(
         synthetic_db,
-        tmp_path,
+        tmp_path / "sim",
         ("update guardrail_sim set tag = 'Measured' where scenario = 'ask_once'",),
     )
-    sec = _section(_html(mixed), "B4.3")
-    assert "chip chip-measured" in sec and "chip chip-modeled" in sec
+    b43 = _section(_html(mixed_sim), "B4.3")
+    assert "chip chip-measured" in b43 and "chip chip-modeled" in b43
+    mixed_curve = _mutated(
+        synthetic_db,
+        tmp_path / "curve",
+        ("update cost_curves set tag = 'Measured' where scenario = 'both'",),
+    )
+    b41 = _section(_html(mixed_curve), "B4.1")
+    assert "chip chip-measured" in b41 and "chip chip-modeled" in b41
+
+
+def test_b41_and_b43_agree_on_scenario_display_names(synthetic_db):
+    # SCENARIO_NAMES (B4.1 curves) and SIM_HOLD_NAMES (B4.3 bars) are two maps
+    # over the paired scenarios; their display strings must match so one fix
+    # reads the same in both panels — pinned by value, not only by key.
+    assert tuple(text.SCENARIO_NAMES.values()) == tuple(text.SIM_HOLD_NAMES.values())
 
 
 def test_the_allowlist_and_queries_gain_the_beat_four_marts():

@@ -602,5 +602,5 @@ BEAT4_FRAGMENTS = {
     "threshold day (stat, days)": ">14.0 days<",
     "threshold amount (stat, eur)": ">€42.67<",
     "threshold share (stat, pct)": ">49.0%<",
-    "released share (note, pct)": "releases 49.0% of held claims",
+    "released share (note, pct)": "releases 49.0% of synthetic claims",
 }

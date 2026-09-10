@@ -665,7 +665,7 @@ _BEATS = (
     ("Beat 1 — People are telling us what’s wrong, in public", beat1_panels),
     ("Beat 2 — The complaints have a shape", beat2_panels),
     ("Beat 3 — What a wrongly held claim costs", beat3_panels),
-    ("Beat 4 — Three small fixes, no rebuild required", beat4_panels),
+    ("Beat 4 — Three small fixes, no system overhaul", beat4_panels),
 )
 
 

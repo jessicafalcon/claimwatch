@@ -982,15 +982,17 @@ def _curve_series(conn, scenario: str, panel_id: str) -> tuple[Series, ...]:
     )
 
 
-def _default_flag_rate(conn, scenario: str, panel_id: str) -> float:
-    """The one `is_default` flag rate of a scenario's `cost_curves` rows — the
-    "you are here" grid x, read from the mart, exactly one else refuse. Shared by
-    B3.2's `_curve_markers` and B4.1's `_net_marker`."""
+def _one_default_rate(
+    scenario_rows: list[tuple], scenario: str, panel_id: str
+) -> float:
+    """The single `is_default` flag rate among a scenario's already-read
+    `cost_curves` rows (shape: flag_rate, fraud_saved, friction_cost, net,
+    is_default, tag) — exactly one else refuse. The pure core shared by
+    `_default_flag_rate` (which reads per scenario, B3.2) and `_net_marker`
+    (which reads the whole mart once, B4.1)."""
     defaults = [
         float(_require(flag_rate, "flag_rate", panel_id))
-        for flag_rate, *_rest, is_default, _tag in _scenario_rows(
-            conn, _Q_COST_CURVES, scenario, panel_id
-        )
+        for flag_rate, *_rest, is_default, _tag in scenario_rows
         if is_default
     ]
     if len(defaults) != 1:
@@ -999,6 +1001,14 @@ def _default_flag_rate(conn, scenario: str, panel_id: str) -> float:
             f'{scenario} — exactly one is the "you are here" rule'
         )
     return defaults[0]
+
+
+def _default_flag_rate(conn, scenario: str, panel_id: str) -> float:
+    """The one `is_default` flag rate of a scenario's `cost_curves` rows — the
+    "you are here" grid x, read from the mart (B3.2's `_curve_markers`)."""
+    return _one_default_rate(
+        _scenario_rows(conn, _Q_COST_CURVES, scenario, panel_id), scenario, panel_id
+    )
 
 
 def _curve_markers(conn, scenario: str, panel_id: str) -> tuple[tuple[str, float], ...]:
@@ -1252,17 +1262,19 @@ def net_domain(values: Iterable[float]) -> tuple[float, float]:
     return (0.0, 1.0) if top == bottom else (bottom, top)
 
 
-def _net_curves(conn, panel_id: str) -> tuple[Series, ...]:
+def _net_curves(curve_rows: list[tuple], panel_id: str) -> tuple[Series, ...]:
     """B4.1: one net (fraud − friction) curve per cost-model scenario, in
     `SCENARIOS` order — baseline the reference — four series within the
     five-slot palette, each a series of `cost_curves` `net` cells keyed on
-    `scenario`. The display names are the closed `SCENARIO_NAMES` map, pinned
-    equal to the scenario set."""
+    `scenario`. Reads the already-fetched `cost_curves` rows (grouped by
+    `scenario` here, so the mart is read once for the whole panel). The display
+    names are the closed `SCENARIO_NAMES` map, pinned equal to the scenario set."""
     if tuple(text.SCENARIO_NAMES) != tuple(SCENARIOS):
         raise RenderRefused(
             f"{panel_id}: SCENARIO_NAMES {tuple(text.SCENARIO_NAMES)} are not the "
             f"cost-model scenarios {tuple(SCENARIOS)}"
         )
+    by_scenario = _rows_by_scenario(curve_rows)
     series = []
     for slot, scenario in enumerate(text.SCENARIO_NAMES):
         points = [
@@ -1273,19 +1285,34 @@ def _net_curves(conn, panel_id: str) -> tuple[Series, ...]:
                 "",
                 "eur",
             )
-            for flag_rate, _fraud, _friction, net, _is_default, tag in _scenario_rows(
-                conn, _Q_COST_CURVES, scenario, panel_id
+            for flag_rate, _fraud, _friction, net, _is_default, tag in by_scenario.get(
+                scenario, []
             )
         ]
+        if not points:
+            raise RenderRefused(f"{panel_id}: cost_curves has no rows for {scenario!r}")
         series.append(Series(text.SCENARIO_NAMES[scenario], slot, tuple(points)))
     return tuple(series)
 
 
-def _net_marker(conn, panel_id: str) -> tuple[tuple[str, float], ...]:
+def _net_marker(
+    curve_rows: list[tuple], panel_id: str
+) -> tuple[tuple[str, float], ...]:
     """B4.1's single "you are here" rule: the baseline scenario's default flag
     rate (every scenario shares the grid and the default), on a grid x the curves
-    draw."""
-    return ((text.MARKER_DEFAULT, _default_flag_rate(conn, BASELINE, panel_id)),)
+    draw. Reads the already-fetched rows, so the mart is read once for B4.1."""
+    baseline = _rows_by_scenario(curve_rows).get(BASELINE, [])
+    return ((text.MARKER_DEFAULT, _one_default_rate(baseline, BASELINE, panel_id)),)
+
+
+def _rows_by_scenario(curve_rows: list[tuple]) -> dict[str, list[tuple]]:
+    """The `cost_curves` rows grouped by their `scenario` (the first column),
+    each value the rows with `scenario` stripped — so B4.1 reads the mart once
+    and both readers filter in Python (the Beat 3 read-whole pattern)."""
+    by_scenario: dict[str, list[tuple]] = {}
+    for scenario, *rest in curve_rows:
+        by_scenario.setdefault(scenario, []).append(tuple(rest))
+    return by_scenario
 
 
 def _hold_summary(conn, panel_id: str) -> dict[str, tuple[float, float, str]]:
@@ -1341,7 +1368,7 @@ def _hold_bars(
         Point(text.SIM_HOLD_NAMES[name], summary[name][0], summary[name][2], "", "days")
         for name in text.SIM_HOLD_NAMES
     )
-    return (Series("holds", 0, points),)
+    return (Series("Mean hold", 0, points),)
 
 
 class _Threshold(NamedTuple):
@@ -1394,7 +1421,9 @@ def beat4_panels(conn) -> list[Panel]:
     the Pending outcome-log panel. Every number a `cost_curves`, `sla_threshold`
     or `guardrail_sim` cell, filled on every rebuild input — so no corpus gate,
     and the committed page shows these numbers."""
-    net = _net_curves(conn, "B4.1")
+    curve_rows = _rows(conn, _Q_COST_CURVES)  # read once; B4.1 filters in Python
+    net = _net_curves(curve_rows, "B4.1")
+    marker = _net_marker(curve_rows, "B4.1")
     threshold = _threshold_row(conn, "B4.2")
     summary = _hold_summary(conn, "B4.3")
     bars = _hold_bars(summary, "B4.3")
@@ -1414,7 +1443,7 @@ def beat4_panels(conn) -> list[Panel]:
             tag="Modeled",
             kind="curve",
             series=net,
-            markers=_net_marker(conn, "B4.1"),
+            markers=marker,
             domain=net_domain(p.value for s in net for p in s.points),
             sources=_FIT_SOURCES,
             notes=(
@@ -1461,7 +1490,7 @@ def beat4_panels(conn) -> list[Panel]:
             backing_row="B4.3",
             title="Before and after",
             blurb=(
-                "What the fixes do to how long a claim waits: the mean hold in "
+                "What the fixes do to how long a claim waits: the average hold in "
                 "days before any fix and after each one. Ask-once cuts the "
                 "document loop to a single round; the clock releases the small "
                 "low-risk claims early."
