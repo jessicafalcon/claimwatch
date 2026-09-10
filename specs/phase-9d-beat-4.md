@@ -192,18 +192,18 @@ Freeze: none
 
 ## Record updates (REQUIRED)
 
-- [ ] `DECISIONS.md` — Phase 9d entry (the static-comparison reading, the SQL
+- [x] `DECISIONS.md` — Phase 9d entry (the static-comparison reading, the SQL
   aggregate pinned to `summarize`, no new `Kind`).
-- [ ] `BACKLOG.md` — row "No test that a Phase 9 SQL aggregate over
+- [x] `BACKLOG.md` — row "No test that a Phase 9 SQL aggregate over
   `guardrail_sim` reproduces `summarize`" struck (DONE Phase 9d); count
   decremented; the 9f rows (published corpus render, tooltip-only trail, live
   sliders) still stand, their triggers unchanged.
-- [ ] LESSONS.md — none until a review round reports a correctness finding; then backtick it and the fix commit writes the row.
-- [ ] `CLAUDE.md` — Current status; Repo map (`study/` now renders Beats 1–4; the "Beats 1–3 render" sentence becomes 1–4); BACKLOG count.
-- [ ] BACKING — none (B4.1–B4.3 already Modeled from Phase 8b; B4.4 stays Pending; no tag change, `make check-backing` stays green).
-- [ ] `SPEC.md` — one clarifying B4.1 sentence: the panel draws the net curve across baseline and the three toggled scenarios (the "curves move" comparison), reconciling the Beat 3 fragment ("the three toggled scenarios are B4.1's") with B4.1's fix heading. No other chart changes.
-- [ ] README — none (the README is Phase 9f).
-- [ ] this spec — the "Delivered" paragraph appended at exit.
+- [x] LESSONS.md — none until a review round reports a correctness finding; then backtick it and the fix commit writes the row.
+- [x] `CLAUDE.md` — Current status; Repo map (`study/` now renders Beats 1–4; the "Beats 1–3 render" sentence becomes 1–4); BACKLOG count.
+- [x] BACKING — none structural (B4.1–B4.3 already Modeled from Phase 8b; B4.4 stays Pending; no tag change, `make check-backing` stays green). One exit-audit wording fix: the "What Beat 4 landed" B4.1 narrative reworded to the shipped four-scenario net curve (was `contacts_once`-only, double-attributing `guardrail_sim`).
+- [x] `SPEC.md` — one clarifying B4.1 sentence: the panel draws the net curve across baseline and the three toggled scenarios (the "curves move" comparison), reconciling the Beat 3 fragment ("the three toggled scenarios are B4.1's") with B4.1's fix heading. No other chart changes.
+- [x] README — none (the README is Phase 9f).
+- [x] this spec — the "Delivered" paragraph appended at exit.
 
 ## Threat model (REQUIRED when the phase adds a `make` target that takes a variable, deletes anything, calls a paid API, or touches the network)
 
@@ -246,3 +246,45 @@ Agents are selected by diff surface (CLAUDE.md → "Which review agents run").
   stranger acceptance test).
 - Live sliders / an inline recompute script (BACKLOG, Phase 9f).
 - Beat 5, the README, and the Metabase demonstration (Phases 9e–9g).
+
+## Delivered (2026-09-10)
+
+Beat 4 renders the three fixes beside the Beat 3 curves through the 9a/9c
+contract — no new chart `Kind`, no new dependency, no `make` target. **B4.1**
+draws the net (fraud − friction) curve of `cost_curves` for `baseline`,
+`contacts_once`, `churn_halved` and `both` — four series, inside the five-slot
+palette (`_series_var` refuses slot 5 loudly) — with the default-rate marker;
+the hold-duration effect is B4.3's, not B4.1's. **B4.2** is a `stat_row` over
+`sla_threshold`'s `is_default` row (the timer day the clock fires, the
+net-negative threshold amount, the share of claims under it) with the
+net-negative arithmetic in the note, templated from the mart cells so it cannot
+drift. **B4.3** is a `grouped_bar`, one bar per simulator scenario (the no-fix
+hold and each fix beside it, the timer-released share a note figure), reading
+`guardrail_sim` through `panels._hold_summary`'s portable `avg`/`count`/`case`
+group-by, rounded at the model's one site and pinned equal to
+`models/guardrail_sim.py::summarize` on all four scenarios
+(`tests/test_beat4.py::test_b43_sql_aggregate_equals_summarize`), which closes
+the Phase 8b BACKLOG row. **B4.4** stays the Pending placeholder — no number.
+Every Beat 4 number is a cell of `cost_curves`, `guardrail_sim` or
+`sla_threshold`, tagged Modeled from the mart's own row; a mutated cell moves
+the page, a render over `ROWS=none` shows the same numbers, and the bytes are
+stable on a re-render. The Beat 4 display texts (scenario names, the templated
+B4.2 sentence, the B4.4 placeholder, every note) live in `study/text.py` beside
+the Beat 1–3 texts; `pipeline/sql_lint.py` accepts the `case` idiom. The
+permanent page carries no script — the live-slider question stays 9f's
+(BACKLOG).
+
+Review round 1, round 2, and the exit round (coherence-auditor, whole repo)
+found no BLOCKER. Fixes: B4.3 redrawn as one bar per scenario, not before/after
+pairs (`22b8bbf`, round 1 #15); round 1 craft/voice/coverage/record
+(`1d6baef`); `text.released_note` pinned in its test (`d73003a`); round 2 stale
+prose, craft, coverage (`91fb0cd`); records reconciled to the
+one-bar-per-scenario B4.3, BACKLOG #12 (`dabb274`). At the exit audit, one
+wording drift: BACKING's "What Beat 4 landed" B4.1 narrative still named
+`contacts_once` alone and double-attributed the hold durations to
+`guardrail_sim` — reworded to the shipped four-scenario net curve. Two forward
+notes carried to 9f: the duplicated-but-pinned-equal `SCENARIO_NAMES` /
+`SIM_HOLD_NAMES` display maps (test #8 asserts they agree), and the B4.2↔B4.3
+"same 49%" prose, an identity between two independently-computed marts that is
+true now but could drift if a 9f live slider moved the timer rule independently
+of `share_under`.
