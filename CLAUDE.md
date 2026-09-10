@@ -126,8 +126,8 @@ Delivered paragraph and `make help`, not here.
   `export.py` (the hand-written inline-SVG charts — line, grouped bars, the
   stat row, the metric table, the formula list, the curve with its markers,
   the range marks — and the page), `__main__.py` (the `make study` entry), the
-  committed `friction_ledger.html`; Beats 1–3 render (9a, 9b, 9c), Beats 4–5,
-  the README and the Metabase demonstration are later Phase 9 sub-phases.
+  committed `friction_ledger.html`; Beats 1–4 render (9a–9d), Beat 5, the README
+  and the Metabase demonstration are later Phase 9 sub-phases.
   `dags/` *(Phase 10)* — `friction_ledger.py`.
 - `fixtures/` — read-only after Phase 1, each set with a `MANIFEST.sha256`:
   `synthetic/` (hand-written fake reviews), `anchors/` (brief §6 figures with
@@ -728,10 +728,13 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 ## Current status
 
-**In progress: none — between phases.** The active branch is the hotfix
-`fix/drill-footer-verb` (the study footer names a repository file as its own
-"source file" clause, never "opened to" — the finding deferred from Phase 9c
-review round 1 #8, cross-phase into 9b's B2.4). Next phase: 9d — Beat 4.
+**In progress: Phase 9d — Beat 4** (branch `phase-9d`, spec
+`specs/phase-9d-beat-4.md`, challenged round 1, spec `50966c34` — rework scoped
+to B4.1, all amendments applied). Beat 4 renders through the 9a/9c contract: B4.1
+the net curve across the four scenarios (`cost_curves`), B4.2 the computed
+hold-length threshold (`sla_threshold`, a `stat_row`), B4.3 the before/after
+holds per fix (`guardrail_sim` aggregated in SQL, pinned to `summarize`), B4.4
+Pending. No new dependency, no `make` target, no new chart `Kind`.
 
 **Merged:** Phases 0a–9c in order, each with its spec under `specs/` (the
 Delivered paragraph) and its DECISIONS appendix — 9c (PR #25, 2026-09-09: Beat
@@ -746,12 +749,10 @@ promoted). Phase 8b — the guardrail simulator (B4.1–B4.3, PR #19,
 2026-09-07) — landed `models/guardrail_sim.py::RULES`, the hold timer's three
 formulas in `models/cost_model.py`, the two simulator marts and `make simulate`.
 
-**Next (Phase 9 sub-phases, in order):** 9d — Beat 4 (the toggled scenarios
-over the 9c readers, the hold timer from `sla_threshold`, `guardrail_sim`);
-9e — Beat 5; 9f — the README + the stranger acceptance test (and the live-
-slider decision); 9g — the Metabase demonstration (the review-level drill,
-non-CI). Plus two pulled-out data phases: the claims
-sample-mean slider and data.ameli practitioner fees.
+**Next (Phase 9 sub-phases, in order):** 9e — Beat 5; 9f — the README + the
+stranger acceptance test (and the live-slider decision); 9g — the Metabase
+demonstration (the review-level drill, non-CI). Plus two pulled-out data phases:
+the claims sample-mean slider and data.ameli practitioner fees.
 
 Open BACKLOG rows: **41**.
 

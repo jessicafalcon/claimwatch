@@ -194,16 +194,20 @@ and "both fixes" show the same hold.
 
 - **B4.1 — Ask for everything once.** A lookup that returns the complete document
   list for a claim type and flag reason in one request, ending the serial
-  document loop — contacts per stuck claim drop to one, and the curves move. Tag:
-  *Modeled*.
+  document loop — contacts per stuck claim drop to one, and the curves move. The
+  chart draws the net (fraud saved minus friction cost) over the flag rate for
+  the baseline and all three toggled scenarios of B3.1/B3.2 — one net line each,
+  the fixes lifting the line; the fraud caught is unchanged, so what moves is the
+  cost. Tag: *Modeled*.
 - **B4.2 — A clock on every hold.** A timer on each held claim: past a threshold,
   small low-risk claims auto-release and large ones escalate to a person. The
   threshold is computed from the Beat 3 model, not guessed, and the arithmetic
   is shown ("holds beyond N days on claims under €X are net-negative in
   expectation"). Tag: *Modeled*.
-- **B4.3 — Before and after.** For each fix, the mean hold in days and the share
-  of claims the clock released, with the Beat 3 curves beside them — two hold
-  lengths per fix, not a distribution. Tag: *Modeled*.
+- **B4.3 — Before and after.** One bar per scenario — the no-fix hold and each
+  fix beside it (scenario × hold days), so the before is shown once, not a
+  distribution — with the share of claims the clock released as a note figure.
+  Tag: *Modeled*.
 - **B4.4 — Count the mistakes.** Logging how each hold ends — fraud-confirmed or
   released-clean — yields a false-positive rate per flag rule, the metric the
   system otherwise lacks; the same event stream also triggers a status

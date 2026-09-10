@@ -157,3 +157,84 @@ def crossover_note(crossover: str | None, marginal: str | None, default: str) ->
             "past it, the flags as a whole cost more than they recover."
         )
     return f"{marginal_sentence} {crossover_sentence}"
+
+
+# --- Beat 4 (Phase 9d): the three fixes, drawn beside the Beat 3 curves --------
+# B4.1's four net curves, keyed by the cost-model scenario each draws
+# (`models.cost_model.SCENARIOS`) and in that draw order — baseline first, the
+# reference. `churn_halved` is the cost-curve effect the hold timer is modelled
+# as (fewer customers lost), which is why its display name names the clock.
+# A test pins these keys equal to `SCENARIOS` (the B4.1 palette is ≤ 5 series).
+SCENARIO_NAMES = {
+    "baseline": "Today, no fix",
+    "contacts_once": "Ask once",
+    "churn_halved": "A clock on every hold",
+    "both": "Both fixes",
+}
+# B4.3's bars, one per simulator scenario (`models.guardrail_sim.SIM_SCENARIOS`,
+# in that order): the no-fix hold is the "before", each fix's hold the "after"
+# beside it — the spec's "scenario × hold days", the before shown once, not
+# repeated per fix. The display names match B4.1's for the paired scenarios. A
+# test pins these keys equal to the simulator scenario set.
+SIM_HOLD_NAMES = {
+    "no_fix": "Today, no fix",
+    "ask_once": "Ask once",
+    "hold_timer": "A clock on every hold",
+    "both_fixes": "Both fixes",
+}
+# B4.2's three stat labels, in the order of `sla_threshold`'s cells
+# (`timer_days`, `timer_amount_eur`, `share_under`), each with its display unit
+# — the closed display text as data, not literals in `panels.py`. "Claims small
+# enough to auto-release" names the share as what it is (the small claims the
+# clock releases), so B4.2's 49% reads as the same quantity B4.3 reports
+# released, not a second coincidental figure.
+THRESHOLD_STATS = (
+    ("Clock fires after", "days"),
+    ("Not worth holding below", "eur"),
+    ("Claims small enough to auto-release", "pct"),
+)
+
+
+# The B4.2 note: the clock's arithmetic, filled from the `sla_threshold`
+# is_default row's three cells (a reading of the mart, never a typed figure) —
+# the timer day, the claim amount below which a hold that long is net-negative,
+# and the share of synthetic claims under it.
+def threshold_note(timer_days: str, amount: str, share: str) -> str:
+    """The sentence beneath B4.2, from the three displayed cells of the default
+    threshold row: a hold beyond the timer day on a claim under the amount costs
+    more in friction than the fraud it could still catch, so it auto-releases;
+    the share names how many claims fall under that amount."""
+    return (
+        f"Holds beyond {timer_days} on claims under {amount} are net-negative in "
+        f"expectation — the friction they add outweighs the fraud they still "
+        f"catch — so past {timer_days} a small claim auto-releases and a large "
+        f"one goes to a person. {share} of synthetic claims fall under that "
+        "amount."
+    )
+
+
+# The B4.3 note figure: where the released share renders (a note figure, not a
+# bar — the bars are one mean hold per scenario). Only the clock releases claims;
+# once the document loop is already one round, the timer has nothing left to
+# release, so ask-once and both-fixes release none (SPEC Beat 4). The "same hold
+# as ask-once" claim is prose; the ask_once == both_fixes equality it rests on is
+# pinned in tests/test_beat4.py, so a parameter change that broke it fails there.
+def released_note(clock_share: str) -> str:
+    """The sentence naming the clock's released share, from the `hold_timer`
+    scenario's aggregate cell — the same "synthetic claims" population B4.2's
+    threshold note counts, so the shared figure reads as one quantity."""
+    return (
+        f"The clock alone releases {clock_share} of synthetic claims early. With "
+        "the document loop already cut to one round, ask-once and both-fixes "
+        "leave the timer nothing to release — the same hold as ask-once."
+    )
+
+
+# B4.4 is Pending: a design panel with no number, because the outcome log a
+# false-positive rate needs does not exist yet (SPEC B4.4).
+BEAT4_PENDING = (
+    "No number yet: a false-positive rate per flag rule needs an outcome log — "
+    "each hold recorded as fraud-confirmed or released-clean — that the system "
+    "does not keep. The same event stream would also trigger a status "
+    "notification against silent rejections, from the events already recorded."
+)

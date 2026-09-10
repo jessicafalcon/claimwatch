@@ -2547,3 +2547,61 @@ column), both merged first.
 
 Challenge dispositions are recorded in the spec (round 1, 2026-09-09, approve
 with amendments). Supersedes nothing.
+
+### Phase 9d
+
+Branch `phase-9d-beat-4`, spec `specs/phase-9d-beat-4.md`, challenged round 1
+(rework scoped to B4.1, all amendments applied; spec `50966c34`). Beat 4 of the
+study — the three fixes, drawn beside the Beat 3 curves. Depends on Phase 9c
+(PR #25) and the fix PR `fix/drill-footer-verb` (PR #26), both merged first. The
+Beat 4 marts already existed from Phase 8b; this phase renders them.
+
+- **The toggled scenarios are drawn beside the baseline, not toggled by a
+  control.** The permanent page carries no script (9a/9b/9c), so B4.1 draws the
+  net curve for the baseline and all three toggled scenarios as four static
+  lines a reader compares by eye; the live-control decision stays Phase 9f's
+  (BACKLOG *Live sliders need a script the permanent page does not carry*).
+  *Rejected: an inline recompute script (the permanent artifact carries none); a
+  control that does nothing (reads as broken).*
+- **B4.1 draws the net per scenario (four lines), keyed on `scenario`, within
+  the five-slot palette — it does not reuse `_curve_series` with
+  `contacts_once`.** This supersedes the Phase 9c entry's forward note ("9d's
+  B4.1 reuses `_formula_rows`, `_curve_series` and `_curve_markers` with
+  `contacts_once`"): the challenge chose all three toggled scenarios (SPEC
+  B3.1/B3.2 assign them to B4.1), and three scenarios × the two curves (fraud +
+  friction) is six-plus series against a palette of five (`_series_var` refuses
+  slot 5, a CVD-validated cap). One net line per scenario is four series ≤ 5 and
+  shows exactly what the fixes move (fraud caught is unchanged). A new reader
+  `_net_curves` and a signed `net_domain` (the net dips below zero — the
+  crossover; `curve_domain`'s 0-floor would clip it), the significant-figure
+  rule factored into `_sig_ceil` and shared. *Rejected: `contacts_once` alone
+  (SPEC assigns three); fraud + friction per scenario (exceeds the palette);
+  small multiples (a layout the contract does not have, and past the ≤6 cap).*
+- **B4.2 is a `stat_row`, not a `curve` (build-time finding, amendment committed
+  alone).** The `curve` kind hardwires its x-axis to a flag-rate percent
+  (`study/export.py`), so `timer_days` would mislabel. B4.2 shows the three
+  cells of `sla_threshold`'s `is_default` row (the timer day, the net-negative
+  amount, the share under it) with the arithmetic in the note. *Rejected: B4.2
+  as a curve (mislabelled x-axis); the 60-row threshold grid (`make simulate`
+  prints it — the page shows the computed answer); extending the curve x-axis
+  unit (render-contract surface a stat row does not need).*
+- **B4.3 aggregates `guardrail_sim` in one ANSI SQL group-by, pinned to
+  `summarize`.** `panels._hold_summary` reads mean hold days (`avg`) and the
+  timer-released share (`sum(case when outcome = 'timer_released' …)/count(*)` —
+  the portable conditional count, not `filter`), rounded at the model's one site
+  (`rounded`); `tests/test_beat4.py::test_b43_sql_aggregate_equals_summarize`
+  pins it equal to `models/guardrail_sim.py::summarize` on all four scenarios,
+  closing the Phase 8b BACKLOG row that named exactly this test. The released
+  share renders as a note figure (only the clock releases claims); B4.3 draws
+  one bar per scenario (the shared no-fix baseline and each fix beside it —
+  round 1 #15 dropped the before/after pairs that repeated the baseline in three
+  colours). *Rejected: a Python reduction in the reader (a SQL aggregate is the
+  shape the BACKLOG row named, and keeps the mart the one source); `filter
+  (where …)` (not portable to Snowflake).*
+- **B4.4 stays Pending — a design panel, no number.** The false-positive rate it
+  would show needs an outcome log that does not exist; `check_panel` refuses a
+  value on a Pending panel. *Rejected: inventing a placeholder number (the
+  provenance contract — never faked).*
+
+Challenge dispositions are recorded in the spec (round 1, 2026-09-09, rework
+scoped to B4.1). Supersedes the Phase 9c forward note on B4.1's readers (above).

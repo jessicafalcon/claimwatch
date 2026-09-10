@@ -335,4 +335,254 @@
 <p class="note">Stated here: the cost per contact is a declared guess awaiting a public benchmark; if one is handed over, the row moves to the sourced panel with its citation and nothing else changes.</p>
 <p class="evidence">Evidence: B3.4 · Modeled · source file models/cost_model.py</p>
 </section>
+<h2 class="beat">Beat 4 — Three small fixes, no system overhaul</h2>
+<section class="panel">
+<h3>B4.1 · The curves move <span class="chip chip-modeled">Modeled</span></h3>
+<p class="blurb">The first fix collapses the back-and-forth for documents: one request returns the whole list. Fewer stuck claims means less friction, so the net line — fraud saved minus friction cost — lifts. Each line is one scenario; the fraud caught is unchanged, so what moves is the cost.</p>
+<svg viewBox="0 0 680 280" role="img" preserveAspectRatio="xMidYMid meet" class="chart">
+<line x1="104.00" y1="240.00" x2="664.00" y2="240.00" class="grid"/>
+<text x="98.00" y="243.00" class="tick" text-anchor="end">€-2,000,000.00</text>
+<line x1="104.00" y1="184.00" x2="664.00" y2="184.00" class="grid"/>
+<text x="98.00" y="187.00" class="tick" text-anchor="end">€-1,000,000.00</text>
+<line x1="104.00" y1="128.00" x2="664.00" y2="128.00" class="grid"/>
+<text x="98.00" y="131.00" class="tick" text-anchor="end">€0.00</text>
+<line x1="104.00" y1="72.00" x2="664.00" y2="72.00" class="grid"/>
+<text x="98.00" y="75.00" class="tick" text-anchor="end">€1,000,000.00</text>
+<line x1="104.00" y1="16.00" x2="664.00" y2="16.00" class="grid"/>
+<text x="98.00" y="19.00" class="tick" text-anchor="end">€2,000,000.00</text>
+<polyline points="104.00,128.00 118.00,125.56 132.00,123.46 146.00,121.70 160.00,120.25 174.00,119.11 188.00,118.26 202.00,117.69 216.00,117.40 230.00,117.36 244.00,117.58 258.00,118.03 272.00,118.72 286.00,119.62 300.00,120.74 314.00,122.07 328.00,123.59 342.00,125.30 356.00,127.20 370.00,129.26 384.00,131.50 398.00,133.89 412.00,136.44 426.00,139.14 440.00,141.99 454.00,144.97 468.00,148.08 482.00,151.31 496.00,154.67 510.00,158.15 524.00,161.74 538.00,165.44 552.00,169.24 566.00,173.14 580.00,177.13 594.00,181.22 608.00,185.40 622.00,189.66 636.00,194.00 650.00,198.42 664.00,202.92" fill="none" stroke="var(--s0)" stroke-width="2"/>
+<circle cx="104.00" cy="128.00" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.000: €0.00 (Modeled)</title></circle>
+<circle cx="118.00" cy="125.56" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.005: €43,584.91 (Modeled)</title></circle>
+<circle cx="132.00" cy="123.46" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.010: €81,019.94 (Modeled)</title></circle>
+<circle cx="146.00" cy="121.70" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.015: €112,546.24 (Modeled)</title></circle>
+<circle cx="160.00" cy="120.25" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.020: €138,395.50 (Modeled)</title></circle>
+<circle cx="174.00" cy="119.11" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.025: €158,790.31 (Modeled)</title></circle>
+<circle cx="188.00" cy="118.26" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.030: €173,944.54 (Modeled)</title></circle>
+<circle cx="202.00" cy="117.69" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.035: €184,063.68 (Modeled)</title></circle>
+<circle cx="216.00" cy="117.40" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.040: €189,345.16 (Modeled)</title></circle>
+<circle cx="230.00" cy="117.36" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.045: €189,978.67 (Modeled)</title></circle>
+<circle cx="244.00" cy="117.58" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.050: €186,146.45 (Modeled)</title></circle>
+<circle cx="258.00" cy="118.03" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.055: €178,023.62 (Modeled)</title></circle>
+<circle cx="272.00" cy="118.72" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.060: €165,778.40 (Modeled)</title></circle>
+<circle cx="286.00" cy="119.62" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.065: €149,572.44 (Modeled)</title></circle>
+<circle cx="300.00" cy="120.74" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.070: €129,561.04 (Modeled)</title></circle>
+<circle cx="314.00" cy="122.07" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.075: €105,893.41 (Modeled)</title></circle>
+<circle cx="328.00" cy="123.59" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.080: €78,712.92 (Modeled)</title></circle>
+<circle cx="342.00" cy="125.30" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.085: €48,157.31 (Modeled)</title></circle>
+<circle cx="356.00" cy="127.20" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.090: €14,358.92 (Modeled)</title></circle>
+<circle cx="370.00" cy="129.26" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.095: €-22,555.10 (Modeled)</title></circle>
+<circle cx="384.00" cy="131.50" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.100: €-62,462.58 (Modeled)</title></circle>
+<circle cx="398.00" cy="133.89" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.105: €-105,246.16 (Modeled)</title></circle>
+<circle cx="412.00" cy="136.44" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.110: €-150,793.04 (Modeled)</title></circle>
+<circle cx="426.00" cy="139.14" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.115: €-198,994.90 (Modeled)</title></circle>
+<circle cx="440.00" cy="141.99" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.120: €-249,747.61 (Modeled)</title></circle>
+<circle cx="454.00" cy="144.97" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.125: €-302,951.17 (Modeled)</title></circle>
+<circle cx="468.00" cy="148.08" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.130: €-358,509.47 (Modeled)</title></circle>
+<circle cx="482.00" cy="151.31" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.135: €-416,330.18 (Modeled)</title></circle>
+<circle cx="496.00" cy="154.67" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.140: €-476,324.59 (Modeled)</title></circle>
+<circle cx="510.00" cy="158.15" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.145: €-538,407.47 (Modeled)</title></circle>
+<circle cx="524.00" cy="161.74" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.150: €-602,496.94 (Modeled)</title></circle>
+<circle cx="538.00" cy="165.44" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.155: €-668,514.30 (Modeled)</title></circle>
+<circle cx="552.00" cy="169.24" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.160: €-736,383.96 (Modeled)</title></circle>
+<circle cx="566.00" cy="173.14" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.165: €-806,033.30 (Modeled)</title></circle>
+<circle cx="580.00" cy="177.13" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.170: €-877,392.54 (Modeled)</title></circle>
+<circle cx="594.00" cy="181.22" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.175: €-950,394.62 (Modeled)</title></circle>
+<circle cx="608.00" cy="185.40" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.180: €-1,024,975.14 (Modeled)</title></circle>
+<circle cx="622.00" cy="189.66" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.185: €-1,101,072.19 (Modeled)</title></circle>
+<circle cx="636.00" cy="194.00" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.190: €-1,178,626.33 (Modeled)</title></circle>
+<circle cx="650.00" cy="198.42" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.195: €-1,257,580.40 (Modeled)</title></circle>
+<circle cx="664.00" cy="202.92" r="3" fill="var(--s0)"><title>Today, no fix · flag rate 0.200: €-1,337,879.52 (Modeled)</title></circle>
+<polyline points="104.00,128.00 118.00,123.97 132.00,120.29 146.00,116.94 160.00,113.91 174.00,111.18 188.00,108.75 202.00,106.59 216.00,104.71 230.00,103.09 244.00,101.72 258.00,100.59 272.00,99.69 286.00,99.01 300.00,98.55 314.00,98.29 328.00,98.22 342.00,98.35 356.00,98.66 370.00,99.14 384.00,99.79 398.00,100.60 412.00,101.56 426.00,102.67 440.00,103.93 454.00,105.33 468.00,106.85 482.00,108.50 496.00,110.28 510.00,112.17 524.00,114.17 538.00,116.28 552.00,118.50 566.00,120.81 580.00,123.22 594.00,125.73 608.00,128.32 622.00,130.99 636.00,133.75 650.00,136.59 664.00,139.50" fill="none" stroke="var(--s1)" stroke-width="2"/>
+<circle cx="104.00" cy="128.00" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.000: €0.00 (Modeled)</title></circle>
+<circle cx="118.00" cy="123.97" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.005: €71,899.24 (Modeled)</title></circle>
+<circle cx="132.00" cy="120.29" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.010: €137,648.61 (Modeled)</title></circle>
+<circle cx="146.00" cy="116.94" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.015: €197,489.25 (Modeled)</title></circle>
+<circle cx="160.00" cy="113.91" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.020: €251,652.84 (Modeled)</title></circle>
+<circle cx="174.00" cy="111.18" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.025: €300,361.98 (Modeled)</title></circle>
+<circle cx="188.00" cy="108.75" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.030: €343,830.54 (Modeled)</title></circle>
+<circle cx="202.00" cy="106.59" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.035: €382,264.02 (Modeled)</title></circle>
+<circle cx="216.00" cy="104.71" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.040: €415,859.83 (Modeled)</title></circle>
+<circle cx="230.00" cy="103.09" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.045: €444,807.68 (Modeled)</title></circle>
+<circle cx="244.00" cy="101.72" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.050: €469,289.79 (Modeled)</title></circle>
+<circle cx="258.00" cy="100.59" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.055: €489,481.29 (Modeled)</title></circle>
+<circle cx="272.00" cy="99.69" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.060: €505,550.41 (Modeled)</title></circle>
+<circle cx="286.00" cy="99.01" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.065: €517,658.78 (Modeled)</title></circle>
+<circle cx="300.00" cy="98.55" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.070: €525,961.71 (Modeled)</title></circle>
+<circle cx="314.00" cy="98.29" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.075: €530,608.42 (Modeled)</title></circle>
+<circle cx="328.00" cy="98.22" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.080: €531,742.27 (Modeled)</title></circle>
+<circle cx="342.00" cy="98.35" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.085: €529,500.99 (Modeled)</title></circle>
+<circle cx="356.00" cy="98.66" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.090: €524,016.94 (Modeled)</title></circle>
+<circle cx="370.00" cy="99.14" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.095: €515,417.25 (Modeled)</title></circle>
+<circle cx="384.00" cy="99.79" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.100: €503,824.10 (Modeled)</title></circle>
+<circle cx="398.00" cy="100.60" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.105: €489,354.86 (Modeled)</title></circle>
+<circle cx="412.00" cy="101.56" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.110: €472,122.31 (Modeled)</title></circle>
+<circle cx="426.00" cy="102.67" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.115: €452,234.79 (Modeled)</title></circle>
+<circle cx="440.00" cy="103.93" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.120: €429,796.40 (Modeled)</title></circle>
+<circle cx="454.00" cy="105.33" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.125: €404,907.18 (Modeled)</title></circle>
+<circle cx="468.00" cy="106.85" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.130: €377,663.22 (Modeled)</title></circle>
+<circle cx="482.00" cy="108.50" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.135: €348,156.84 (Modeled)</title></circle>
+<circle cx="496.00" cy="110.28" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.140: €316,476.76 (Modeled)</title></circle>
+<circle cx="510.00" cy="112.17" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.145: €282,708.21 (Modeled)</title></circle>
+<circle cx="524.00" cy="114.17" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.150: €246,933.09 (Modeled)</title></circle>
+<circle cx="538.00" cy="116.28" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.155: €209,230.06 (Modeled)</title></circle>
+<circle cx="552.00" cy="118.50" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.160: €169,674.73 (Modeled)</title></circle>
+<circle cx="566.00" cy="120.81" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.165: €128,339.72 (Modeled)</title></circle>
+<circle cx="580.00" cy="123.22" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.170: €85,294.82 (Modeled)</title></circle>
+<circle cx="594.00" cy="125.73" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.175: €40,607.07 (Modeled)</title></circle>
+<circle cx="608.00" cy="128.32" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.180: €-5,659.11 (Modeled)</title></circle>
+<circle cx="622.00" cy="130.99" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.185: €-53,441.83 (Modeled)</title></circle>
+<circle cx="636.00" cy="133.75" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.190: €-102,681.63 (Modeled)</title></circle>
+<circle cx="650.00" cy="136.59" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.195: €-153,321.37 (Modeled)</title></circle>
+<circle cx="664.00" cy="139.50" r="3" fill="var(--s1)"><title>Ask once · flag rate 0.200: €-205,306.16 (Modeled)</title></circle>
+<polyline points="104.00,128.00 118.00,123.58 132.00,119.50 146.00,115.75 160.00,112.32 174.00,109.20 188.00,106.37 202.00,103.82 216.00,101.54 230.00,99.52 244.00,97.76 258.00,96.23 272.00,94.93 286.00,93.86 300.00,93.00 314.00,92.34 328.00,91.88 342.00,91.61 356.00,91.52 370.00,91.61 384.00,91.86 398.00,92.27 412.00,92.84 426.00,93.56 440.00,94.42 454.00,95.42 468.00,96.54 482.00,97.80 496.00,99.18 510.00,100.67 524.00,102.28 538.00,103.99 552.00,105.81 566.00,107.73 580.00,109.75 594.00,111.85 608.00,114.05 622.00,116.33 636.00,118.69 650.00,121.13 664.00,123.64" fill="none" stroke="var(--s2)" stroke-width="2"/>
+<circle cx="104.00" cy="128.00" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.000: €0.00 (Modeled)</title></circle>
+<circle cx="118.00" cy="123.58" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.005: €78,977.82 (Modeled)</title></circle>
+<circle cx="132.00" cy="119.50" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.010: €151,805.78 (Modeled)</title></circle>
+<circle cx="146.00" cy="115.75" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.015: €218,725.00 (Modeled)</title></circle>
+<circle cx="160.00" cy="112.32" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.020: €279,967.17 (Modeled)</title></circle>
+<circle cx="174.00" cy="109.20" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.025: €335,754.89 (Modeled)</title></circle>
+<circle cx="188.00" cy="106.37" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.030: €386,302.04 (Modeled)</title></circle>
+<circle cx="202.00" cy="103.82" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.035: €431,814.10 (Modeled)</title></circle>
+<circle cx="216.00" cy="101.54" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.040: €472,488.50 (Modeled)</title></circle>
+<circle cx="230.00" cy="99.52" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.045: €508,514.93 (Modeled)</title></circle>
+<circle cx="244.00" cy="97.76" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.050: €540,075.63 (Modeled)</title></circle>
+<circle cx="258.00" cy="96.23" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.055: €567,345.71 (Modeled)</title></circle>
+<circle cx="272.00" cy="94.93" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.060: €590,493.41 (Modeled)</title></circle>
+<circle cx="286.00" cy="93.86" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.065: €609,680.37 (Modeled)</title></circle>
+<circle cx="300.00" cy="93.00" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.070: €625,061.88 (Modeled)</title></circle>
+<circle cx="314.00" cy="92.34" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.075: €636,787.18 (Modeled)</title></circle>
+<circle cx="328.00" cy="91.88" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.080: €644,999.61 (Modeled)</title></circle>
+<circle cx="342.00" cy="91.61" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.085: €649,836.91 (Modeled)</title></circle>
+<circle cx="356.00" cy="91.52" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.090: €651,431.44 (Modeled)</title></circle>
+<circle cx="370.00" cy="91.61" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.095: €649,910.34 (Modeled)</title></circle>
+<circle cx="384.00" cy="91.86" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.100: €645,395.77 (Modeled)</title></circle>
+<circle cx="398.00" cy="92.27" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.105: €638,005.11 (Modeled)</title></circle>
+<circle cx="412.00" cy="92.84" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.110: €627,851.14 (Modeled)</title></circle>
+<circle cx="426.00" cy="93.56" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.115: €615,042.21 (Modeled)</title></circle>
+<circle cx="440.00" cy="94.42" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.120: €599,682.41 (Modeled)</title></circle>
+<circle cx="454.00" cy="95.42" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.125: €581,871.77 (Modeled)</title></circle>
+<circle cx="468.00" cy="96.54" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.130: €561,706.39 (Modeled)</title></circle>
+<circle cx="482.00" cy="97.80" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.135: €539,278.59 (Modeled)</title></circle>
+<circle cx="496.00" cy="99.18" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.140: €514,677.10 (Modeled)</title></circle>
+<circle cx="510.00" cy="100.67" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.145: €487,987.13 (Modeled)</title></circle>
+<circle cx="524.00" cy="102.28" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.150: €459,290.59 (Modeled)</title></circle>
+<circle cx="538.00" cy="103.99" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.155: €428,666.15 (Modeled)</title></circle>
+<circle cx="552.00" cy="105.81" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.160: €396,189.40 (Modeled)</title></circle>
+<circle cx="566.00" cy="107.73" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.165: €361,932.98 (Modeled)</title></circle>
+<circle cx="580.00" cy="109.75" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.170: €325,966.66 (Modeled)</title></circle>
+<circle cx="594.00" cy="111.85" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.175: €288,357.49 (Modeled)</title></circle>
+<circle cx="608.00" cy="114.05" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.180: €249,169.89 (Modeled)</title></circle>
+<circle cx="622.00" cy="116.33" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.185: €208,465.76 (Modeled)</title></circle>
+<circle cx="636.00" cy="118.69" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.190: €166,304.54 (Modeled)</title></circle>
+<circle cx="650.00" cy="121.13" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.195: €122,743.39 (Modeled)</title></circle>
+<circle cx="664.00" cy="123.64" r="3" fill="var(--s2)"><title>A clock on every hold · flag rate 0.200: €77,837.18 (Modeled)</title></circle>
+<polyline points="104.00,128.00 118.00,121.99 132.00,116.33 146.00,110.99 160.00,105.98 174.00,101.27 188.00,96.85 202.00,92.72 216.00,88.86 230.00,85.25 244.00,81.90 258.00,78.79 272.00,75.91 286.00,73.25 300.00,70.80 314.00,68.56 328.00,66.51 342.00,64.65 356.00,62.98 370.00,61.48 384.00,60.15 398.00,58.97 412.00,57.96 426.00,57.09 440.00,56.36 454.00,55.78 468.00,55.32 482.00,54.99 496.00,54.78 510.00,54.69 524.00,54.71 538.00,54.84 552.00,55.07 566.00,55.41 580.00,55.84 594.00,56.36 608.00,56.96 622.00,57.66 636.00,58.43 650.00,59.29 664.00,60.22" fill="none" stroke="var(--s3)" stroke-width="2"/>
+<circle cx="104.00" cy="128.00" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.000: €0.00 (Modeled)</title></circle>
+<circle cx="118.00" cy="121.99" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.005: €107,292.16 (Modeled)</title></circle>
+<circle cx="132.00" cy="116.33" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.010: €208,434.45 (Modeled)</title></circle>
+<circle cx="146.00" cy="110.99" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.015: €303,668.00 (Modeled)</title></circle>
+<circle cx="160.00" cy="105.98" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.020: €393,224.51 (Modeled)</title></circle>
+<circle cx="174.00" cy="101.27" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.025: €477,326.56 (Modeled)</title></circle>
+<circle cx="188.00" cy="96.85" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.030: €556,188.05 (Modeled)</title></circle>
+<circle cx="202.00" cy="92.72" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.035: €630,014.44 (Modeled)</title></circle>
+<circle cx="216.00" cy="88.86" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.040: €699,003.17 (Modeled)</title></circle>
+<circle cx="230.00" cy="85.25" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.045: €763,343.93 (Modeled)</title></circle>
+<circle cx="244.00" cy="81.90" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.050: €823,218.97 (Modeled)</title></circle>
+<circle cx="258.00" cy="78.79" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.055: €878,803.38 (Modeled)</title></circle>
+<circle cx="272.00" cy="75.91" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.060: €930,265.42 (Modeled)</title></circle>
+<circle cx="286.00" cy="73.25" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.065: €977,766.71 (Modeled)</title></circle>
+<circle cx="300.00" cy="70.80" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.070: €1,021,462.56 (Modeled)</title></circle>
+<circle cx="314.00" cy="68.56" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.075: €1,061,502.19 (Modeled)</title></circle>
+<circle cx="328.00" cy="66.51" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.080: €1,098,028.95 (Modeled)</title></circle>
+<circle cx="342.00" cy="64.65" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.085: €1,131,180.59 (Modeled)</title></circle>
+<circle cx="356.00" cy="62.98" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.090: €1,161,089.45 (Modeled)</title></circle>
+<circle cx="370.00" cy="61.48" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.095: €1,187,882.68 (Modeled)</title></circle>
+<circle cx="384.00" cy="60.15" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.100: €1,211,682.45 (Modeled)</title></circle>
+<circle cx="398.00" cy="58.97" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.105: €1,232,606.13 (Modeled)</title></circle>
+<circle cx="412.00" cy="57.96" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.110: €1,250,766.49 (Modeled)</title></circle>
+<circle cx="426.00" cy="57.09" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.115: €1,266,271.89 (Modeled)</title></circle>
+<circle cx="440.00" cy="56.36" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.120: €1,279,226.43 (Modeled)</title></circle>
+<circle cx="454.00" cy="55.78" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.125: €1,289,730.12 (Modeled)</title></circle>
+<circle cx="468.00" cy="55.32" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.130: €1,297,879.07 (Modeled)</title></circle>
+<circle cx="482.00" cy="54.99" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.135: €1,303,765.61 (Modeled)</title></circle>
+<circle cx="496.00" cy="54.78" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.140: €1,307,478.45 (Modeled)</title></circle>
+<circle cx="510.00" cy="54.69" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.145: €1,309,102.82 (Modeled)</title></circle>
+<circle cx="524.00" cy="54.71" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.150: €1,308,720.61 (Modeled)</title></circle>
+<circle cx="538.00" cy="54.84" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.155: €1,306,410.51 (Modeled)</title></circle>
+<circle cx="552.00" cy="55.07" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.160: €1,302,248.09 (Modeled)</title></circle>
+<circle cx="566.00" cy="55.41" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.165: €1,296,306.00 (Modeled)</title></circle>
+<circle cx="580.00" cy="55.84" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.170: €1,288,654.02 (Modeled)</title></circle>
+<circle cx="594.00" cy="56.36" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.175: €1,279,359.18 (Modeled)</title></circle>
+<circle cx="608.00" cy="56.96" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.180: €1,268,485.92 (Modeled)</title></circle>
+<circle cx="622.00" cy="57.66" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.185: €1,256,096.12 (Modeled)</title></circle>
+<circle cx="636.00" cy="58.43" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.190: €1,242,249.24 (Modeled)</title></circle>
+<circle cx="650.00" cy="59.29" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.195: €1,227,002.42 (Modeled)</title></circle>
+<circle cx="664.00" cy="60.22" r="3" fill="var(--s3)"><title>Both fixes · flag rate 0.200: €1,210,410.54 (Modeled)</title></circle>
+<text x="104.00" y="256.00" class="tick" text-anchor="middle">0.0%</text>
+<text x="244.00" y="256.00" class="tick" text-anchor="middle">5.0%</text>
+<text x="384.00" y="256.00" class="tick" text-anchor="middle">10.0%</text>
+<text x="524.00" y="256.00" class="tick" text-anchor="middle">15.0%</text>
+<text x="664.00" y="256.00" class="tick" text-anchor="middle">20.0%</text>
+<line x1="244.00" y1="16.00" x2="244.00" y2="240.00" class="marker"/>
+<text x="248.00" y="26.00" class="marker-label" text-anchor="start">you are here (5.0%)</text>
+</svg>
+<ul class="legend">
+<li><span class="swatch" style="background:var(--s0)"></span>Today, no fix</li>
+<li><span class="swatch" style="background:var(--s1)"></span>Ask once</li>
+<li><span class="swatch" style="background:var(--s2)"></span>A clock on every hold</li>
+<li><span class="swatch" style="background:var(--s3)"></span>Both fixes</li>
+</ul>
+<p class="note">Each line is the net at the same defaults with one or two inputs changed — ask-once sets contacts to one, the clock is modelled as halving the customers lost, both apply together. The fixes do not change the fraud caught, only the friction, so the fraud-saved curve of Beat 3 is the same under every scenario.</p>
+<p class="note">The rule is the default flag rate, read from the model’s own row, not the drawing (the crossover of Beat 3 above). Where a net line stays above zero across the grid, that scenario never reaches a rate at which the flags cost more than they recover.</p>
+<p class="evidence">Evidence: B4.1 · Modeled · opens to <a href="https://www.data.gouv.fr/api/1/datasets/open-damir-base-complete-sur-les-depenses-dassurance-maladie-interregimes/" rel="noopener">https://www.data.gouv.fr/api/1/datasets/open-damir-base-complete-sur-les-depenses-dassurance-maladie-interregimes/</a>; source file data/damir/claim_cost_fit.csv</p>
+</section>
+<section class="panel">
+<h3>B4.2 · A clock on every hold <span class="chip chip-modeled">Modeled</span></h3>
+<p class="blurb">The second fix puts a timer on each held claim: past a threshold, a small low-risk claim releases itself and a large one goes to a person. The threshold is computed from the Beat 3 model, not guessed — the day and amount below which a hold that long costs more than it saves.</p>
+<div class="stat-row">
+<div class="stat"><div class="stat-value">14.0 days</div><div class="stat-label">Clock fires after</div><span class="chip chip-modeled">Modeled</span></div>
+<div class="stat"><div class="stat-value">€42.67</div><div class="stat-label">Not worth holding below</div><span class="chip chip-modeled">Modeled</span></div>
+<div class="stat"><div class="stat-value">49.0%</div><div class="stat-label">Claims small enough to auto-release</div><span class="chip chip-modeled">Modeled</span></div>
+</div>
+<p class="note">Holds beyond 14.0 days on claims under €42.67 are net-negative in expectation — the friction they add outweighs the fraud they still catch — so past 14.0 days a small claim auto-releases and a large one goes to a person. 49.0% of synthetic claims fall under that amount.</p>
+<p class="note">The threshold is the amount at which the friction of a hold that long equals the fraud it could still catch, read from the cost model’s own rows — the same arithmetic printed in Beat 3, at the baseline defaults.</p>
+<p class="evidence">Evidence: B4.2 · Modeled · opens to <a href="https://www.data.gouv.fr/api/1/datasets/open-damir-base-complete-sur-les-depenses-dassurance-maladie-interregimes/" rel="noopener">https://www.data.gouv.fr/api/1/datasets/open-damir-base-complete-sur-les-depenses-dassurance-maladie-interregimes/</a>; source file data/damir/claim_cost_fit.csv</p>
+</section>
+<section class="panel">
+<h3>B4.3 · Before and after <span class="chip chip-modeled">Modeled</span></h3>
+<p class="blurb">What the fixes do to how long a claim waits: the average hold in days before any fix and after each one. Ask-once cuts the document loop to a single round; the clock releases the small low-risk claims early.</p>
+<svg viewBox="0 0 680 280" role="img" preserveAspectRatio="xMidYMid meet" class="chart">
+<line x1="48.00" y1="240.00" x2="664.00" y2="240.00" class="grid"/>
+<text x="42.00" y="243.00" class="tick" text-anchor="end">0</text>
+<line x1="48.00" y1="184.00" x2="664.00" y2="184.00" class="grid"/>
+<text x="42.00" y="187.00" class="tick" text-anchor="end">7.5</text>
+<line x1="48.00" y1="128.00" x2="664.00" y2="128.00" class="grid"/>
+<text x="42.00" y="131.00" class="tick" text-anchor="end">15</text>
+<line x1="48.00" y1="72.00" x2="664.00" y2="72.00" class="grid"/>
+<text x="42.00" y="75.00" class="tick" text-anchor="end">22.5</text>
+<line x1="48.00" y1="16.00" x2="664.00" y2="16.00" class="grid"/>
+<text x="42.00" y="19.00" class="tick" text-anchor="end">30</text>
+<rect x="78.80" y="83.20" width="92.40" height="156.80" rx="4" fill="var(--s0)"><title>Mean hold · Today, no fix: 21.0 days (Modeled)</title></rect>
+<text x="125.00" y="256.00" class="tick" text-anchor="middle">Today, no fix</text>
+<text x="125.00" y="77.20" class="barval" text-anchor="middle">21.0 days</text>
+<rect x="232.80" y="187.73" width="92.40" height="52.27" rx="4" fill="var(--s0)"><title>Mean hold · Ask once: 7.0 days (Modeled)</title></rect>
+<text x="279.00" y="256.00" class="tick" text-anchor="middle">Ask once</text>
+<text x="279.00" y="181.73" class="barval" text-anchor="middle">7.0 days</text>
+<rect x="386.80" y="108.81" width="92.40" height="131.19" rx="4" fill="var(--s0)"><title>Mean hold · A clock on every hold: 17.6 days (Modeled)</title></rect>
+<text x="433.00" y="256.00" class="tick" text-anchor="middle">A clock on every hold</text>
+<text x="433.00" y="102.81" class="barval" text-anchor="middle">17.6 days</text>
+<rect x="540.80" y="187.73" width="92.40" height="52.27" rx="4" fill="var(--s0)"><title>Mean hold · Both fixes: 7.0 days (Modeled)</title></rect>
+<text x="587.00" y="256.00" class="tick" text-anchor="middle">Both fixes</text>
+<text x="587.00" y="181.73" class="barval" text-anchor="middle">7.0 days</text>
+</svg>
+<p class="note">The clock alone releases 49.0% of synthetic claims early. With the document loop already cut to one round, ask-once and both-fixes leave the timer nothing to release — the same hold as ask-once.</p>
+<p class="note">Each bar is the mean over a thousand synthetic claims — the fitted distribution read at a thousand evenly spaced points, no individual claim, none is public. One hold per scenario, not a distribution: the no-fix bar is the hold before any fix, each fix beside it, the document loop or the timer, whichever ends the hold first.</p>
+<p class="evidence">Evidence: B4.3 · Modeled · opens to <a href="https://www.data.gouv.fr/api/1/datasets/open-damir-base-complete-sur-les-depenses-dassurance-maladie-interregimes/" rel="noopener">https://www.data.gouv.fr/api/1/datasets/open-damir-base-complete-sur-les-depenses-dassurance-maladie-interregimes/</a>; source file data/damir/claim_cost_fit.csv</p>
+</section>
+<section class="panel">
+<h3>B4.4 · Count the mistakes <span class="chip chip-pending">Pending</span></h3>
+<p class="blurb">The third fix records how each hold ends — fraud confirmed, or released clean. That log would be the false-positive rate per flag rule the system otherwise never learns, and the same events would drive a status notification against silent rejections.</p>
+<div class="pending">No number yet: a false-positive rate per flag rule needs an outcome log — each hold recorded as fraud-confirmed or released-clean — that the system does not keep. The same event stream would also trigger a status notification against silent rejections, from the events already recorded.</div>
+<p class="evidence">Evidence: B4.4 · Pending · source pending</p>
+</section>
 </main></body></html>

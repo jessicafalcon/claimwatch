@@ -91,9 +91,10 @@ Phase 9 renders B3.3's headline derived figures it reads those from
 **What Beat 4 landed (Phase 8b).** The synthetic claims are the same fit read at
 a thousand evenly spaced quantiles — a real distribution, synthetic claims: no
 individual claim is public — so `guardrail_sim` and `sla_threshold` name
-`open-damir` as their upstream too. **B4.1** is the `contacts_once` rows of
-`cost_curves` (the "curves move" half) beside the `ask_once` hold durations in
-`guardrail_sim`. **B4.2**'s printed arithmetic is the `loop_days` /
+`open-damir` as their upstream too. **B4.1** is the net (fraud minus friction)
+curve of `cost_curves` for the baseline and the three toggled scenarios — the
+"curves move" as each fix lifts the net line; the hold durations are B4.3's.
+**B4.2**'s printed arithmetic is the `loop_days` /
 `friction_per_day` / `timer_amount_eur` rows of `cost_model_outputs` at
 `baseline`, read into `sla_threshold` as the amount below which a hold that long
 is net-negative in expectation. **B4.3** is the before/after hold durations in
