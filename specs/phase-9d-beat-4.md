@@ -138,11 +138,17 @@ make review-gate SPEC=specs/phase-9d-beat-4.md && make rebuild ROWS=synthetic &&
   toggled scenarios to B4.1. Satisfies invariant 2. A one-line SPEC B4.1
   sentence names this four-scenario net comparison (Record updates).
 - **No new chart `Kind` — the 9a/9c contract is reused.** B4.1 `curve` (four net
-  series with the default-rate marker), B4.2 `curve` (`timer_amount_eur` over
-  `timer_days`, the default day a marker) with the net-negative arithmetic in
-  the note, B4.3 `grouped_bar` (scenario × hold days, the released share a note
-  figure), B4.4 the Pending placeholder. Rejected: a new before/after kind —
-  `grouped_bar` already fits. The dullest way.
+  series with the default-rate marker; `flag_rate` is a percent, the kind's
+  hardwired x-axis unit), B4.2 `stat_row` (the three cells of `sla_threshold`'s
+  `is_default` row — the timer day the clock fires, the net-negative threshold
+  amount, the share of claims under it — with the net-negative arithmetic in the
+  note), B4.3 `grouped_bar` (scenario × hold days, the released share a note
+  figure), B4.4 the Pending placeholder. Rejected: B4.2 as a `curve` — the
+  `curve` kind formats every x value as a flag-rate percent, so `timer_days`
+  would mislabel (a build-time finding; the amendment naming it is committed
+  alone); the 60-row threshold grid — `make simulate` prints it, the page shows
+  the computed answer; a new before/after kind — `grouped_bar` already fits. The
+  dullest way.
 - **B4.3 aggregates in ANSI SQL, pinned to `summarize`.** The reader's query is
   an `avg`/`count` group-by over `guardrail_sim`, the released share
   `sum(case when outcome = 'timer_released' then 1 else 0 end)` over
