@@ -6,7 +6,7 @@ evidence without asking a human anything") and §3 (the README is the third
 delivery format, telling the same five beats in prose). Depends on Phase 9e
 merged.
 
-**Status: APPROVED 2026-09-10 — in progress.** No new dependencies (the
+**Status: APPROVED 2026-09-10 — DELIVERED 2026-09-10, PR open.** No new dependencies (the
 allowlist is in CLAUDE.md → Conventions). No new `make` target, no new chart
 `Kind`, no new mart, no new BACKING row.
 Challenged: 2026-09-10, round 1, spec 997535b0 — approve with amendments (5 should-fix + 2 suggestions applied)
@@ -246,3 +246,33 @@ Agents are selected by diff surface (CLAUDE.md → "Which review agents run").
   this phase's prose.
 - The claims sample-mean slider and data.ameli practitioner fees — the two
   pulled-out data phases (DECISIONS Phase 9a).
+
+## Delivered (2026-09-10)
+
+`README.md` tells the five beats in the two-layer voice — the third delivery
+format beside the permanent page — and `tests/test_readme.py` pins the stranger
+walk: every euro/percent figure carries one tag→row citation, each Modeled figure
+(€42.67, 49.0% → B4.2) equals its `tests/pins.py` value and cites its own mart
+row, the three Beat 5 counts (1/14/4 → B5.1) sit on tagged template lines, and the
+first-paragraph, study-page and BACKING links resolve. Two decisions settled: the
+permanent artifact stays the byte-checked **synthetic** render (a captured render
+is the reader's own `make rebuild ROWS=captured && make study`, closing the
+"corpus render" BACKLOG row and answering the brand-address/page-size questions),
+and the permanent page carries no live-slider script (live exploration is 9g,
+where the "live sliders" row closes). No new dependency, `make` target, mart,
+chart `Kind` or BACKING row; the committed page is byte-unchanged. The DONE
+command `make review-gate SPEC=… && make study && git diff --exit-code` is 8/8
+checks and byte-identical.
+
+Challenge round 1 approved with amendments (5 should-fix + 2 suggestions, all
+applied), plus a build amendment (the Beat 1 "Day N" clause dropped — B1.1 is
+Pending, so the hero shows no number) and a round-1-fix amendment (Invariant 2's
+falsifier bound the per-figure citation to the pins). Review round 1: code-reviewer
+(11 findings, one BLOCKER — 49.0% cited B4.3, whose value renders in B4.2's stat
+row), functionality-tester (works), study-editor (4) — all fixed; the correctness
+fix restored Invariant 2 (a figure reaches its own backing row) and extended the
+`unpinned` LESSONS row (a membership check let a wrong-but-real citation pass).
+Exit coherence-auditor: 0 BLOCKER, 3 should-fix — a stale spec hash in CLAUDE.md,
+the tooltip-count BACKLOG trigger re-pointed to 9g, and the two-glossary drift
+reconciled to "one glossary per delivery surface" (README + SPEC) with a DECISIONS
+Phase 9f note — all fixed.
