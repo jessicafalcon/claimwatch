@@ -31,21 +31,22 @@ review can appear.
 
 Every review shown is hand-written (`ROWS=synthetic`, as the opening says); the
 drill carries only the non-text allowlist, so no review body or brand address can
-appear.
+appear. Each image carries the caption *synthetic fixture data — not a study
+finding* in its pixels and in its text metadata, so it says so wherever it travels.
 
 The dashboard: the theme-row bar, the review-level drill, and B2.1's paraphrases.
 
-![The Beat 2 drill dashboard over synthetic reviews](screenshots/01-dashboard.png)
+![The Beat 2 drill dashboard — synthetic fixture data — not a study finding](screenshots/01-dashboard.png)
 
 Drilling one theme (`document-loop`) to the review rows behind it — a stable id,
 theme, rating, the review's own date, segment and platform; never its words, never
 a per-review address.
 
-![The drill filtered to the document-loop theme](screenshots/02-theme-drill.png)
+![The drill filtered to the document-loop theme — synthetic fixture data — not a study finding](screenshots/02-theme-drill.png)
 
 B2.1's five theme paraphrases, each in our words with its public source.
 
-![The five theme paraphrases and their sources](screenshots/03-paraphrase.png)
+![The five theme paraphrases and their sources — synthetic fixture data — not a study finding](screenshots/03-paraphrase.png)
 
 ## Run it
 
