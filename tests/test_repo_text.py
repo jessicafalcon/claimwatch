@@ -12,6 +12,7 @@ import pytest
 from tests.repo_text import (
     MAX_INFLATED,
     PNG_SIGNATURE,
+    is_binary_asset,
     png_text,
     repo_text,
 )
@@ -35,6 +36,13 @@ def test_repo_text_fails_by_name_on_a_file_that_is_not_text(tmp_path: Path):
     latin.write_bytes(b"# caf\xe9\n")
     with pytest.raises(pytest.fail.Exception, match=r"^latin.py: not UTF-8 text$"):
         repo_text(latin)
+
+
+def test_is_binary_asset_is_the_declared_suffix_case_folded():
+    assert is_binary_asset(Path("a/shot.png"))
+    assert is_binary_asset(Path("a/SHOT.PNG"))
+    assert not is_binary_asset(Path("a/shot.py"))
+    assert not is_binary_asset(Path("a/png"))  # a name, not a suffix
 
 
 def test_a_png_reads_as_every_text_channel_it_carries(tmp_path: Path):
