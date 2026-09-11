@@ -50,6 +50,18 @@ PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 # through latin-1). A closed set: any other chunk is pixels or layout.
 # REF: https://www.w3.org/TR/png-3/#11textinfo
 PNG_TEXT_CHUNKS = frozenset({b"tEXt", b"zTXt", b"iTXt", b"eXIf"})
+# The chunk types that carry no text — pixels, palette, colour, layout, timing
+# (the specification's critical and ancillary chunks, APNG's three) and Apple's
+# private `iDOT` (parallel-decode offsets; every macOS screenshot carries it).
+# With the text chunks these are the whole closed set: a chunk of any other
+# kind is refused by name rather than skipped, so no channel goes unread.
+PNG_OTHER_CHUNKS = frozenset(
+    {
+        b"IHDR", b"PLTE", b"IDAT", b"IEND", b"tRNS", b"cHRM", b"gAMA", b"iCCP",
+        b"sBIT", b"sRGB", b"cICP", b"mDCV", b"cLLI", b"bKGD", b"hIST", b"pHYs",
+        b"sPLT", b"tIME", b"acTL", b"fcTL", b"fdAT", b"iDOT",
+    }
+)  # fmt: skip
 MAX_INFLATED = 1 << 20  # a compressed text chunk may not inflate past 1 MiB
 
 
@@ -85,7 +97,8 @@ def _chunk_text(kind: bytes, body: bytes) -> str:
 
 def png_text(data: bytes) -> str:
     """The text a PNG carries beside its pixels, one chunk per line; bytes that
-    are not a PNG, or whose chunks are truncated, are `Unreadable` by name."""
+    are not a PNG, whose chunks are truncated, or that carry a chunk kind
+    outside the closed set are `Unreadable` by name."""
     if not data.startswith(PNG_SIGNATURE):
         raise Unreadable("not a PNG")
     lines: list[str] = []
@@ -98,6 +111,8 @@ def png_text(data: bytes) -> str:
             raise Unreadable("truncated PNG chunk")
         if kind in PNG_TEXT_CHUNKS:
             lines.append(_chunk_text(kind, body))
+        elif kind not in PNG_OTHER_CHUNKS:
+            raise Unreadable(f"unknown PNG chunk {kind.decode('latin-1')!r}")
         pos += 12 + length  # length, type, body, CRC
     return "\n".join(lines)
 

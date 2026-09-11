@@ -114,6 +114,27 @@ def test_a_file_named_png_that_is_not_a_png_fails_by_name(tmp_path: Path):
         repo_text(fake, tmp_path)
 
 
+def test_a_png_with_a_chunk_outside_the_closed_set_fails_by_name(tmp_path: Path):
+    """The chunk kinds are a closed set — text (read), pixels/colour/layout
+    (skipped) — so a private chunk that could carry text is refused by name,
+    never silently skipped; the kinds macOS screenshots carry are in the set."""
+    odd = _asset(tmp_path, "odd.png", _png(_chunk(b"prIv", b"hidden words")))
+    with pytest.raises(pytest.fail.Exception, match=r"unknown PNG chunk 'prIv'"):
+        repo_text(odd, tmp_path)
+    mac = _asset(
+        tmp_path,
+        "mac.png",
+        _png(
+            _chunk(b"iCCP", b"p\0\0" + zlib.compress(b"icc")),
+            _chunk(b"cICP", b"\1\r\0\1"),
+            _chunk(b"pHYs", b"\0" * 9),
+            _chunk(b"iDOT", b"\0" * 28),
+            _chunk(b"IDAT", zlib.compress(b"\0\0")),
+        ),
+    )
+    assert repo_text(mac, tmp_path) == ""
+
+
 def test_a_truncated_or_over_inflating_png_fails_by_name(tmp_path: Path):
     cut = _asset(tmp_path, "cut.png", _png(_chunk(b"tEXt", b"Comment\0hello"))[:-9])
     with pytest.raises(
