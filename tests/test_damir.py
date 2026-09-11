@@ -563,6 +563,39 @@ def test_read_fit_refuses_a_non_positive_mean(tmp_path):
             read_fit(p)
 
 
+def test_read_fit_refusals_cap_the_echoed_token(tmp_path):
+    """A refusal names the field and shows the foreign token cut to a few
+    dozen characters: a corrupted cell or name of thousands of characters
+    never lands whole on the refusal line (round 1, security #3)."""
+    lines = _valid_fit_file(tmp_path).read_text(encoding="utf-8").splitlines()
+    long = "x" * 5000
+    big_value = tmp_path / "big_value.csv"
+    big_value.write_text(
+        "\n".join(f"mu,{long}" if x.startswith("mu,") else x for x in lines) + "\n",
+        "utf-8",
+    )
+    with pytest.raises(ValueError, match="mu") as exc:
+        read_fit(big_value)
+    assert len(str(exc.value)) < 200 and "5000 chars" in str(exc.value)
+    big_name = tmp_path / "big_name.csv"
+    big_name.write_text("\n".join(lines) + f"\n{long},1\n", "utf-8")
+    with pytest.raises(ValueError, match="not in the fit artifact") as exc:
+        read_fit(big_name)
+    assert len(str(exc.value)) < 200
+
+
+def test_read_fit_is_order_independent(tmp_path):
+    """read_fit keys on names, not position: a valid artifact with its rows
+    shuffled reads to the same Fit and deciles (the writer's order is pinned
+    separately by test_fit_field_names_is_the_write_order; round 1,
+    functionality-tester coverage note)."""
+    ordered = _valid_fit_file(tmp_path)
+    header, *rows = ordered.read_text(encoding="utf-8").splitlines()
+    shuffled = tmp_path / "shuffled.csv"
+    shuffled.write_text("\n".join([header, *reversed(rows)]) + "\n", "utf-8")
+    assert read_fit(shuffled) == read_fit(ordered)
+
+
 def test_read_fit_refuses_a_negative_sigma(tmp_path):
     """sigma is a standard deviation: a negative value is domain-invalid and
     refuses, rather than flowing into exp(mu + sigma²/2) as a wrong number."""

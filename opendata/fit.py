@@ -150,21 +150,37 @@ _MAX_FIT_BYTES = 64 * 1024
 _MIN_EUR_MEAN = 0.01
 
 
+# A refusal names what it refused, but a foreign token (a cell or a name the
+# file carried) is shown at most this long: the file is capped at 64 KiB, and
+# one corrupted cell must not put that much free text on one refusal line
+# (review round 1, security-reviewer #3).
+_SHOWN_CHARS = 40
+
+
+def _shown(token: str) -> str:
+    """The repr of a foreign token, cut to `_SHOWN_CHARS` with an ellipsis."""
+    if len(token) <= _SHOWN_CHARS:
+        return repr(token)
+    return repr(token[:_SHOWN_CHARS]) + f"… ({len(token)} chars)"
+
+
 def _finite_float(raw: dict[str, str], name: str, where: str) -> float:
     value = raw[name]
     try:
         number = float(value)
     except ValueError as exc:
-        raise ValueError(f"{where}: {name!r} is not a number: {value!r}") from exc
+        raise ValueError(f"{where}: {name!r} is not a number: {_shown(value)}") from exc
     if not math.isfinite(number):
-        raise ValueError(f"{where}: {name!r} is not a finite number: {value!r}")
+        raise ValueError(f"{where}: {name!r} is not a finite number: {_shown(value)}")
     return number
 
 
 def _positive_int(raw: dict[str, str], name: str, where: str) -> int:
     value = raw[name]
     if not (value.isascii() and value.isdigit()) or int(value) <= 0:
-        raise ValueError(f"{where}: {name!r} is not a positive integer: {value!r}")
+        raise ValueError(
+            f"{where}: {name!r} is not a positive integer: {_shown(value)}"
+        )
     return int(value)
 
 
@@ -192,15 +208,18 @@ def read_fit(path: Path = ARTIFACT) -> tuple[Fit, list[Decile]]:
         for lineno, row in enumerate(reader, 2):
             if len(row) != 2:
                 raise ValueError(
-                    f"{where}: line {lineno}: wrong number of cells: {row!r}"
+                    f"{where}: line {lineno}: wrong number of cells ({len(row)})"
                 )
             name = row[0]
             if name in raw:
-                raise ValueError(f"{where}: line {lineno}: duplicate name {name!r}")
+                raise ValueError(
+                    f"{where}: line {lineno}: duplicate name {_shown(name)}"
+                )
             raw[name] = row[1]
     expected = set(FIT_FIELD_NAMES)
     if unknown := sorted(set(raw) - expected):
-        raise ValueError(f"{where}: name(s) not in the fit artifact's shape: {unknown}")
+        shown = ", ".join(_shown(n) for n in unknown)
+        raise ValueError(f"{where}: name(s) not in the fit artifact's shape: {shown}")
     if missing := sorted(expected - set(raw)):
         raise ValueError(
             f"{where}: name(s) the fit artifact must carry are missing: {missing}"
