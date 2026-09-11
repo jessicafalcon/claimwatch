@@ -2731,3 +2731,75 @@ per delivery surface, ≤10 terms each"; `make check-docs` already enforces the 
 per file. *Rejected: consolidating to a single canonical glossary — it costs the
 stranger-facing README its self-contained glossary, against the "reads the README
 first" goal.*
+
+### Phase 9g
+
+Branch `phase-9g-metabase`, spec `specs/phase-9g-metabase.md`, challenged round 1
+(rework — 2 BLOCKER, 4 should-fix; all applied) then round 2 (approve with
+amendments — 1 BLOCKER, 3 should-fix, 1 question; all applied). The Metabase
+demonstration: the review-level drill over the reader's own rebuild, the last
+Phase 9 sub-phase. Non-CI (CI has no Docker): an offline core CI runs (the
+applier's dry-run request bodies, the drill view's + SQLite export's column
+allowlist) plus a developer-run live run with synthetic-only screenshots.
+
+- **A recorded deviation from brief §90: the drill's audit trail is counted rows
+  plus a sourced theme paraphrase, not per-review excerpts.** §90 as written asks
+  the drill to reach "the underlying review excerpts." That is unattainable under
+  two contracts already in force: no declared source yields a per-review public
+  address (D1 — every parser stores the brand-carrying page address, not a
+  per-review URL), and Neutrality/personal data forbids publishing a review's own
+  `body` (brief §5 bodies name conditions). So the drill shows per-review rows on
+  a non-text allowlist plus, per theme, one Documented paraphrase (B2.1). The
+  BACKLOG row *"A per-review drill needs a per-review public address"* stays
+  **open, re-deferred**, carrying the surviving reopen trigger: *revisit if a
+  source yields a per-review public address*, which external per-review citation
+  would need. *Rejected: a truncated `body` snippet as the "one short marked
+  phrase" — raw text carries a name/condition and has no per-review public source;
+  a machine-generated paraphrase — the model is called from one site
+  (`classify/llm.py`), never for prose.*
+- **The drill's non-text allowlist holds across the join, and its honesty comes
+  from the synthetic input plus a caption, not a corpus gate.** `review_drill`
+  joins `stg_classified_reviews` to `stg_reviews` (which carries `body`/`title`),
+  so the allowlist (`review_id, theme, rating, review_date, segment, source`) is
+  the guard, checked on the joined cursor's description and again in the export
+  (`FORBIDDEN_COLUMNS`). The 9b render-time corpus gate lives in `study/panels.py`,
+  **not** in the marts Metabase reads — so over `ROWS=synthetic` Metabase shows
+  real counts of hand-written fake reviews; the demonstration earns its honesty
+  from the synthetic input (only fake reviews exist) and the *synthetic fixture
+  data — not a study finding* caption, never from a gate it does not inherit
+  (round-2 BLOCKER). `review_id` is the computed `source || ':' || external_id`,
+  the one definition in `classify/labels.py::review_id`.
+- **Metabase reads a stdlib-`sqlite3` export of the marts through its built-in
+  SQLite driver — no DuckDB community driver.** SQLite is an official Metabase
+  driver (self-hosted); DuckDB is community-only (a third-party JAR — the "ask
+  before ANY package" instinct — whose auto-download of the DuckDB SQLite
+  extension would break the offline rebuild). The export is stdlib, offline and
+  deterministic: a fixed mart set, ordered rows, DuckDB decimals as their exact
+  string (`rating` '4.3' never drifts), byte-identical on a rerun. *Rejected: the
+  DuckDB community JAR; a Postgres container + load (a second server for a laptop
+  demo); Snowflake full-mode (Phase 10, needs an account).*
+- **The applier is a developer-run stdlib-`urllib` module, idempotent by
+  upsert-by-name, not a `make` target.** It reads Metabase credentials from `.env`
+  (refused by name, never by value) and talks to localhost only; `--dry-run`
+  builds the request bodies offline with no credentials. Idempotency: GET the list,
+  match by name, PUT if present else POST — a second apply creates no duplicate.
+  The HTTP client is an injected seam so the socket-blocking suite tests it with a
+  fake client. Keeping it out of `make` avoids the variable/`confirm` surface
+  (localhost provisioning is neither paid nor destructive).
+- **B2.1 lands Documented, curated in `study/paraphrases.yaml`.** One paraphrased,
+  sourced example per theme (paraphrase not quote, no insurer named); it is the
+  only text a drilled theme shows. `positive`/`unclassified` carry no theme and no
+  paraphrase, so a drill row on either shows its counted columns and no text.
+- **BACKLOG 52 was NOT folded in.** The developer's initial "fold it in" was
+  reversed by challenge round 1: the classify-path idempotency target is a
+  general-pipeline change whose recorded home is its own `fix/idempotency-classify`
+  PR, kept off this study-surface diff (one phase, one diff); the property is
+  already covered by two slow tests CI runs.
+
+Gotcha (build-time, verified): the Metabase HTTP API is documented live at
+`/api/docs` on a running instance; `POST /api/session` returns a session id used
+in the `X-Metabase-Session` header; list endpoints return a bare list on some
+versions and `{"data": [...]}` on others, so `as_list` accepts both. The pinned
+`metabase/metabase` image tag and the exact dashcard body are confirmed against
+the running version in the build's first hour (spec stack risk); SQLite is a
+built-in driver, so no third-party JAR is mounted.

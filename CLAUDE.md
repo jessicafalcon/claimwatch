@@ -87,8 +87,9 @@ Delivered paragraph and `make help`, not here.
   `sla_threshold`, five in all — the two theme-share marts, and the two Beat 5
   marts — `determinism_facts` filled in `rebuild()` on every input, and
   `pipeline_row_counts` filled in the classify path) has a DDL-only
-  `.sql` and one writer in `pipeline/build.py`; the two theme-share marts are
-  additionally excluded from the generic marts loop (run after classify).
+  `.sql` and one writer in `pipeline/build.py`; the two theme-share marts and
+  `review_drill` (B2.1, 9g — pure SQL, no Python writer) are additionally excluded
+  from the generic marts loop and run after classify by `build_post_classify_marts`.
 - `pipeline/` — `warehouse.py` (the one place that knows DuckDB from
   Snowflake), `build.py` (raw → staging → marts; the review load stamps
   `segment`; also `reviews_per_month`, a printed pipeline-health query, and the
@@ -132,8 +133,15 @@ Delivered paragraph and `make help`, not here.
   committed `friction_ledger.html`; Beats 1–5 render (9a–9e). `README.md` (9f)
   tells the five beats in prose and links every figure to its BACKING row, the
   third delivery format beside the page; `tests/test_readme.py` pins the stranger
-  walk. The Metabase demonstration (9g) is the last Phase 9 sub-phase.
-  `dags/` *(Phase 10)* — `friction_ledger.py`.
+  walk. `study/metabase/` *(9g)* — the Metabase demonstration (the review-level
+  drill, developer-run, non-CI): `export.py` (marts → a gitignored SQLite file via
+  stdlib `sqlite3`, allowlisted columns, `rating` as an exact string), `apply.py`
+  (config.yaml → the HTTP API via stdlib `urllib`, idempotent upsert by name, an
+  injected client seam, `--dry-run`), `config.yaml` (the dashboard/cards as data),
+  `docker-compose.yml`, `DEMONSTRATION.md` + `screenshots/` (synthetic-only, the
+  developer's step). `study/paraphrases.yaml` — B2.1's five Documented theme
+  paraphrases, the only text the drill shows. `sql/marts/review_drill.sql` — the
+  drill's non-text allowlist. `dags/` *(Phase 10)* — `friction_ledger.py`.
 - `fixtures/` — read-only after Phase 1, each set with a `MANIFEST.sha256`:
   `synthetic/` (hand-written fake reviews), `anchors/` (brief §6 figures with
   source URLs, seeded as Documented in every rebuild but `ROWS=none`),
@@ -736,22 +744,31 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 ## Current status
 
-**In progress: Phase 9f — the README + the stranger acceptance test** (branch
-`phase-9f`, spec `specs/phase-9f-readme.md`, challenged round 1, spec `997535b0`
-— approve with amendments, all applied, plus one build amendment dropping the
-Beat 1 "Day N" clause since B1.1 is Pending). The README tells the five beats in
-the two-layer voice and links every figure to its BACKING row; `tests/test_readme.py`
-pins the walk (each euro/percent figure wears one tag and cites a resolving
-`B<beat>.<n>`, the three Beat 5 counts on tagged template lines, the
-first-paragraph and page/BACKING links resolve). Decided: the permanent artifact
-stays the byte-checked **synthetic** render (a captured render is the reader's own
-`make rebuild ROWS=captured && make study`), and the permanent page carries no
-live-slider script (live exploration is 9g). No new dependency, `make` target,
-mart, chart `Kind` or BACKING row; Beat 3–4 numbers are Modeled and
-corpus-independent, so they hold on the shipped page.
+**In progress: Phase 9g — the Metabase demonstration (the review-level drill)**
+(branch `phase-9g-metabase`, spec `specs/phase-9g-metabase.md`, challenged round 1
+rework then round 2 approve-with-amendments, spec `062cf09f`, all applied). The
+last Phase 9 sub-phase, non-CI: an offline core CI runs (the applier's `--dry-run`
+request bodies, the drill view's and SQLite export's column allowlist) plus a
+developer-run live Metabase run with synthetic-only screenshots. A theme bar drills
+to the review rows behind it — `sql/marts/review_drill.sql`, one row per classified
+review × theme on the non-text allowlist (`review_id`=`source||':'||external_id`,
+theme, rating, review_date, segment, source — never body/title/source_url, though
+the join to `stg_reviews` reaches them). The only text a drilled theme shows is a
+Documented, sourced paraphrase (`study/paraphrases.yaml`, B2.1 Pending → Documented).
+`study/metabase/export.py` writes the marts to a gitignored SQLite file Metabase
+reads with its built-in SQLite driver (no DuckDB community JAR); `study/metabase/apply.py`
+provisions the dashboard from `config.yaml` idempotently (stdlib `urllib`, upsert by
+name, `.env` credentials). Recorded §90 deviation: the audit trail is counted rows +
+a theme paraphrase, not per-review excerpts (D1/Neutrality forbid a per-review
+address — the "per-review public address" BACKLOG row stays open). BACKLOG 52 (classify
+idempotency) was NOT folded in — its own `fix/` PR. No new Python dependency; Docker
+pre-approved.
 
-**Merged:** Phases 0a–9e in order, each with its spec under `specs/` (the
-Delivered paragraph) and its DECISIONS appendix — 9e (PR #28, 2026-09-10: Beat 5,
+**Merged:** Phases 0a–9f in order, each with its spec under `specs/` (the
+Delivered paragraph) and its DECISIONS appendix — 9f (PR #29, 2026-09-10: the
+README telling the five beats in the two-layer voice + the stranger acceptance test
+`tests/test_readme.py`; the permanent artifact stays the byte-checked synthetic
+render, the page carries no live-slider script) then 9e (PR #28, 2026-09-10: Beat 5,
 the checkable facts B5.1 `determinism_facts` and the reproducibility row-counts
 B5.2 `pipeline_row_counts`; the `reviews_per_month` query relocated into
 `pipeline/build.py`, `pipeline/metrics.py` deleted) then 9d (PR #27, 2026-09-10: Beat 4,
@@ -769,10 +786,12 @@ promoted). Phase 8b — the guardrail simulator (B4.1–B4.3, PR #19,
 2026-09-07) — landed `models/guardrail_sim.py::RULES`, the hold timer's three
 formulas in `models/cost_model.py`, the two simulator marts and `make simulate`.
 
-**Next (Phase 9 sub-phases, in order):** 9g — the Metabase demonstration
-(the review-level drill, non-CI). Plus two pulled-out data phases: the claims
-sample-mean slider and data.ameli practitioner fees.
+**Next:** Phase 9 is complete once 9g merges. Two pulled-out data phases remain:
+the claims sample-mean slider and data.ameli practitioner fees. Beyond Phase 9:
+Phase 10 (the Airflow DAG), which is also the home for the classify-path
+idempotency target (BACKLOG). A `fix/idempotency-classify` PR may land that
+target sooner.
 
-Open BACKLOG rows: **40**.
+Open BACKLOG rows: **39**.
 
 (Update this section at the end of every working day.)

@@ -178,3 +178,22 @@ API key and no network:
 Delete the API key and the pipeline still runs end to end: the reviews the rules
 could not settle stay "not yet classified", and the study shows them as a gray
 band rather than hiding them.
+
+### The Metabase demonstration — the clickable third surface
+
+Beside the permanent page and this README, the study has a third form you *click*:
+a Metabase dashboard where a theme bar drills to the individual reviews counted
+under it, over your own rebuild. It needs Docker (so it is developer-run, not part
+of the automated checks). The walk is in
+[`study/metabase/DEMONSTRATION.md`](study/metabase/DEMONSTRATION.md); in short:
+
+```
+make rebuild ROWS=captured && uv run python -m study.metabase export
+cd study/metabase && docker compose up -d
+cd ../.. && uv run python -m study.metabase apply     # reads .env
+```
+
+The drill shows each review's theme, rating, date, segment and platform — never
+its own words and never a per-review web address — and, per theme, one paraphrased
+example with its public source. The audit trail is the counted rows plus that
+paraphrase, not quoted excerpts.
