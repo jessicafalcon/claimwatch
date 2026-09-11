@@ -3,7 +3,7 @@ theme-share marts (theme_share_by_month B2.2, theme_share_by_segment B2.5).
 
 Offline, no key, DuckDB temp files. The classification path the CLI runs after a
 rebuild is replicated here (rebuild -> classify_all rules-only ->
-write_classified_reviews -> build_theme_share_marts), so the marts are exercised
+write_classified_reviews -> build_post_classify_marts), so the marts are exercised
 without the CLI's printing or fixed db paths."""
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from classify.combined import classify_all
 from classify.labels import review_id
 from classify.rules import load_rules
 from pipeline.build import (
-    build_theme_share_marts,
+    build_post_classify_marts,
     rebuild,
     write_classified_reviews,
 )
@@ -46,7 +46,7 @@ def _classify_and_build(db, run_id: str = "t") -> None:
     conn = connect("duckdb", database=db)
     try:
         write_classified_reviews(conn, classified, run_id=run_id)
-        build_theme_share_marts(conn)
+        build_post_classify_marts(conn)
     finally:
         conn.close()
 
@@ -86,7 +86,7 @@ def _add_second_theme_to_first_review(conn, run_id: str) -> tuple[str, str]:
         "values (?, ?, ?, ?)",
         [src, ext, other, run_id],
     )
-    build_theme_share_marts(conn)
+    build_post_classify_marts(conn)
     return other, month
 
 

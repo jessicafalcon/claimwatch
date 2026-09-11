@@ -750,12 +750,13 @@ def create_raw(conn) -> None:
         warehouse.run_sql_file(conn, path)
 
 
-# The marts that count the classifier's output: they read stg_classified_reviews,
-# which Python fills in the classify step (pipeline/cli.py) after staging. The
-# generic pass runs before classify, so it would build them empty — the classify
-# step runs them instead (build_theme_share_marts), after the table is filled.
+# The marts that read stg_classified_reviews, which Python fills in the classify
+# step (pipeline/cli.py) after staging: the two theme-share marts (B2.2, B2.5) and
+# the review-level drill (B2.1, 9g). The generic pass runs before classify, so it
+# would build them empty — the classify step runs them instead
+# (build_post_classify_marts), after the table is filled.
 POST_CLASSIFY_MARTS = frozenset(
-    {"theme_share_by_month.sql", "theme_share_by_segment.sql"}
+    {"theme_share_by_month.sql", "theme_share_by_segment.sql", "review_drill.sql"}
 )
 
 
@@ -788,10 +789,12 @@ def write_classified_reviews(conn, rows, run_id: str) -> None:
     conn.execute("commit")
 
 
-def build_theme_share_marts(conn) -> None:
-    """Run the two theme-share marts (B2.2, B2.5) after stg_classified_reviews is
-    filled. Segment is a review column (Phase 7a, A1), so the marts group by it
-    with no join — a review is counted under exactly one segment, on any input."""
+def build_post_classify_marts(conn) -> None:
+    """Run the marts that read stg_classified_reviews, after it is filled: the two
+    theme-share marts (B2.2, B2.5) and the review-level drill (B2.1, 9g). Segment
+    is a review column (Phase 7a, A1), so the theme marts group by it with no join
+    — a review is counted under exactly one segment, on any input; the drill is one
+    row per classified review x theme (its non-text allowlist is the guard)."""
     for name in sorted(POST_CLASSIFY_MARTS):
         warehouse.run_sql_file(conn, ROOT / "sql" / "marts" / name)
 

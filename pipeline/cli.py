@@ -56,7 +56,7 @@ from opendata.sources import cache_path, valid_month
 from pipeline.build import (
     FETCHED_SNAPSHOTS,
     INPUTS,
-    build_theme_share_marts,
+    build_post_classify_marts,
     captures_for,
     idempotency_check,
     read_model_fit,
@@ -274,7 +274,7 @@ def _classify_and_print(db, rows_input: str) -> None:
     conn = connect("duckdb", database=db)
     try:
         write_classified_reviews(conn, classified, run_id=rows_input)
-        build_theme_share_marts(conn)
+        build_post_classify_marts(conn)
         # B5.2: the per-stage row counts, after the classified stage exists, so
         # pipeline_row_counts counts it too (corpus-gated at render like the theme
         # marts). Idempotency-check runs rebuild() only, so a named test proves
