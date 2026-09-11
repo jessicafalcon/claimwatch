@@ -198,6 +198,9 @@ class UrllibClient:
         # proxies disabled: the token must not route through an ambient proxy
         # (the opendata/fetch.py reason). The opener is injectable for tests.
         self._opener = opener if opener is not None else build_opener(ProxyHandler({}))
+        # None until authenticated: _request attaches the session header only once
+        # a token exists, so the /api/session call itself carries none (no flag).
+        self._token: str | None = None
         self._token = self._authenticate(creds)
 
     def _authenticate(self, creds: Credentials) -> str:
@@ -205,21 +208,17 @@ class UrllibClient:
             "POST",
             "/api/session",
             {"username": creds.username, "password": creds.password},
-            token=None,
         )
         token = payload.get("id") if isinstance(payload, dict) else None
         if not token:
             raise MetabaseError("authentication returned no session id")
         return str(token)
 
-    def _request(
-        self, method: str, path: str, body: dict | None, *, token: str | None = ""
-    ) -> object:
+    def _request(self, method: str, path: str, body: dict | None) -> object:
         url = f"{self._base}{path}"
         headers = {"Content-Type": "application/json"}
-        session = self._token if token == "" else token
-        if session:
-            headers["X-Metabase-Session"] = session
+        if self._token:
+            headers["X-Metabase-Session"] = self._token
         data = json.dumps(body).encode("utf-8") if body is not None else None
         request = Request(url, data=data, headers=headers, method=method)
         try:

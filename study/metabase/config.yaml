@@ -21,13 +21,15 @@ collection:
   name: The Friction Ledger — Beat 2
 
 questions:
-  - name: Theme share — review counts by theme
+  # theme_rows, not "reviews": the grain is one row per review x theme, so a
+  # review carrying two themes counts in two bars (B2.2's vocabulary).
+  - name: Complaints by theme (theme rows)
     display: bar
     sql: >
-      select theme, count(*) as reviews
+      select theme, count(*) as theme_rows
       from review_drill
       group by theme
-      order by reviews desc, theme
+      order by theme_rows desc, theme
 
   - name: Review-level drill (the rows behind each theme)
     display: table
@@ -47,6 +49,6 @@ dashboard:
   name: The Friction Ledger — Beat 2 drill
   # the reader picks a theme; the drill and the paraphrase both filter to it
   cards:
-    - Theme share — review counts by theme
+    - Complaints by theme (theme rows)
     - Review-level drill (the rows behind each theme)
     - Theme paraphrases (B2.1)

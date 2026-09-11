@@ -18,7 +18,7 @@
 -- No text a reader sees comes from here: the theme's paraphrase is
 --   study/paraphrases.yaml (B2.1, Documented, sourced), joined by theme in the
 --   Metabase config, never a review body.
--- month/segment/rating are the review's own columns (never a clock); source and
+-- segment/rating are the review's own columns (never a clock); source and
 --   segment are carried from stg_reviews. Portable: string-concat only, no regex,
 --   no reader function, no clock.
 -- Provenance: the rows carry no tag/run_id column — the drill is the audit trail
@@ -29,7 +29,7 @@
 -- Feeds: the Metabase review-level drill (B2.1's paraphrases are shown beside it).
 --   Built by the classify step after stg_classified_reviews is filled (excluded
 --   from the generic marts pass, which runs before classify).
-create or replace table review_drill as
+create or replace view review_drill as
 select
     r.source || ':' || r.external_id as review_id,
     c.theme                          as theme,

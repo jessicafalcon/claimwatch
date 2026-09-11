@@ -63,3 +63,12 @@ the source of truth, re-appliable and reviewable.
 The exported `rating` is written as a fixed one-decimal string, so a `4.3`
 never drifts to `4.2999…` on the way through SQLite; the export is
 byte-identical on a rerun.
+
+A word on what the numbers mean. Over `ROWS=synthetic` (the committed
+screenshots) every count is fixture data. Over your own `ROWS=captured` rebuild
+they are your corpus's real counts — Measured, at the review × theme grain (a
+review with two themes counts in two bars). Metabase is an exploration surface,
+not the study's tagged presentation: the tags (Measured / Documented / Modeled /
+Pending) and the gated, byte-checked figures live on the HTML page and in the
+marts' own provenance. Read a Metabase count as "how many rows the classifier put
+here", and cross-check the study's claims against the page.

@@ -180,7 +180,9 @@ make rebuild ROWS=synthetic && make idempotency-check ROWS=synthetic && make che
 - `sql/staging/stg_reviews.sql` — carry `segment`; header: it feeds the marts via
   `stg_classified_reviews` by `(source, external_id)`, grouped by its `segment`.
 - `pipeline/build.py` — `segment` on the review load path (fixture + captures);
-  `segment_by_platform`; `write_classified_reviews`; `build_theme_share_marts`;
+  `segment_by_platform`; `write_classified_reviews`; `build_theme_share_marts`
+  (renamed `build_post_classify_marts` in Phase 9g, when `review_drill` joined the
+  set);
   exclude the two theme-share marts from the generic marts loop.
 - `pipeline/cli.py` — the classify step fills `stg_classified_reviews` and runs
   the two theme-share mart SQL files after it.

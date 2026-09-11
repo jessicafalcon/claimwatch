@@ -203,7 +203,7 @@ def test_a_forbidden_mart_column_is_refused_by_name(tmp_path):
         # would succeed and leak body, so this isolates the guard (removing it
         # fails the test on "did not raise", not on a downstream SQL error).
         conn.execute(
-            "create or replace table review_drill as "
+            "create or replace view review_drill as "
             "select 'app-store:1' as review_id, 'positive' as theme, 5.0 as rating, "
             "'2026-01-01' as review_date, 'digital-first' as segment, "
             "'app-store' as source, 'leaked text' as body"

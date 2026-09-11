@@ -304,7 +304,7 @@ REVIEW_DRILL_COLUMNS = (
 # asserted alongside in test_metabase_apply.
 METABASE_DRY_RUN_REQUESTS = 7
 METABASE_DRY_RUN_SHA256 = (
-    "66c5d859a7274614ad47ebfdd08067e9ab6469de158720e555ab877797e2df47"
+    "2b489593d7c9e0be6eb647c6baff3bbb86b6e86c09e9af84ef3e0caadf6de05a"
 )
 
 # The theme-share marts count those rows. share = theme_rows / reviews, at the
