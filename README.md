@@ -123,7 +123,7 @@ sits only at the edges, in one narrow place, never trusted on its own. Three
 facts you can check in the code:
 
 - A language model makes a decision in exactly **1** place *(Measured — B5.1)*.
-- **14** cost-model formulas are printed next to the numbers they produce
+- **15** cost-model formulas are printed next to the numbers they produce
   *(Measured — B5.1)*.
 - Every number in the study wears one of **4** evidence tags *(Measured — B5.1)*.
 

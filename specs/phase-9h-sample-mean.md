@@ -10,7 +10,7 @@ review round (two commits before this spec, at the developer's word — the
 one exception so far to "the first commit is the spec" and "tooling never
 mixed with a phase"; DECISIONS → Process records it).
 
-**Status: PROPOSED — do not start until approved.** No new dependencies: the
+**Status: APPROVED 2026-09-11 — building.** No new dependencies: the
 mean is stdlib `statistics.fmean`, the rest is the existing formulas-as-data
 path (`models/cost_model.py`, `pipeline/build.py::write_model_marts`,
 `study/panels.py`).

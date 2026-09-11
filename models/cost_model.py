@@ -11,15 +11,23 @@ stores all of it side by side. The printed formula, the unit and the computed
 number therefore cannot drift apart — they are one entry, 1:1 by construction
 (docs/PLAN.md §4 decision 5).
 
-`PARAMETERS` carries the static assumptions; the three DAMIR-fit rows (`mu`,
-`sigma`, `emp_p50`) are handed in by the caller as a `Fit` and added by
-`parameters(fit)`, so this layer reads no file, no clock and no key — it
-computes over what it is given. Every parameter carries a range the study's
+`PARAMETERS` carries the static assumptions; the four DAMIR-fit rows (`mu`,
+`sigma`, `emp_p50`, `emp_mean`) are handed in by the caller as a `Fit` and
+added by `parameters(fit)`, so this layer reads no file, no clock and no key —
+it computes over what it is given. Every parameter carries a range the study's
 sliders span: a sourced figure the record gives as a floor spans the floor to
 twice it (the study's stated exploration bound, not a fact); `mu`/`sigma` span
-the fit plus and minus two standard errors; an unsourced guess spans the range
-worth exploring. Nothing is a fitted predictive model — the only fit is the
+the fit plus and minus two standard errors; the two read cells (`emp_p50`,
+`emp_mean`) are fixed marks; an unsourced guess spans the range worth
+exploring. Nothing is a fitted predictive model — the only fit is the
 lognormal the caller supplies, whose own goodness-of-fit is shown upstream.
+
+The claim count is one division, refunds paid over the mean claim, and the
+model prints it twice: over the lognormal's own mean (`claims`, the count
+every later formula uses) and over the sample's arithmetic mean cell
+(`claims_at_mean_cell`, Phase 9h) — the contrast a reader who recomputes the
+mean from the fixture would otherwise find missing. Nothing downstream reads
+the second count.
 """
 
 from collections.abc import Callable, Mapping, Sequence
@@ -49,15 +57,17 @@ def rounded(unit: str, value: float | None) -> float | int | None:
 class Fit:
     """What the cost model needs from the DAMIR lognormal fit: the two
     log-moments, the sample size behind them (for the standard-error ranges on
-    `mu`/`sigma`), and the median DAMIR cell (`emp_p50`, the contrast to the
-    mean). The caller reads these from `data/damir/claim_cost_fit.csv` via
-    `opendata.fit.read_fit` and hands them in, so this module imports no reader
-    and touches no file."""
+    `mu`/`sigma`), the median DAMIR cell (`emp_p50`, the contrast to the mean)
+    and the sample's arithmetic mean cell (`emp_mean`, the contrast to the
+    lognormal mean's claim count). The caller reads these from
+    `data/damir/claim_cost_fit.csv` via `opendata.fit.read_fit` and hands them
+    in, so this module imports no reader and touches no file."""
 
     mu: float
     sigma: float
     n: int
     emp_p50: float
+    emp_mean: float
 
 
 @dataclass(frozen=True)
@@ -187,11 +197,13 @@ PARAMETERS = SCALE_PARAMETERS + KNOB_PARAMETERS
 
 
 def fit_parameters(fit: Fit) -> tuple[Parameter, ...]:
-    """The three sourced rows the DAMIR fit supplies, with their computed ranges.
+    """The four sourced rows the DAMIR fit supplies, with their computed ranges.
     `mu`/`sigma` span the fit ± 2 standard errors (`se_mu = sigma / √n`,
     `se_sigma = sigma / √(2n)`, the closed-form lognormal-MLE standard errors);
-    `emp_p50` is a read figure whose slider is `mu`/`sigma`, so its range is
-    itself. Every cell is rounded at the one site, so the rows are byte-stable."""
+    `emp_p50` and `emp_mean` are read figures whose slider is `mu`/`sigma`, so
+    each range is itself (a fixed mark; a third such row is the BACKLOG trigger
+    for a shape of their own). Every cell is rounded at the one site, so the
+    rows are byte-stable."""
     se_mu = fit.sigma / sqrt(fit.n)
     se_sigma = fit.sigma / sqrt(2 * fit.n)
     return (
@@ -221,6 +233,15 @@ def fit_parameters(fit: Fit) -> tuple[Parameter, ...]:
             _FIT_CITE,
             rounded("eur", fit.emp_p50),
             rounded("eur", fit.emp_p50),
+        ),
+        Parameter(
+            "emp_mean",
+            rounded("eur", fit.emp_mean),
+            "€",
+            "sourced",
+            _FIT_CITE,
+            rounded("eur", fit.emp_mean),
+            rounded("eur", fit.emp_mean),
         ),
     )
 
@@ -279,6 +300,10 @@ def _median_cell(v: Mapping[str, float]) -> float:
 
 def _claims(v: Mapping[str, float]) -> float:
     return v["refunded_eur"] / v["mean_claim"]
+
+
+def _claims_at_mean_cell(v: Mapping[str, float]) -> float:
+    return v["refunded_eur"] / v["emp_mean"]
 
 
 def _flagged(v: Mapping[str, float]) -> float:
@@ -343,6 +368,14 @@ POINT_FORMULAS = (
         _median_cell,
     ),
     Formula("claims", "refunded_eur / mean_claim", "point", "count", _claims),
+    Formula(
+        "claims_at_mean_cell",
+        "refunded_eur / emp_mean  -- the same division over the sample's own "
+        "mean cell; the contrast, used by nothing downstream",
+        "point",
+        "count",
+        _claims_at_mean_cell,
+    ),
     Formula("flagged", "claims * flag_rate", "point", "count", _flagged),
     Formula("false_pos", "flagged * fp_share", "point", "count", _false_pos),
     Formula(
@@ -419,6 +452,9 @@ CURVE_FORMULAS = (
     ),
 )
 FORMULAS = POINT_FORMULAS + CURVE_FORMULAS
+# The printer's name column: the longest point-formula name, computed once, so
+# a new entry never misaligns the table (the curve column is its own width).
+_POINT_NAME_WIDTH = max(len(f.name) for f in POINT_FORMULAS)
 
 
 # The flag-rate grid: 0.000 to 0.200 in steps of 0.005 (41 points), rounded so
@@ -532,8 +568,10 @@ def format_model(fit: Fit) -> str:
             f"scenario {scenario} — each formula beside its value at the defaults:"
         )
         for f in POINT_FORMULAS:
-            lines.append(f"  {f.name:16} = {f.expression}")
-            lines.append(f"  {'':16}   -> {outputs[f.name]} ({f.unit})")
+            lines.append(f"  {f.name:{_POINT_NAME_WIDTH}} = {f.expression}")
+            lines.append(
+                f"  {'':{_POINT_NAME_WIDTH}}   -> {outputs[f.name]} ({f.unit})"
+            )
         for f in CURVE_FORMULAS:
             lines.append(f"  {f.name:28} = {f.expression}")
             lines.append(f"  {'':28}   -> {crossovers[f.name]} ({f.unit})")

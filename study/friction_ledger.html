@@ -150,6 +150,7 @@
 <tr><th scope="row">The mean claim, from the fit <code class="ident">mean_claim</code></th><td><code class="expr">exp(mu + sigma^2 / 2)  -- a DAMIR cell sums &gt;= 1 claims, so this overstates a claim&#x27;s cost and understates claims and friction_cost</code></td><td>€494.45</td></tr>
 <tr><th scope="row">The median reimbursement cell <code class="ident">median_cell</code></th><td><code class="expr">emp_p50  -- the middle DAMIR cell, the contrast to the mean</code></td><td>€49.76</td></tr>
 <tr><th scope="row">Claims per year <code class="ident">claims</code></th><td><code class="expr">refunded_eur / mean_claim</code></td><td>707,858</td></tr>
+<tr><th scope="row">Claims per year at the mean cell <code class="ident">claims_at_mean_cell</code></th><td><code class="expr">refunded_eur / emp_mean  -- the same division over the sample&#x27;s own mean cell; the contrast, used by nothing downstream</code></td><td>412,935</td></tr>
 <tr><th scope="row">Claims flagged <code class="ident">flagged</code></th><td><code class="expr">claims * flag_rate</code></td><td>35,393</td></tr>
 <tr><th scope="row">Claims wrongly held <code class="ident">false_pos</code></th><td><code class="expr">flagged * fp_share</code></td><td>17,696</td></tr>
 <tr><th scope="row">Fraud saved <code class="ident">fraud_saved</code></th><td><code class="expr">fraud_pool_eur * (1 - exp(-k * flag_rate))</code></td><td>€1,318,719.82</td></tr>
@@ -285,7 +286,7 @@
 </section>
 <section class="panel">
 <h3>B3.3 · The sourced defaults <span class="chip chip-modeled">Modeled</span></h3>
-<p class="blurb">The inputs anchored to public figures — revenue, members, the fraud pool, refunds paid, and the typical size of a claim — each shown with the public figure behind it and the range the study explores. The three headline figures above the rows are derived from these inputs, at the defaults.</p>
+<p class="blurb">The inputs anchored to public figures — revenue, members, the fraud pool, refunds paid, and the typical size of a claim — each shown with the public figure behind it and the range the study explores. The headline figures above the rows are derived from these inputs, at the defaults.</p>
 <table class="metric formulas headline"><thead><tr>
 <th>Derived figure</th>
 <th>Formula</th>
@@ -294,6 +295,7 @@
 <tr><th scope="row">Revenue per member per year <code class="ident">customer_value</code></th><td><code class="expr">arr_eur / members</code></td><td>€800.00</td></tr>
 <tr><th scope="row">The mean claim, from the fit <code class="ident">mean_claim</code></th><td><code class="expr">exp(mu + sigma^2 / 2)  -- a DAMIR cell sums &gt;= 1 claims, so this overstates a claim&#x27;s cost and understates claims and friction_cost</code></td><td>€494.45</td></tr>
 <tr><th scope="row">Claims per year <code class="ident">claims</code></th><td><code class="expr">refunded_eur / mean_claim</code></td><td>707,858</td></tr>
+<tr><th scope="row">Claims per year at the mean cell <code class="ident">claims_at_mean_cell</code></th><td><code class="expr">refunded_eur / emp_mean  -- the same division over the sample&#x27;s own mean cell; the contrast, used by nothing downstream</code></td><td>412,935</td></tr>
 </tbody></table>
 <table class="metric params"><thead><tr>
 <th>Parameter</th>
@@ -308,9 +310,11 @@
 <tr><th scope="row">Log-mean of the claim cost, from the fit <code class="ident">mu</code></th><td><svg viewBox="0 0 240 30" role="img" class="range range-sourced"><line x1="8.00" y1="12.00" x2="232.00" y2="12.00" class="range-line"/><circle cx="120.00" cy="12.00" r="5" class="range-dot"/><text x="8.00" y="27.00" class="tick">3.747929 log-euros</text><text x="232.00" y="27.00" class="tick" text-anchor="end">3.871699 log-euros</text></svg></td><td>3.809814 log-euros</td><td class="cnt">log-euros · data/damir/claim_cost_fit.csv ← open-damir</td></tr>
 <tr><th scope="row">Log-spread of the claim cost, from the fit <code class="ident">sigma</code></th><td><svg viewBox="0 0 240 30" role="img" class="range range-sourced"><line x1="8.00" y1="12.00" x2="232.00" y2="12.00" class="range-line"/><circle cx="120.00" cy="12.00" r="5" class="range-dot"/><text x="8.00" y="27.00" class="tick">2.144221 log-euros</text><text x="232.00" y="27.00" class="tick" text-anchor="end">2.231741 log-euros</text></svg></td><td>2.187981 log-euros</td><td class="cnt">log-euros · data/damir/claim_cost_fit.csv ← open-damir</td></tr>
 <tr><th scope="row">Median reimbursement cell <code class="ident">emp_p50</code></th><td><span class="fixed">fixed — read from the fit</span></td><td>€49.76</td><td class="cnt">€ · data/damir/claim_cost_fit.csv ← open-damir</td></tr>
+<tr><th scope="row">Mean reimbursement cell <code class="ident">emp_mean</code></th><td><span class="fixed">fixed — read from the fit</span></td><td>€847.59</td><td class="cnt">€ · data/damir/claim_cost_fit.csv ← open-damir</td></tr>
 </tbody></table>
 <p class="note">Each range is shown as a fixed mark, not a slider you drag: low, default and high come from the model’s own table, so a reader redoes the arithmetic at any point of the range by hand with the printed formula. A published figure given as a floor spans the floor to twice it — the study’s stated exploration bound, not a fact.</p>
-<p class="note">Stated here: the four scale anchors are public disclosures cited second-hand from the project brief, each a floor; the fit rows span the fit plus and minus two standard errors, and the median cell is a read figure with no range of its own.</p>
+<p class="note">Stated here: the four scale anchors are public disclosures cited second-hand from the project brief, each a floor; the fit rows span the fit plus and minus two standard errors, and the median and mean cells are read figures with no range of their own.</p>
+<p class="note">Two claim counts are shown, one division each: refunds paid over the mean claim from the fit, and refunds paid over the mean reimbursement cell of the sample itself — the plain average of the cells, no fit involved. The mean cell sits above the fitted mean, so the lognormal puts less weight on the largest cells than the sample carries, and the count at the mean cell is the lower of the two. Every later formula uses the fitted count; the second is the contrast a reader recomputing from the data would find.</p>
 <p class="evidence">Evidence: B3.3 · Modeled · opens to <a href="https://www.data.gouv.fr/api/1/datasets/open-damir-base-complete-sur-les-depenses-dassurance-maladie-interregimes/" rel="noopener">https://www.data.gouv.fr/api/1/datasets/open-damir-base-complete-sur-les-depenses-dassurance-maladie-interregimes/</a>; source file data/damir/claim_cost_fit.csv</p>
 </section>
 <section class="panel">
@@ -591,7 +595,7 @@
 <p class="blurb">Three facts about how this study is built, each a count you can verify in the code. A language model makes a decision in exactly one place; the cost model&#x27;s formulas are printed next to the numbers they give; and every number on the page carries a tag saying where it came from.</p>
 <div class="stat-row">
 <div class="stat"><div class="stat-value">1</div><div class="stat-label">Places a language model makes a decision</div><span class="chip chip-measured">Measured</span></div>
-<div class="stat"><div class="stat-value">14</div><div class="stat-label">Cost-model formulas shown beside their output</div><span class="chip chip-measured">Measured</span></div>
+<div class="stat"><div class="stat-value">15</div><div class="stat-label">Cost-model formulas shown beside their output</div><span class="chip chip-measured">Measured</span></div>
 <div class="stat"><div class="stat-value">4</div><div class="stat-label">Evidence tags in the study&#x27;s closed set</div><span class="chip chip-measured">Measured</span></div>
 </div>
 <p class="note">One place a model decides: every other tag comes from rules, SQL or arithmetic. The formulas are the cost-model ones printed next to their output in &quot;What a wrongly held claim costs&quot; above — redo any by hand. Every number on this page carries one of three tags — Measured, Documented or Modeled — and a panel with no number yet is marked Pending, so nothing stands unsourced.</p>

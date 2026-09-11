@@ -20,9 +20,12 @@ two down the page. No clock, no randomness: the same slice always gives the
 same numbers.
 
 The fit and the goodness-of-fit land in one tracked, numbers-only CSV
-(`data/damir/claim_cost_fit.csv`) that Phase 8's cost model and simulator read.
-A test recomputes it from the frozen fixture and pins every value, so CI
-reproduces the sourced fit offline."""
+(`data/damir/claim_cost_fit.csv`) that Phase 8's cost model and simulator read,
+with the sample's own arithmetic mean (`emp_mean`, Phase 9h) as the last row:
+the contrast the study prints beside the lognormal's mean, a number a reader
+recomputes from the fixture with no fit involved. A test recomputes the file
+from the frozen fixture and pins every value, so CI reproduces the sourced fit
+offline."""
 
 from __future__ import annotations
 
@@ -50,11 +53,28 @@ _AMOUNT_DP = 2
 
 @dataclass(frozen=True)
 class Fit:
-    """The lognormal fit: the two parameters and the sample size behind them."""
+    """The lognormal fit: the two parameters, the sample size behind them, and
+    the sample's arithmetic mean (`emp_mean`, `mean(x)` — no fit involved, the
+    contrast to the lognormal's own mean `exp(mu + sigma²/2)`)."""
 
     mu: float
     sigma: float
     n: int
+    emp_mean: float
+
+
+# Every name the artifact carries, in write order: the three fit parameters,
+# then `emp_p<d>`/`fit_p<d>` for each decile, then the sample mean last (Phase
+# 9h, appended so the pre-9h file is a byte prefix of the new one). The writer
+# emits exactly these, the reader requires exactly these, and the tracked-files
+# test reads this tuple — one closed set, no hand-typed copy.
+FIT_FIELD_NAMES: tuple[str, ...] = (
+    "mu",
+    "sigma",
+    "n",
+    *(name for d in DECILES for name in (f"emp_p{d}", f"fit_p{d}")),
+    "emp_mean",
+)
 
 
 @dataclass(frozen=True)
@@ -80,7 +100,7 @@ def fit_lognormal(amounts: list[float]) -> Fit:
     logs = [log(x) for x in amounts]
     mu = statistics.fmean(logs)
     sigma = statistics.pstdev(logs, mu)
-    return Fit(mu=mu, sigma=sigma, n=len(amounts))
+    return Fit(mu=mu, sigma=sigma, n=len(amounts), emp_mean=statistics.fmean(amounts))
 
 
 def goodness_of_fit(amounts: list[float], fit: Fit) -> list[Decile]:
@@ -113,20 +133,16 @@ def write_fit(fit: Fit, gof: list[Decile], path: Path = ARTIFACT) -> None:
         for row in gof:
             writer.writerow([f"emp_p{row.decile}", f"{row.empirical:.{_AMOUNT_DP}f}"])
             writer.writerow([f"fit_p{row.decile}", f"{row.predicted:.{_AMOUNT_DP}f}"])
+        # The mean is a divisor downstream (claims at the mean cell), so it is
+        # written at the parameters' precision: a reader's hand division from
+        # six places lands on one count, from two it could straddle two.
+        writer.writerow(["emp_mean", f"{fit.emp_mean:.{_PARAM_DP}f}"])
 
 
-# The fit artifact is tiny (three parameters + two figures per decile); a file
-# larger than this is not the shape we wrote, so refuse before reading it.
+# The fit artifact is tiny (three parameters + two figures per decile + the
+# mean); a file larger than this is not the shape we wrote, so refuse before
+# reading it.
 _MAX_FIT_BYTES = 64 * 1024
-
-
-def _fit_field_names() -> tuple[str, ...]:
-    """Every name the artifact must carry, in write order: the three parameters
-    then `emp_p<d>`/`fit_p<d>` for each decile — the mirror of `write_fit`."""
-    names = ["mu", "sigma", "n"]
-    for decile in DECILES:
-        names += [f"emp_p{decile}", f"fit_p{decile}"]
-    return tuple(names)
 
 
 def _finite_float(raw: dict[str, str], name: str, where: str) -> float:
@@ -152,7 +168,8 @@ def read_fit(path: Path = ARTIFACT) -> tuple[Fit, list[Decile]]:
     deciles — the strict mirror of `write_fit`, the one place besides the writer
     that knows the artifact's shape. Every declared name must be present, numeric
     and finite (`n` a positive integer); an unknown, missing, duplicate or
-    non-numeric name refuses with the name, never a silent default. `z` is the
+    non-numeric name refuses with the name, never a silent default; `emp_mean`
+    is a divisor downstream, so a value that is not > 0 refuses too. `z` is the
     standard-normal quantile recomputed per decile (the writer stores none), the
     same value `goodness_of_fit` used, so the returned deciles carry it."""
     where = path.name
@@ -175,7 +192,7 @@ def read_fit(path: Path = ARTIFACT) -> tuple[Fit, list[Decile]]:
             if name in raw:
                 raise ValueError(f"{where}: line {lineno}: duplicate name {name!r}")
             raw[name] = row[1]
-    expected = set(_fit_field_names())
+    expected = set(FIT_FIELD_NAMES)
     if unknown := sorted(set(raw) - expected):
         raise ValueError(f"{where}: name(s) not in the fit artifact's shape: {unknown}")
     if missing := sorted(expected - set(raw)):
@@ -187,10 +204,17 @@ def read_fit(path: Path = ARTIFACT) -> tuple[Fit, list[Decile]]:
         raise ValueError(
             f"{where}: 'sigma' is a standard deviation and must be >= 0: {sigma!r}"
         )
+    emp_mean = _finite_float(raw, "emp_mean", where)
+    if emp_mean <= 0:
+        raise ValueError(
+            f"{where}: 'emp_mean' is a mean of positive amounts and a divisor, "
+            f"must be > 0: {emp_mean!r}"
+        )
     fit = Fit(
         mu=_finite_float(raw, "mu", where),
         sigma=sigma,
         n=_positive_int(raw, "n", where),
+        emp_mean=emp_mean,
     )
     normal = statistics.NormalDist()
     gof = [
@@ -212,6 +236,8 @@ def format_fit(fit: Fit, gof: list[Decile]) -> str:
         f"lognormal fit over {fit.n} DAMIR reimbursed amounts (PRS_REM_MNT):",
         f"  mu    = {fit.mu:.{_PARAM_DP}f}   (mean of ln amount)",
         f"  sigma = {fit.sigma:.{_PARAM_DP}f}   (population std of ln amount)",
+        f"  mean  = {fit.emp_mean:.{_PARAM_DP}f}   (arithmetic mean of the amounts, "
+        "no fit — the contrast to exp(mu + sigma²/2))",
         "the fit shown — each decile, real amount vs the fitted curve:",
         f"  {'decile':>6}  {'z':>8}  {'real €':>12}  {'fitted €':>12}",
     ]

@@ -69,13 +69,14 @@ TRADITIONAL_CAVEAT = (
 # Each formula's display name, keyed by its `FORMULAS` name and in `FORMULAS`
 # order (a test pins the key sequence equal), so the page reads line for line
 # with `make model`. A name the map does not know refuses by name in the reader
-# — a fifteenth formula added without a study name fails the render rather than
+# — a formula added without a study name fails the render rather than
 # rendering its identifier as prose (Phase 9c, pinned decision 6).
 FORMULA_NAMES = {
     "customer_value": "Revenue per member per year",
     "mean_claim": "The mean claim, from the fit",
     "median_cell": "The median reimbursement cell",
     "claims": "Claims per year",
+    "claims_at_mean_cell": "Claims per year at the mean cell",
     "flagged": "Claims flagged",
     "false_pos": "Claims wrongly held",
     "fraud_saved": "Fraud saved",
@@ -99,6 +100,7 @@ PARAMETER_NAMES = {
     "mu": ("Log-mean of the claim cost, from the fit", "logeur"),
     "sigma": ("Log-spread of the claim cost, from the fit", "logeur"),
     "emp_p50": ("Median reimbursement cell", "eur"),
+    "emp_mean": ("Mean reimbursement cell", "eur"),
     "flag_rate": ("Flag rate", "pct"),
     "fp_share": ("Share of flags that are wrong", "pct"),
     "contacts": ("Contacts per stuck claim", "count"),
@@ -108,10 +110,25 @@ PARAMETER_NAMES = {
     "days_per_round": ("Days per document round trip", "days"),
     "timer_days": ("Days a hold may run before the clock", "days"),
 }
-# The three derived headline figures B3.3 shows above its parameter rows
-# (BACKING B3.3: revenue per member, the mean claim, the claim volume) — read
-# from the outputs mart at the baseline, never retyped.
-HEADLINE_FORMULAS = ("customer_value", "mean_claim", "claims")
+# The derived headline figures B3.3 shows above its parameter rows (BACKING
+# B3.3: revenue per member, the mean claim, the claim volume) and, from 9h, the
+# claim count at the sample's own mean cell — the contrast beside the claim
+# volume, a fourth row through this one map — read from the outputs mart at the
+# baseline, never retyped.
+HEADLINE_FORMULAS = ("customer_value", "mean_claim", "claims", "claims_at_mean_cell")
+# What B3.3 says about the two claim counts: only what its cells show — the
+# mean cell sits above the fitted mean, so the count at the mean cell is the
+# lower one. No maximum cell, no percentage, no decile: the page holds none of
+# those as a cell (9h, challenge round 1, #8).
+MEAN_CELL_NOTE = (
+    "Two claim counts are shown, one division each: refunds paid over the mean "
+    "claim from the fit, and refunds paid over the mean reimbursement cell of "
+    "the sample itself — the plain average of the cells, no fit involved. The "
+    "mean cell sits above the fitted mean, so the lognormal puts less weight on "
+    "the largest cells than the sample carries, and the count at the mean cell "
+    "is the lower of the two. Every later formula uses the fitted count; the "
+    "second is the contrast a reader recomputing from the data would find."
+)
 
 # The labels of a curve panel's three markers, in the order they are drawn:
 # the default flag rate, then the two crossovers. Two markers at one x stack

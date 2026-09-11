@@ -32,7 +32,11 @@ from models.cost_model import (
 from tests import pins
 
 FIT = Fit(
-    mu=pins.DAMIR_MU, sigma=pins.DAMIR_SIGMA, n=pins.DAMIR_N, emp_p50=pins.DAMIR_EMP_P50
+    mu=pins.DAMIR_MU,
+    sigma=pins.DAMIR_SIGMA,
+    n=pins.DAMIR_N,
+    emp_p50=pins.DAMIR_EMP_P50,
+    emp_mean=pins.DAMIR_EMP_MEAN,
 )
 
 
@@ -166,6 +170,28 @@ def test_timer_formulas_recomputed_by_hand():
         assert (
             out["timer_amount_eur"] == pins.COST_OUTPUTS[scenario]["timer_amount_eur"]
         )
+
+
+def test_claims_at_mean_cell_is_the_division_by_hand():
+    """9h, invariant 3: the contrast count is refunds paid over the sample's
+    mean cell, redone by hand from the parameter table; the same on every
+    scenario (nothing a scenario toggles enters it); the pinned figure is the
+    same whether the reader divides by the page's two-place cell or the
+    artifact's six-place one."""
+    values = defaults(FIT)
+    emp_mean = next(p for p in parameters(FIT) if p.name == "emp_mean")
+    assert emp_mean.sourcing == "sourced" and emp_mean.citation
+    assert emp_mean.low == emp_mean.default == emp_mean.high  # a fixed mark
+    by_hand = round(values["refunded_eur"] / emp_mean.default)
+    assert by_hand == pins.COST_OUTPUTS["baseline"]["claims_at_mean_cell"]
+    assert round(values["refunded_eur"] / pins.DAMIR_EMP_MEAN) == by_hand
+    for scenario in SCENARIOS:
+        assert evaluate(values, scenario)["claims_at_mean_cell"] == by_hand
+    contrast = next(f for f in POINT_FORMULAS if f.name == "claims_at_mean_cell")
+    assert contrast.expression.startswith("refunded_eur / emp_mean")
+    names = [f.name for f in POINT_FORMULAS]
+    assert names.index("claims_at_mean_cell") == names.index("claims") + 1
+    assert "claims_at_mean_cell" in format_model(FIT)
 
 
 def test_mean_claim_prints_its_bias_and_the_median_cell():
