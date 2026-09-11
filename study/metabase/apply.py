@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Protocol
 from urllib.error import URLError
 from urllib.parse import urlparse
-from urllib.request import ProxyHandler, Request, build_opener
+from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
 import yaml
 
@@ -53,6 +53,21 @@ class MetabaseError(Exception):
     """A one-line refusal on the developer-run applier path — a missing
     credential, a URL of the wrong shape, or a response that is not the shape the
     API documents."""
+
+
+class _NoCrossHostRedirect(HTTPRedirectHandler):
+    """Refuse a redirect that leaves the configured host. urllib's default
+    redirect handler re-sends every header — including `X-Metabase-Session` — to
+    the target, so a 3xx to another host would carry the token off the base URL
+    `_base_url_ok` vetted. This mirrors the repo's fetching rule: a redirect to
+    another host is refused, not followed (secure-by-construction)."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: PLR0917 -- signature fixed by HTTPRedirectHandler
+        if urlparse(newurl).hostname != urlparse(req.full_url).hostname:
+            raise URLError(
+                f"refusing a cross-host redirect to {urlparse(newurl).hostname}"
+            )
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 def _base_url_ok(url: str) -> bool:
@@ -196,8 +211,13 @@ class UrllibClient:
     def __init__(self, creds: Credentials, *, opener=None):
         self._base = creds.url
         # proxies disabled: the token must not route through an ambient proxy
-        # (the opendata/fetch.py reason). The opener is injectable for tests.
-        self._opener = opener if opener is not None else build_opener(ProxyHandler({}))
+        # (the opendata/fetch.py reason); cross-host redirects refused so the token
+        # cannot follow a 3xx off the vetted host. The opener is injectable for tests.
+        self._opener = (
+            opener
+            if opener is not None
+            else build_opener(ProxyHandler({}), _NoCrossHostRedirect())
+        )
         # None until authenticated: _request attaches the session header only once
         # a token exists, so the /api/session call itself carries none (no flag).
         self._token: str | None = None

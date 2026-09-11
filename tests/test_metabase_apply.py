@@ -6,8 +6,10 @@ call."""
 from __future__ import annotations
 
 import hashlib
+from http.client import HTTPMessage
 from pathlib import Path
 from urllib.error import URLError
+from urllib.request import Request
 
 import pytest
 
@@ -17,6 +19,7 @@ from study.metabase.apply import (
     MetabaseError,
     UrllibClient,
     _base_url_ok,
+    _NoCrossHostRedirect,
     _require_id,
     apply,
     as_list,
@@ -275,6 +278,9 @@ def test_export_command_routes_rows_to_the_matching_database(monkeypatch):
     assert entry.main(["export", "--rows", "synthetic"]) == 0
     assert seen["db"] == database_for("synthetic")
     assert seen["db"] != database_for("captured")
+    # #1's core promise: the default (no --rows) is the real corpus
+    assert entry.main(["export"]) == 0
+    assert seen["db"] == database_for("captured")
 
 
 def test_dashcards_are_replaced_not_appended_on_reapply():
@@ -289,3 +295,19 @@ def test_dashcards_are_replaced_not_appended_on_reapply():
     n = len(_CONFIG["dashboard"]["cards"])
     assert all(len(body["dashcards"]) == n for body in dashcard_writes)
     assert not any(kind == "dashcard" for kind, _ in client.creates)
+
+
+def test_client_refuses_a_cross_host_redirect():
+    """The session token must not follow a 3xx off the vetted host: a cross-host
+    redirect is refused (raised as URLError, which _request maps to a one-line
+    MetabaseError), while a same-host redirect is allowed."""
+    handler = _NoCrossHostRedirect()
+    req = Request("https://metabase.example.com/api/card")
+    with pytest.raises(URLError):
+        handler.redirect_request(
+            req, None, 302, "Found", HTTPMessage(), "https://evil.example.com/x"
+        )
+    same = handler.redirect_request(
+        req, None, 302, "Found", HTTPMessage(), "https://metabase.example.com/login"
+    )
+    assert same is not None  # a same-host redirect is followed
