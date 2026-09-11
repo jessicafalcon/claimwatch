@@ -328,6 +328,26 @@ place and never deleted.
   gate, `ROWS`, the raw-table shape check, the no-key classify step). The
   rules sections are untouched; cut them only when they too carry
   redundancy.
+- **The CLAUDE.md cap is 600 lines, and the trim is a `tooling/` PR
+  (tooling, 2026-09-11).** At 805 lines the Phase 6–9g exits had each
+  re-deferred the BACKLOG row; `tooling/claude-md-trim` cut the file to 584
+  without touching a rule: the Repo map lost its per-mart and per-module
+  history (each module's docstring and each spec's Delivered paragraph hold
+  it), Commands lost the per-target lines `make help` prints and the
+  `confirm` gate's mechanism (the Threat model of `specs/phase-3a-snapshots.md`
+  holds it, and the section now points there), Working with the model and
+  Project tooling lost the sentences that restated Workflow rules or a hook's
+  own header, and Current status is the pointer paragraph plus the BACKLOG
+  count that `docs/PLAN.md` §7 asked for. The rules sections (Deterministic
+  first through the agents table) are ~330 lines on their own, so the ~400
+  cap of Phase 0a cannot be met while they stand; the cap is restated as 600,
+  the number the exits had already used as the trigger, and the coherence
+  audit reports growth past 550. Not taken: moving rules into the three
+  standards (a skill loads by path; a rule that applies on every turn belongs
+  in the file every turn and every custom subagent receives); a second
+  always-loaded file under `docs/` (custom subagents receive CLAUDE.md only —
+  sub-agents reference, read 2026-09-05 — so the split would hide the moved
+  rules from the reviewers).
 
 ## Gotchas (stack surprises found live)
 
