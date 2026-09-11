@@ -545,11 +545,12 @@ def test_read_fit_refuses_an_artifact_without_the_mean(tmp_path):
 
 
 def test_read_fit_refuses_a_non_positive_mean(tmp_path):
-    """emp_mean is a divisor (claims at the mean cell): zero, negative and
-    non-finite values refuse by name rather than reaching the model as a
-    ZeroDivisionError or a negative count."""
+    """emp_mean is a divisor (claims at the mean cell) that the model rounds to
+    cents first: zero, negative, non-finite and sub-cent values refuse by name
+    rather than reaching the model as a ZeroDivisionError or a negative count
+    (a sub-cent value passed a plain `> 0` guard — round 1, security #1)."""
     lines = _valid_fit_file(tmp_path).read_text(encoding="utf-8").splitlines()
-    for bad in ("0", "-12.5", "inf", "nan"):
+    for bad in ("0", "-12.5", "inf", "nan", "0.004"):
         p = tmp_path / f"mean_{bad}.csv"
         p.write_text(
             "\n".join(

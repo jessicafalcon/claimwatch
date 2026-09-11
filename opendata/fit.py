@@ -143,6 +143,11 @@ def write_fit(fit: Fit, gof: list[Decile], path: Path = ARTIFACT) -> None:
 # mean); a file larger than this is not the shape we wrote, so refuse before
 # reading it.
 _MAX_FIT_BYTES = 64 * 1024
+# The smallest amount a euro slice can carry, and the smallest value the cost
+# model's euro rounding keeps: a mean under one cent is not a mean of euro
+# amounts, and divided by after rounding it would be zero (invariant 7 —
+# never a traceback downstream; review round 1, security-reviewer #1).
+_MIN_EUR_MEAN = 0.01
 
 
 def _finite_float(raw: dict[str, str], name: str, where: str) -> float:
@@ -169,7 +174,8 @@ def read_fit(path: Path = ARTIFACT) -> tuple[Fit, list[Decile]]:
     that knows the artifact's shape. Every declared name must be present, numeric
     and finite (`n` a positive integer); an unknown, missing, duplicate or
     non-numeric name refuses with the name, never a silent default; `emp_mean`
-    is a divisor downstream, so a value that is not > 0 refuses too. `z` is the
+    is a divisor downstream, rounded to cents first, so a value under one cent
+    refuses too. `z` is the
     standard-normal quantile recomputed per decile (the writer stores none), the
     same value `goodness_of_fit` used, so the returned deciles carry it."""
     where = path.name
@@ -205,10 +211,10 @@ def read_fit(path: Path = ARTIFACT) -> tuple[Fit, list[Decile]]:
             f"{where}: 'sigma' is a standard deviation and must be >= 0: {sigma!r}"
         )
     emp_mean = _finite_float(raw, "emp_mean", where)
-    if emp_mean <= 0:
+    if emp_mean < _MIN_EUR_MEAN:
         raise ValueError(
-            f"{where}: 'emp_mean' is a mean of positive amounts and a divisor, "
-            f"must be > 0: {emp_mean!r}"
+            f"{where}: 'emp_mean' is a mean of euro amounts and a divisor, "
+            f"must be at least one cent ({_MIN_EUR_MEAN}): {emp_mean!r}"
         )
     fit = Fit(
         mu=_finite_float(raw, "mu", where),
