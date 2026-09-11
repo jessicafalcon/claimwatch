@@ -231,7 +231,7 @@ Freeze: none
   read-figure rows sit under `Parameter`, whose docstring says "on a
   slider"* (`emp_p50`, `emp_mean`; trigger: a third fixed-range row — give the
   read figures their own shape or sourcing kind); the count updated
-- [ ] LESSONS.md — none until a review round reports a correctness finding; then backtick it and the fix commit writes the row
+- [x] `LESSONS.md` — the `unshaped-input` row extended with the round-1 correctness fix (`711864e`: the reader's divisor domain)
 - [ ] `CLAUDE.md` — Current status; BACKLOG count
 - [ ] `BACKING.md` — the "On the `open-damir` upstream (B3.3, B4.3)" paragraph
   names `emp_mean` and `claims_at_mean_cell`; no row's tag changes
