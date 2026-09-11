@@ -87,7 +87,7 @@ Five beats, told from the customer's chair. The customer is the protagonist; the
 - The taxonomy (5 themes, see §5) with paraphrased documented examples. Tag: Documented.
 - **The chart the pipeline exists to produce:** theme share among every classified review over time, per segment (digital-first vs traditional; positive reviews in the denominator, never a theme bar). Tag: Measured (via the gated classifier). Until real, it's tagged Pending — never faked.
 - Peer context: public ratings across the market segment. Tag: Documented (the anchors), Measured for our own points.
-- Every theme bar must drill through to the underlying review excerpts (Metabase drill-through). Audit trail, not citation.
+- Every theme bar must drill through to the underlying review excerpts (Metabase drill-through). Audit trail, not citation. *(Phase 9g reconciliation — DECISIONS → Phase 9g: literal review **excerpts** proved unattainable under D1 (no per-review public address) and the Neutrality/personal-data rule (no review body), so the shipped drill's trail is the counted rows plus a sourced theme-level paraphrase (B2.1), not per-review excerpts; the per-review-public-address need stays an open BACKLOG row.)*
 - Classifier quality (per-theme precision/recall vs hand labels) is displayed **inside the study**, next to the charts it feeds.
 
 ### Beat 3 — What a wrongly held claim costs

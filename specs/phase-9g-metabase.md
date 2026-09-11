@@ -5,7 +5,7 @@ Contract for the `phase-9g-metabase` branch. Source: PROJECT_BRIEF.md §4.4 (the
 the permanent-artifact-first split (DECISIONS → Phase 9a). It is the last Phase 9
 sub-phase. Depends on Phase 9f merged (PR #29, 2026-09-10).
 
-**Status: APPROVED 2026-09-10 — in progress.** No new Python dependency:
+**Status: APPROVED 2026-09-10 — DELIVERED 2026-09-11, PR open.** No new Python dependency:
 the applier is stdlib `urllib` (the `opendata/fetch.py` precedent), the
 marts→engine export is stdlib `sqlite3`, the config is `pyyaml` (Phase 2), the
 drill view is `duckdb` + SQL. Metabase runs via Docker, which CLAUDE.md →
@@ -16,7 +16,7 @@ live run cannot end CI-green — the phase splits into an offline, CI-checkable
 core (the applier's request bodies, the drill view's + SQLite export's column
 allowlist) and a developer-run demonstration (the live Metabase run and its
 synthetic-only screenshots).
-Challenged: 2026-09-10, round 2, spec 062cf09f — approve with amendments (1 BLOCKER, 3 should-fix, 1 question; all applied; re-hashed after amendments)
+Challenged: 2026-09-10, round 2, spec 9cba5dd4 — approve with amendments (1 BLOCKER, 3 should-fix, 1 question; all applied; re-hashed at exit — the SQLite path refined to data/metabase/ by review round 1 #3, invariants unchanged)
 Challenged: 2026-09-10, round 1, spec 76269923 — rework (2 BLOCKER, 4 should-fix; all applied)
 
 ## Why
@@ -110,7 +110,7 @@ make rebuild ROWS=synthetic && uv run pytest tests/test_metabase_apply.py tests/
 
 1. **Metabase is provisioned from committed config over a SQLite export,
    idempotently.** `make rebuild` (then a stdlib `sqlite3` export step) writes the
-   drill and aggregate marts to a gitignored `data/metabase.sqlite`; a committed
+   drill and aggregate marts to a gitignored `data/metabase/metabase.sqlite`; a committed
    `study/metabase/docker-compose.yml` brings up Metabase reading that file via
    its **built-in SQLite driver**; `study.metabase apply` reads
    `study/metabase/config.yaml` and upserts the collection, questions and
@@ -250,7 +250,7 @@ make rebuild ROWS=synthetic && uv run pytest tests/test_metabase_apply.py tests/
 - `study/metabase/__init__.py`, `study/metabase/__main__.py` (the `apply` entry,
   `--dry-run`), `study/metabase/apply.py` (YAML → HTTP-API request bodies; the
   upsert; the injected HTTP-client seam), `study/metabase/export.py` (marts →
-  `data/metabase.sqlite` via stdlib `sqlite3`, allowlisted columns only),
+  `data/metabase/metabase.sqlite` via stdlib `sqlite3`, allowlisted columns only),
   `study/metabase/config.yaml` (the SQLite connection, questions and dashboard as
   data), `study/metabase/docker-compose.yml`, `study/metabase/DEMONSTRATION.md`,
   `study/metabase/screenshots/` (committed synthetic-only PNGs).
@@ -263,7 +263,7 @@ make rebuild ROWS=synthetic && uv run pytest tests/test_metabase_apply.py tests/
   (the pinned request bodies and drill fragments).
 - Records: `DECISIONS.md`, `BACKLOG.md`, `CLAUDE.md`, `BACKING.md`, `SPEC.md`,
   `README.md`, this spec.
-- `.gitignore` (if `data/metabase.sqlite` is not already covered by `data/`).
+- `.gitignore` (if `data/metabase/metabase.sqlite` is not already covered by `data/`).
 
 Freeze: none
 
@@ -290,6 +290,8 @@ Freeze: none
   `URLError`) with the 9g occurrences
 - [ ] `specs/phase-7a-findings-marts.md` — the `build_theme_share_marts` →
   `build_post_classify_marts` rename note (review round 1, #16)
+- [ ] `PROJECT_BRIEF.md` — §90 reconciliation note (exit audit): the drill's trail
+  is counted rows + a sourced paraphrase, not literal review excerpts (D1/Neutrality)
 - [ ] `CLAUDE.md` — Current status; Commands (`study.metabase apply` /
   `export`); Repo map (`study/metabase/`, `study/paraphrases.yaml`,
   `sql/marts/review_drill.sql`); Teaching rule (Metabase drill-through, the
@@ -314,7 +316,7 @@ credentials).
 | Target/module | empty | `../x` | `"; ` | env-exported | credentials | Pinned by |
 |---|---|---|---|---|---|---|
 | `study.metabase apply` (module, not a `make` target) | missing `METABASE_URL`/user/password → refuses naming the variable, never the value; `--dry-run` needs none | n/a — no path is built from a variable | n/a — no shell; `urllib` builds the request, no subprocess | reads `.env` only, never Actions | credentials in `.env` only; refusals print names; run twice = idempotent upsert (no duplicate object, no paid call, localhost only) | `tests/test_metabase_apply.py::test_apply_refuses_missing_credentials_by_name` |
-| `study.metabase export` (offline) | writes `data/metabase.sqlite` from the running marts; empty marts → an empty allowlisted table, never a body column | n/a — the path is a fixed constant, not a variable | n/a — no shell | needs none | none — offline | `tests/test_review_drill.py::test_sqlite_export_carries_only_the_allowlist_no_body_title_source_url` |
+| `study.metabase export` (offline) | writes `data/metabase/metabase.sqlite` from the running marts; empty marts → an empty allowlisted table, never a body column | n/a — the path is a fixed constant, not a variable | n/a — no shell | needs none | none — offline | `tests/test_review_drill.py::test_sqlite_export_carries_only_the_allowlist_no_body_title_source_url` |
 
 Settled shape: one Python process validates, derives the request bodies / the
 export, and (for a live apply) reads `.env` then acts; `--dry-run` and `export`
@@ -349,7 +351,7 @@ Agents are selected by diff surface (CLAUDE.md → "Which review agents run").
   Workflow rules → Stack surprises; log under DECISIONS → Gotchas):**
   1. **Metabase's built-in SQLite driver reads a mounted file.** SQLite is
      official (verified in the record), but confirm the container reads the
-     mounted `data/metabase.sqlite` and one card loads before pinning the config.
+     mounted `data/metabase/metabase.sqlite` and one card loads before pinning the config.
      Low risk (file-based native driver); the fallback if it fails is a Postgres
      container + load, scoped then as an amendment.
   2. **Metabase HTTP API idempotency.** The API creates on POST; the applier must
@@ -376,3 +378,54 @@ Agents are selected by diff surface (CLAUDE.md → "Which review agents run").
   pulled-out data phases (DECISIONS → Phase 9a).
 - *"B4.3's four bar labels are a latent overflow"* — a Beat-4 follow-on,
   untouched.
+
+## Delivered (2026-09-11)
+
+The Metabase demonstration — the study's clickable third surface, developer-run
+and non-CI. A theme bar drills to the review rows behind it over the reader's own
+rebuild: `sql/marts/review_drill.sql` is a view (one row per classified review ×
+theme) projecting the non-text allowlist `review_id` (`source || ':' ||
+external_id`, mirroring `classify/labels.py::review_id`), `theme`, `rating`,
+`review_date`, `segment`, `source` — never `body`/`title`/`source_url`, though the
+join to `stg_reviews` reaches them, so the projection is the guard (checked on the
+joined cursor and again in the export's `FORBIDDEN_COLUMNS`). It is built in the
+post-classify path by `build_post_classify_marts` (renamed from
+`build_theme_share_marts`). `study/metabase/export.py` copies the marts to a
+gitignored `data/metabase/metabase.sqlite` via stdlib `sqlite3` — decimals as
+their exact string (`rating` never drifts), ordered rows, byte-identical on a
+rerun — which Metabase reads through its built-in SQLite driver (no DuckDB
+community JAR). `study/metabase/apply.py` provisions the dashboard from
+`config.yaml` over the HTTP API idempotently (stdlib `urllib`, an injected client
+seam, upsert by name, credentials from `.env` refused by name, `_base_url_ok` and
+`_NoCrossHostRedirect` keeping the session token on the vetted host, `--dry-run`
+the offline half). The only text a drilled theme shows is B2.1's five Documented,
+sourced paraphrases (`study/paraphrases.yaml`) — B2.1 moved Pending → Documented.
+
+Recorded §90 deviation: literal review *excerpts* are unattainable under D1 and
+Neutrality, so the audit trail is counted rows + a sourced theme paraphrase, not
+per-review excerpts (DECISIONS → Phase 9g; PROJECT_BRIEF §90 annotated). Closed:
+the tooltip-only trail and the live-sliders debt (Metabase shows visible counts
+and its own exploration); the per-review-public-address row stays open,
+re-deferred. BACKLOG 52 was NOT folded in (its own `fix/` PR). No new Python
+dependency (Docker/Metabase pre-approved); the committed HTML page is
+byte-unchanged.
+
+The offline core is what CI and the DONE command run — `make rebuild
+ROWS=synthetic && uv run pytest tests/test_metabase_apply.py
+tests/test_review_drill.py -q && uv run python -m study.metabase apply --dry-run`,
+all green; `make review-gate SPEC=…` 8/8. The live `docker compose up` + apply +
+synthetic-only screenshots are the developer's step; the build's first-hour spike
+confirms the built-in SQLite driver reads the mounted file and the exact dashcard
+body against `/api/docs`.
+
+Challenge round 1 returned rework (2 BLOCKER — scope, the §90 framing — 4
+should-fix; all applied) and round 2 approve-with-amendments (1 BLOCKER — the
+corpus gate is render-time, absent from the marts Metabase reads — 3 should-fix, 1
+question; all applied), spec `062cf09f`. Review round 1: 0 BLOCKER, functionality
+works; 16 findings fixed across six commits (the `unshaped-input` and
+`traceback-at-boundary` classes, the least-privilege docker mount, `export --rows`,
+tests, wording/records). Round 2: 0 correctness, the cap rule did not fire; 5
+notes/record/wording fixed (cross-host redirect refused, the make-rebuild prose,
+the image-tag Gotcha, Record-updates reconciled). Exit coherence audit: coherent,
+no BLOCKER — the §90-brief annotation and the Phase-10 warehouse-aware BACKLOG row
+(now naming `review_drill`) applied at exit.

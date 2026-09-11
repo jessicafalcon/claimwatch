@@ -744,9 +744,10 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 ## Current status
 
-**In progress: Phase 9g — the Metabase demonstration (the review-level drill)**
-(branch `phase-9g-metabase`, spec `specs/phase-9g-metabase.md`, challenged round 1
-rework then round 2 approve-with-amendments, spec `062cf09f`, all applied). The
+**Delivered on branch (PR pending): Phase 9g — the Metabase demonstration (the
+review-level drill)** (branch `phase-9g-metabase`, spec `specs/phase-9g-metabase.md`
+DELIVERED, challenged round 1 rework then round 2 approve-with-amendments, spec
+`9cba5dd4`, all applied; review rounds 1–2 + the exit coherence audit clean). The
 last Phase 9 sub-phase, non-CI: an offline core CI runs (the applier's `--dry-run`
 request bodies, the drill view's and SQLite export's column allowlist) plus a
 developer-run live Metabase run with synthetic-only screenshots. A theme bar drills
