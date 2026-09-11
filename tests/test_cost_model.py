@@ -71,6 +71,12 @@ def test_make_model_prints_each_expression_beside_its_value():
     width = max(len(f.name) for f in POINT_FORMULAS)
     for f in POINT_FORMULAS:
         assert f"  {f.name.ljust(width)} = {f.expression}" in out
+    # The parameter table too: the longest name sets the column (round 2,
+    # coherence-auditor #2), so the default column starts at one offset.
+    params = parameters(FIT)
+    p_width = max(len(p.name) for p in params)
+    for p in params:
+        assert f"  {p.name.ljust(p_width)} {p.default:>16} " in out
 
 
 def test_make_model_prints_the_unit_beside_each_value():
@@ -176,6 +182,15 @@ def test_timer_formulas_recomputed_by_hand():
         assert (
             out["timer_amount_eur"] == pins.COST_OUTPUTS[scenario]["timer_amount_eur"]
         )
+
+
+def test_the_reader_one_cent_floor_is_the_model_euro_rounding_scale():
+    """opendata.fit refuses a mean under one cent because models.cost_model
+    rounds euros to two places: the two constants are one fact, bound here
+    since fit.py cannot import the model (round 2, code-reviewer #2)."""
+    from opendata.fit import _MIN_EUR_MEAN
+
+    assert _MIN_EUR_MEAN == 10 ** -_ROUNDING["eur"]
 
 
 def test_fit_parameters_are_the_four_read_rows_two_of_them_fixed_marks():

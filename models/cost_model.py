@@ -554,10 +554,11 @@ def format_model(fit: Fit) -> str:
     lines.append(
         "parameters (every unsourced default is a guess to explore, never a fact):"
     )
+    name_width = max(len(p.name) for p in params)  # one column, however long
     for p in params:
         cite = p.citation if p.sourcing == "sourced" else "declared unsourced"
         lines.append(
-            f"  {p.name:16} {p.default:>16} {p.unit:24} "
+            f"  {p.name:{name_width}} {p.default:>16} {p.unit:24} "
             f"[{p.low} .. {p.high}]  {p.sourcing}: {cite}"
         )
     for scenario in SCENARIOS:
