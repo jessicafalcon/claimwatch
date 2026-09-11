@@ -1,0 +1,59 @@
+# study/paraphrases.yaml — B2.1: the five-theme taxonomy with one Documented,
+# paraphrased public example per theme, shown beside the review-level drill in the
+# Metabase demonstration (9g). It is the ONLY text a drilled theme shows; a review
+# body is never rendered (9g central constraint).
+#
+# The rules, all from PROJECT_BRIEF.md §2.5:
+#  - Paraphrase, never a quote — each line restates what reviewers describe, in
+#    our words, not theirs.
+#  - No insurer is named — a sector phenomenon, never an exposé (§2.5, Neutrality
+#    contract); check-docs scans this file against the hashed tokens.
+#  - Always the public source — the platform the examples were read on and the
+#    brief section that documents them; no per-review URL exists (DECISIONS D1),
+#    so the source is the platform, not a page.
+#  - Two layers — the first sentence reads for anyone; the theme's mechanism
+#    follows.
+#
+# Keyed by the theme's closed label (classify/labels.py::THEMES). The two labels
+# with no theme — `positive` and `unclassified` — carry no paraphrase on purpose:
+# a drill row on either shows its counted columns and no text.
+
+document-loop:
+  title: The document loop
+  paraphrase: >
+    Reviewers describe a refund put on hold while one document after another is
+    asked for — each one sent, then a harder-to-obtain one requested — until they
+    run out of energy and give up. One documented case: an emergency-room refund
+    left unpaid for months despite repeated follow-ups.
+  source: "public reviews, 2025–2026 (PROJECT_BRIEF.md §5.1); Opinion Assurances; Trustpilot"
+
+silent-rejection:
+  title: Silent rejections
+  paraphrase: >
+    Reviewers report learning a claim was refused only by checking the app — no
+    message arrived to say so — while a satisfaction survey does arrive once the
+    complaint is closed.
+  source: "public reviews, 2025–2026 (PROJECT_BRIEF.md §5.2); Opinion Assurances; Trustpilot"
+
+second-payer:
+  title: Second-payer failures
+  paraphrase: >
+    Reviewers using the insurer as secondary coverage describe first-pass
+    rejections: the automated reader cannot parse another payer's statement, or
+    stalls when there is no public-insurance counterpart to match.
+  source: "public reviews, 2025–2026 (PROJECT_BRIEF.md §5.3); Trustpilot"
+
+support-traction:
+  title: Support without traction
+  paraphrase: >
+    Reviewers describe chat answers that miss the point and a phone line that only
+    calls back, with support unable to release a claim the system is holding.
+  source: "public reviews, 2025–2026 (PROJECT_BRIEF.md §5.4); App Store; Opinion Assurances"
+
+coverage-price:
+  title: Coverage & price frustration
+  paraphrase: >
+    Reviewers describe trimmed benefits, being steered toward the insurer's own
+    shop, and rising premiums — the ordinary insurance friction the study keeps
+    separate so it does not blur the systems-failure signal.
+  source: "public reviews, 2025–2026 (PROJECT_BRIEF.md §5.5); Trustpilot"

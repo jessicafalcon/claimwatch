@@ -284,6 +284,29 @@ RULES_HELDOUT = {
 CLASSIFIED_REVIEWS_ROWS = STG_REVIEWS_ROWS  # 39
 CLASSIFIED_REVIEWS_COLUMNS = ("source", "external_id", "theme", "run_id")
 
+# review_drill (B2.1, 9g): one row per classified review x theme, the non-text
+# allowlist behind each theme bar. NEVER body/title/source_url — the join reaches
+# stg_reviews which carries them, so this exact column set is the guard. review_id
+# is the computed source||':'||external_id (classify/labels.py::review_id).
+REVIEW_DRILL_COLUMNS = (
+    "review_id",
+    "theme",
+    "rating",
+    "review_date",
+    "segment",
+    "source",
+)
+
+# The Metabase applier's dry-run request bodies (9g): 7 requests — the SQLite
+# database, the collection, three native-SQL questions, the dashboard, and the
+# dashboard's cards. Pinned as a hash of the deterministic JSON so a config.yaml
+# change is a deliberate re-pin, not a silent drift; the readable structure is
+# asserted alongside in test_metabase_apply.
+METABASE_DRY_RUN_REQUESTS = 7
+METABASE_DRY_RUN_SHA256 = (
+    "2b489593d7c9e0be6eb647c6baff3bbb86b6e86c09e9af84ef3e0caadf6de05a"
+)
+
 # The theme-share marts count those rows. share = theme_rows / reviews, at the
 # review x theme grain (a review counts once in `reviews`, once per theme bar).
 # unclassified is a row, not a gap — the gray "not yet classified" band, and with

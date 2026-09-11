@@ -173,4 +173,7 @@ def test_no_new_mart():
         # the per-stage row counts (B5.2).
         "determinism_facts.sql",
         "pipeline_row_counts.sql",
+        # the review-level drill lands in 9g (SQL over stg_classified_reviews,
+        # the non-text allowlist behind each theme bar — B2.1).
+        "review_drill.sql",
     }

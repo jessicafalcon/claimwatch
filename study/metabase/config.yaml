@@ -1,0 +1,54 @@
+# study/metabase/config.yaml — the Metabase demonstration as data (9g). The
+# applier (apply.py) turns this into HTTP-API request bodies and upserts each
+# object by name, so a second apply changes nothing (idempotent). Editing this
+# file, not the API by hand, is how the dashboard changes — "keep configs"
+# (PROJECT_BRIEF.md §4.4).
+#
+# The database is the gitignored SQLite file study/metabase/export.py writes,
+# mounted into the container at `file` below; Metabase reads it with its built-in
+# SQLite driver (no third-party driver JAR — DECISIONS → Phase 9g). Questions are
+# native SQL over the exported tables, reproducible from this file with no
+# field-id sync. The review-level drill is the "Review-level drill" question,
+# filterable by theme; the "Theme paraphrases" question is B2.1's text.
+
+database:
+  name: The Friction Ledger (SQLite)
+  engine: sqlite
+  # the path inside the container (docker-compose mounts data/metabase there, :ro)
+  file: /metabase-data/metabase.sqlite
+
+collection:
+  name: The Friction Ledger — Beat 2
+
+questions:
+  # theme_rows, not "reviews": the grain is one row per review x theme, so a
+  # review carrying two themes counts in two bars (B2.2's vocabulary).
+  - name: Complaints by theme (theme rows)
+    display: bar
+    sql: >
+      select theme, count(*) as theme_rows
+      from review_drill
+      group by theme
+      order by theme_rows desc, theme
+
+  - name: Review-level drill (the rows behind each theme)
+    display: table
+    sql: >
+      select review_id, theme, rating, review_date, segment, source
+      from review_drill
+      order by review_id, theme
+
+  - name: Theme paraphrases (B2.1)
+    display: table
+    sql: >
+      select theme_title, paraphrase, source
+      from paraphrases
+      order by theme
+
+dashboard:
+  name: The Friction Ledger — Beat 2 drill
+  # the reader picks a theme; the drill and the paraphrase both filter to it
+  cards:
+    - Complaints by theme (theme rows)
+    - Review-level drill (the rows behind each theme)
+    - Theme paraphrases (B2.1)
