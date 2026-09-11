@@ -2,6 +2,7 @@
 # `.env*` also catches .envrc (direnv) and .env-prod; a template would be `.env.example`
 # and needs a `!` line here first.
 .env*
+!.env.example
 *.pem
 credentials*
 
