@@ -2807,7 +2807,16 @@ built-in driver, so no third-party JAR is mounted. Confirmed 2026-09-11 on
 `data/metabase/metabase.sqlite`, and `PUT /api/dashboard/:id` with a `dashcards`
 array attaches the cards — the applier's request bodies matched the running
 version, no `apply.py` change needed; the demonstration screenshots (synthetic)
-are committed under `study/metabase/screenshots/`. The image is pinned by the
+are committed under `study/metabase/screenshots/`. These PNGs are the repo's
+first tracked binary assets: the one full-tree neutrality scanner
+(`tests/test_ingest_layout.py::test_brand_carrying_strings_appear_only_in_the_declarations`)
+now skips a declared binary-extension set (`tests/repo_text.py::BINARY_ASSET_SUFFIXES`,
+`{.png}`) — a screenshot's neutrality is reviewed by eye, not by decode, and any
+other non-UTF-8 tracked file still fails by name (the traceback-at-boundary guard
+is unchanged). Landed on `fix/9g-demonstration` (the screenshots were unpushed
+when PR #30 merged, so its CI never saw them). *Rejected: keeping the repo
+binary-free by not committing the screenshots — done-when 5 wants them committed
+as the demonstration's evidence.* The image is pinned by the
 mutable tag `v0.63.16`, not a content digest (review round 2, security note): the
 repo's SHA-pin bar is for GitHub Actions, and this stack is developer-run, never
 in CI, so the tag stands with the compose header's "confirm the tag in the spike"

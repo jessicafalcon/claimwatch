@@ -26,7 +26,7 @@ from ingest.sources import (
     by_name,
     source_names,
 )
-from tests.repo_text import repo_text
+from tests.repo_text import is_binary_asset, repo_text
 
 ROOT = Path(__file__).resolve().parent.parent
 EXCLUDED_TOP = ("tests",)  # plus every dot-directory (.venv, .git, .claude)
@@ -268,9 +268,11 @@ def test_brand_carrying_strings_appear_only_in_the_declarations():
     """D1, enforced over the tree: every string that spells the studied
     insurer (`ingest/sources.py::BRAND_TOKENS`) appears in no other tracked
     file — not a doc, a comment, a test name, a fixture or a record — as a
-    whole word, in any case. Every tracked file is UTF-8 text (the repo holds
-    no binary), so a file that does not decode fails by name rather than
-    being skipped (round 1 skipped it; tooling round 3 closed the class)."""
+    whole word, in any case. Tracked files are UTF-8 text but for the declared
+    binary assets (`repo_text.BINARY_ASSET_SUFFIXES` — the 9g demonstration
+    screenshots, whose neutrality is reviewed by eye), which are skipped; any
+    other file that does not decode fails by name rather than being skipped
+    (round 1 skipped it; tooling round 3 closed the class)."""
     import subprocess
 
     from ingest.sources import BRAND_TOKENS
@@ -283,7 +285,7 @@ def test_brand_carrying_strings_appear_only_in_the_declarations():
         if rel == "ingest/sources.py":
             continue
         path = ROOT / rel
-        if not path.is_file():
+        if not path.is_file() or is_binary_asset(path):
             continue
         for n, line in enumerate(repo_text(path).splitlines(), 1):
             for token in BRAND_TOKENS:

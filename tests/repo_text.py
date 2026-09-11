@@ -14,6 +14,17 @@ import pytest
 
 from pipeline.warehouse import ROOT
 
+# Tracked binary assets a full-tree text scanner skips — read by eye in review,
+# never decoded (the Metabase demonstration screenshots, Phase 9g). A closed set:
+# a tracked file with any OTHER suffix is expected to be UTF-8 text and still
+# fails by name if it is not (the traceback-at-boundary guard is preserved).
+BINARY_ASSET_SUFFIXES = frozenset({".png"})
+
+
+def is_binary_asset(path: Path) -> bool:
+    """True for a declared tracked binary asset a text scanner should skip."""
+    return path.suffix.lower() in BINARY_ASSET_SUFFIXES
+
 
 def repo_text(path: Path) -> str:
     """The file's text; a file that is not UTF-8 text fails the test naming it."""
