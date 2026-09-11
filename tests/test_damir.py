@@ -17,6 +17,7 @@ import pipeline.cli as cli
 from opendata.fit import (
     FIT_FIELD_NAMES,
     fit_lognormal,
+    format_fit,
     goodness_of_fit,
     read_fit,
     write_fit,
@@ -268,6 +269,21 @@ def test_artifact_carries_mu_sigma_n_deciles_and_the_mean(tmp_path):
     for name in ("mu,", "sigma,", "n,", "emp_p50,", "fit_p50,"):
         assert name in text
     assert text.endswith("emp_mean,100.500000\n")  # the last row, six places
+
+
+def test_format_fit_prints_the_mean_cell_beside_the_parameters():
+    """The `make fit-damir` summary prints the sample mean at the parameters'
+    six places, labelled as no fit, beside mu and sigma — what the artifact
+    carries is what the screen says."""
+    amounts = [float(x) for x in range(1, 201)]
+    fit = fit_lognormal(amounts)
+    out = format_fit(fit, goodness_of_fit(amounts, fit))
+    lines = out.splitlines()
+    assert lines[0] == "lognormal fit over 200 DAMIR reimbursed amounts (PRS_REM_MNT):"
+    assert lines[1].startswith(f"  mu    = {fit.mu:.6f}")
+    assert lines[2].startswith(f"  sigma = {fit.sigma:.6f}")
+    assert lines[3].startswith("  mean  = 100.500000   (arithmetic mean")
+    assert "no fit" in lines[3]
 
 
 def test_fit_field_names_is_the_write_order(tmp_path):

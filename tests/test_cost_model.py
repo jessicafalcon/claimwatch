@@ -26,6 +26,7 @@ from models.cost_model import (
     curves,
     defaults,
     evaluate,
+    fit_parameters,
     format_model,
     parameters,
 )
@@ -170,6 +171,21 @@ def test_timer_formulas_recomputed_by_hand():
         assert (
             out["timer_amount_eur"] == pins.COST_OUTPUTS[scenario]["timer_amount_eur"]
         )
+
+
+def test_fit_parameters_are_the_four_read_rows_two_of_them_fixed_marks():
+    """The fit supplies four sourced rows in order — mu, sigma, emp_p50,
+    emp_mean — each cited to the artifact; the two cells read off the sample
+    are fixed marks (low == default == high), the two log-moments are not."""
+    rows = fit_parameters(FIT)
+    assert tuple(p.name for p in rows) == ("mu", "sigma", "emp_p50", "emp_mean")
+    for p in rows:
+        assert p.sourcing == "sourced" and "claim_cost_fit.csv" in p.citation
+    fixed = {p.name for p in rows if p.low == p.default == p.high}
+    assert fixed == {"emp_p50", "emp_mean"}
+    emp_mean = rows[-1]
+    assert emp_mean.default == round(pins.DAMIR_EMP_MEAN, 2) and emp_mean.unit == "€"
+    assert [p.name for p in parameters(FIT)][4:8] == [p.name for p in rows]
 
 
 def test_claims_at_mean_cell_is_the_division_by_hand():
