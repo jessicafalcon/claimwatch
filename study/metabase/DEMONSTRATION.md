@@ -33,7 +33,7 @@ From the repository root:
 
 ```
 make rebuild ROWS=captured                        # your own corpus
-uv run python -m study.metabase export            # writes data/metabase.sqlite (ROWS=captured)
+uv run python -m study.metabase export            # writes data/metabase/metabase.sqlite
 cd study/metabase && docker compose up -d
 cd ../.. && uv run python -m study.metabase apply  # provisions from config.yaml; reads .env
 open http://localhost:3000
@@ -52,7 +52,7 @@ call or credentials.
 
 ### Under the signpost — how the pieces fit
 
-`export.py` copies the marts into a SQLite file (`data/metabase.sqlite`) that
+`export.py` copies the marts into a SQLite file (`data/metabase/metabase.sqlite`) that
 Metabase reads with its **built-in** SQLite driver — no third-party driver JAR,
 so the stack stays a laptop with no extra downloads. `config.yaml` describes the
 database connection, the three questions (native SQL over the exported tables)

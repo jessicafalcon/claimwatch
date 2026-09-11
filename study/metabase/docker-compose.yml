@@ -9,7 +9,7 @@
 #
 # Run (from the repo root):
 #   make rebuild ROWS=captured            # your own corpus, or ROWS=synthetic
-#   uv run python -m study.metabase export   # writes data/metabase.sqlite
+#   uv run python -m study.metabase export   # writes data/metabase/metabase.sqlite
 #   cd study/metabase && docker compose up -d
 #   cd ../.. && uv run python -m study.metabase apply   # reads .env
 #   open http://localhost:3000            # drill a theme bar
@@ -22,6 +22,11 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      # the repo's data/ directory (where the SQLite export lands) mounted where
-      # config.yaml points: database.file = /metabase-data/metabase.sqlite
-      - ../../data:/metabase-data
+      # ONLY the dedicated export subdir (study/metabase/export.py writes
+      # data/metabase/metabase.sqlite there), read-only — so the raw corpus under
+      # data/cache/ and the *.duckdb files (real review bodies) are never handed
+      # to this third-party container (security review, round 1). config.yaml
+      # points at database.file = /metabase-data/metabase.sqlite.
+      # (If the SQLite driver needs a lock file, drop `:ro` — the dedicated subdir
+      # already keeps the corpus out of the container.)
+      - ../../data/metabase:/metabase-data:ro

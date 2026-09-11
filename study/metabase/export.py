@@ -37,7 +37,10 @@ EXPORTED_MARTS: tuple[tuple[str, str], ...] = (
 # refused by name, so a future mart that added one cannot leak through the export.
 FORBIDDEN_COLUMNS = frozenset({"body", "title", "source_url"})
 
-DEFAULT_SQLITE = warehouse.ROOT / "data" / "metabase.sqlite"
+# A dedicated subdir, not data/ itself: the Metabase container mounts only this
+# directory, so the raw corpus (data/cache/, *.duckdb — real review bodies) is
+# never exposed to a third-party container (security review, round 1).
+DEFAULT_SQLITE = warehouse.ROOT / "data" / "metabase" / "metabase.sqlite"
 PARAPHRASES_YAML = Path(__file__).resolve().parent.parent / "paraphrases.yaml"
 
 
