@@ -191,7 +191,7 @@ def test_the_reader_one_cent_floor_is_the_model_euro_rounding_scale():
     from opendata.fit import _MIN_EUR_MEAN
 
     one_euro_unit = 10 ** -_ROUNDING["eur"]  # 0.01: what euro rounding keeps
-    assert _MIN_EUR_MEAN == one_euro_unit
+    assert one_euro_unit == _MIN_EUR_MEAN  # the constant on the right: SIM300
 
 
 def test_fit_parameters_are_the_four_read_rows_two_of_them_fixed_marks():
