@@ -1,0 +1,27 @@
+# study/metabase/docker-compose.yml — the laptop Metabase for the demonstration
+# (Phase 9g). Developer-run, never CI (CI is offline, no Docker).
+#
+# Metabase reads the gitignored SQLite export (study/metabase/export.py) through
+# its built-in SQLite driver — no third-party DuckDB driver JAR (DECISIONS →
+# Phase 9g). Its own application database is the default in-container H2, which is
+# fine for a demonstration: the dashboard is re-applied from config.yaml, not
+# hand-built, so nothing is lost if the container is recreated.
+#
+# Run (from the repo root):
+#   make rebuild ROWS=captured            # your own corpus, or ROWS=synthetic
+#   uv run python -m study.metabase export   # writes data/metabase.sqlite
+#   cd study/metabase && docker compose up -d
+#   cd ../.. && uv run python -m study.metabase apply   # reads .env
+#   open http://localhost:3000            # drill a theme bar
+#
+# The image tag is confirmed against the running version in the build's first
+# hour (spec stack risk); SQLite is an official, built-in Metabase driver.
+services:
+  metabase:
+    image: metabase/metabase:v0.63.16
+    ports:
+      - "3000:3000"
+    volumes:
+      # the repo's data/ directory (where the SQLite export lands) mounted where
+      # config.yaml points: database.file = /metabase-data/metabase.sqlite
+      - ../../data:/metabase-data

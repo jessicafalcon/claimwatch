@@ -9,6 +9,7 @@ body ever appears."""
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from decimal import Decimal
 from pathlib import Path
@@ -240,3 +241,24 @@ def test_sqlite_export_rating_is_exact_and_row_order_is_stable(tmp_path):
         conn.close()
     assert got == ("4.3", "text")
     assert Path(a).read_bytes() == Path(b).read_bytes()  # byte-identical rerun
+
+
+_METABASE = Path(__file__).resolve().parent.parent / "study" / "metabase"
+_LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+
+
+def test_demonstration_doc_and_synthetic_screenshots_exist_and_links_resolve():
+    """Done-when 5: the walkthrough is committed, captions the view as synthetic
+    fixture data (so no fake share reads as a finding), the screenshots directory
+    exists, and every relative link resolves. The PNGs themselves are the
+    developer's spike step (non-CI); this checks the committed structure."""
+    doc = _METABASE / "DEMONSTRATION.md"
+    assert doc.is_file()
+    text = doc.read_text(encoding="utf-8")
+    assert "synthetic fixture data — not a study finding" in text
+    assert (_METABASE / "screenshots").is_dir()
+    for target in _LINK.findall(text):
+        if target.startswith(("http://", "https://")):
+            continue
+        path = target.split("#", 1)[0]
+        assert (doc.parent / path).exists(), target
