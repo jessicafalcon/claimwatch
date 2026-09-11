@@ -10,12 +10,21 @@ import hashlib
 import pytest
 
 from study.metabase.apply import (
+    Client,
     Credentials,
     MetabaseError,
+    UrllibClient,
     apply,
+    as_list,
+    card_body,
+    collection_body,
+    dashboard_body,
+    dashcards_body,
+    database_body,
     dry_run_requests,
     dry_run_text,
     load_config,
+    upsert,
 )
 from tests import pins
 
@@ -126,3 +135,52 @@ def test_credentials_from_a_full_environment_strips_trailing_slash():
     )
     assert creds.url == "http://localhost:3000"
     assert creds.username == "admin@example.com"
+
+
+def test_upsert_creates_when_absent_then_updates_when_present():
+    """upsert is the idempotency mechanism: create when no object of the kind has
+    the name, update the one that does — never a second create."""
+    client = FakeClient()
+    first_id = upsert(client, "card", "Q", {"name": "Q"})
+    assert len(client.creates) == 1
+    second_id = upsert(client, "card", "Q", {"name": "Q", "display": "table"})
+    assert second_id == first_id  # found by name, not created again
+    assert len(client.creates) == 1
+    assert client.updates[-1][0] == "card"
+
+
+def test_request_bodies_have_the_documented_shapes():
+    """The pure body-builders emit the shapes the Metabase API documents."""
+    db = database_body(_CONFIG)
+    assert db["engine"] == "sqlite"
+    assert db["details"]["db"].endswith(".sqlite")
+    assert collection_body(_CONFIG)["name"] == _CONFIG["collection"]["name"]
+    drill_question = _CONFIG["questions"][1]
+    card = card_body(drill_question, 7, 3)
+    assert card["dataset_query"]["type"] == "native"
+    assert card["dataset_query"]["database"] == 7
+    assert card["collection_id"] == 3
+    assert "review_drill" in card["dataset_query"]["native"]["query"]
+    assert dashboard_body(_CONFIG, 3)["collection_id"] == 3
+    named = dict.fromkeys(_CONFIG["dashboard"]["cards"], 1)
+    dashcards = dashcards_body(_CONFIG, named)["dashcards"]
+    assert len(dashcards) == len(_CONFIG["dashboard"]["cards"])
+    assert all(dc["size_x"] > 0 for dc in dashcards)
+
+
+def test_as_list_accepts_a_list_or_data_wrapper_and_refuses_other_shapes():
+    """A list endpoint returns a bare list on some versions, {'data': [...]} on
+    others; anything else is unshaped input and is refused."""
+    assert as_list([{"id": 1}]) == [{"id": 1}]
+    assert as_list({"data": [{"id": 2}]}) == [{"id": 2}]
+    with pytest.raises(MetabaseError):
+        as_list({"unexpected": True})
+
+
+def test_client_seam_is_defined_by_both_the_live_and_fake_clients():
+    """The Client protocol names list/create/update; UrllibClient (the live one)
+    and FakeClient (the test one) both provide them, so they are interchangeable."""
+    for method in ("list", "create", "update"):
+        assert hasattr(Client, method)
+        assert callable(getattr(UrllibClient, method))
+        assert callable(getattr(FakeClient, method))
