@@ -209,6 +209,17 @@ def test_b3_3_prints_the_mean_cell_count_beside_the_claim_count(synthetic_db):
         assert text.FIXED_RANGE in _row(sec, key)
 
 
+def test_the_mean_cell_note_carries_no_figure_the_marts_do_not_hold():
+    """The note says only what its two cells show: no typed number, no
+    percentage, no decile, no tail clause (pinned decision 3; round 2,
+    functionality-tester's surviving mutation)."""
+    note = text.MEAN_CELL_NOTE
+    assert not any(ch.isdigit() for ch in note)
+    for banned in ("%", "decile", "tail", "weight", "largest"):
+        assert banned not in note
+    assert "the lower of the two" in note
+
+
 def test_b3_3_and_b3_4_render_every_parameter_with_default_unit_and_range(
     synthetic_db,
 ):
