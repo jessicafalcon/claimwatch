@@ -1,4 +1,4 @@
-# Phase 9h — the claims sample-mean contrast (PROPOSED)
+# Phase 9h — the claims sample-mean contrast
 
 Contract for the `phase-9h-sample-mean` branch. Source: post-plan extension —
 BACKLOG row *The claim-cost mean is the lognormal mean, not the fixture's
@@ -171,11 +171,12 @@ make review-gate SPEC=specs/phase-9h-sample-mean.md && make rebuild ROWS=none &&
   `mean_claim` stays the lognormal mean and `claims` stays the count every
   downstream formula uses, so Beat 4 and the simulator are untouched
   (satisfies 4). The note (in `study/text.py`, data) says only what its two
-  cells show: the mean reimbursement cell sits above the fitted mean, so the
-  lognormal puts less weight on the largest cells than the sample carries, and
-  the count at the mean cell is the lower of the two; no maximum cell, no
-  percentage, no decile (the goodness-of-fit table is not rendered, and at
-  p70–p90 the fit is the heavier side — round 1, #8). *Rejected: switching
+  cells show: the mean reimbursement cell is the larger figure, so the count
+  computed from it is the lower of the two; no maximum cell, no percentage,
+  no decile, no tail clause (the goodness-of-fit table is not rendered, and
+  at p70–p90 the fit is the heavier side — challenge round 1, #8; the tail
+  clause the challenge's own wording carried was struck at review round 1,
+  study-editor #8). *Rejected: switching
   `claims` to the mean cell — a different page, not a contrast, and a Beat 4
   re-pin.*
 - **The page reads the new row from the marts like every other.** B3.1's
@@ -301,3 +302,20 @@ third read-figure row (#10); the headline is a fourth row through
 `HEADLINE_FORMULAS`, no new shape (#11). The invariant the round put in front
 of the build: for every number Beat 3 renders, it equals a mart cell and
 carries that row's tag (invariant 6).
+
+**Review round 1 (2026-09-11; code-reviewer 5, functionality-tester works + 1,
+security-reviewer 3 notes, study-editor 3; disposition: fix all).** One
+correctness fix, a fix amendment: **invariant 7 restored** — "never a
+traceback downstream". `read_fit` accepted any `emp_mean` above zero, but the
+model divides by that value rounded to cents (`rounded("eur", …)`, the one
+rounding site), so a sub-cent positive value passed the reader and reached
+`evaluate` as a `ZeroDivisionError` (security-reviewer #1). The reader's
+domain is now the data's: a mean of euro amounts is at least one cent, the
+smallest amount the slice can carry and the smallest the model's rounding
+keeps, so `emp_mean < 0.01` refuses by name. The Invariants table is unchanged
+(its "≤ 0" is a subset of the new refusal; the stamp stays `4d4aa226`). The
+other fixes are wording, records and tests: the note's tail clause struck
+(pinned decision 3 above), the reader's refusals cap the echoed token, a test
+that a reordered artifact reads to the same fit, the stale "three fit rows" /
+"fourteen rows" comments, the README and SPEC glosses of "cell", the title's
+"(PROPOSED)".
