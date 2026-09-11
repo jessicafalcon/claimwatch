@@ -331,7 +331,8 @@ place and never deleted.
 - **The CLAUDE.md cap is 600 lines; the trim rides the next phase's branch
   (2026-09-11).** The BACKLOG row was re-deferred at the 3c, 5a,
   5b and 9g exits and the 6–9f exits did not report the 600 trigger at all;
-  at 805 lines the trim cut the file to 592
+  at 805 lines the trim cut the file to 592 (597 after Phase 9h's status
+  paragraph)
   without touching a rule: the Repo map lost its per-mart and per-module
   history (each module's docstring and each spec's Delivered paragraph hold
   it), Commands lost the per-target lines `make help` prints and the
@@ -2904,7 +2905,8 @@ CLAUDE.md trim and its docs-only round (Process, above).
   writer emits, the reader requires and `tests/test_snapshots.py` reads — the
   hand-typed copy the snapshot test carried was the drift the 9h challenge
   found (#2). `read_fit` refuses a missing, non-numeric, non-finite or
-  non-positive `emp_mean` by name: it is a divisor downstream. *Rejected: the
+  under-one-cent `emp_mean` by name: it is a divisor downstream, rounded to
+  cents first (review round 1, `711864e`). *Rejected: the
   row after `n` (challenge #1) — it breaks the byte-prefix property for a
   grouping no reader sees; two decimals like the deciles (challenge #5) — a
   divisor at two places puts the hand-recomputed count one calculator digit
@@ -2954,6 +2956,21 @@ CLAUDE.md trim and its docs-only round (Process, above).
 - **`make model`'s name column is the longest point-formula name, computed
   once.** The literal 16 misaligned the new nineteen-character row; the width
   is `max(len(f.name))` over `POINT_FORMULAS`, so the next entry cannot
-  misalign either (fix the class). *Rejected: a shorter name (`claims_cell`)
-  to fit the literal — the name is the one the display map and the page
-  carry.*
+  misalign either (fix the class); the parameter table's literal 16 went the
+  same way at review round 2 (`71b0a33`). *Rejected: a shorter name
+  (`claims_cell`) to fit the literal — the name is the one the display map and
+  the page carry.*
+- **Review round 2 (the exit round): the fit reader's foreign shapes are the
+  repo's shared ones, and its refusals are bounded on what they print.** A
+  value cell is accepted only in `opendata.slice.DECIMAL_SHAPE` (now public:
+  plain digits, one separator, an optional minus — the amount reader's shape,
+  so `1e5`, `1_000`, `nan`, `inf`, `+3` refuse by name) and `n` only in
+  `ingest.parsed.count_in_range` (the one count shape every parser uses); a
+  shown token is cut on its printed repr, and a list of stray names shows
+  three and counts the rest (`242d3d3`). *Rejected: a second regex in
+  `opendata/fit.py` — the `unshaped-input` class's promotion says one shape
+  per kind, shared; widening `count_in_range` — ten ASCII digits already hold
+  any sample size.* The one-cent floor is bound to the model's euro rounding
+  scale by a test (`71b0a33`); the B3.3 note is pinned to carry no figure the
+  marts do not hold (`88d1f89`). The round found no correctness finding in
+  round 1's fixes, so the review cap did not fire.

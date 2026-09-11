@@ -580,10 +580,10 @@ demonstration (PR #30, 2026-09-11), and its evidence on `fix/9g-demonstration`
 (PR #31, 2026-09-11: the captioned synthetic screenshots, `.env.example`, the
 guards' shared binary-asset reader). Phase 9 is complete.
 
-**In progress:** Phase 9h on `phase-9h-sample-mean` (spec challenged round
-1, all eleven findings applied; built 2026-09-11, review rounds next): the
-claim count at the sample's mean reimbursement cell beside the fitted count,
-B3.3; the branch also carries the CLAUDE.md trim.
+**In review:** Phase 9h on `phase-9h-sample-mean` (spec challenged round 1;
+built, reviewed in two rounds and every finding fixed, 2026-09-11; PR next):
+the claim count at the sample's mean reimbursement cell beside the fitted
+count, B3.3; the branch also carries the CLAUDE.md trim.
 
 **Next:** the second pulled-out data phase (data.ameli practitioner fees —
 BACKLOG), then Phase 10 (the Airflow DAG; its

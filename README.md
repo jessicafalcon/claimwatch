@@ -85,11 +85,11 @@ on that with arithmetic printed in full, so anyone can redo it by hand.
   flagged; where they cross, the next flag destroys more than it recovers
   *(Modeled — B3.2)*.
 - The sourced inputs — revenue per member, the fraud pool, claim volume — each
-  shown with its source, and the claim volume worked out two ways: once from
-  the average claim size the fitted curve gives, and once from the plain
-  average of the public reimbursement figures themselves (each figure a
-  grouped total in the open data), so a reader who redoes the division from
-  the data lands on the number the page shows *(Modeled — B3.3)*.
+  shown with its source; the claim volume the study uses comes from the
+  average claim size the fitted curve gives, and beside it the page shows a
+  second, lower count a reader gets by dividing instead by the plain average
+  of the public reimbursement totals (each a grouped figure in the open data),
+  so that recompute is on the page to check *(Modeled — B3.3)*.
 - The parameters with no public source, drawn on a differently-styled range and
   labelled "explore the range" *(Modeled — B3.4)*.
 
