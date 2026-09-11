@@ -17,6 +17,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import review_gate
 from review_common import (
     Refused,
+    Unreadable,
+    png_text,
     read_text_or_error,
     readable,
     resolve_spec,
@@ -99,6 +101,20 @@ def test_read_boundary_reports_by_name_and_skips_in_a_loop(tmp_path: Path):
     errors: list[str] = []
     seen = [f.name for f, _ in readable([latin, good], tmp_path, errors)]
     assert (seen, errors) == (["good.md"], ["latin.md: not UTF-8 text"])
+
+
+def test_png_text_reads_the_chunks_and_refuses_by_name():
+    """The PNG reader as a pure function of the bytes: text chunks come back
+    keyed, one per line; bytes that are not a PNG raise `Unreadable` with the
+    one clause `read_text_or_error` appends to the path."""
+    body = b"Comment\0hello"
+    chunk = len(body).to_bytes(4, "big") + b"tEXt" + body + b"\0\0\0\0"
+    iend = b"\0\0\0\0IEND\xaeB`\x82"
+    assert png_text(b"\x89PNG\r\n\x1a\n" + chunk + iend) == "Comment: hello"
+    with pytest.raises(Unreadable, match=r"^not a PNG$"):
+        png_text(b"\x89PNG but not really")
+    with pytest.raises(Unreadable, match=r"^truncated PNG chunk$"):
+        png_text(b"\x89PNG\r\n\x1a\n" + chunk[:-6])  # cut inside the body
 
 
 def test_the_shared_reader_reads_a_declared_asset_and_reports_a_fake_one(
