@@ -217,6 +217,30 @@ def test_check_neutrality_reports_a_token_never_a_url_and_never_the_name(
     assert missing == ["scripts/neutrality_hashes.txt: hash file is missing"]
 
 
+def test_check_neutrality_reads_a_declared_binary_asset_s_text_channels(
+    tmp_path: Path,
+):
+    """A listed token in a screenshot's text chunk is a hit like one in a
+    doc (the same reader as the suite's scanners); a text file mis-named
+    into the screenshots directory is an error by name, never skipped."""
+    digest = hashlib.sha256(b"zzbrand").hexdigest()
+    shots = tmp_path / "study" / "metabase" / "screenshots"
+    shots.mkdir(parents=True)
+    body = b"Comment\0ZZBrand held it"
+    chunk = len(body).to_bytes(4, "big") + b"tEXt" + body + b"\0\0\0\0"
+    (shots / "shot.png").write_bytes(b"\x89PNG\r\n\x1a\n" + chunk)
+    (shots / "fake.png").write_bytes(b"ZZBrand in plain text\n")
+    out = check_docs.check_neutrality(
+        [shots / "shot.png", shots / "fake.png"], {digest}, tmp_path
+    )
+    assert out == [
+        f"study/metabase/screenshots/shot.png:1: names the study's target "
+        f"(sha256 {digest[:8]}…)",
+        "study/metabase/screenshots/fake.png: not a PNG",
+    ]
+    assert "zzbrand" not in "\n".join(out).lower()
+
+
 def test_neutrality_files_are_the_tracked_code_and_prose_minus_the_declarations():
     paths = [
         "README.md",
@@ -229,6 +253,7 @@ def test_neutrality_files_are_the_tracked_code_and_prose_minus_the_declarations(
         "data/snapshots/m.csv",
         "scripts/neutrality_hashes.txt",
         "study/index.png",
+        "study/metabase/screenshots/01-dashboard.png",
     ]
     kept = check_docs.neutrality_files(ROOT, paths)
     assert [p.relative_to(ROOT).as_posix() for p in kept] == [
@@ -237,6 +262,7 @@ def test_neutrality_files_are_the_tracked_code_and_prose_minus_the_declarations(
         "Makefile",
         ".github/workflows/ci.yml",
         "sql/marts/x.sql",
+        "study/metabase/screenshots/01-dashboard.png",  # a declared binary asset
     ]
     assert "CLAUDE.md" in check_docs.tracked_paths(ROOT)
 

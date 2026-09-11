@@ -1,7 +1,8 @@
 """Shared by scripts/review_gate.py, check_pins.py, check_docs.py and
 check_backing.py (not a pytest file). One spec-path validator, one base-rev
 validator, one diff-path reader, one section parser, one subprocess runner,
-one file reader, one Makefile-target reader. Stdlib only.
+one file reader (UTF-8 text, or a declared binary asset's text channels), one
+Makefile-target reader. Stdlib only.
 
 The read boundary: every file a script reads and every subprocess it runs
 goes through `read_text_or_error` / `readable` and `run` here, so a file that
@@ -15,7 +16,8 @@ from __future__ import annotations
 import re
 import subprocess
 import sys
-from collections.abc import Iterator
+import zlib
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -35,6 +37,95 @@ RECORD_DOCS = ("DECISIONS.md", "BACKLOG.md", "LESSONS.md")
 
 class Refused(Exception):
     """A one-line refusal: printed as-is, exit 2, never a traceback."""
+
+
+class Unreadable(Exception):
+    """Why a file is not readable as text — one clause, reported after the
+    path by `read_text_or_error`, never raised past it."""
+
+
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+# The PNG chunk types that carry text beside the pixels: the three textual
+# chunks of the specification and the EXIF payload (its ASCII fields read
+# through latin-1). A closed set: any other chunk is pixels or layout.
+# REF: https://www.w3.org/TR/png-3/#11textinfo
+PNG_TEXT_CHUNKS = frozenset({b"tEXt", b"zTXt", b"iTXt", b"eXIf"})
+MAX_INFLATED = 1 << 20  # a compressed text chunk may not inflate past 1 MiB
+
+
+def _inflate(data: bytes) -> bytes:
+    inflater = zlib.decompressobj()
+    try:
+        out = inflater.decompress(data, MAX_INFLATED)
+    except zlib.error:
+        raise Unreadable("corrupt compressed text chunk") from None
+    if not inflater.eof or inflater.unconsumed_tail:
+        raise Unreadable(f"a text chunk inflates past {MAX_INFLATED} bytes")
+    return out
+
+
+def _chunk_text(kind: bytes, body: bytes) -> str:
+    """One text chunk decoded: `keyword: text` for the keyed kinds."""
+    if kind == b"eXIf":
+        return body.decode("latin-1")
+    keyword, _, rest = body.partition(b"\0")
+    if kind == b"tEXt":
+        text = rest
+    elif kind == b"zTXt":
+        text = _inflate(rest[1:])  # one byte of compression method
+    else:  # iTXt: flag, method, language\0, translated keyword\0, UTF-8 text
+        compressed = rest[:1] == b"\1"
+        _, _, rest = rest[2:].partition(b"\0")
+        _, _, text = rest.partition(b"\0")
+        if compressed:
+            text = _inflate(text)
+    encoding = "utf-8" if kind == b"iTXt" else "latin-1"
+    return f"{keyword.decode('latin-1')}: {text.decode(encoding, errors='replace')}"
+
+
+def png_text(data: bytes) -> str:
+    """The text a PNG carries beside its pixels, one chunk per line; bytes that
+    are not a PNG, or whose chunks are truncated, are `Unreadable` by name."""
+    if not data.startswith(PNG_SIGNATURE):
+        raise Unreadable("not a PNG")
+    lines: list[str] = []
+    pos = len(PNG_SIGNATURE)
+    while pos < len(data):
+        length = int.from_bytes(data[pos : pos + 4], "big")
+        kind = data[pos + 4 : pos + 8]
+        body = data[pos + 8 : pos + 8 + length]
+        if len(kind) != 4 or len(body) != length:
+            raise Unreadable("truncated PNG chunk")
+        if kind in PNG_TEXT_CHUNKS:
+            lines.append(_chunk_text(kind, body))
+        pos += 12 + length  # length, type, body, CRC
+    return "\n".join(lines)
+
+
+# The tracked binary assets, each declared by the directory that holds it AND
+# its suffix, with the reader for the text it carries beside its pixels (the
+# Metabase demonstration screenshots, Phase 9g). The pixels are reviewed by
+# eye; the text channels are read here, so every scanner — the suite's and
+# `check_docs`'s naming check alike — sees the same channels. A closed set: a
+# `.png` outside its declared directory is not an asset — it is expected to be
+# UTF-8 text like every other tracked file and is reported by name when it is
+# not, so a stray image has to be declared here before a scanner accepts it.
+BINARY_ASSETS: tuple[tuple[str, str, Callable[[bytes], str]], ...] = (
+    ("study/metabase/screenshots", ".png", png_text),
+)
+
+
+def binary_asset_reader(path: Path, root: Path = ROOT) -> Callable[[bytes], str] | None:
+    """The declared reader for `path` (under `root`), or None for a text file:
+    a match is the declared directory (exactly, no subdirectory) and the
+    suffix, case-folded."""
+    if not path.is_relative_to(root):
+        return None
+    rel = path.relative_to(root)
+    for directory, suffix, reader in BINARY_ASSETS:
+        if rel.parent.as_posix() == directory and rel.suffix.lower() == suffix:
+            return reader
+    return None
 
 
 def die(exc: Refused) -> None:
@@ -109,9 +200,15 @@ def read_text_or_error(
 ) -> tuple[str, None] | tuple[None, str]:
     """(text, None) or (None, one error line naming the path): a file that is
     not UTF-8 text or cannot be read is reported, never raised — exactly one
-    side is None, so a caller never needs a fallback line."""
+    side is None, so a caller never needs a fallback line. A declared binary
+    asset (`BINARY_ASSETS`) reads as the text it carries beside its pixels."""
+    reader = binary_asset_reader(path, root)
     try:
+        if reader is not None:
+            return reader(path.read_bytes()), None
         return path.read_text(encoding="utf-8"), None
+    except Unreadable as exc:
+        return None, f"{shown(path, root)}: {exc}"
     except UnicodeDecodeError:
         return None, f"{shown(path, root)}: not UTF-8 text"
     except OSError as exc:

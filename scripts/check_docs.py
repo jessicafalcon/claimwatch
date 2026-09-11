@@ -67,6 +67,7 @@ from review_common import (
     MAKE_TICK,
     RECORD_DOCS,
     ROOT,
+    binary_asset_reader,
     diff_paths,
     make_targets,
     read_text_or_error,
@@ -319,7 +320,8 @@ def tracked_paths(root: Path) -> list[str]:
 
 def neutrality_files(root: Path, paths: list[str]) -> list[Path]:
     """The tracked paths the naming check reads: code, prose and workflow
-    files, minus the declared exclusions."""
+    files and the declared binary assets (their text channels), minus the
+    declared exclusions."""
     keep: list[Path] = []
     for p in paths:
         if p.startswith(NEUTRALITY_EXCLUDED):
@@ -328,6 +330,7 @@ def neutrality_files(root: Path, paths: list[str]) -> list[Path]:
             p.endswith(NEUTRALITY_SUFFIXES)
             or p == "Makefile"
             or p.startswith(".github/")
+            or binary_asset_reader(root / p, root) is not None
         ):
             keep.append(root / p)
     return keep

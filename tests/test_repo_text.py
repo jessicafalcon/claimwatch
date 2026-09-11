@@ -4,19 +4,16 @@ text it carries beside its pixels — never skipped, never a traceback."""
 
 from __future__ import annotations
 
+import sys
 import zlib
 from pathlib import Path
 
 import pytest
 
-from pipeline.warehouse import ROOT
-from tests.repo_text import (
-    MAX_INFLATED,
-    PNG_SIGNATURE,
-    is_binary_asset,
-    png_text,
-    repo_text,
-)
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+from review_common import MAX_INFLATED, PNG_SIGNATURE, ROOT
+
+from tests.repo_text import is_binary_asset, repo_text
 
 
 def _chunk(kind: bytes, body: bytes) -> bytes:
@@ -63,7 +60,9 @@ def test_a_png_outside_the_declared_directory_fails_by_name(tmp_path: Path):
     stray = tmp_path / "models" / "stray.png"
     stray.parent.mkdir()
     stray.write_bytes(_png(_chunk(b"IDAT", zlib.compress(b"\0\0"))))
-    with pytest.raises(pytest.fail.Exception, match=r"^stray.png: not UTF-8 text$"):
+    with pytest.raises(
+        pytest.fail.Exception, match=r"^models/stray.png: not UTF-8 text$"
+    ):
         repo_text(stray, tmp_path)
 
 
@@ -111,22 +110,23 @@ def test_a_file_named_png_that_is_not_a_png_fails_by_name(tmp_path: Path):
     """The suffix is a claim, not a proof: a text file mis-named `.png` is
     refused, never skipped as if its pixels had been reviewed."""
     fake = _asset(tmp_path, "fake.png", b"some text a scanner must not miss\n")
-    with pytest.raises(pytest.fail.Exception, match=r"^fake.png: not a PNG$"):
+    with pytest.raises(pytest.fail.Exception, match=rf"^{SHOTS}/fake.png: not a PNG$"):
         repo_text(fake, tmp_path)
 
 
 def test_a_truncated_or_over_inflating_png_fails_by_name(tmp_path: Path):
-    cut = tmp_path / "cut.png"
-    cut.write_bytes(_png(_chunk(b"tEXt", b"Comment\0hello"))[:-9])
-    with pytest.raises(pytest.fail.Exception, match=r"^cut.png: truncated PNG chunk$"):
-        png_text(cut)
-    bomb = tmp_path / "bomb.png"
-    bomb.write_bytes(
-        _png(_chunk(b"zTXt", b"Note\0\0" + zlib.compress(b"\0" * (MAX_INFLATED + 1))))
+    cut = _asset(tmp_path, "cut.png", _png(_chunk(b"tEXt", b"Comment\0hello"))[:-9])
+    with pytest.raises(
+        pytest.fail.Exception, match=rf"^{SHOTS}/cut.png: truncated PNG chunk$"
+    ):
+        repo_text(cut, tmp_path)
+    bomb = _asset(
+        tmp_path,
+        "bomb.png",
+        _png(_chunk(b"zTXt", b"Note\0\0" + zlib.compress(b"\0" * (MAX_INFLATED + 1)))),
     )
     with pytest.raises(pytest.fail.Exception, match=r"inflates past"):
-        png_text(bomb)
-    bad = tmp_path / "bad.png"
-    bad.write_bytes(_png(_chunk(b"zTXt", b"Note\0\0not-zlib")))
+        repo_text(bomb, tmp_path)
+    bad = _asset(tmp_path, "bad.png", _png(_chunk(b"zTXt", b"Note\0\0not-zlib")))
     with pytest.raises(pytest.fail.Exception, match=r"corrupt compressed text chunk"):
-        png_text(bad)
+        repo_text(bad, tmp_path)
