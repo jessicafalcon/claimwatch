@@ -5,7 +5,8 @@ Contract for the `phase-9g-metabase` branch. Source: PROJECT_BRIEF.md §4.4 (the
 the permanent-artifact-first split (DECISIONS → Phase 9a). It is the last Phase 9
 sub-phase. Depends on Phase 9f merged (PR #29, 2026-09-10).
 
-**Status: APPROVED 2026-09-10 — DELIVERED 2026-09-11, PR open.** No new Python dependency:
+**Status: APPROVED 2026-09-10 — DELIVERED 2026-09-11, merged (PR #30); the
+demonstration's evidence landed after it on `fix/9g-demonstration`.** No new Python dependency:
 the applier is stdlib `urllib` (the `opendata/fetch.py` precedent), the
 marts→engine export is stdlib `sqlite3`, the config is `pyyaml` (Phase 2), the
 drill view is `duckdb` + SQL. Metabase runs via Docker, which CLAUDE.md →
@@ -264,6 +265,9 @@ make rebuild ROWS=synthetic && uv run pytest tests/test_metabase_apply.py tests/
 - Records: `DECISIONS.md`, `BACKLOG.md`, `CLAUDE.md`, `BACKING.md`, `SPEC.md`,
   `README.md`, this spec.
 - `.gitignore` (if `data/metabase/metabase.sqlite` is not already covered by `data/`).
+- `.env.example` (added on `fix/9g-demonstration`): the placeholder template for
+  the applier's three variables and the model key; the one tracked `.env*` file,
+  un-ignored by `!.env.example`.
 
 Freeze: none
 
@@ -429,3 +433,18 @@ notes/record/wording fixed (cross-host redirect refused, the make-rebuild prose,
 the image-tag Gotcha, Record-updates reconciled). Exit coherence audit: coherent,
 no BLOCKER — the §90-brief annotation and the Phase-10 warehouse-aware BACKLOG row
 (now naming `review_drill`) applied at exit.
+
+After the merge, `fix/9g-demonstration` landed the demonstration's evidence and
+what the live step taught. The three synthetic screenshots are committed, each
+carrying *synthetic fixture data — not a study finding* in its pixels (a caption
+band under the capture) and in an iTXt `Comment` chunk, the doc's alt text
+repeating it; the pinning test now walks the committed PNGs (invariant 2 held
+by a test, not by eye alone). `.env.example` is tracked. The repo's first tracked
+binary assets are read through the guards' reader —
+`scripts/review_common.py::read_text_or_error` reads a declared asset
+(`BINARY_ASSETS`, by directory and suffix) as its text channels for the suite's
+scanners and `check_docs`'s naming check alike; the PNG chunk kinds are a closed
+set, each text chunk is parsed to its declared shape, IEND ends the walk. The
+applier's login comes from the environment and every doc shows the export step.
+Review round 1 on that branch fixed four findings; round 2 (the exit audit, five
+agents): 0 BLOCKER, 22 findings, all fixed (DECISIONS → Phase 9g).

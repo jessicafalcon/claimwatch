@@ -2831,3 +2831,29 @@ in CI, so the tag stands with the compose header's "confirm the tag in the spike
 caveat; a digest pin is a later option if demo reproducibility matters. Cross-host
 redirects on the applier's HTTP client are refused (`_NoCrossHostRedirect`) so a
 3xx cannot carry the session token off the vetted host (round 2, security note).
+
+Exit review of `fix/9g-demonstration` (2026-09-11, five agents, 22 findings, all
+fixed). (1) Every committed screenshot carries the caption *synthetic fixture
+data — not a study finding* in its pixels (a band drawn under the capture) and in
+an iTXt `Comment` chunk, and the doc's alt text repeats it; the pinning test walks
+the committed PNGs, so a captionless screenshot fails by name. The committed
+bytes are the captioned render of the original capture (drawn by a scratch
+script, not tracked), so each PNG now carries an `eXIf` chunk and the caption
+`iTXt`, no longer the capture's XMP. (2) The reader for a tracked binary asset
+moved from `tests/repo_text.py` into `scripts/review_common.py::read_text_or_error`,
+the guards' read boundary, so the suite's scanners and `check_docs`'s naming
+check read the same channels (site-fix: round 1 had taught one of the two); an
+asset is declared by directory AND suffix (`BINARY_ASSETS`), the PNG chunk kinds
+are a closed set (the text kinds read; the specification's pixel, colour, layout
+and timing kinds and Apple's `iDOT` skipped; anything else refused by name), each
+text chunk is parsed to its declared shape, and IEND ends the walk. *Rejected:
+scanning every unknown chunk's body as latin-1 — noise from compressed profiles
+and no refusal when a channel is unreadable; refusing by name keeps the set
+explicit.* (3) The applier reads its login from the environment; every doc said
+"reads `.env`" while nothing loaded the file, so the docs now show the export
+step. *Rejected: a `.env` loader in the applier — a second secrets read path for
+one developer-run command; the model key has the same convention.* (4)
+`.env.example` is the one tracked `.env*` file: placeholders only, un-ignored by
+`!.env.example`; recorded in the spec's Scope and CLAUDE.md's Repo map. The
+CLAUDE.md-length BACKLOG row is re-deferred once more (805 lines; its own
+`tooling/` PR before Phase 10).

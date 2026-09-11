@@ -194,7 +194,10 @@ set -a; . ./.env; set +a                              # your Metabase login, exp
 cd ../.. && uv run python -m study.metabase apply     # reads it from the environment
 ```
 
-The drill shows each review's theme, rating, date, segment and platform — never
+The export step copies the marts into a SQLite file that Metabase reads with its
+built-in driver, so the stack is Docker plus one file and no extra download; `apply`
+provisions the dashboard from `config.yaml` and reads your login from the
+environment. The drill shows each review's theme, rating, date, segment and platform — never
 its own words and never a per-review web address — and, per theme, one paraphrased
 example with its public source. The audit trail is the counted rows plus that
 paraphrase, not quoted excerpts.

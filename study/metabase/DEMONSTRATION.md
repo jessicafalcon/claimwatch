@@ -44,7 +44,9 @@ a per-review address.
 
 ![The drill filtered to the document-loop theme — synthetic fixture data — not a study finding](screenshots/02-theme-drill.png)
 
-B2.1's five theme paraphrases, each in our words with its public source.
+B2.1's five theme paraphrases, each in our words with its public source — shown
+here as the question's own result view (the SQL editor), the same rows the
+dashboard's third card carries.
 
 ![The five theme paraphrases and their sources — synthetic fixture data — not a study finding](screenshots/03-paraphrase.png)
 
@@ -87,7 +89,7 @@ The exported `rating` is written as a fixed one-decimal string, so a `4.3`
 never drifts to `4.2999…` on the way through SQLite; the export is
 byte-identical on a rerun.
 
-A word on what the numbers mean. Over `ROWS=synthetic` (the committed
+What the numbers mean. Over `ROWS=synthetic` (the committed
 screenshots) every count is fixture data. Over your own `ROWS=captured` rebuild
 they are your corpus's real counts — Measured, at the review × theme grain (a
 review with two themes counts in two bars). Metabase is an exploration surface,

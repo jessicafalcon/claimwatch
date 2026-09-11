@@ -67,8 +67,11 @@ Delivered paragraph and `make help`, not here.
   `neutrality_hashes.txt` (the hashed tokens the naming check reads).
 - `tests/` — pytest; no services, no network, no key. `tests/pins.py` holds
   every pinned number; `tests/repo_text.py` is the one reader the layout
-  tests that walk a package read through (a file that is not text fails by
-  name).
+  tests that walk a package read through — a pytest wrapper over the guards'
+  reader, `scripts/review_common.py::read_text_or_error`, which reads a
+  declared binary asset (`BINARY_ASSETS`: the 9g screenshots, by directory
+  and suffix) as its text channels and any other file as UTF-8 text; either
+  way an unreadable file fails the test by name.
 - `.claude/` — agents (report-only), skills (the three standards,
   `/challenge`, the four on-request loop steps), the three hooks. Settings
   are local-only and gitignored.
@@ -80,6 +83,9 @@ Delivered paragraph and `make help`, not here.
   to the repo, `data/snapshots/` only. `.github/pull_request_template.md`.
 - `pyproject.toml`, `uv.lock`, `.python-version`, `.pre-commit-config.yaml` —
   the toolchain (uv, ruff, pytest, pre-commit), versions pinned in lockstep.
+  `.env.example` — the placeholder template for the untracked `.env` (the
+  model key, the Metabase login); the one `.env*` file tracked, by the
+  `!.env.example` line in `.gitignore`.
 - `sql/raw/`, `sql/staging/`, `sql/marts/` — plain SQL, one file per table;
   the header names the grain, the provenance columns and the BACKING rows
   fed. A Python-fed mart (`classifier_quality`, `stg_classified_reviews`, the
@@ -354,9 +360,11 @@ study names no insurer as its subject.
   tag opens the comment. ruff refuses `FIXME`, `XXX` and a TODO without its
   parens or colon; `make check-docs` refuses a tag whose record entry does
   not exist (`code-craft` → Comments has the rule).
-- Secrets: the API key and warehouse credentials live in `.env` only — never
-  in a tracked file, never in Actions, never echoed. Refusals print names,
-  never values.
+- Secrets: the API key, the Metabase login and warehouse credentials live in
+  `.env` only — never in a tracked file, never in Actions, never echoed. The
+  code reads the environment (export `.env` first; nothing loads the file),
+  and the only tracked `.env*` file is `.env.example`, placeholders with no
+  value. Refusals print names, never values.
 - Scraping: ≥ 2 s between requests to one host, identifying User-Agent,
   robots.txt honoured, pages cached under `data/`. No proxies, no evasion.
 
@@ -744,29 +752,25 @@ fixed in the main session or explicitly accepted — never auto-fixed.
 
 ## Current status
 
-**Delivered on branch (PR pending): Phase 9g — the Metabase demonstration (the
-review-level drill)** (branch `phase-9g-metabase`, spec `specs/phase-9g-metabase.md`
-DELIVERED, challenged round 1 rework then round 2 approve-with-amendments, spec
-`9cba5dd4`, all applied; review rounds 1–2 + the exit coherence audit clean). The
-last Phase 9 sub-phase, non-CI: an offline core CI runs (the applier's `--dry-run`
-request bodies, the drill view's and SQLite export's column allowlist) plus a
-developer-run live Metabase run with synthetic-only screenshots. A theme bar drills
-to the review rows behind it — `sql/marts/review_drill.sql`, one row per classified
-review × theme on the non-text allowlist (`review_id`=`source||':'||external_id`,
-theme, rating, review_date, segment, source — never body/title/source_url, though
-the join to `stg_reviews` reaches them). The only text a drilled theme shows is a
-Documented, sourced paraphrase (`study/paraphrases.yaml`, B2.1 Pending → Documented).
-`study/metabase/export.py` writes the marts to a gitignored SQLite file Metabase
-reads with its built-in SQLite driver (no DuckDB community JAR); `study/metabase/apply.py`
-provisions the dashboard from `config.yaml` idempotently (stdlib `urllib`, upsert by
-name, `.env` credentials). Recorded §90 deviation: the audit trail is counted rows +
-a theme paraphrase, not per-review excerpts (D1/Neutrality forbid a per-review
-address — the "per-review public address" BACKLOG row stays open). BACKLOG 52 (classify
-idempotency) was NOT folded in — its own `fix/` PR. No new Python dependency; Docker
-pre-approved.
+**Delivered on branch (PR pending): `fix/9g-demonstration` — the Phase 9g
+demonstration's evidence.** Phase 9g merged as PR #30 (2026-09-11) with its live
+step still the developer's; this fix branch lands what that step produced and what
+it taught: the three synthetic screenshots, each carrying *synthetic fixture data —
+not a study finding* in its pixels and its iTXt `Comment` (the pinning test walks
+the committed PNGs); `.env.example`, the one tracked `.env*` file (placeholders
+only); and the repo's first tracked binary assets read through the guards' shared
+reader — `scripts/review_common.py::read_text_or_error` reads a declared asset
+(`BINARY_ASSETS`, by directory and suffix) as its text channels for the suite's
+scanners and `check_docs`'s naming check alike, the chunk kinds a closed set, each
+text chunk parsed to its shape, IEND the end of the walk. The applier reads its
+login from the environment and the docs show the export step. Review rounds 1–2
+(round 2 the exit audit): 0 BLOCKER; round 2's 22 findings all fixed (DECISIONS →
+Phase 9g).
 
-**Merged:** Phases 0a–9f in order, each with its spec under `specs/` (the
-Delivered paragraph) and its DECISIONS appendix — 9f (PR #29, 2026-09-10: the
+**Merged:** Phases 0a–9g in order, each with its spec under `specs/` (the
+Delivered paragraph) and its DECISIONS appendix — 9g (PR #30, 2026-09-11: the
+Metabase demonstration — `review_drill` on the non-text allowlist, B2.1's five
+Documented paraphrases, `study/metabase/` export + idempotent applier) then 9f (PR #29, 2026-09-10: the
 README telling the five beats in the two-layer voice + the stranger acceptance test
 `tests/test_readme.py`; the permanent artifact stays the byte-checked synthetic
 render, the page carries no live-slider script) then 9e (PR #28, 2026-09-10: Beat 5,
@@ -787,11 +791,14 @@ promoted). Phase 8b — the guardrail simulator (B4.1–B4.3, PR #19,
 2026-09-07) — landed `models/guardrail_sim.py::RULES`, the hold timer's three
 formulas in `models/cost_model.py`, the two simulator marts and `make simulate`.
 
-**Next:** Phase 9 is complete once 9g merges. Two pulled-out data phases remain:
-the claims sample-mean slider and data.ameli practitioner fees. Beyond Phase 9:
-Phase 10 (the Airflow DAG), which is also the home for the classify-path
-idempotency target (BACKLOG). A `fix/idempotency-classify` PR may land that
-target sooner.
+**Next:** Phase 9 is complete. First, the CLAUDE.md trim as its own `tooling/`
+PR (BACKLOG: 805 lines against the 600-line trigger). Two pulled-out data phases
+remain: the claims sample-mean slider and data.ameli practitioner fees. Beyond
+Phase 9: Phase 10 (the Airflow DAG), also the home for the classify-path
+idempotency target (BACKLOG); its spec decides how the publish task calls the two
+Metabase steps, which are `python -m study.metabase export|apply`, not `make`
+targets (`docs/PLAN.md` §5 says five `make` tasks). A `fix/idempotency-classify`
+PR may land that target sooner.
 
 Open BACKLOG rows: **39**.
 
