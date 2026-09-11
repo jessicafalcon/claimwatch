@@ -16,8 +16,8 @@ live run cannot end CI-green — the phase splits into an offline, CI-checkable
 core (the applier's request bodies, the drill view's + SQLite export's column
 allowlist) and a developer-run demonstration (the live Metabase run and its
 synthetic-only screenshots).
-Challenged: 2026-09-10, round 1, spec (pre-amendment) — rework (2 BLOCKER, 4
-should-fix; all applied in this amendment). <!-- re-stamped after round 2 -->
+Challenged: 2026-09-10, round 2, spec 062cf09f — approve with amendments (1 BLOCKER, 3 should-fix, 1 question; all applied; re-hashed after amendments)
+Challenged: 2026-09-10, round 1, spec 76269923 — rework (2 BLOCKER, 4 should-fix; all applied)
 
 ## Why
 
@@ -42,18 +42,23 @@ forbids publishing a review's own `body` (brief §5's example bodies name medica
 conditions). So the drill's audit trail is **the counted rows plus, per theme, a
 sourced paraphrase** — not per-review excerpts. This is a brief-reconciliation
 entry (DECISIONS → Phase 9g), not a silent repair: §90's literal "excerpts" is
-recorded as unshippable, and the per-review-public-address need (BACKLOG 70)
-that would let external per-review citation exist stays a matter of record.
+recorded as unshippable. The row *"A per-review drill needs a per-review public
+address"* therefore stays **open, re-deferred**: 9g ships the review-level
+*view* over the reader's own rebuild, but its surviving trigger — a source that
+yields a per-review public address, which external per-review citation would
+need — is unmet, and the DECISIONS §90 entry carries that trigger forward.
 
 It also finally lands **B2.1** (Pending since Phase 2): the five-theme taxonomy
 with its Documented paraphrased examples, curated with public sources, is the
 text a drilled theme shows.
 
-This closes the tooltip-only trail (BACKLOG 72 — Metabase shows the counts as
-visible cells, not a hover title) and the live-exploration debt (BACKLOG 73 —
-Metabase's own filters and drill are the exploration a browser slider would have
-been). It does **not** fold in the classify-path idempotency target (BACKLOG 52):
-that is a general-pipeline change whose recorded home is its own `fix/` PR (see
+This closes the tooltip-only trail (*"The B2.2/B2.5 trail is tooltip-only"* —
+Metabase shows the counts as visible cells, not a hover title) and the
+live-exploration debt (*"Live sliders need a script the permanent page does not
+carry"* — Metabase's own filters and drill are the exploration a browser slider
+would have been). It does **not** fold in the classify-path idempotency target
+(*"`make idempotency-check` skips the classify step…"*): that is a
+general-pipeline change whose recorded home is its own `fix/` PR (see
 Out of scope), kept off this study-surface diff.
 
 This is not a fix PR: it adds a delivery surface (a Docker stack, a stdlib
@@ -82,9 +87,12 @@ make rebuild ROWS=synthetic && uv run pytest tests/test_metabase_apply.py tests/
 ```
 
 - `make rebuild ROWS=synthetic` builds the frozen input and the `review_drill`
-  view over it; the view carries only the allowlisted columns and, over a fixture
-  input, the labelled fixture state and no counted number (the 9b corpus gate).
-  Reproduces the synthetic rebuild.
+  view over it; the view carries only the allowlisted columns. The
+  `ROWS=synthetic` rows are hand-written fake reviews, so any count Metabase
+  shows over them is fixture data, not a study finding (the marts carry the
+  input's real counts — the HTML render's corpus gate does not live in the mart,
+  so the demonstration earns its honesty from the synthetic input and a caption,
+  never a gate; see done-when 5). Reproduces the synthetic rebuild.
 - `uv run pytest tests/test_metabase_apply.py tests/test_review_drill.py -q`
   proves the offline core the live run cannot: the applier builds pinned request
   bodies from the YAML and, given a fake client whose state already holds the
@@ -118,7 +126,11 @@ make rebuild ROWS=synthetic && uv run pytest tests/test_metabase_apply.py tests/
    `source` (the platform slug, never `source_url`). The allowlist is checked on
    the joined cursor's description so `select *` or a stray `body`/`title`/
    `source_url` fails by name, and the SQLite export copies only those columns.
-   *Evidence: rows 3, 4, 5.*
+   `rating` (`decimal(2,1)`) is written to SQLite as a rounded fixed-form string
+   (one decimal), so the DuckDB decimal → SQLite (untyped, no decimal) trip is
+   exact — `4.3` never surfaces as `4.2999…`; the export orders rows
+   deterministically, so it is byte-identical on a rerun. *Evidence: rows 3, 4,
+   5.*
 3. **A drilled theme's only text is a curated, sourced paraphrase; B2.1 becomes
    Documented.** `study/paraphrases.yaml` carries one paraphrased example per
    theme (five), each with the public source it paraphrases (brief §6); the drill
@@ -130,14 +142,18 @@ make rebuild ROWS=synthetic && uv run pytest tests/test_metabase_apply.py tests/
    SQLite export and `apply --dry-run` all succeed; ambiguous reviews are
    `unclassified` and appear in the drill under the "not yet classified" band; the
    applier's dry-run bytes are identical to the keyed run's. *Evidence: rows 8, 9.*
-5. **The demonstration is committed and safe by construction.**
-   `study/metabase/DEMONSTRATION.md` walks a theme-bar → review drill with
-   **synthetic-only** screenshots under `study/metabase/screenshots/` (captured
-   over `ROWS=synthetic`, where the corpus gate shows the fixture state and no
-   real review can appear); because the drill view (done-when 2, 3) carries no
-   `body`/`title`/`source_url` column, no screenshot can show raw review text or a
-   brand address; study-editor and security-reviewer confirm the committed
-   artifacts. *Evidence: row 10.*
+5. **The demonstration is committed, captioned as fixture data, and safe by
+   construction.** `study/metabase/DEMONSTRATION.md` walks a theme-bar → review
+   drill with **synthetic-only** screenshots under `study/metabase/screenshots/`
+   (captured over `ROWS=synthetic`, so every review shown is a hand-written fake);
+   the walkthrough and every screenshot caption the view as *synthetic fixture
+   data — not a study finding*, so no fake share reads as a result. Two things are
+   safe by construction, not by a gate: only fake reviews exist under
+   `ROWS=synthetic`, and the drill view (done-when 2, 3) carries no
+   `body`/`title`/`source_url` column, so no screenshot can show raw review text
+   or a brand address. study-editor confirms the caption on `DEMONSTRATION.md` and
+   the screenshots; security-reviewer confirms no leaked text/brand. *Evidence:
+   row 10.*
 
 ## Evidence (REQUIRED)
 
@@ -147,6 +163,7 @@ make rebuild ROWS=synthetic && uv run pytest tests/test_metabase_apply.py tests/
 | 1 | `tests/test_metabase_apply.py::test_dry_run_builds_pinned_request_bodies_without_network` |
 | 2 | `tests/test_review_drill.py::test_drill_projects_only_the_non_text_allowlist_across_the_join` |
 | 2 | `tests/test_review_drill.py::test_sqlite_export_carries_only_the_allowlist_no_body_title_source_url` |
+| 2 | `tests/test_review_drill.py::test_sqlite_export_rating_is_exact_and_row_order_is_stable` |
 | 2 | `tests/test_review_drill.py::test_review_id_expression_matches_labels_review_id` |
 | 3 | `tests/test_review_drill.py::test_drilled_theme_paraphrase_resolves_to_a_sourced_entry` |
 | 3 | `tests/test_review_drill.py::test_a_review_body_never_appears_in_any_drill_column` |
@@ -159,6 +176,8 @@ make rebuild ROWS=synthetic && uv run pytest tests/test_metabase_apply.py tests/
 | Invariant ("for all …, … holds") | Falsified by (scenario test) |
 |---|---|
 | For all rows the drill exposes — in the DuckDB view and in the SQLite export — the projected column set is a fixed allowlist containing no raw-text column (`body`, `title`) and no per-review brand address (`source_url`), even though the join reaches `stg_reviews` which carries them. | `tests/test_review_drill.py::test_drill_projects_only_the_non_text_allowlist_across_the_join`; `::test_sqlite_export_carries_only_the_allowlist_no_body_title_source_url` — the joined cursor's / SQLite table's columns equal the allowlist; a query naming `body`/`title`/`source_url` fails by name. |
+| The marts Metabase reads carry the input's real counts — only the HTML render blanks a fixture count — so the demonstration earns its honesty from the synthetic input (only fake reviews exist under `ROWS=synthetic`) and a caption, never from a corpus gate it does not inherit; every committed screenshot and `DEMONSTRATION.md` carries the *synthetic fixture data — not a study finding* caption. | `tests/test_review_drill.py::test_demonstration_doc_and_synthetic_screenshots_exist_and_links_resolve` (the doc carries the caption; study-editor confirms it on the screenshots) — an uncaptioned demonstration artifact fails. |
+| For all rows, the SQLite export preserves `rating` exactly (a rounded one-decimal fixed form, not a float) and orders rows deterministically, so the exported file is byte-identical on a rerun. | `tests/test_review_drill.py::test_sqlite_export_rating_is_exact_and_row_order_is_stable` — a `4.3` review reads back `4.3`, and two exports of one DB are identical. |
 | For all reviews in the drill, any text shown comes from `study/paraphrases.yaml`, never from the review's own `body`; a review with no theme paraphrase shows no text. | `tests/test_review_drill.py::test_a_review_body_never_appears_in_any_drill_column` — a synthetic review with a distinctive body renders no text and the body string appears in no drill column. |
 | For all rows, the drill's `review_id` equals `classify/labels.py::review_id(source, external_id)` — one definition of identity, not two. | `tests/test_review_drill.py::test_review_id_expression_matches_labels_review_id` — for every staged row the SQL expression and the Python function return the same string. |
 | For all Metabase objects the applier provisions, applying the same config twice leaves the server unchanged — it upserts by stable name, never creating a duplicate. | `tests/test_metabase_apply.py::test_apply_twice_over_existing_state_issues_no_create` — a fake client pre-loaded with the objects records every request; the second apply issues only updates, no create. |
@@ -171,9 +190,12 @@ make rebuild ROWS=synthetic && uv run pytest tests/test_metabase_apply.py tests/
   per-review excerpts — an explicit, recorded deviation from brief §90.** §90's
   "underlying review excerpts" is unattainable: D1 yields no per-review public
   address and Neutrality forbids publishing a `body`. Recorded as a
-  brief-reconciliation entry (DECISIONS → Phase 9g); BACKLOG 70's per-review-
-  public-address need stays a matter of record even as the review-level *view*
-  ships. Satisfies the central constraint. *Rejected: rendering a truncated
+  brief-reconciliation entry (DECISIONS → Phase 9g), which carries forward the
+  surviving reopen trigger — *revisit if a source yields a per-review public
+  address*. The row *"A per-review drill needs a per-review public address"*
+  stays **open, re-deferred**: 9g ships the review-level *view*, but external
+  per-review citation still needs an address no source yields. Satisfies the
+  central constraint. *Rejected: rendering a truncated
   `body` snippet as "one short marked phrase" — raw text carries a name/condition
   and has no per-review public source (D1); a machine-generated paraphrase — the
   model is called from exactly one site (`classify/llm.py`), never for prose.*
@@ -192,8 +214,11 @@ make rebuild ROWS=synthetic && uv run pytest tests/test_metabase_apply.py tests/
   driver (verified, [metabase.com/data-sources]); DuckDB is community-only (a
   third-party JAR — the "ask before ANY package" instinct), and its auto-download
   of the DuckDB SQLite extension would break the offline rebuild. The export is
-  Python stdlib, offline and deterministic; the stack stays laptop-portable, no
-  account (§4.4 Portable). Satisfies done-when 1. *Rejected: the DuckDB community
+  Python stdlib, offline and deterministic — `rating` is written as a rounded
+  one-decimal string (SQLite has no decimal type), rows in a fixed order, so the
+  file is byte-identical on a rerun. The stack stays laptop-portable, no account
+  (§4.4 Portable). Satisfies done-when 1 and the rating-fidelity invariant.
+  *Rejected: the DuckDB community
   JAR (third-party runtime code, version-coupled to Metabase); a Postgres
   container + load (a second server for a laptop demo); Snowflake full-mode
   (Phase 10, needs an account).*
@@ -246,13 +271,20 @@ Freeze: none
 
 - [ ] `DECISIONS.md` — Phase 9g entry: the §90 brief-reconciliation deviation
   (excerpts unshippable under D1/Neutrality; audit trail = counts + theme
-  paraphrase); the drill allowlist across the join; the SQLite-over-DuckDB-JAR
+  paraphrase; carries the *per-review public address* reopen trigger forward);
+  the honesty-from-synthetic-input-and-caption note (the corpus gate is a
+  render mechanism, absent from the marts Metabase reads); the drill allowlist
+  across the join; the rating-as-rounded-string SQLite export; the SQLite-over-DuckDB-JAR
   engine choice (Gotchas); the applier shape; B2.1's realization; the
   offline/synthetic-screenshot split; challenge dispositions (rounds 1–2)
-- [ ] `BACKLOG.md` — closed (70 the review-level drill delivered — with the §90
-  deviation noted; 72 visible counts; 73 live exploration — struck + "DONE Phase
-  9g"); row 52 re-pointed (a `fix/idempotency-classify` PR, not 9g); a new row
-  opened for the HTML export of B2.1's paraphrases (out of scope here)
+- [ ] `BACKLOG.md` (rows cited by title, never number) — closed, struck +
+  "DONE Phase 9g": *"The B2.2/B2.5 trail is tooltip-only"* (visible counts) and
+  *"Live sliders need a script the permanent page does not carry"* (live
+  exploration). *"A per-review drill needs a per-review public address"* stays
+  **open, re-deferred** (the review-level view shipped; the per-review-address
+  trigger survives). *"`make idempotency-check` skips the classify step…"*
+  re-pointed to a `fix/idempotency-classify` PR (not 9g). A new row opened for
+  the HTML export of B2.1's paraphrases (out of scope here)
 - [ ] LESSONS.md — none until a review round reports a correctness finding; then
   backtick it and the fix commit writes the row
 - [ ] `CLAUDE.md` — Current status; Commands (`study.metabase apply` /
@@ -291,9 +323,9 @@ deleted.
 Agents are selected by diff surface (CLAUDE.md → "Which review agents run").
 
 - **code-reviewer** (triggered — `study/**/*.py`, `sql/marts/**`, `tests/`): the
-  drill view's allowlist across the join and the corpus gate, the SQLite export's
-  column set, the applier's idempotent upsert, config-as-data, the no-key path,
-  scope.
+  drill view's allowlist across the join, the SQLite export's column set and
+  rating fidelity, the applier's idempotent upsert, config-as-data, the no-key
+  path, scope.
 - **security-reviewer** (mandatory — a network module with credentials,
   `study/metabase/`): credential handling (`.env` only, refusals name not value),
   the HTTP client (no shell, `urllib` request built from data), the SQLite export
@@ -324,8 +356,9 @@ Agents are selected by diff surface (CLAUDE.md → "Which review agents run").
 
 ## Out of scope (deferred, recorded)
 
-- **BACKLOG 52** (the classify-path marts not machine-checked for idempotency by
-  a `make` target): a separate `fix/idempotency-classify` PR off `main`, its own
+- *"`make idempotency-check` skips the classify step, so the theme marts are not
+  machine-checked by the target"*: a separate `fix/idempotency-classify` PR off
+  `main`, its own
   commit and review; the property is already covered by
   `tests/test_theme_share.py::test_rebuild_twice_stable` and
   `tests/test_beat5.py::test_pipeline_row_counts_stable_across_reclassify` (slow
@@ -338,4 +371,5 @@ Agents are selected by diff surface (CLAUDE.md → "Which review agents run").
   named, not built here.
 - The claims sample-mean slider and data.ameli practitioner fees — their own
   pulled-out data phases (DECISIONS → Phase 9a).
-- BACKLOG 74 (B4.3's four-bar-label overflow) — a Beat-4 follow-on, untouched.
+- *"B4.3's four bar labels are a latent overflow"* — a Beat-4 follow-on,
+  untouched.
