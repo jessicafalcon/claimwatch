@@ -3,7 +3,7 @@ demonstration (9g).
 
   export            build the gitignored SQLite file Metabase reads (offline)
   apply             provision the dashboard from config.yaml (developer-run,
-                    reads .env, talks to localhost Metabase)
+                    credentials from the environment, talks to localhost Metabase)
   apply --dry-run   print the request bodies apply would send (offline, no
                     credentials) — the CI-checkable half
 

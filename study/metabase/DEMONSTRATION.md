@@ -56,7 +56,8 @@ From the repository root:
 make rebuild ROWS=captured                        # your own corpus
 uv run python -m study.metabase export            # writes data/metabase/metabase.sqlite
 cd study/metabase && docker compose up -d
-cd ../.. && uv run python -m study.metabase apply  # provisions from config.yaml; reads .env
+set -a; . ./.env; set +a                           # your Metabase login, exported
+cd ../.. && uv run python -m study.metabase apply  # provisions from config.yaml
 open http://localhost:3000
 ```
 
@@ -66,8 +67,9 @@ captured over the synthetic fixture instead, so no real review can appear —
 `export --rows` takes the same closed set as `make rebuild` (`captured`, `none`,
 `synthetic`, `samples`).
 
-`apply` reads your Metabase login from `.env` (`METABASE_URL`, `METABASE_USER`,
-`METABASE_PASSWORD`) and upserts the dashboard by name, so running it twice
+`apply` reads your Metabase login from the environment (`METABASE_URL`,
+`METABASE_USER`, `METABASE_PASSWORD`; copy `.env.example` to `.env`, fill it in
+and export it as above — nothing loads the file for you) and upserts the dashboard by name, so running it twice
 changes nothing. `apply --dry-run` prints the request bodies without a network
 call or credentials.
 

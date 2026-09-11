@@ -190,7 +190,8 @@ of the automated checks). The walk is in
 ```
 make rebuild ROWS=captured && uv run python -m study.metabase export
 cd study/metabase && docker compose up -d
-cd ../.. && uv run python -m study.metabase apply     # reads .env
+set -a; . ./.env; set +a                              # your Metabase login, exported
+cd ../.. && uv run python -m study.metabase apply     # reads it from the environment
 ```
 
 The drill shows each review's theme, rating, date, segment and platform — never

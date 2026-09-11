@@ -223,7 +223,7 @@ make rebuild ROWS=synthetic && uv run pytest tests/test_metabase_apply.py tests/
   container + load (a second server for a laptop demo); Snowflake full-mode
   (Phase 10, needs an account).*
 - **The applier is a developer-run stdlib `urllib` module reading Metabase
-  credentials from `.env`, idempotent by upsert-by-name; it is not a `make`
+  credentials from the environment (the developer exports `.env`), idempotent by upsert-by-name; it is not a `make`
   target with a variable.** Keeping it `python -m study.metabase apply` avoids the
   `make` variable/`confirm` surface; localhost provisioning is neither paid nor
   destructive; `--dry-run` is the offline half. Satisfies invariants 4 and 6.
@@ -309,8 +309,8 @@ Freeze: none
 
 The phase adds **no** `make` target that takes a variable, deletes, calls a paid
 API, or touches the public network. It adds one developer-run network module
-(`study.metabase apply`, HTTP to **localhost** Metabase with credentials from
-`.env`) and one offline stdlib export (`study.metabase export`, no network, no
+(`study.metabase apply`, HTTP to **localhost** Metabase with credentials from the environment, the
+exported `.env`) and one offline stdlib export (`study.metabase export`, no network, no
 credentials).
 
 | Target/module | empty | `../x` | `"; ` | env-exported | credentials | Pinned by |
@@ -396,7 +396,7 @@ their exact string (`rating` never drifts), ordered rows, byte-identical on a
 rerun — which Metabase reads through its built-in SQLite driver (no DuckDB
 community JAR). `study/metabase/apply.py` provisions the dashboard from
 `config.yaml` over the HTTP API idempotently (stdlib `urllib`, an injected client
-seam, upsert by name, credentials from `.env` refused by name, `_base_url_ok` and
+seam, upsert by name, credentials from the environment refused by name, `_base_url_ok` and
 `_NoCrossHostRedirect` keeping the session token on the vetted host, `--dry-run`
 the offline half). The only text a drilled theme shows is B2.1's five Documented,
 sourced paraphrases (`study/paraphrases.yaml`) — B2.1 moved Pending → Documented.

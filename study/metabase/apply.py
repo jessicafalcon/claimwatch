@@ -1,8 +1,9 @@
 """Provision the Metabase demonstration from study/metabase/config.yaml over the
 HTTP API, idempotently (9g). Developer-run: it reads Metabase credentials from
-`.env` and talks to a localhost Metabase (never a paid API, never the public
-network); `--dry-run` builds every request body with no network and no
-credentials.
+the environment (`.env.example` is the template; export your filled-in copy
+before running — nothing here loads the file) and talks to a localhost Metabase
+(never a paid API, never the public network); `--dry-run` builds every request
+body with no network and no credentials.
 
 Idempotent by upsert-by-name: for each object (the SQLite database connection,
 the collection, the questions, the dashboard) the applier lists what exists,
@@ -92,7 +93,8 @@ def _require_id(obj: object, kind: str) -> object:
 
 @dataclass(frozen=True)
 class Credentials:
-    """Metabase login, from `.env`. A missing variable is refused by name, never
+    """Metabase login, from the environment (`.env` exported by the developer;
+    the applier loads no file). A missing variable is refused by name, never
     by value (the value is a secret; the name is not)."""
 
     url: str
@@ -105,8 +107,8 @@ class Credentials:
         missing = [name for name in _ENV if not source.get(name)]
         if missing:
             raise MetabaseError(
-                f"missing Metabase credential(s) {missing} — set them in .env "
-                "(never in a tracked file or in Actions)"
+                f"missing Metabase credential(s) {missing} — export them from your "
+                ".env (`set -a; . ./.env; set +a`), never in a tracked file or Actions"
             )
         url = source["METABASE_URL"].rstrip("/")
         if not _base_url_ok(url):
