@@ -5,7 +5,7 @@ Contract for the `phase-9g-metabase` branch. Source: PROJECT_BRIEF.md §4.4 (the
 the permanent-artifact-first split (DECISIONS → Phase 9a). It is the last Phase 9
 sub-phase. Depends on Phase 9f merged (PR #29, 2026-09-10).
 
-**Status: PROPOSED — do not start until approved.** No new Python dependency:
+**Status: APPROVED 2026-09-10 — in progress.** No new Python dependency:
 the applier is stdlib `urllib` (the `opendata/fetch.py` precedent), the
 marts→engine export is stdlib `sqlite3`, the config is `pyyaml` (Phase 2), the
 drill view is `duckdb` + SQL. Metabase runs via Docker, which CLAUDE.md →
