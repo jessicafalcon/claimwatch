@@ -135,6 +135,24 @@ def test_a_png_with_a_chunk_outside_the_closed_set_fails_by_name(tmp_path: Path)
     assert repo_text(mac, tmp_path) == ""
 
 
+def test_a_text_chunk_off_its_declared_shape_fails_by_name(tmp_path: Path):
+    """Each text chunk is parsed to the specification's shape — the keyword
+    and its separators, zTXt's method byte, iTXt's flag and method — so a
+    malformed chunk is refused by name instead of reading as empty text (a
+    lenient split would fail open where the container fails closed)."""
+    cases = {
+        "text-no-separator.png": _chunk(b"tEXt", b"no separator at all"),
+        "text-empty-keyword.png": _chunk(b"tEXt", b"\0text"),
+        "ztxt-method.png": _chunk(b"zTXt", b"Note\0\1" + zlib.compress(b"x")),
+        "itxt-flag.png": _chunk(b"iTXt", b"Title\0\2\0en\0\0text"),
+        "itxt-separators.png": _chunk(b"iTXt", b"Title\0\0\0en-only"),
+    }
+    for name, chunk in cases.items():
+        shot = _asset(tmp_path, name, _png(chunk))
+        with pytest.raises(pytest.fail.Exception, match=r"malformed [tzi]\wXt chunk"):
+            repo_text(shot, tmp_path)
+
+
 def test_a_truncated_or_over_inflating_png_fails_by_name(tmp_path: Path):
     cut = _asset(tmp_path, "cut.png", _png(_chunk(b"tEXt", b"Comment\0hello"))[:-9])
     with pytest.raises(

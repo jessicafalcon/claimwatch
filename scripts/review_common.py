@@ -76,20 +76,33 @@ def _inflate(data: bytes) -> bytes:
     return out
 
 
+def _fields(kind: bytes, body: bytes, count: int) -> list[bytes]:
+    """`body` split on exactly `count` NUL separators, or malformed by name."""
+    fields = body.split(b"\0", count)
+    if len(fields) != count + 1 or not 1 <= len(fields[0]) <= 79:
+        raise Unreadable(f"malformed {kind.decode('latin-1')} chunk")
+    return fields
+
+
 def _chunk_text(kind: bytes, body: bytes) -> str:
-    """One text chunk decoded: `keyword: text` for the keyed kinds."""
+    """One text chunk decoded to `keyword: text`, each kind parsed to the shape
+    the specification declares (a 1–79 byte keyword, its NUL separators, the
+    flag and method bytes); a chunk off that shape is malformed by name."""
     if kind == b"eXIf":
         return body.decode("latin-1")
-    keyword, _, rest = body.partition(b"\0")
     if kind == b"tEXt":
-        text = rest
+        keyword, text = _fields(kind, body, 1)
     elif kind == b"zTXt":
-        text = _inflate(rest[1:])  # one byte of compression method
-    else:  # iTXt: flag, method, language\0, translated keyword\0, UTF-8 text
-        compressed = rest[:1] == b"\1"
-        _, _, rest = rest[2:].partition(b"\0")
-        _, _, text = rest.partition(b"\0")
-        if compressed:
+        keyword, rest = _fields(kind, body, 1)
+        if rest[:1] != b"\0":  # the one compression method
+            raise Unreadable("malformed zTXt chunk")
+        text = _inflate(rest[1:])
+    else:  # iTXt: keyword, flag, method, language, translated keyword, text
+        keyword, rest = _fields(kind, body, 1)
+        if rest[:1] not in (b"\0", b"\1") or rest[1:2] != b"\0":
+            raise Unreadable("malformed iTXt chunk")
+        _, _, text = _fields(kind, keyword + b"\0" + rest[2:], 3)[1:]
+        if rest[:1] == b"\1":
             text = _inflate(text)
     encoding = "utf-8" if kind == b"iTXt" else "latin-1"
     return f"{keyword.decode('latin-1')}: {text.decode(encoding, errors='replace')}"
