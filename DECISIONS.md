@@ -328,9 +328,10 @@ place and never deleted.
   gate, `ROWS`, the raw-table shape check, the no-key classify step). The
   rules sections are untouched; cut them only when they too carry
   redundancy.
-- **The CLAUDE.md cap is 600 lines, and the trim is a `tooling/` PR
-  (tooling, 2026-09-11).** At 805 lines the Phase 6–9g exits had each
-  re-deferred the BACKLOG row; `tooling/claude-md-trim` cut the file to 584
+- **The CLAUDE.md cap is 600 lines; the trim rides the next phase's branch
+  (2026-09-11).** The BACKLOG row was re-deferred at the 3c, 5a,
+  5b and 9g exits and the 6–9f exits did not report the 600 trigger at all;
+  at 805 lines the trim cut the file to 592
   without touching a rule: the Repo map lost its per-mart and per-module
   history (each module's docstring and each spec's Delivered paragraph hold
   it), Commands lost the per-target lines `make help` prints and the
@@ -341,13 +342,18 @@ place and never deleted.
   count that `docs/PLAN.md` §7 asked for. The rules sections (Deterministic
   first through the agents table) are ~330 lines on their own, so the ~400
   cap of Phase 0a cannot be met while they stand; the cap is restated as 600,
-  the number the exits had already used as the trigger, and the coherence
-  audit reports growth past 550. Not taken: moving rules into the three
+  the number the exits had already used as the trigger. No guard checks it —
+  `wc -l` at each exit is the developer's step, as the 0a promise of an audit
+  report proved to be. Not taken: moving rules into the three
   standards (a skill loads by path; a rule that applies on every turn belongs
   in the file every turn and every custom subagent receives); a second
   always-loaded file under `docs/` (custom subagents receive CLAUDE.md only —
   sub-agents reference, read 2026-09-05 — so the split would hide the moved
-  rules from the reviewers).
+  rules from the reviewers). Written on `tooling/claude-md-trim`, reviewed by
+  the docs-only round (coherence-auditor + study-editor, nine wording and
+  record findings, all fixed), then folded into `phase-9h-sample-mean` at the
+  developer's word — the one exception so far to "never mixed with a phase"
+  (CLAUDE.md → Git workflow), taken because the round had already run.
 
 ## Gotchas (stack surprises found live)
 

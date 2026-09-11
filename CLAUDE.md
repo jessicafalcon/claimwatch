@@ -80,8 +80,8 @@ Delivered paragraph and `make help`, not here.
   file tracked.
 - `sql/raw/`, `sql/staging/`, `sql/marts/` — plain SQL, one file per table;
   the header names the grain, the provenance columns and the BACKING rows
-  fed. A Python-fed mart has a DDL-only `.sql` and one writer in
-  `pipeline/build.py`, which lists them.
+  fed. A Python-fed mart has a DDL-only `.sql` and one `write_*` function
+  in `pipeline/build.py`.
 - `pipeline/` — `warehouse.py` (the one place that knows DuckDB from
   Snowflake), `build.py` (raw → staging → marts, the classify step, the
   Python-fed mart writers), `cli.py` (the validating `make` entry),
@@ -89,8 +89,9 @@ Delivered paragraph and `make help`, not here.
 - `ingest/` — the scrapers: `sources.py` (every source as one declaration;
   the one place a brand-carrying address may appear), `politeness.py`,
   `robots.py` (RFC 9309), `parsed.py` (what every parser hands back and the
-  declared bounds), `captures.py`, one parser per source (`trustpilot.py`
-  reads an authorized OFFLINE export), `fetch.py` (the only `httpx` import).
+  declared bounds), `captures.py`, a parser per fetched source — four; two
+  sources are hand-read (`trustpilot.py` reads an authorized OFFLINE
+  export), `fetch.py` (the only `httpx` import).
   A *capture* is one run's saved copy of the pages exactly as they arrived,
   with each page's address and time and the robots file beside it.
 - `classify/` — `labels.py` (the closed seven-label set), `split.py`
@@ -113,8 +114,9 @@ Delivered paragraph and `make help`, not here.
 - `dags/` *(Phase 10)* — `friction_ledger.py`.
 - `fixtures/` — read-only after Phase 1, each set with a `MANIFEST.sha256`:
   `synthetic/` (hand-written fake reviews), `anchors/` (brief §6 figures,
-  seeded as Documented), one hand-written capture set per source in its
-  exact shape, `damir/` (a small, real, brand-free slice). Re-freezing is a
+  seeded as Documented), a hand-written capture set per parsed source in
+  its exact shape (four), `damir/` (a small, real, brand-free slice).
+  Re-freezing is a
   `Freeze:` line in the spec plus a DECISIONS entry.
 - `data/` — gitignored working output with two tracked subtrees:
   `data/snapshots/` (figures a person read off a page, and the weekly cron's
@@ -125,7 +127,9 @@ Delivered paragraph and `make help`, not here.
 `make help` lists every target with its one-line meaning; a later phase adds
 its targets there and here in the same PR. Every target is offline — no key,
 no services, no network — except the classify step of `rebuild` when a key is
-set and the three targets behind `confirm`. What `make help` cannot say:
+set and the two network targets behind `confirm` (`scrape`, `fetch-damir`);
+`reset`, also behind `confirm`, is offline but destructive. What `make help`
+cannot say:
 
 - `lint` (ruff via pre-commit) REWRITES files, never inside a gate. Its rule
   set is the mechanical half of `code-craft`; a function that stays whole
@@ -367,9 +371,7 @@ one, and write one sentence in the README about why.
 
 - Result first: what changed / passed / failed, then details.
 - Plain English, short sentences. No task restatement, no "I will now…", no
-  closing summary that repeats the middle. A one-line statement of what the
-  next step produces is not a restatement; the report format below is the
-  recap.
+  closing summary that repeats the middle.
 - One sentence if it fits. Explanations ≤ 4 sentences.
 - The banned-word list above applies to chat too. Show the property.
 - Code comments only where the code can't say it. One-line docstrings unless
@@ -381,8 +383,9 @@ one, and write one sentence in the README about why.
 
 The session model is chosen with `/model`. The four diff reviewers pin
 `model: claude-opus-4-8`; `senior-architect` and `coherence-auditor` inherit
-the session's; all six pin `effort: high`. The classifier's model
-(`classify/llm.py`, Haiku 4.5) is a data-path setting. Source: the two
+the session's model; all six pin `effort: high`. The classifier's model
+(`classify/llm.py`, Haiku 4.5) is a data-path setting, not this section's
+subject. Source: the two
 prompting guides, read 2026-09-05 (DECISIONS → Gotchas).
 
 **On either model**
@@ -434,11 +437,9 @@ serif, terracotta) is wrong for a data study (the charts rule).
 ## Git workflow (one branch + one PR per phase)
 
 - `main` is unprotected on this private repo, so "never commit to it directly,
-  never force-push" is a self-imposed rule. The one written exception: the
-  weekly workflow's identity commits under `data/snapshots/` only (the commit
-  stages only that subtree; `persist-credentials: false` keeps the write token
-  off `.git/config`). DECISIONS → Gotchas; revisit if the repo goes public or
-  onto a paid plan.
+  never force-push" is a self-imposed rule (DECISIONS → Gotchas). The one
+  written exception: the weekly workflow's identity commits under
+  `data/snapshots/` only, staged as that subtree alone.
 - Review gate BEFORE the remote: run the agents on the finished work and
   report verdicts. Do NOT push or open a PR until the developer has seen the
   verdicts and says to.
@@ -531,7 +532,9 @@ makes the stamp stale.
 
 Across the loop: a skill and its agent read the same text, so the bar the
 code was written to is the bar it is reviewed against; the reviewers judge
-diffs and never re-judge the plan; every reminder is one line and none blocks.
+diffs and never re-judge the plan; one reminder per reason at each entry
+point (the `challenge-gate` hook, `/phase-start`, `/review-round`), and none
+of them blocks.
 
 ## Project tooling
 
@@ -541,8 +544,13 @@ by contract: none carry Write/Edit (one carve-out: functionality-tester may
 and remove it). Findings are fixed in the main session or explicitly accepted
 — never auto-fixed.
 
-- Hooks under `.claude/hooks/`, each fail-open and pinned by its test, wired
-  by the gitignored `.claude/settings.local.json`: `run-tests` (after any
+- Hooks under `.claude/hooks/`, each fail-open and pinned by its test. The
+  wiring is the gitignored `.claude/settings.local.json`, three groups, each
+  hook as `{"type": "command", "command": "python3
+  \"$CLAUDE_PROJECT_DIR/.claude/hooks/<name>.py\""}`: PostToolUse
+  `"Write|Edit|MultiEdit|NotebookEdit"` → `run-tests.py` then
+  `challenge-gate.py`; PreToolUse `"ExitPlanMode"` → `challenge-gate.py`;
+  PreToolUse `"Bash"` → `ask-gate.py`. `run-tests` (after any
   `.py`, `.sql`, `.yaml` or `.yml` edit, pytest failures-first, blocks on
   red; it runs the checked-out branch's tests with your HOME, so read an
   inbound branch's diff of the hooks, `tests/conftest.py`, `pyproject.toml`
