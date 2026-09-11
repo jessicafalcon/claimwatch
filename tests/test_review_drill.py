@@ -199,7 +199,15 @@ def test_a_forbidden_mart_column_is_refused_by_name(tmp_path):
     db = _built(tmp_path)
     conn = connect("duckdb", database=db)
     try:
-        conn.execute("create or replace table review_drill as select 'x' as body")
+        # a well-formed drill row plus a body column: without the guard the export
+        # would succeed and leak body, so this isolates the guard (removing it
+        # fails the test on "did not raise", not on a downstream SQL error).
+        conn.execute(
+            "create or replace table review_drill as "
+            "select 'app-store:1' as review_id, 'positive' as theme, 5.0 as rating, "
+            "'2026-01-01' as review_date, 'digital-first' as segment, "
+            "'app-store' as source, 'leaked text' as body"
+        )
     finally:
         conn.close()
     with pytest.raises(ExportError, match="body"):
@@ -271,3 +279,20 @@ def test_export_refuses_a_missing_mart_by_name(tmp_path):
     connect("duckdb", database=empty).close()  # a DB with no marts
     with pytest.raises(ExportError, match="review_drill"):
         build_sqlite(duck_db=empty, sqlite_path=tmp_path / "out.sqlite")
+
+
+def test_review_drill_is_stable_across_a_rebuild(tmp_path):
+    """The run-twice property (CLAUDE.md): rebuilding review_drill over the same
+    input leaves the row count unchanged (create or replace, deterministic join)."""
+    db = _built(tmp_path)
+
+    def count() -> int:
+        conn = connect("duckdb", database=db)
+        try:
+            return conn.execute("select count(*) from review_drill").fetchone()[0]
+        finally:
+            conn.close()
+
+    first = count()
+    _classify_and_build(db, run_id="again")  # re-run the classify path on the same db
+    assert count() == first == pins.CLASSIFIED_REVIEWS_ROWS

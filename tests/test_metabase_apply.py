@@ -275,3 +275,17 @@ def test_export_command_routes_rows_to_the_matching_database(monkeypatch):
     assert entry.main(["export", "--rows", "synthetic"]) == 0
     assert seen["db"] == database_for("synthetic")
     assert seen["db"] != database_for("captured")
+
+
+def test_dashcards_are_replaced_not_appended_on_reapply():
+    """Invariant 6 for the dashboard's cards: every apply PUTs the complete
+    dashcard set as an update (Metabase PUT-replace), never creating a per-card
+    'dashcard' object — so a re-apply does not accumulate duplicate cards."""
+    client = FakeClient()
+    apply(_CONFIG, client)
+    apply(_CONFIG, client)
+    dashcard_writes = [body for _, _, body in client.updates if "dashcards" in body]
+    assert len(dashcard_writes) == 2  # one complete PUT per apply
+    n = len(_CONFIG["dashboard"]["cards"])
+    assert all(len(body["dashcards"]) == n for body in dashcard_writes)
+    assert not any(kind == "dashcard" for kind, _ in client.creates)
