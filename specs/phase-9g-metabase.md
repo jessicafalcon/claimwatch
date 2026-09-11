@@ -5,7 +5,8 @@ Contract for the `phase-9g-metabase` branch. Source: PROJECT_BRIEF.md §4.4 (the
 the permanent-artifact-first split (DECISIONS → Phase 9a). It is the last Phase 9
 sub-phase. Depends on Phase 9f merged (PR #29, 2026-09-10).
 
-**Status: APPROVED 2026-09-10 — DELIVERED 2026-09-11, PR open.** No new Python dependency:
+**Status: APPROVED 2026-09-10 — DELIVERED 2026-09-11, merged (PR #30); the
+demonstration's evidence landed after it on `fix/9g-demonstration`.** No new Python dependency:
 the applier is stdlib `urllib` (the `opendata/fetch.py` precedent), the
 marts→engine export is stdlib `sqlite3`, the config is `pyyaml` (Phase 2), the
 drill view is `duckdb` + SQL. Metabase runs via Docker, which CLAUDE.md →
@@ -223,7 +224,7 @@ make rebuild ROWS=synthetic && uv run pytest tests/test_metabase_apply.py tests/
   container + load (a second server for a laptop demo); Snowflake full-mode
   (Phase 10, needs an account).*
 - **The applier is a developer-run stdlib `urllib` module reading Metabase
-  credentials from `.env`, idempotent by upsert-by-name; it is not a `make`
+  credentials from the environment (the developer exports `.env`), idempotent by upsert-by-name; it is not a `make`
   target with a variable.** Keeping it `python -m study.metabase apply` avoids the
   `make` variable/`confirm` surface; localhost provisioning is neither paid nor
   destructive; `--dry-run` is the offline half. Satisfies invariants 4 and 6.
@@ -264,6 +265,9 @@ make rebuild ROWS=synthetic && uv run pytest tests/test_metabase_apply.py tests/
 - Records: `DECISIONS.md`, `BACKLOG.md`, `CLAUDE.md`, `BACKING.md`, `SPEC.md`,
   `README.md`, this spec.
 - `.gitignore` (if `data/metabase/metabase.sqlite` is not already covered by `data/`).
+- `.env.example` (added on `fix/9g-demonstration`): the placeholder template for
+  the applier's three variables and the model key; the one tracked `.env*` file,
+  un-ignored by `!.env.example`.
 
 Freeze: none
 
@@ -309,8 +313,8 @@ Freeze: none
 
 The phase adds **no** `make` target that takes a variable, deletes, calls a paid
 API, or touches the public network. It adds one developer-run network module
-(`study.metabase apply`, HTTP to **localhost** Metabase with credentials from
-`.env`) and one offline stdlib export (`study.metabase export`, no network, no
+(`study.metabase apply`, HTTP to **localhost** Metabase with credentials from the environment, the
+exported `.env`) and one offline stdlib export (`study.metabase export`, no network, no
 credentials).
 
 | Target/module | empty | `../x` | `"; ` | env-exported | credentials | Pinned by |
@@ -396,7 +400,7 @@ their exact string (`rating` never drifts), ordered rows, byte-identical on a
 rerun — which Metabase reads through its built-in SQLite driver (no DuckDB
 community JAR). `study/metabase/apply.py` provisions the dashboard from
 `config.yaml` over the HTTP API idempotently (stdlib `urllib`, an injected client
-seam, upsert by name, credentials from `.env` refused by name, `_base_url_ok` and
+seam, upsert by name, credentials from the environment refused by name, `_base_url_ok` and
 `_NoCrossHostRedirect` keeping the session token on the vetted host, `--dry-run`
 the offline half). The only text a drilled theme shows is B2.1's five Documented,
 sourced paraphrases (`study/paraphrases.yaml`) — B2.1 moved Pending → Documented.
@@ -429,3 +433,18 @@ notes/record/wording fixed (cross-host redirect refused, the make-rebuild prose,
 the image-tag Gotcha, Record-updates reconciled). Exit coherence audit: coherent,
 no BLOCKER — the §90-brief annotation and the Phase-10 warehouse-aware BACKLOG row
 (now naming `review_drill`) applied at exit.
+
+After the merge, `fix/9g-demonstration` landed the demonstration's evidence and
+what the live step taught. The three synthetic screenshots are committed, each
+carrying *synthetic fixture data — not a study finding* in its pixels (a caption
+band under the capture) and in an iTXt `Comment` chunk, the doc's alt text
+repeating it; the pinning test now walks the committed PNGs (invariant 2 held
+by a test, not by eye alone). `.env.example` is tracked. The repo's first tracked
+binary assets are read through the guards' reader —
+`scripts/review_common.py::read_text_or_error` reads a declared asset
+(`BINARY_ASSETS`, by directory and suffix) as its text channels for the suite's
+scanners and `check_docs`'s naming check alike; the PNG chunk kinds are a closed
+set, each text chunk is parsed to its declared shape, IEND ends the walk. The
+applier's login comes from the environment and every doc shows the export step.
+Review round 1 on that branch fixed four findings; round 2 (the exit audit, five
+agents): 0 BLOCKER, 22 findings, all fixed (DECISIONS → Phase 9g).

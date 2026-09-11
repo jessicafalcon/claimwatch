@@ -26,7 +26,7 @@ from ingest.sources import (
     by_name,
     source_names,
 )
-from tests.repo_text import repo_text
+from tests.repo_text import is_binary_asset, repo_text
 
 ROOT = Path(__file__).resolve().parent.parent
 EXCLUDED_TOP = ("tests",)  # plus every dot-directory (.venv, .git, .claude)
@@ -268,9 +268,14 @@ def test_brand_carrying_strings_appear_only_in_the_declarations():
     """D1, enforced over the tree: every string that spells the studied
     insurer (`ingest/sources.py::BRAND_TOKENS`) appears in no other tracked
     file — not a doc, a comment, a test name, a fixture or a record — as a
-    whole word, in any case. Every tracked file is UTF-8 text (the repo holds
-    no binary), so a file that does not decode fails by name rather than
-    being skipped (round 1 skipped it; tooling round 3 closed the class)."""
+    whole word, in any case. Every tracked file is read through `repo_text`:
+    UTF-8 text as its lines, a declared binary asset (the 9g demonstration
+    screenshots, `repo_text.BINARY_ASSETS`) as the text it carries
+    beside its pixels — the pixels are reviewed by eye, the text channels
+    here; any other file that does not decode fails by name rather than being
+    skipped (round 1 skipped it; tooling round 3 closed the class). The floor
+    keeps the empty result honest: a run that read no text file or no binary
+    asset proves nothing (`test_noqa_reasons` has the same floor)."""
     import subprocess
 
     from ingest.sources import BRAND_TOKENS
@@ -279,12 +284,14 @@ def test_brand_carrying_strings_appear_only_in_the_declarations():
         ["git", "ls-files", "-z"], cwd=ROOT, capture_output=True, check=True
     ).stdout.decode("utf-8", errors="replace")
     hits: list[str] = []
+    scanned = {"text": 0, "binary": 0}
     for rel in filter(None, tracked.split("\0")):
         if rel == "ingest/sources.py":
             continue
         path = ROOT / rel
         if not path.is_file():
             continue
+        scanned["binary" if is_binary_asset(path) else "text"] += 1
         for n, line in enumerate(repo_text(path).splitlines(), 1):
             for token in BRAND_TOKENS:
                 if re.search(
@@ -292,6 +299,12 @@ def test_brand_carrying_strings_appear_only_in_the_declarations():
                 ):
                     hits.append(f"{rel}:{n}: {token}")
     assert hits == [], hits
+    assert scanned["text"] >= 1, scanned
+    assert scanned["binary"] >= 1, (
+        f"{scanned}: no declared binary asset was read — if the screenshots were "
+        "removed on purpose, retire their BINARY_ASSETS declaration "
+        "(scripts/review_common.py) and this floor in the same commit"
+    )
 
 
 # The words an address of the studied insurer may carry WITHOUT being a brand

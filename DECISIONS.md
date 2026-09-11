@@ -2802,10 +2802,58 @@ in the `X-Metabase-Session` header; list endpoints return a bare list on some
 versions and `{"data": [...]}` on others, so `as_list` accepts both. The pinned
 `metabase/metabase` image tag and the exact dashcard body are confirmed against
 the running version in the build's first hour (spec stack risk); SQLite is a
-built-in driver, so no third-party JAR is mounted. The image is pinned by the
+built-in driver, so no third-party JAR is mounted. Confirmed 2026-09-11 on
+`metabase/metabase:v0.63.16`: the built-in SQLite driver reads the mounted
+`data/metabase/metabase.sqlite`, and `PUT /api/dashboard/:id` with a `dashcards`
+array attaches the cards — the applier's request bodies matched the running
+version, no `apply.py` change needed; the demonstration screenshots (synthetic)
+are committed under `study/metabase/screenshots/`. These PNGs are the repo's
+first tracked binary assets: the one full-tree neutrality scanner
+(`tests/test_ingest_layout.py::test_brand_carrying_strings_appear_only_in_the_declarations`)
+reads a declared binary asset (`tests/repo_text.py::BINARY_ASSET_READERS`,
+`{.png}`) as the text it carries beside its pixels — every `tEXt`, `zTXt`,
+`iTXt` and `eXIf` chunk, decoded — so the pixels are reviewed by eye and the
+text channels by the scanner (the macOS screenshots carry an XMP `iTXt` and an
+EXIF chunk; review round 1 of this branch asked that they not go unscanned, and
+that a text file mis-named `.png` not slip past — the reader refuses a file
+without the PNG signature by name). Any other non-UTF-8 tracked file still fails
+by name (the traceback-at-boundary guard is unchanged), and the scanner asserts
+it read at least one text file and one binary asset, so an empty hit list can
+never be vacuous. *Rejected: forbidding text chunks outright — every macOS
+screenshot carries them, so the rule would force a strip step on each capture;
+scanning them is the same guarantee with no step.* Landed on `fix/9g-demonstration` (the screenshots were unpushed
+when PR #30 merged, so its CI never saw them). *Rejected: keeping the repo
+binary-free by not committing the screenshots — done-when 5 wants them committed
+as the demonstration's evidence.* The image is pinned by the
 mutable tag `v0.63.16`, not a content digest (review round 2, security note): the
 repo's SHA-pin bar is for GitHub Actions, and this stack is developer-run, never
 in CI, so the tag stands with the compose header's "confirm the tag in the spike"
 caveat; a digest pin is a later option if demo reproducibility matters. Cross-host
 redirects on the applier's HTTP client are refused (`_NoCrossHostRedirect`) so a
 3xx cannot carry the session token off the vetted host (round 2, security note).
+
+Exit review of `fix/9g-demonstration` (2026-09-11, five agents, 22 findings, all
+fixed). (1) Every committed screenshot carries the caption *synthetic fixture
+data — not a study finding* in its pixels (a band drawn under the capture) and in
+an iTXt `Comment` chunk, and the doc's alt text repeats it; the pinning test walks
+the committed PNGs, so a captionless screenshot fails by name. The committed
+bytes are the captioned render of the original capture (drawn by a scratch
+script, not tracked), so each PNG now carries an `eXIf` chunk and the caption
+`iTXt`, no longer the capture's XMP. (2) The reader for a tracked binary asset
+moved from `tests/repo_text.py` into `scripts/review_common.py::read_text_or_error`,
+the guards' read boundary, so the suite's scanners and `check_docs`'s naming
+check read the same channels (site-fix: round 1 had taught one of the two); an
+asset is declared by directory AND suffix (`BINARY_ASSETS`), the PNG chunk kinds
+are a closed set (the text kinds read; the specification's pixel, colour, layout
+and timing kinds and Apple's `iDOT` skipped; anything else refused by name), each
+text chunk is parsed to its declared shape, and IEND ends the walk. *Rejected:
+scanning every unknown chunk's body as latin-1 — noise from compressed profiles
+and no refusal when a channel is unreadable; refusing by name keeps the set
+explicit.* (3) The applier reads its login from the environment; every doc said
+"reads `.env`" while nothing loaded the file, so the docs now show the export
+step. *Rejected: a `.env` loader in the applier — a second secrets read path for
+one developer-run command; the model key has the same convention.* (4)
+`.env.example` is the one tracked `.env*` file: placeholders only, un-ignored by
+`!.env.example`; recorded in the spec's Scope and CLAUDE.md's Repo map. The
+CLAUDE.md-length BACKLOG row is re-deferred once more (805 lines; its own
+`tooling/` PR before Phase 10).

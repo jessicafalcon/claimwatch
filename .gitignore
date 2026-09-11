@@ -1,7 +1,8 @@
-# Secrets — never commit. The API key and warehouse credentials live in .env only.
-# `.env*` also catches .envrc (direnv) and .env-prod; a template would be `.env.example`
-# and needs a `!` line here first.
+# Secrets — never commit. The API key, the Metabase login and warehouse credentials
+# live in .env only. `.env*` also catches .envrc (direnv) and .env-prod; the one
+# tracked exception is the placeholder template, un-ignored by the `!` line below.
 .env*
+!.env.example
 *.pem
 credentials*
 

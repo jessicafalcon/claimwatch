@@ -24,6 +24,7 @@ from pipeline.build import build_post_classify_marts, rebuild, write_classified_
 from pipeline.warehouse import connect, database_for
 from study.metabase.export import ExportError, _cell, build_sqlite
 from tests import pins
+from tests.repo_text import repo_text
 
 pytestmark = pytest.mark.slow  # slow: a full rebuild, kept out of the fast hook
 
@@ -252,24 +253,35 @@ def test_sqlite_export_rating_is_exact_and_row_order_is_stable(tmp_path):
 
 
 _METABASE = Path(__file__).resolve().parent.parent / "study" / "metabase"
+_IMAGE = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
 _LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
+_CAPTION = "synthetic fixture data — not a study finding"
 
 
 def test_demonstration_doc_and_synthetic_screenshots_exist_and_links_resolve():
-    """Done-when 5: the walkthrough is committed, captions the view as synthetic
-    fixture data (so no fake share reads as a finding), the screenshots directory
-    exists, and every relative link resolves. The PNGs themselves are the
-    developer's spike step (non-CI); this checks the committed structure."""
+    """Done-when 5 / invariant 2: the walkthrough is committed, it captions the
+    view as synthetic fixture data, every relative link resolves, and EVERY
+    committed screenshot carries the caption itself — in the doc's alt text and
+    in the PNG's own text channel (read through the suite's one reader), so a
+    screenshot that travels alone still says it is not a finding. The pixels'
+    caption band is the same sentence, confirmed by eye."""
     doc = _METABASE / "DEMONSTRATION.md"
     assert doc.is_file()
     text = doc.read_text(encoding="utf-8")
-    assert "synthetic fixture data — not a study finding" in text
-    assert (_METABASE / "screenshots").is_dir()
+    assert _CAPTION in text
+    shots = _METABASE / "screenshots"
+    assert shots.is_dir()
     for target in _LINK.findall(text):
         if target.startswith(("http://", "https://")):
             continue
         path = target.split("#", 1)[0]
         assert (doc.parent / path).exists(), target
+    linked = {Path(t).name: alt for alt, t in _IMAGE.findall(text)}
+    committed = sorted(p.name for p in shots.glob("*.png"))
+    assert committed and committed == sorted(linked), (committed, sorted(linked))
+    for name in committed:
+        assert _CAPTION in linked[name], name
+        assert _CAPTION in repo_text(shots / name), name
 
 
 def test_export_refuses_a_missing_mart_by_name(tmp_path):

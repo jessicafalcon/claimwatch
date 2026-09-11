@@ -1,24 +1,35 @@
 """The one reader for the suite's repository scanners — the layout tests that
 walk models/, ingest/, classify/, pipeline/ or the tracked list and read each
-file. A file that is not UTF-8 text fails the test by name, never as a
+file. It is the guards' reader (`scripts/review_common.py::read_text_or_error`)
+with one difference: an unreadable file fails the test by name, never as a
 `UnicodeDecodeError` traceback (LESSONS: traceback-at-boundary, hit again in
-tests/ after the read boundary under scripts/ was closed). A test that reads
-its own tmp_path file or a fixture through a parser is not a scanner and does
-not read through here."""
+tests/ after the read boundary under scripts/ was closed). A declared binary
+asset (`review_common.BINARY_ASSETS`) reads as the text it carries outside its
+pixels — a PNG's text chunks — so the suite's scanners and `check_docs`'s
+naming check see the same channels (LESSONS: site-fix). A test that reads its
+own tmp_path file or a fixture through a parser is not a scanner and does not
+read through here."""
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
 
-from pipeline.warehouse import ROOT
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
+from review_common import ROOT, binary_asset_reader, read_text_or_error
 
 
-def repo_text(path: Path) -> str:
-    """The file's text; a file that is not UTF-8 text fails the test naming it."""
-    try:
-        return path.read_text(encoding="utf-8")
-    except UnicodeDecodeError:
-        shown = path.relative_to(ROOT) if path.is_relative_to(ROOT) else path.name
-        pytest.fail(f"{shown}: not UTF-8 text")
+def is_binary_asset(path: Path, root: Path = ROOT) -> bool:
+    """True for a declared tracked binary asset: its directory and suffix."""
+    return binary_asset_reader(path, root) is not None
+
+
+def repo_text(path: Path, root: Path = ROOT) -> str:
+    """The file's text — for a declared binary asset, the text beside its
+    pixels; a file that is not readable as text fails the test naming it."""
+    text, err = read_text_or_error(path, root)
+    if text is None:
+        pytest.fail(err)
+    return text
