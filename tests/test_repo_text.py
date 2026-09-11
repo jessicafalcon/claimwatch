@@ -169,3 +169,22 @@ def test_a_truncated_or_over_inflating_png_fails_by_name(tmp_path: Path):
     bad = _asset(tmp_path, "bad.png", _png(_chunk(b"zTXt", b"Note\0\0not-zlib")))
     with pytest.raises(pytest.fail.Exception, match=r"corrupt compressed text chunk"):
         repo_text(bad, tmp_path)
+    stub = zlib.compress(b"cut short")[:-4]  # a stream with no end
+    short = _asset(tmp_path, "short.png", _png(_chunk(b"zTXt", b"Note\0\0" + stub)))
+    with pytest.raises(
+        pytest.fail.Exception, match=r"incomplete compressed text chunk"
+    ):
+        repo_text(short, tmp_path)
+
+
+def test_iend_ends_the_image_and_nothing_may_follow_or_be_missing(tmp_path: Path):
+    """IEND is the end of the image: bytes after it and an image with no IEND
+    are each refused by name, so a tool-appended tail is one clear line and a
+    chunk after IEND cannot hide from the closed-set walk."""
+    whole = _png(_chunk(b"tEXt", b"Comment\0hello"))
+    tail = _asset(tmp_path, "tail.png", whole + b"trailing bytes")
+    with pytest.raises(pytest.fail.Exception, match=r"bytes after the IEND chunk"):
+        repo_text(tail, tmp_path)
+    no_end = _asset(tmp_path, "no-end.png", whole[:-12])
+    with pytest.raises(pytest.fail.Exception, match=r"no IEND chunk"):
+        repo_text(no_end, tmp_path)

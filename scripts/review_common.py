@@ -71,8 +71,10 @@ def _inflate(data: bytes) -> bytes:
         out = inflater.decompress(data, MAX_INFLATED)
     except zlib.error:
         raise Unreadable("corrupt compressed text chunk") from None
-    if not inflater.eof or inflater.unconsumed_tail:
+    if inflater.unconsumed_tail:
         raise Unreadable(f"a text chunk inflates past {MAX_INFLATED} bytes")
+    if not inflater.eof:
+        raise Unreadable("incomplete compressed text chunk")
     return out
 
 
@@ -110,8 +112,9 @@ def _chunk_text(kind: bytes, body: bytes) -> str:
 
 def png_text(data: bytes) -> str:
     """The text a PNG carries beside its pixels, one chunk per line; bytes that
-    are not a PNG, whose chunks are truncated, or that carry a chunk kind
-    outside the closed set are `Unreadable` by name."""
+    are not a PNG, whose chunks are truncated, that carry a chunk kind outside
+    the closed set, that end before IEND or go on after it are `Unreadable`
+    by name."""
     if not data.startswith(PNG_SIGNATURE):
         raise Unreadable("not a PNG")
     lines: list[str] = []
@@ -122,12 +125,16 @@ def png_text(data: bytes) -> str:
         body = data[pos + 8 : pos + 8 + length]
         if len(kind) != 4 or len(body) != length:
             raise Unreadable("truncated PNG chunk")
+        if kind == b"IEND":
+            if pos + 12 + length != len(data):
+                raise Unreadable("bytes after the IEND chunk")
+            return "\n".join(lines)
         if kind in PNG_TEXT_CHUNKS:
             lines.append(_chunk_text(kind, body))
         elif kind not in PNG_OTHER_CHUNKS:
             raise Unreadable(f"unknown PNG chunk {kind.decode('latin-1')!r}")
         pos += 12 + length  # length, type, body, CRC
-    return "\n".join(lines)
+    raise Unreadable("no IEND chunk")
 
 
 # The tracked binary assets, each declared by the directory that holds it AND

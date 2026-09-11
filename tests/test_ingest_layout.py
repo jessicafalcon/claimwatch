@@ -299,7 +299,12 @@ def test_brand_carrying_strings_appear_only_in_the_declarations():
                 ):
                     hits.append(f"{rel}:{n}: {token}")
     assert hits == [], hits
-    assert scanned["text"] >= 1 and scanned["binary"] >= 1, scanned
+    assert scanned["text"] >= 1, scanned
+    assert scanned["binary"] >= 1, (
+        f"{scanned}: no declared binary asset was read — if the screenshots were "
+        "removed on purpose, retire their BINARY_ASSETS declaration "
+        "(scripts/review_common.py) and this floor in the same commit"
+    )
 
 
 # The words an address of the studied insurer may carry WITHOUT being a brand
