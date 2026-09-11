@@ -569,7 +569,12 @@ def test_the_only_tracked_files_under_data_are_hand_read_snapshot_csvs():
     # field either (round 1, sec #3); the set is the writer's own FIT_FIELD_NAMES
     # tuple, which stays closed because the writer emits exactly it
     # (tests/test_damir.py::test_fit_field_names_is_the_write_order) — a
-    # hand-typed copy here would only drift (9h challenge round 1, #2).
+    # hand-typed copy here would only drift (9h challenge round 1, #2). So the
+    # name check is a consistency check; the guard that keeps a brand or a
+    # person out of the tracked file is the trio below it — every value parses
+    # as a number, every row is exactly two cells, and the file's bytes are
+    # pinned (test_artifact_equals_recompute, the byte-prefix pin) — not the
+    # name set (9h review round 1, security-reviewer #2).
     from opendata.fit import FIT_FIELD_NAMES
 
     DAMIR_FIT = "data/damir/claim_cost_fit.csv"
