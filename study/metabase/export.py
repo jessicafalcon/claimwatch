@@ -54,7 +54,9 @@ def _cell(value: object) -> object:
 
 def _columns(duck_conn, table: str) -> list[str]:
     """The mart's column names, from the engine's own catalog (a limit-0 read)."""
-    return [d[0] for d in duck_conn.execute(f"select * from {table} limit 0").description]
+    return [
+        d[0] for d in duck_conn.execute(f"select * from {table} limit 0").description
+    ]
 
 
 def _export_table(duck_conn, sqlite_conn, table: str, order_by: str) -> int:
@@ -72,7 +74,9 @@ def _export_table(duck_conn, sqlite_conn, table: str, order_by: str) -> int:
     placeholders = ", ".join("?" for _ in columns)
     sqlite_conn.execute(f'drop table if exists "{table}"')
     sqlite_conn.execute(f'create table "{table}" ({cols_sql})')
-    rows = duck_conn.execute(f"select {cols_sql} from {table} order by {order_by}").fetchall()
+    rows = duck_conn.execute(
+        f"select {cols_sql} from {table} order by {order_by}"
+    ).fetchall()
     sqlite_conn.executemany(
         f'insert into "{table}" ({cols_sql}) values ({placeholders})',
         [[_cell(v) for v in row] for row in rows],
@@ -88,8 +92,7 @@ def _export_paraphrases(sqlite_conn, yaml_path: Path = PARAPHRASES_YAML) -> int:
     data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
     sqlite_conn.execute('drop table if exists "paraphrases"')
     sqlite_conn.execute(
-        'create table "paraphrases" '
-        "(theme, theme_title, paraphrase, source)"
+        'create table "paraphrases" (theme, theme_title, paraphrase, source)'
     )
     rows = [
         (

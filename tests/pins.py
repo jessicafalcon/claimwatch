@@ -297,6 +297,16 @@ REVIEW_DRILL_COLUMNS = (
     "source",
 )
 
+# The Metabase applier's dry-run request bodies (9g): 7 requests — the SQLite
+# database, the collection, three native-SQL questions, the dashboard, and the
+# dashboard's cards. Pinned as a hash of the deterministic JSON so a config.yaml
+# change is a deliberate re-pin, not a silent drift; the readable structure is
+# asserted alongside in test_metabase_apply.
+METABASE_DRY_RUN_REQUESTS = 7
+METABASE_DRY_RUN_SHA256 = (
+    "66c5d859a7274614ad47ebfdd08067e9ab6469de158720e555ab877797e2df47"
+)
+
 # The theme-share marts count those rows. share = theme_rows / reviews, at the
 # review x theme grain (a review counts once in `reviews`, once per theme bar).
 # unclassified is a row, not a gap — the gray "not yet classified" band, and with

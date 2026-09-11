@@ -21,7 +21,6 @@ from classify.labels import POSITIVE, THEMES, UNCLASSIFIED, review_id
 from classify.rules import load_rules
 from pipeline.build import build_post_classify_marts, rebuild, write_classified_reviews
 from pipeline.warehouse import connect, database_for
-from study.metabase import export
 from study.metabase.export import ExportError, _cell, build_sqlite
 from tests import pins
 
@@ -82,8 +81,7 @@ def test_drill_projects_only_the_non_text_allowlist_across_the_join(tmp_path):
     conn = connect("duckdb", database=db)
     try:
         joined = [
-            d[0]
-            for d in conn.execute("select * from stg_reviews limit 0").description
+            d[0] for d in conn.execute("select * from stg_reviews limit 0").description
         ]
     finally:
         conn.close()
@@ -105,7 +103,9 @@ def test_review_id_expression_matches_labels_review_id(tmp_path):
         ).fetchall()
         drill_ids = {
             r[0]
-            for r in conn.execute("select distinct review_id from review_drill").fetchall()
+            for r in conn.execute(
+                "select distinct review_id from review_drill"
+            ).fetchall()
         }
     finally:
         conn.close()
@@ -135,7 +135,8 @@ def test_a_review_body_never_appears_in_any_drill_column(tmp_path):
     conn = connect("duckdb", database=db)
     try:
         body = conn.execute(
-            "select body from stg_reviews where body <> '' order by source, external_id limit 1"
+            "select body from stg_reviews where body <> '' "
+            "order by source, external_id limit 1"
         ).fetchone()[0]
         cells = conn.execute("select * from review_drill").fetchall()
     finally:
@@ -176,8 +177,13 @@ def test_sqlite_export_carries_only_the_allowlist_no_body_title_source_url(tmp_p
     build_sqlite(duck_db=db, sqlite_path=out)
     conn = sqlite3.connect(out)
     try:
-        drill_cols = tuple(r[1] for r in conn.execute("pragma table_info(review_drill)"))
-        tables = [r[0] for r in conn.execute("select name from sqlite_master where type='table'")]
+        drill_cols = tuple(
+            r[1] for r in conn.execute("pragma table_info(review_drill)")
+        )
+        tables = [
+            r[0]
+            for r in conn.execute("select name from sqlite_master where type='table'")
+        ]
         for table in tables:
             cols = {r[1] for r in conn.execute(f'pragma table_info("{table}")')}
             assert not cols & set(FORBIDDEN), (table, cols)
@@ -208,7 +214,8 @@ def test_sqlite_export_rating_is_exact_and_row_order_is_stable(tmp_path):
     conn = connect("duckdb", database=db)
     try:
         first = conn.execute(
-            "select source, external_id from stg_reviews order by source, external_id limit 1"
+            "select source, external_id from stg_reviews "
+            "order by source, external_id limit 1"
         ).fetchone()
         conn.execute(
             "update stg_reviews set rating = 4.3 where source = ? and external_id = ?",
@@ -226,7 +233,8 @@ def test_sqlite_export_rating_is_exact_and_row_order_is_stable(tmp_path):
     conn = sqlite3.connect(a)
     try:
         got = conn.execute(
-            "select rating, typeof(rating) from review_drill where review_id = ?", [rid[0]]
+            "select rating, typeof(rating) from review_drill where review_id = ?",
+            [rid[0]],
         ).fetchone()
     finally:
         conn.close()
