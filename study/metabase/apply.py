@@ -22,6 +22,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
+from urllib.parse import urlparse
 from urllib.request import ProxyHandler, Request, build_opener
 
 import yaml
@@ -40,10 +41,37 @@ _PATHS = {
 # Credential environment variable names — read from .env, never echoed.
 _ENV = ("METABASE_URL", "METABASE_USER", "METABASE_PASSWORD")
 
+# The base URL the client will carry a session token to: https anywhere, or plain
+# http only to the local machine. A foreign value (METABASE_URL from .env) reaches
+# a declared shape here, so the session token is never sent to an arbitrary http
+# host (secure-by-construction → what we do not own).
+_LOCAL_HOSTS = frozenset({"localhost", "127.0.0.1", "::1"})
+
 
 class MetabaseError(Exception):
     """A one-line refusal on the developer-run applier path — a missing
-    credential, or a response that is not the shape the API documents."""
+    credential, a URL of the wrong shape, or a response that is not the shape the
+    API documents."""
+
+
+def _base_url_ok(url: str) -> bool:
+    """True iff `url` is https, or http to the local machine — the closed set the
+    session token may travel to."""
+    parsed = urlparse(url)
+    if parsed.scheme == "https":
+        return True
+    return parsed.scheme == "http" and parsed.hostname in _LOCAL_HOSTS
+
+
+def _require_id(obj: object, kind: str) -> object:
+    """The `id` of a Metabase API object, or a one-line refusal naming the kind —
+    the reply is a foreign input, so its shape is checked, not assumed."""
+    if not isinstance(obj, dict) or "id" not in obj:
+        raise MetabaseError(
+            f"{kind} response is not a Metabase object with an id "
+            f"(got {type(obj).__name__})"
+        )
+    return obj["id"]
 
 
 @dataclass(frozen=True)
@@ -64,11 +92,15 @@ class Credentials:
                 f"missing Metabase credential(s) {missing} — set them in .env "
                 "(never in a tracked file or in Actions)"
             )
-        return cls(
-            source["METABASE_URL"].rstrip("/"),
-            source["METABASE_USER"],
-            source["METABASE_PASSWORD"],
-        )
+        url = source["METABASE_URL"].rstrip("/")
+        if not _base_url_ok(url):
+            scheme = urlparse(url).scheme or "?"
+            host = urlparse(url).hostname or "?"
+            raise MetabaseError(
+                f"METABASE_URL must be https:// or http://localhost — refusing "
+                f"{scheme}://{host} (the session token may not travel there)"
+            )
+        return cls(url, source["METABASE_USER"], source["METABASE_PASSWORD"])
 
 
 # --- request bodies, pure functions of config (and resolved ids) -----------------
@@ -156,8 +188,9 @@ def as_list(response: object) -> list[dict]:
 
 class UrllibClient:
     """The live client: authenticate once, then carry the session token in the
-    `X-Metabase-Session` header. stdlib `urllib`, proxies disabled, https or a
-    localhost http url only. Developer-run."""
+    `X-Metabase-Session` header. stdlib `urllib`, proxies disabled. The base URL
+    is checked to https or local http by `Credentials.from_env` (`_base_url_ok`)
+    before a token is ever sent to it. Developer-run."""
 
     def __init__(self, creds: Credentials):
         self._base = creds.url
@@ -210,11 +243,11 @@ def upsert(client: Client, kind: str, name: str, body: dict) -> object:
     that does. Returns its id. This is the idempotency mechanism: a second apply
     finds the object and updates it, never creating a duplicate."""
     for existing in client.list(kind):
-        if existing.get("name") == name:
-            object_id = existing["id"]
+        if isinstance(existing, dict) and existing.get("name") == name:
+            object_id = _require_id(existing, kind)
             client.update(kind, object_id, body)
             return object_id
-    return client.create(kind, body)["id"]
+    return _require_id(client.create(kind, body), kind)
 
 
 def apply(config: dict, client: Client) -> dict[str, object]:

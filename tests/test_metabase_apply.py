@@ -14,6 +14,8 @@ from study.metabase.apply import (
     Credentials,
     MetabaseError,
     UrllibClient,
+    _base_url_ok,
+    _require_id,
     apply,
     as_list,
     card_body,
@@ -184,3 +186,48 @@ def test_client_seam_is_defined_by_both_the_live_and_fake_clients():
         assert hasattr(Client, method)
         assert callable(getattr(UrllibClient, method))
         assert callable(getattr(FakeClient, method))
+
+
+def test_require_id_refuses_a_reply_that_is_not_an_object_with_an_id():
+    """The Metabase reply is a foreign input: its id is shaped, not assumed — a
+    reply missing id (or not a dict) is a one-line MetabaseError, not a KeyError."""
+    assert _require_id({"id": 7, "name": "x"}, "card") == 7
+    for bad in ({}, {"name": "x"}, [], "nope", None):
+        with pytest.raises(MetabaseError, match="card"):
+            _require_id(bad, "card")
+
+
+def test_upsert_refuses_a_created_object_with_no_id():
+    """upsert extracts the id through the shape guard, so a create returning no id
+    refuses by name rather than raising KeyError deeper in."""
+
+    class NoIdClient:
+        def list(self, kind):
+            return []
+
+        def create(self, kind, body):
+            return {"name": body.get("name")}  # no id
+
+        def update(self, kind, object_id, body):
+            return {}
+
+    with pytest.raises(MetabaseError):
+        upsert(NoIdClient(), "card", "Q", {"name": "Q"})
+
+
+def test_base_url_is_https_or_local_http_only():
+    """METABASE_URL reaches a declared shape: https anywhere, or http only to the
+    local machine — the session token never travels to an arbitrary http host."""
+    assert _base_url_ok("https://metabase.example.com")
+    assert _base_url_ok("http://localhost:3000")
+    assert _base_url_ok("http://127.0.0.1:3000")
+    assert not _base_url_ok("http://metabase.example.com")
+    assert not _base_url_ok("ftp://localhost")
+    with pytest.raises(MetabaseError, match="METABASE_URL"):
+        Credentials.from_env(
+            {
+                "METABASE_URL": "http://reporting.example.com",
+                "METABASE_USER": "admin",
+                "METABASE_PASSWORD": "secret",
+            }
+        )
