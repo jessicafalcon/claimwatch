@@ -27,6 +27,26 @@ review can appear.
   paraphrase (B2.1, [`../paraphrases.yaml`](../paraphrases.yaml)): our words, not
   a reviewer's, always with the public source it paraphrases.
 
+## Screenshots
+
+Captured over `ROWS=synthetic` — **synthetic fixture data, not a study finding**.
+Every review shown is hand-written; the drill carries only the non-text allowlist,
+so no review body or brand address can appear.
+
+The dashboard: the theme-row bar, the review-level drill, and B2.1's paraphrases.
+
+![The Beat 2 drill dashboard over synthetic reviews](screenshots/01-dashboard.png)
+
+Drilling one theme (`document-loop`) to the review rows behind it — a stable id,
+theme, rating, the review's own date, segment and platform; never its words, never
+a per-review address.
+
+![The drill filtered to the document-loop theme](screenshots/02-theme-drill.png)
+
+B2.1's five theme paraphrases, each in our words with its public source.
+
+![The five theme paraphrases and their sources](screenshots/03-paraphrase.png)
+
 ## Run it
 
 From the repository root:

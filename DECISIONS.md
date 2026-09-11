@@ -2802,7 +2802,12 @@ in the `X-Metabase-Session` header; list endpoints return a bare list on some
 versions and `{"data": [...]}` on others, so `as_list` accepts both. The pinned
 `metabase/metabase` image tag and the exact dashcard body are confirmed against
 the running version in the build's first hour (spec stack risk); SQLite is a
-built-in driver, so no third-party JAR is mounted. The image is pinned by the
+built-in driver, so no third-party JAR is mounted. Confirmed 2026-09-11 on
+`metabase/metabase:v0.63.16`: the built-in SQLite driver reads the mounted
+`data/metabase/metabase.sqlite`, and `PUT /api/dashboard/:id` with a `dashcards`
+array attaches the cards — the applier's request bodies matched the running
+version, no `apply.py` change needed; the demonstration screenshots (synthetic)
+are committed under `study/metabase/screenshots/`. The image is pinned by the
 mutable tag `v0.63.16`, not a content digest (review round 2, security note): the
 repo's SHA-pin bar is for GitHub Actions, and this stack is developer-run, never
 in CI, so the tag stands with the compose header's "confirm the tag in the spike"
