@@ -262,3 +262,12 @@ def test_demonstration_doc_and_synthetic_screenshots_exist_and_links_resolve():
             continue
         path = target.split("#", 1)[0]
         assert (doc.parent / path).exists(), target
+
+
+def test_export_refuses_a_missing_mart_by_name(tmp_path):
+    """An export before rebuild (a DB with no review_drill) refuses in one line
+    naming the mart, not a raw duckdb traceback (traceback-at-boundary)."""
+    empty = tmp_path / "empty.duckdb"
+    connect("duckdb", database=empty).close()  # a DB with no marts
+    with pytest.raises(ExportError, match="review_drill"):
+        build_sqlite(duck_db=empty, sqlite_path=tmp_path / "out.sqlite")

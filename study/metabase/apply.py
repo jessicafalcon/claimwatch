@@ -22,6 +22,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
+from urllib.error import URLError
 from urllib.parse import urlparse
 from urllib.request import ProxyHandler, Request, build_opener
 
@@ -192,9 +193,11 @@ class UrllibClient:
     is checked to https or local http by `Credentials.from_env` (`_base_url_ok`)
     before a token is ever sent to it. Developer-run."""
 
-    def __init__(self, creds: Credentials):
+    def __init__(self, creds: Credentials, *, opener=None):
         self._base = creds.url
-        self._opener = build_opener(ProxyHandler({}))
+        # proxies disabled: the token must not route through an ambient proxy
+        # (the opendata/fetch.py reason). The opener is injectable for tests.
+        self._opener = opener if opener is not None else build_opener(ProxyHandler({}))
         self._token = self._authenticate(creds)
 
     def _authenticate(self, creds: Credentials) -> str:
@@ -219,8 +222,16 @@ class UrllibClient:
             headers["X-Metabase-Session"] = session
         data = json.dumps(body).encode("utf-8") if body is not None else None
         request = Request(url, data=data, headers=headers, method=method)
-        with self._opener.open(request, timeout=30) as response:
-            raw = response.read()
+        try:
+            with self._opener.open(request, timeout=30) as response:
+                raw = response.read()
+        except URLError as error:
+            # a network boundary refuses in one line naming the host and cause,
+            # never the request body or the token (traceback-at-boundary)
+            raise MetabaseError(
+                f"{method} {path} to {urlparse(self._base).hostname} failed: "
+                f"{getattr(error, 'reason', error)}"
+            ) from error
         return json.loads(raw) if raw else {}
 
     def list(self, kind: str) -> list[dict]:

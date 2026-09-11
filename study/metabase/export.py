@@ -19,6 +19,7 @@ import sqlite3
 from decimal import Decimal
 from pathlib import Path
 
+import duckdb
 import yaml
 
 from pipeline import warehouse
@@ -53,10 +54,17 @@ def _cell(value: object) -> object:
 
 
 def _columns(duck_conn, table: str) -> list[str]:
-    """The mart's column names, from the engine's own catalog (a limit-0 read)."""
-    return [
-        d[0] for d in duck_conn.execute(f"select * from {table} limit 0").description
-    ]
+    """The mart's column names, from the engine's own catalog (a limit-0 read). A
+    missing mart (an export before `make rebuild`, or a DB with no classify step)
+    is refused in one line naming it, not a raw duckdb traceback at the boundary."""
+    try:
+        cur = duck_conn.execute(f"select * from {table} limit 0")
+    except duckdb.Error as error:
+        raise ExportError(
+            f"mart {table!r} not found — run `make rebuild` (then the classify "
+            f"step) before exporting"
+        ) from error
+    return [d[0] for d in cur.description]
 
 
 def _export_table(duck_conn, sqlite_conn, table: str, order_by: str) -> int:

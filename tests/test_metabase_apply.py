@@ -6,6 +6,7 @@ call."""
 from __future__ import annotations
 
 import hashlib
+from urllib.error import URLError
 
 import pytest
 
@@ -231,3 +232,26 @@ def test_base_url_is_https_or_local_http_only():
                 "METABASE_PASSWORD": "secret",
             }
         )
+
+
+def test_urllib_client_maps_a_network_error_to_a_one_line_refusal():
+    """A network failure at the boundary is a one-line MetabaseError naming the
+    host and cause — never a traceback, never the token or request body
+    (traceback-at-boundary). The opener is injected, so no socket opens."""
+
+    class FailingOpener:
+        def open(self, request, timeout=None):
+            raise URLError("connection refused")
+
+    creds = Credentials.from_env(
+        {
+            "METABASE_URL": "http://localhost:3000",
+            "METABASE_USER": "admin",
+            "METABASE_PASSWORD": "secret",
+        }
+    )
+    with pytest.raises(MetabaseError) as caught:
+        UrllibClient(creds, opener=FailingOpener())  # authenticates on init
+    message = str(caught.value)
+    assert "localhost" in message
+    assert "secret" not in message and "admin" not in message
