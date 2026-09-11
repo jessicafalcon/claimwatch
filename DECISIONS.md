@@ -2810,10 +2810,18 @@ version, no `apply.py` change needed; the demonstration screenshots (synthetic)
 are committed under `study/metabase/screenshots/`. These PNGs are the repo's
 first tracked binary assets: the one full-tree neutrality scanner
 (`tests/test_ingest_layout.py::test_brand_carrying_strings_appear_only_in_the_declarations`)
-now skips a declared binary-extension set (`tests/repo_text.py::BINARY_ASSET_SUFFIXES`,
-`{.png}`) — a screenshot's neutrality is reviewed by eye, not by decode, and any
-other non-UTF-8 tracked file still fails by name (the traceback-at-boundary guard
-is unchanged). Landed on `fix/9g-demonstration` (the screenshots were unpushed
+reads a declared binary asset (`tests/repo_text.py::BINARY_ASSET_READERS`,
+`{.png}`) as the text it carries beside its pixels — every `tEXt`, `zTXt`,
+`iTXt` and `eXIf` chunk, decoded — so the pixels are reviewed by eye and the
+text channels by the scanner (the macOS screenshots carry an XMP `iTXt` and an
+EXIF chunk; review round 1 of this branch asked that they not go unscanned, and
+that a text file mis-named `.png` not slip past — the reader refuses a file
+without the PNG signature by name). Any other non-UTF-8 tracked file still fails
+by name (the traceback-at-boundary guard is unchanged), and the scanner asserts
+it read at least one text file and one binary asset, so an empty hit list can
+never be vacuous. *Rejected: forbidding text chunks outright — every macOS
+screenshot carries them, so the rule would force a strip step on each capture;
+scanning them is the same guarantee with no step.* Landed on `fix/9g-demonstration` (the screenshots were unpushed
 when PR #30 merged, so its CI never saw them). *Rejected: keeping the repo
 binary-free by not committing the screenshots — done-when 5 wants them committed
 as the demonstration's evidence.* The image is pinned by the

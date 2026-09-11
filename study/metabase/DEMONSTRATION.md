@@ -29,9 +29,9 @@ review can appear.
 
 ## Screenshots
 
-Captured over `ROWS=synthetic` — **synthetic fixture data, not a study finding**.
-Every review shown is hand-written; the drill carries only the non-text allowlist,
-so no review body or brand address can appear.
+Every review shown is hand-written (`ROWS=synthetic`, as the opening says); the
+drill carries only the non-text allowlist, so no review body or brand address can
+appear.
 
 The dashboard: the theme-row bar, the review-level drill, and B2.1's paraphrases.
 
