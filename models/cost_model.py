@@ -268,7 +268,7 @@ def check_parameter(p: Parameter) -> None:
 
 
 def parameters(fit: Fit) -> tuple[Parameter, ...]:
-    """The full ordered parameter set: the four scale anchors, the three
+    """The full ordered parameter set: the four scale anchors, the four
     fit-derived rows, then the unsourced knobs — one row per slider the study
     shows, the fit never a second literal here. Every row is checked well-formed."""
     params = SCALE_PARAMETERS + fit_parameters(fit) + KNOB_PARAMETERS
@@ -283,8 +283,8 @@ def defaults(fit: Fit) -> dict[str, float]:
     return {p.name: p.default for p in parameters(fit)}
 
 
-# The point formulas, in order (brief §7 plus the three derived defaults and the
-# median contrast). Each fn reads one mapping of the parameters and the results
+# The point formulas, in order (brief §7 plus the derived defaults and the median
+# and mean contrasts). Each fn reads one mapping of the parameters and the results
 # computed before it, so a later formula names an earlier one by key.
 def _customer_value(v: Mapping[str, float]) -> float:
     return v["arr_eur"] / v["members"]

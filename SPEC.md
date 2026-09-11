@@ -158,7 +158,8 @@ climbs; friction cost rises with the false positives that same rate creates.
   the value it produces. The hold timer's three formulas (the loop length, the
   friction per day, and the threshold amount) print in the same list, used by
   Beat 4 at the defaults, and so does the contrast count — claims per year at
-  the sample's own mean reimbursement cell, the same division as the claim
+  the sample's own mean reimbursement cell (each cell an aggregated total for
+  a group of claims in the open DAMIR data), the same division as the claim
   volume over the plain average of the cells, used by nothing downstream. The
   list is the baseline scenario; the three toggled scenarios are B4.1's. Tag:
   *Modeled*.

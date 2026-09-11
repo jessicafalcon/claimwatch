@@ -65,9 +65,10 @@ class Fit:
 
 # Every name the artifact carries, in write order: the three fit parameters,
 # then `emp_p<d>`/`fit_p<d>` for each decile, then the sample mean last (Phase
-# 9h, appended so the pre-9h file is a byte prefix of the new one). The writer
-# emits exactly these, the reader requires exactly these, and the tracked-files
-# test reads this tuple — one closed set, no hand-typed copy.
+# 9h, appended so the pre-9h file is a byte prefix of the new one). The reader
+# requires exactly this set and the tracked-files test reads this tuple; the
+# writer emits each row with its own format, and a test pins its column
+# sequence to this tuple — one closed set, no copy that can drift.
 FIT_FIELD_NAMES: tuple[str, ...] = (
     "mu",
     "sigma",

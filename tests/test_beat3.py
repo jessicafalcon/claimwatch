@@ -202,7 +202,7 @@ def test_b3_3_prints_the_mean_cell_count_beside_the_claim_count(synthetic_db):
     sec = _section(_html(synthetic_db), "B3.3")
     assert sec.index(">707,858<") < sec.index(">412,935<")
     assert "Claims per year at the mean cell" in sec
-    assert "the count at the mean cell is the lower of the two" in sec
+    assert "the count computed from it is the lower of the two" in sec
     for key in pins.BEAT3_FIXED_PARAMETERS:
         fixed = next(s for s in b33.series if s.key == key)
         assert len({p.value for p in fixed.points}) == 1

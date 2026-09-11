@@ -117,16 +117,16 @@ PARAMETER_NAMES = {
 # baseline, never retyped.
 HEADLINE_FORMULAS = ("customer_value", "mean_claim", "claims", "claims_at_mean_cell")
 # What B3.3 says about the two claim counts: only what its cells show — the
-# mean cell sits above the fitted mean, so the count at the mean cell is the
-# lower one. No maximum cell, no percentage, no decile: the page holds none of
-# those as a cell (9h, challenge round 1, #8).
+# mean cell is the larger figure, so the count at the mean cell is the lower
+# one. No maximum cell, no percentage, no decile, no tail clause: the page
+# holds none of those as a cell (9h, challenge round 1 #8; review round 1,
+# study-editor #3).
 MEAN_CELL_NOTE = (
     "Two claim counts are shown, one division each: refunds paid over the mean "
     "claim from the fit, and refunds paid over the mean reimbursement cell of "
-    "the sample itself — the plain average of the cells, no fit involved. The "
-    "mean cell sits above the fitted mean, so the lognormal puts less weight on "
-    "the largest cells than the sample carries, and the count at the mean cell "
-    "is the lower of the two. Every later formula uses the fitted count; the "
+    "the sample itself — the plain average of the cells, no fit involved. "
+    "Because the mean cell is the larger figure, the count computed from it is "
+    "the lower of the two. Every later formula uses the fitted count; the "
     "second is the contrast a reader recomputing from the data would find."
 )
 
