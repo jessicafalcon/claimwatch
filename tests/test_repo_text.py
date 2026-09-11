@@ -54,6 +54,7 @@ def test_is_binary_asset_is_the_declared_directory_and_suffix_case_folded(
     assert not is_binary_asset(tmp_path / SHOTS / "png", tmp_path)  # a name
     assert not is_binary_asset(Path("/elsewhere") / SHOTS / "shot.png", tmp_path)
     assert is_binary_asset(ROOT / SHOTS / "01-dashboard.png")  # the default root
+    assert is_binary_asset(Path(SHOTS) / "01-dashboard.png")  # relative: under root
 
 
 def test_a_png_outside_the_declared_directory_fails_by_name(tmp_path: Path):

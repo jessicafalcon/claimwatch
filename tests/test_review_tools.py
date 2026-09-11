@@ -113,7 +113,9 @@ def test_the_shared_reader_reads_a_declared_asset_and_reports_a_fake_one(
     shots.mkdir(parents=True)
     body = b"Comment\0made up"
     chunk = len(body).to_bytes(4, "big") + b"tEXt" + body + b"\0\0\0\0"
-    (shots / "shot.png").write_bytes(b"\x89PNG\r\n\x1a\n" + chunk)
+    (shots / "shot.png").write_bytes(
+        b"\x89PNG\r\n\x1a\n" + chunk + b"\0\0\0\0IEND\xaeB`\x82"
+    )
     (shots / "fake.png").write_bytes(b"plain text\n")
     assert read_text_or_error(shots / "shot.png", tmp_path) == (
         "Comment: made up",

@@ -151,9 +151,11 @@ BINARY_ASSETS: tuple[tuple[str, str, Callable[[bytes], str]], ...] = (
 
 
 def binary_asset_reader(path: Path, root: Path = ROOT) -> Callable[[bytes], str] | None:
-    """The declared reader for `path` (under `root`), or None for a text file:
-    a match is the declared directory (exactly, no subdirectory) and the
-    suffix, case-folded."""
+    """The declared reader for `path` (under `root`; a relative path is taken
+    as relative to it), or None for a text file: a match is the declared
+    directory (exactly, no subdirectory) and the suffix, case-folded."""
+    if not path.is_absolute():
+        path = root / path
     if not path.is_relative_to(root):
         return None
     rel = path.relative_to(root)
