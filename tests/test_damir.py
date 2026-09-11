@@ -23,6 +23,7 @@ from opendata.fit import (
     write_fit,
 )
 from opendata.slice import (
+    DECIMAL_SHAPE,
     FIXTURE_CSV,
     freeze_manifest,
     parse_amount,
@@ -144,6 +145,23 @@ def test_parse_amount_keeps_only_positive_numbers():
     )
     for j in junk:
         assert parse_amount(j) is None, j
+
+
+def test_decimal_shape_is_the_one_numeric_shape_both_readers_use(tmp_path):
+    """The amount reader and the fit-artifact reader accept one decimal shape:
+    the exotic float() forms parse_amount refuses are refused by the artifact
+    reader too, by name (9h round 2, code-reviewer #1)."""
+    assert DECIMAL_SHAPE.fullmatch("12.50") and DECIMAL_SHAPE.fullmatch("-0.5")
+    lines = _valid_fit_file(tmp_path).read_text(encoding="utf-8").splitlines()
+    for exotic in ("1e5", "1_000", "1.5e3", "0x10", "+3", " 3", "nan", "inf"):
+        p = tmp_path / "exotic.csv"
+        p.write_text(
+            "\n".join(f"mu,{exotic}" if x.startswith("mu,") else x for x in lines)
+            + "\n",
+            "utf-8",
+        )
+        with pytest.raises(ValueError, match="mu"):
+            read_fit(p)
 
 
 def test_amount_domain_guard_drops_and_counts(tmp_path):
@@ -582,6 +600,23 @@ def test_read_fit_refusals_cap_the_echoed_token(tmp_path):
     with pytest.raises(ValueError, match="not in the fit artifact") as exc:
         read_fit(big_name)
     assert len(str(exc.value)) < 200
+    astral = "\U0001f600" * 5000  # each escapes to ten printed characters
+    wide = tmp_path / "wide.csv"
+    wide.write_text(
+        "\n".join(f"mu,{astral}" if x.startswith("mu,") else x for x in lines) + "\n",
+        "utf-8",
+    )
+    with pytest.raises(ValueError, match="mu") as exc:
+        read_fit(wide)
+    assert len(str(exc.value)) < 200  # the cap is on printed characters
+    many = tmp_path / "many.csv"
+    many.write_text(
+        "\n".join(lines) + "\n" + "\n".join(f"stray{i},1" for i in range(3000)) + "\n",
+        "utf-8",
+    )
+    with pytest.raises(ValueError, match="and 2997 more") as exc:
+        read_fit(many)
+    assert len(str(exc.value)) < 200  # a list of strays is counted, not listed
 
 
 def test_read_fit_is_order_independent(tmp_path):

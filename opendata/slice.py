@@ -79,7 +79,11 @@ class Sample:
 # otherwise accept (underscores `1_000`, scientific `1e5`, `inf`/`nan`), so the
 # guard over this foreign column stays a declared shape, not "whatever float()
 # parses" (round 1, code-reviewer #7).
-_AMOUNT = re.compile(r"-?\d+(?:[.,]\d+)?")
+DECIMAL_SHAPE = re.compile(r"-?\d+(?:[.,]\d+)?")
+# The one numeric shape a foreign decimal cell may take, here and in the fit
+# artifact's reader (`opendata/fit.py`): plain digits, at most one `.` or `,`
+# separator, an optional leading minus. `1e5`, `1_000`, `nan`, `inf`, `+3` are
+# not the shape (9h review round 2, code-reviewer #1).
 
 
 def parse_amount(cell: str) -> float | None:
@@ -88,7 +92,7 @@ def parse_amount(cell: str) -> float | None:
     CSVs use `,`); a blank, text, an exotic numeric form (`1_000`, `1e5`), a
     zero, a negative or a non-finite value returns `None`."""
     text = cell.strip()
-    if not _AMOUNT.fullmatch(text):
+    if not DECIMAL_SHAPE.fullmatch(text):
         return None
     value = float(text.replace(",", "."))  # shape-checked, so this cannot raise
     return value if value > 0 else None
