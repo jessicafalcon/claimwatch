@@ -580,8 +580,13 @@ demonstration (PR #30, 2026-09-11), and its evidence on `fix/9g-demonstration`
 (PR #31, 2026-09-11: the captioned synthetic screenshots, `.env.example`, the
 guards' shared binary-asset reader). Phase 9 is complete.
 
-**Next:** the two pulled-out data phases (the claims sample-mean slider,
-data.ameli practitioner fees — BACKLOG), then Phase 10 (the Airflow DAG; its
+**In progress:** Phase 9h on `phase-9h-sample-mean` (spec challenged round
+1, all eleven findings applied; built 2026-09-11, review rounds next): the
+claim count at the sample's mean reimbursement cell beside the fitted count,
+B3.3; the branch also carries the CLAUDE.md trim.
+
+**Next:** the second pulled-out data phase (data.ameli practitioner fees —
+BACKLOG), then Phase 10 (the Airflow DAG; its
 spec decides how the publish task calls `python -m study.metabase
 export|apply`, which are not `make` targets — `docs/PLAN.md` §5 says five
 `make` tasks — and is the home for the classify-path idempotency target,

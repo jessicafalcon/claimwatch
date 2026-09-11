@@ -81,12 +81,16 @@ aggregated per-cell reimbursement total, not a single claim, so the lognormal
 approximates the claim-cost distribution rather than measuring it claim by claim
 — the honest label Phase 8 carries beside the fit. **B3.3 flipped to Modeled in
 Phase 8a**: `cost_model_params` holds the sourced inputs, `mu`/`sigma`/`emp_p50`
-among them. The fit's *effect* on the displayed euros — `mean_claim =
-exp(mu + sigma²/2)` (with the median cell `emp_p50` printed beside it as the
-contrast) and `claims = refunded_eur / mean_claim` — is a `cost_model_outputs`
-row, which is why B3.1 and B3.2 also name `open-damir` as their upstream. (When
-Phase 9 renders B3.3's headline derived figures it reads those from
-`cost_model_outputs`, not `cost_model_params`.)
+among them and, from Phase 9h, `emp_mean` — the slice's own arithmetic mean
+cell, the artifact's last row, no fit involved. The fit's *effect* on the
+displayed euros — `mean_claim = exp(mu + sigma²/2)` (with the median cell
+`emp_p50` printed beside it as the contrast) and `claims = refunded_eur /
+mean_claim` — is a `cost_model_outputs` row, which is why B3.1 and B3.2 also
+name `open-damir` as their upstream; so is the contrast count
+`claims_at_mean_cell = refunded_eur / emp_mean` (9h), the same division over
+the sample's mean cell, which B3.3 shows beside the claim volume and nothing
+downstream reads. (When Phase 9 renders B3.3's headline derived figures it
+reads those from `cost_model_outputs`, not `cost_model_params`.)
 
 **What Beat 4 landed (Phase 8b).** The synthetic claims are the same fit read at
 a thousand evenly spaced quantiles — a real distribution, synthetic claims: no

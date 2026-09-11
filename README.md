@@ -85,7 +85,10 @@ on that with arithmetic printed in full, so anyone can redo it by hand.
   flagged; where they cross, the next flag destroys more than it recovers
   *(Modeled — B3.2)*.
 - The sourced inputs — revenue per member, the fraud pool, claim volume — each
-  shown with its source *(Modeled — B3.3)*.
+  shown with its source, and the claim volume shown twice: over the mean claim
+  the fitted curve gives and over the plain average of the public
+  reimbursement cells themselves, so a reader who redoes the division from the
+  data finds their number on the page *(Modeled — B3.3)*.
 - The parameters with no public source, drawn on a differently-styled range and
   labelled "explore the range" *(Modeled — B3.4)*.
 
