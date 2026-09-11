@@ -66,6 +66,11 @@ def test_make_model_prints_each_expression_beside_its_value():
         assert f.expression in out
     assert "-> 0.095" in out  # the baseline crossover
     assert "-> 0.05" in out  # the marginal crossover / the default marker
+    # One column for every point formula: the name is padded to the longest
+    # name, so the "=" sits at the same offset on each line (9h, preflight).
+    width = max(len(f.name) for f in POINT_FORMULAS)
+    for f in POINT_FORMULAS:
+        assert f"  {f.name.ljust(width)} = {f.expression}" in out
 
 
 def test_make_model_prints_the_unit_beside_each_value():
