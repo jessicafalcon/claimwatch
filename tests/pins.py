@@ -284,6 +284,19 @@ RULES_HELDOUT = {
 CLASSIFIED_REVIEWS_ROWS = STG_REVIEWS_ROWS  # 39
 CLASSIFIED_REVIEWS_COLUMNS = ("source", "external_id", "theme", "run_id")
 
+# review_drill (B2.1, 9g): one row per classified review x theme, the non-text
+# allowlist behind each theme bar. NEVER body/title/source_url — the join reaches
+# stg_reviews which carries them, so this exact column set is the guard. review_id
+# is the computed source||':'||external_id (classify/labels.py::review_id).
+REVIEW_DRILL_COLUMNS = (
+    "review_id",
+    "theme",
+    "rating",
+    "review_date",
+    "segment",
+    "source",
+)
+
 # The theme-share marts count those rows. share = theme_rows / reviews, at the
 # review x theme grain (a review counts once in `reviews`, once per theme bar).
 # unclassified is a row, not a gap — the gray "not yet classified" band, and with
