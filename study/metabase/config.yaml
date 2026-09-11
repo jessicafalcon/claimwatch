@@ -14,7 +14,7 @@
 database:
   name: The Friction Ledger (SQLite)
   engine: sqlite
-  # the path inside the container (docker-compose mounts ./data there)
+  # the path inside the container (docker-compose mounts data/metabase there, :ro)
   file: /metabase-data/metabase.sqlite
 
 collection:

@@ -285,8 +285,11 @@ Freeze: none
   trigger survives). *"`make idempotency-check` skips the classify step…"*
   re-pointed to a `fix/idempotency-classify` PR (not 9g). A new row opened for
   the HTML export of B2.1's paraphrases (out of scope here)
-- [ ] LESSONS.md — none until a review round reports a correctness finding; then
-  backtick it and the fix commit writes the row
+- [ ] `LESSONS.md` — review round 1 extended `unshaped-input` (reply id +
+  `METABASE_URL` shape) and `traceback-at-boundary` (missing mart, live
+  `URLError`) with the 9g occurrences
+- [ ] `specs/phase-7a-findings-marts.md` — the `build_theme_share_marts` →
+  `build_post_classify_marts` rename note (review round 1, #16)
 - [ ] `CLAUDE.md` — Current status; Commands (`study.metabase apply` /
   `export`); Repo map (`study/metabase/`, `study/paraphrases.yaml`,
   `sql/marts/review_drill.sql`); Teaching rule (Metabase drill-through, the

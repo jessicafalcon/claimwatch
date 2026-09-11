@@ -2802,4 +2802,10 @@ in the `X-Metabase-Session` header; list endpoints return a bare list on some
 versions and `{"data": [...]}` on others, so `as_list` accepts both. The pinned
 `metabase/metabase` image tag and the exact dashcard body are confirmed against
 the running version in the build's first hour (spec stack risk); SQLite is a
-built-in driver, so no third-party JAR is mounted.
+built-in driver, so no third-party JAR is mounted. The image is pinned by the
+mutable tag `v0.63.16`, not a content digest (review round 2, security note): the
+repo's SHA-pin bar is for GitHub Actions, and this stack is developer-run, never
+in CI, so the tag stands with the compose header's "confirm the tag in the spike"
+caveat; a digest pin is a later option if demo reproducibility matters. Cross-host
+redirects on the applier's HTTP client are refused (`_NoCrossHostRedirect`) so a
+3xx cannot carry the session token off the vetted host (round 2, security note).

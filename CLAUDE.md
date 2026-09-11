@@ -204,8 +204,8 @@ its targets there and here in the same PR. What `make help` cannot say:
   `data/classify/decisions.csv` — with no key those reviews stay
   `unclassified` and the run is green. Then the held-out gate fills
   `classifier_quality` (B2.4), the classification is persisted and the two
-  theme-share marts (B2.2, B2.5) are built, all honest to whatever classifier
-  ran. After the marts loop, `rebuild()` fills the three cost-model marts
+  theme-share marts (B2.2, B2.5) and the review-level drill (B2.1, `review_drill`)
+  are built, all honest to whatever classifier ran. After the marts loop, `rebuild()` fills the three cost-model marts
   (B3.1–B3.4) from `models/cost_model.py` and then the two simulator marts
   (B4.1–B4.3) from `models/guardrail_sim.py`, both over the tracked fit — no
   key, no reviews, no classify step, so they fill on every `ROWS` input, `none`
