@@ -270,7 +270,7 @@ def test_brand_carrying_strings_appear_only_in_the_declarations():
     file — not a doc, a comment, a test name, a fixture or a record — as a
     whole word, in any case. Every tracked file is read through `repo_text`:
     UTF-8 text as its lines, a declared binary asset (the 9g demonstration
-    screenshots, `repo_text.BINARY_ASSET_READERS`) as the text it carries
+    screenshots, `repo_text.BINARY_ASSETS`) as the text it carries
     beside its pixels — the pixels are reviewed by eye, the text channels
     here; any other file that does not decode fails by name rather than being
     skipped (round 1 skipped it; tooling round 3 closed the class). The floor

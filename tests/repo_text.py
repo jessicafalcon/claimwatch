@@ -83,24 +83,42 @@ def png_text(path: Path) -> str:
     return "\n".join(lines)
 
 
-# Tracked binary assets and the reader for the text each carries beside its
-# pixels (the Metabase demonstration screenshots, Phase 9g). The pixels are
-# reviewed by eye; the text channels are scanned like any tracked file. A
-# closed set: a tracked file with any OTHER suffix is expected to be UTF-8
-# text and still fails by name if it is not.
-BINARY_ASSET_READERS: dict[str, Callable[[Path], str]] = {".png": png_text}
+# The tracked binary assets, each declared by the directory that holds it AND
+# its suffix, with the reader for the text it carries beside its pixels (the
+# Metabase demonstration screenshots, Phase 9g). The pixels are reviewed by
+# eye; the text channels are scanned like any tracked file. A closed set: a
+# `.png` outside its declared directory is not an asset — it is expected to be
+# UTF-8 text like every other tracked file and fails by name when it is not,
+# so a stray image has to be declared here before the scanners accept it.
+BINARY_ASSETS: tuple[tuple[str, str, Callable[[Path], str]], ...] = (
+    ("study/metabase/screenshots", ".png", png_text),
+)
 
 
-def is_binary_asset(path: Path) -> bool:
-    """True for a declared tracked binary asset, by suffix, case-folded."""
-    return path.suffix.lower() in BINARY_ASSET_READERS
+def binary_asset_reader(path: Path, root: Path = ROOT) -> Callable[[Path], str] | None:
+    """The declared reader for `path` (under `root`), or None for a text file:
+    a match is the declared directory (exactly, no subdirectory) and the
+    suffix, case-folded."""
+    if not path.is_relative_to(root):
+        return None
+    rel = path.relative_to(root)
+    for directory, suffix, reader in BINARY_ASSETS:
+        if rel.parent.as_posix() == directory and rel.suffix.lower() == suffix:
+            return reader
+    return None
 
 
-def repo_text(path: Path) -> str:
+def is_binary_asset(path: Path, root: Path = ROOT) -> bool:
+    """True for a declared tracked binary asset: its directory and suffix."""
+    return binary_asset_reader(path, root) is not None
+
+
+def repo_text(path: Path, root: Path = ROOT) -> str:
     """The file's text — for a declared binary asset, the text beside its
     pixels; a file that is not UTF-8 text fails the test naming it."""
-    if is_binary_asset(path):
-        return BINARY_ASSET_READERS[path.suffix.lower()](path)
+    reader = binary_asset_reader(path, root)
+    if reader is not None:
+        return reader(path)
     try:
         return path.read_text(encoding="utf-8")
     except UnicodeDecodeError:

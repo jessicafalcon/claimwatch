@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from pipeline.warehouse import ROOT
 from tests.repo_text import (
     MAX_INFLATED,
     PNG_SIGNATURE,
@@ -38,11 +39,40 @@ def test_repo_text_fails_by_name_on_a_file_that_is_not_text(tmp_path: Path):
         repo_text(latin)
 
 
-def test_is_binary_asset_is_the_declared_suffix_case_folded():
-    assert is_binary_asset(Path("a/shot.png"))
-    assert is_binary_asset(Path("a/SHOT.PNG"))
-    assert not is_binary_asset(Path("a/shot.py"))
-    assert not is_binary_asset(Path("a/png"))  # a name, not a suffix
+SHOTS = "study/metabase/screenshots"
+
+
+def test_is_binary_asset_is_the_declared_directory_and_suffix_case_folded(
+    tmp_path: Path,
+):
+    """The declaration is a directory AND a suffix: a `.png` under the declared
+    directory (any case) is an asset; the same suffix anywhere else, a
+    subdirectory, or a bare name is not — an undeclared image is text to the
+    scanners and fails by name like any other non-text file."""
+    assert is_binary_asset(tmp_path / SHOTS / "shot.png", tmp_path)
+    assert is_binary_asset(tmp_path / SHOTS / "SHOT.PNG", tmp_path)
+    assert not is_binary_asset(tmp_path / "models" / "shot.png", tmp_path)
+    assert not is_binary_asset(tmp_path / SHOTS / "sub" / "shot.png", tmp_path)
+    assert not is_binary_asset(tmp_path / SHOTS / "shot.py", tmp_path)
+    assert not is_binary_asset(tmp_path / SHOTS / "png", tmp_path)  # a name
+    assert not is_binary_asset(Path("/elsewhere") / SHOTS / "shot.png", tmp_path)
+    assert is_binary_asset(ROOT / SHOTS / "01-dashboard.png")  # the default root
+
+
+def test_a_png_outside_the_declared_directory_fails_by_name(tmp_path: Path):
+    stray = tmp_path / "models" / "stray.png"
+    stray.parent.mkdir()
+    stray.write_bytes(_png(_chunk(b"IDAT", zlib.compress(b"\0\0"))))
+    with pytest.raises(pytest.fail.Exception, match=r"^stray.png: not UTF-8 text$"):
+        repo_text(stray, tmp_path)
+
+
+def _asset(tmp_path: Path, name: str, data: bytes) -> Path:
+    """A file at the declared screenshots path under a tmp root."""
+    path = tmp_path / SHOTS / name
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_bytes(data)
+    return path
 
 
 def test_a_png_reads_as_every_text_channel_it_carries(tmp_path: Path):
@@ -51,8 +81,9 @@ def test_a_png_reads_as_every_text_channel_it_carries(tmp_path: Path):
     payload's ASCII fields — so a brand token in any of them is a scanner hit."""
     itxt_plain = b"Title\0\0\0en\0\0plain \xc3\xa9 text"
     itxt_zip = b"XML:com.adobe.xmp\0\1\0\0\0" + zlib.compress(b"<x>zipped</x>")
-    shot = tmp_path / "shot.png"
-    shot.write_bytes(
+    shot = _asset(
+        tmp_path,
+        "shot.png",
         _png(
             _chunk(b"tEXt", b"Comment\0hello"),
             _chunk(b"zTXt", b"Note\0\0" + zlib.compress(b"inflated")),
@@ -60,9 +91,9 @@ def test_a_png_reads_as_every_text_channel_it_carries(tmp_path: Path):
             _chunk(b"iTXt", itxt_zip),
             _chunk(b"eXIf", b"MM\0*\0\0\0\x08Screenshot\0"),
             _chunk(b"IDAT", zlib.compress(b"\0\0")),
-        )
+        ),
     )
-    assert repo_text(shot).splitlines() == [
+    assert repo_text(shot, tmp_path).splitlines() == [
         "Comment: hello",
         "Note: inflated",
         "Title: plain é text",
@@ -72,18 +103,16 @@ def test_a_png_reads_as_every_text_channel_it_carries(tmp_path: Path):
 
 
 def test_a_png_with_no_text_chunk_reads_empty(tmp_path: Path):
-    shot = tmp_path / "shot.png"
-    shot.write_bytes(_png(_chunk(b"IDAT", zlib.compress(b"\0\0"))))
-    assert png_text(shot) == ""
+    shot = _asset(tmp_path, "shot.png", _png(_chunk(b"IDAT", zlib.compress(b"\0\0"))))
+    assert repo_text(shot, tmp_path) == ""
 
 
 def test_a_file_named_png_that_is_not_a_png_fails_by_name(tmp_path: Path):
     """The suffix is a claim, not a proof: a text file mis-named `.png` is
     refused, never skipped as if its pixels had been reviewed."""
-    fake = tmp_path / "fake.png"
-    fake.write_bytes(b"some text a scanner must not miss\n")
+    fake = _asset(tmp_path, "fake.png", b"some text a scanner must not miss\n")
     with pytest.raises(pytest.fail.Exception, match=r"^fake.png: not a PNG$"):
-        repo_text(fake)
+        repo_text(fake, tmp_path)
 
 
 def test_a_truncated_or_over_inflating_png_fails_by_name(tmp_path: Path):
