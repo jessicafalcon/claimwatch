@@ -15,6 +15,8 @@ from __future__ import annotations
 import argparse
 import sys
 
+from pipeline.build import INPUTS
+from pipeline.warehouse import database_for
 from study.metabase.apply import (
     Credentials,
     MetabaseError,
@@ -29,7 +31,15 @@ from study.metabase.export import ExportError, build_sqlite
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m study.metabase")
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("export", help="build the SQLite file Metabase reads (offline)")
+    export_parser = sub.add_parser(
+        "export", help="build the SQLite file Metabase reads (offline)"
+    )
+    export_parser.add_argument(
+        "--rows",
+        choices=INPUTS,
+        default="captured",
+        help="which rebuild input to export (default: captured — the real corpus)",
+    )
     apply_parser = sub.add_parser("apply", help="provision the dashboard (config.yaml)")
     apply_parser.add_argument(
         "--dry-run",
@@ -40,8 +50,8 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if args.command == "export":
-            path = build_sqlite()
-            print(f"wrote {path}")
+            path = build_sqlite(duck_db=database_for(args.rows))
+            print(f"wrote {path} (from ROWS={args.rows})")
             return 0
         config = load_config()
         if args.dry_run:

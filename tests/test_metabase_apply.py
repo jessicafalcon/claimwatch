@@ -6,6 +6,7 @@ call."""
 from __future__ import annotations
 
 import hashlib
+from pathlib import Path
 from urllib.error import URLError
 
 import pytest
@@ -255,3 +256,22 @@ def test_urllib_client_maps_a_network_error_to_a_one_line_refusal():
     message = str(caught.value)
     assert "localhost" in message
     assert "secret" not in message and "admin" not in message
+
+
+def test_export_command_routes_rows_to_the_matching_database(monkeypatch):
+    """`export --rows <input>` reads the database for that input, so the
+    synthetic-screenshot path (ROWS=synthetic) exports the synthetic build, not
+    the captured corpus (round-1 #1)."""
+    import study.metabase.__main__ as entry
+    from pipeline.warehouse import database_for
+
+    seen = {}
+
+    def fake_build(duck_db=None):
+        seen["db"] = duck_db
+        return Path("x")
+
+    monkeypatch.setattr(entry, "build_sqlite", fake_build)
+    assert entry.main(["export", "--rows", "synthetic"]) == 0
+    assert seen["db"] == database_for("synthetic")
+    assert seen["db"] != database_for("captured")

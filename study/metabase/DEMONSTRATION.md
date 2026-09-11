@@ -32,12 +32,18 @@ review can appear.
 From the repository root:
 
 ```
-make rebuild ROWS=captured            # your own corpus (or ROWS=synthetic)
-uv run python -m study.metabase export   # writes the gitignored data/metabase.sqlite
+make rebuild ROWS=captured                        # your own corpus
+uv run python -m study.metabase export            # writes data/metabase.sqlite (ROWS=captured)
 cd study/metabase && docker compose up -d
-cd ../.. && uv run python -m study.metabase apply     # provisions from config.yaml; reads .env
+cd ../.. && uv run python -m study.metabase apply  # provisions from config.yaml; reads .env
 open http://localhost:3000
 ```
+
+`export` reads the corpus (`captured`) by default; the committed screenshots are
+captured over the synthetic fixture instead, so no real review can appear —
+`make rebuild ROWS=synthetic && uv run python -m study.metabase export --rows synthetic`.
+`export --rows` takes the same closed set as `make rebuild` (`captured`, `none`,
+`synthetic`, `samples`).
 
 `apply` reads your Metabase login from `.env` (`METABASE_URL`, `METABASE_USER`,
 `METABASE_PASSWORD`) and upserts the dashboard by name, so running it twice
