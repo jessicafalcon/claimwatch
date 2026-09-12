@@ -594,11 +594,12 @@ and `fix/foreign-shape-shared-home` (PR #33, 2026-09-12: the shared decimal
 and count shapes given one home in `ingest/parsed.py` and an AST guard against
 a fresh coercion outside them). Phase 9 is complete.
 
-**Proposed:** Phase 9i on `phase-9i-extra-billing` (spec committed
-2026-09-12, awaiting `/challenge` and approval): the extra-billing share from
-data.ameli's `honoraires` dataset as one sourced B3.3 row with its
-profession-family range — read from a hand-downloaded export, since the host's
-robots file disallows the API and download paths; no fetch target.
+**In review:** Phase 9i on `phase-9i-extra-billing` (spec challenged round 1,
+nine amendments applied; built 2026-09-12, DONE command green; review round
+next): the extra-billing share from data.ameli's `honoraires` table as one
+sourced B3.3 row with its profession-family spread, read by no formula — the
+export is a hand download, since the host's robots file disallows the API and
+download paths; `slice-ameli` and `split-ameli` are offline.
 
 **Next:** Phase 10 (the Airflow DAG; its
 spec decides how the publish task calls `python -m study.metabase
