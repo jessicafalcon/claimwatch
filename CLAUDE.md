@@ -589,21 +589,22 @@ and remove it). Findings are fixed in the main session or explicitly accepted
 ## Current status
 
 **Merged:** Phases 0a–9i, each with its spec under `specs/` (the Delivered
-paragraph) and its DECISIONS appendix; the last were 9i, the extra-billing
+paragraph) and its DECISIONS appendix; the last was 9i, the extra-billing
 share from data.ameli's `honoraires` table as one sourced B3.3 row (PR #34,
-2026-09-12), and `fix/idempotency-classify` (PR #35, 2026-09-12: the classify
-step's code moved to `pipeline/build.py::classify_step` and run inside
-`idempotency-check`, so the six classify-path tables are in its diff). Phase 9
-is complete. Off main since: `tooling/skill-sentences` (PR #36, 2026-09-12:
-the two skill sentences of the Phase 9i exit audit — DECISIONS → Tooling).
+2026-09-12). Phase 9 is complete. Off main since, all 2026-09-12:
+`fix/idempotency-classify` (PR #35: the classify step's code moved to
+`pipeline/build.py::classify_step` and run inside `idempotency-check`, so the
+six classify-path tables are in its diff), `tooling/skill-sentences` (PR #36:
+the two skill sentences of the Phase 9i exit audit — DECISIONS → Tooling),
+`fix/csv-reader-boundary` (PR #37: every `csv` reader folds `csv.Error` into
+the refusal it declares and the two DAMIR CLI read paths catch it —
+DECISIONS → Fix; BACKLOG row closed, one opened for the code-craft clause).
 
-**In progress:** two small PRs off main before Phase 10, one at a time:
-`fix/csv-reader-boundary` (this branch: every `csv` reader folds `csv.Error`
-into the refusal it declares and the two DAMIR CLI read paths catch it —
-DECISIONS → Fix, 2026-09-12; BACKLOG row closed, one opened for the code-craft
-clause), then `fix/` for the
-no-`SPEC=` review gate (BACKLOG "`make review-gate` without `SPEC=` is red on
-a phase branch…").
+**In progress:** `fix/review-gate-no-spec` (this branch), the last small PR
+off main before Phase 10: the no-`SPEC=` review gate (BACKLOG "`make
+review-gate` without `SPEC=` is red on a phase branch…") — the no-SPEC form
+reads the branch's spec or skips the freeze check, and the two summary lines
+count the same thing.
 
 **Next:** Phase 10 (the Airflow DAG). Its spec decides how the publish task
 calls `python -m study.metabase export|apply`, which are not `make` targets
