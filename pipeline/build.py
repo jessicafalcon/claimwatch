@@ -36,10 +36,10 @@ import sys
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import NamedTuple
 
 from classify.cache import read_decisions, write_decisions
 from classify.combined import classify_all
@@ -852,7 +852,8 @@ def write_classifier_quality(
     conn.execute("commit")
 
 
-class ClassifyOutcome(NamedTuple):
+@dataclass(frozen=True)
+class ClassifyOutcome:
     """What `classify_step` hands back for the caller to print: the review count,
     the review x theme rows (for the label tallies), the gate's per-label scores,
     and whether the held-out fold was gradeable for this corpus. The writes are
@@ -864,10 +865,10 @@ class ClassifyOutcome(NamedTuple):
     graded: bool
 
 
-def _staged_reviews(db: str | Path) -> list[tuple[str, str, str, str]] | None:
+def _staged_review_rows(db: str | Path) -> list[tuple[str, str, str, str]] | None:
     """`(source, external_id, title, body)` for every staged review, or None when
     the warehouse has no `stg_reviews` yet. One read feeds both the identity map
-    and the classifier's text — the answer key is never touched here."""
+    and `_review_texts` — the answer key is never touched here."""
     db = Path(db)
     if not db.is_file():
         return None
@@ -884,6 +885,16 @@ def _staged_reviews(db: str | Path) -> list[tuple[str, str, str, str]] | None:
         ).fetchall()
     finally:
         conn.close()
+
+
+def _review_texts(staged: list[tuple[str, str, str, str]]) -> list[tuple[str, str]]:
+    """`(review_id, text)` per staged row — the words the rules read (title and
+    body, blank-joined). The one home for that projection: the classify step and
+    the CLI's eval command both derive their reviews from it."""
+    return [
+        (review_id(s, e), "\n".join(p for p in (t, b) if p).strip())
+        for s, e, t, b in staged
+    ]
 
 
 def classify_step(
@@ -905,14 +916,11 @@ def classify_step(
     offline. review_id maps a `(review_id, theme)` row back to `(source,
     external_id)` in Python, so nothing hashes in SQL, and `run_id` is provenance
     (byte-stable per input; not in any natural key)."""
-    staged = _staged_reviews(db)
+    staged = _staged_review_rows(db)
     if staged is None:
         return None
     identity = {review_id(s, e): (s, e) for s, e, _, _ in staged}
-    reviews = [
-        (review_id(s, e), "\n".join(part for part in (t, b) if part).strip())
-        for s, e, t, b in staged
-    ]
+    reviews = _review_texts(staged)
     decisions = read_decisions(cache_path)
     rows, decisions = classify_all(
         reviews, rules=load_rules(), decide=decide, decisions=decisions
@@ -939,7 +947,9 @@ def classify_step(
             )
     finally:
         conn.close()
-    return ClassifyOutcome(len(reviews), rows, scores, graded)
+    return ClassifyOutcome(
+        n_reviews=len(reviews), rows=rows, scores=scores, graded=graded
+    )
 
 
 _MODEL_TAG = "Modeled"

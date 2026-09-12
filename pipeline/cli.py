@@ -25,7 +25,7 @@ from contextlib import suppress
 from classify.cache import DECISIONS
 from classify.eval.gate import HELDOUT_FOLD, format_gate
 from classify.eval.precision import evaluate, format_report
-from classify.labels import POSITIVE, THEMES, UNCLASSIFIED, review_id
+from classify.labels import POSITIVE, THEMES, UNCLASSIFIED
 from classify.llm import ModelError, make_model_decider, model_available
 from classify.rules import classify as classify_reviews
 from classify.rules import load_rules
@@ -71,7 +71,8 @@ from opendata.sources import AMELI_EXPORT, cache_path, valid_month, valid_year
 from pipeline.build import (
     FETCHED_SNAPSHOTS,
     INPUTS,
-    _staged_reviews,
+    _review_texts,
+    _staged_review_rows,
     captures_for,
     classify_step,
     idempotency_check,
@@ -383,15 +384,13 @@ def _do_label_sample(args: argparse.Namespace) -> int:
 def _staged_reviews_text(db) -> list[tuple[str, str]] | None:
     """`(review_id, text)` for every staged review, or None if the warehouse has
     no `stg_reviews` yet. `text` is the review's title and body — the words the
-    rules read; the answer key is never touched here. The read and its existence
-    guard are `build._staged_reviews` (one reader, shared with the classify step)."""
-    staged = _staged_reviews(db)
+    rules read; the answer key is never touched here. The read, its existence
+    guard and the text projection are `build._staged_review_rows`/`_review_texts`
+    (one reader and one projection, shared with the classify step)."""
+    staged = _staged_review_rows(db)
     if staged is None:
         return None
-    return [
-        (review_id(s, e), "\n".join(p for p in (t, b) if p).strip())
-        for s, e, t, b in staged
-    ]
+    return _review_texts(staged)
 
 
 def _do_classify_eval(_args: argparse.Namespace) -> int:
@@ -599,7 +598,10 @@ def _do_simulate(_args: argparse.Namespace) -> int:
 
 
 def _do_idempotency(args: argparse.Namespace) -> int:
-    target = resolve_choice(args.target, TARGETS, "duckdb")
+    # idempotency-check runs the classify step (build.classify_step), which is
+    # DuckDB-only until Phase 10 wires TARGET through it; TARGET=snowflake is
+    # refused with one line here, not silently counted against an empty temp file.
+    target = resolve_choice(args.target, ("duckdb",), "duckdb")
     rows = resolve_choice(args.rows, INPUTS, "synthetic")
     ok, first, second = idempotency_check(target, rows)
     for name in sorted(set(first) | set(second)):
