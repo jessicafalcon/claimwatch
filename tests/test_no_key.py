@@ -104,9 +104,7 @@ def test_no_key_rebuild_classify_step_is_green(monkeypatch, tmp_path, capsys):
     # by build.classify_step) to a temp path, so the no-key run writes nothing
     # under the repo's data/. The extra cache_path arg the step passes is ignored.
     cache = tmp_path / "decisions.csv"
-    monkeypatch.setattr(
-        build, "read_decisions", lambda *a, **k: read_decisions(cache)
-    )
+    monkeypatch.setattr(build, "read_decisions", lambda *a, **k: read_decisions(cache))
     monkeypatch.setattr(
         build, "write_decisions", lambda d, *a, **k: write_decisions(d, cache)
     )
@@ -161,9 +159,7 @@ def test_theme_share_shows_unclassified_band(monkeypatch, tmp_path):
     from pipeline import build, cli
 
     cache = tmp_path / "decisions.csv"
-    monkeypatch.setattr(
-        build, "read_decisions", lambda *a, **k: read_decisions(cache)
-    )
+    monkeypatch.setattr(build, "read_decisions", lambda *a, **k: read_decisions(cache))
     monkeypatch.setattr(
         build, "write_decisions", lambda d, *a, **k: write_decisions(d, cache)
     )
