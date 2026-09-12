@@ -699,27 +699,16 @@ def main(argv: list[str] | None = None) -> int:
     except Refused as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    except PageShapeError as exc:
-        # A stored capture that is not the declared shape (hand-edited, or a
-        # parser tightened since it was written): one line, never a traceback.
-        print(f"refusing: {exc}", file=sys.stderr)
-        return 2
-    except ModelError as exc:
-        # A model call failed on the developer-run paid path (a bad model id, a
-        # rate limit, a network error): one line, never a traceback. The no-key
-        # path never reaches here.
-        print(f"refusing: {exc}", file=sys.stderr)
-        return 2
-    except FetchError as exc:
-        # The developer-run DAMIR download hit no matching month or an empty
-        # body: one line, exit 2, never a traceback. The offline fit path (the
-        # DONE command, CI) never reaches here.
-        print(f"refusing: {exc}", file=sys.stderr)
-        return 2
-    except (CacheError, LabelError) as exc:
-        # The decision cache (the classify step of `rebuild`) or the answer key
-        # (`rebuild`'s gate, `classify-eval`) is off its declared shape or is a
-        # file the parser cannot read: one line, exit 2, never a traceback —
-        # the two declared reader types `main` did not catch (fix round 1).
+    except (PageShapeError, ModelError, FetchError, CacheError, LabelError) as exc:
+        # Every declared refusal a command's library can raise, one line and
+        # exit 2, never a traceback: a stored capture off its declared shape
+        # (hand-edited, or a parser tightened since it was written); a model
+        # call failed on the developer-run paid path (the no-key path never
+        # reaches here); the developer-run DAMIR download hit no matching month
+        # or an empty body (the offline fit path never reaches here); the
+        # decision cache or the answer key off its declared shape or a file
+        # the parser cannot read (`rebuild`'s classify step and gate,
+        # `classify-eval`). A new declared type joins this tuple, never a
+        # fresh arm (fix/csv-reader-boundary, round 2).
         print(f"refusing: {exc}", file=sys.stderr)
         return 2

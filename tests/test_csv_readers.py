@@ -144,8 +144,11 @@ READER_NAMES = ("reader", "DictReader")
 
 class _CsvCallScan(ast.NodeVisitor):
     """Records every call of the `csv` module's `reader`/`DictReader` with its
-    enclosing function name, however the module or the name was bound:
-    `import csv`, `import csv as c`, `from csv import DictReader [as d]`."""
+    enclosing function name, for the closed set of binding forms it resolves:
+    `import csv`, `import csv as c`, `from csv import DictReader [as d]`. It
+    does not see a reader bound by assignment (`d = csv.DictReader`), a
+    star-import or `getattr` — none in the source packages, and a reviewer
+    reads a new reader against this set (round 2, security #1)."""
 
     def __init__(self) -> None:
         self._funcs: list[str] = []

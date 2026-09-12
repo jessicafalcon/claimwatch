@@ -552,13 +552,14 @@ def test_model_error_is_one_line_exit_2(capsys, monkeypatch):
 
 
 CSV_REFUSAL = CSV_UNREADABLE
-# The interpreter's default field limit stays: the synthetic corpus itself must
-# still read, so the corrupt file carries a field past the real limit.
-WIDE = "9" * pins.CSV_FIELD_PAST_DEFAULT_LIMIT_CHARS
 
 
-def _csv(path, header: str, row: str):
-    path.write_text(header + "\n" + row + "\n", encoding="utf-8")
+def _csv_with_a_wide_field(path, header: str, row: str):
+    """`row` with `{WIDE}` filled by a field past the interpreter's default
+    limit — the default stays, since the synthetic corpus itself must still
+    read; the field is built here, when a test runs."""
+    wide = "9" * pins.CSV_FIELD_PAST_DEFAULT_LIMIT_CHARS
+    path.write_text(header + "\n" + row.format(WIDE=wide) + "\n", encoding="utf-8")
     return path
 
 
@@ -568,7 +569,9 @@ def test_rebuild_refuses_a_decision_cache_the_parser_cannot_read(
     """The classify step of `make rebuild` reads the decision cache; a cache
     the parser cannot read is the reader's `CacheError`, which `main` turns
     into one line and exit 2 (fix round 1's BLOCKER: the arm `main` lacked)."""
-    bad = _csv(tmp_path / "decisions.csv", ",".join(DECISION_COLUMNS), f"r,v,m,{WIDE}")
+    bad = _csv_with_a_wide_field(
+        tmp_path / "decisions.csv", ",".join(DECISION_COLUMNS), "r,v,m,{WIDE}"
+    )
     monkeypatch.setattr(cli, "DECISIONS", bad)
     assert main(["rebuild", "--rows=synthetic"]) == 2
     err = capsys.readouterr().err
@@ -584,7 +587,9 @@ def test_classify_eval_refuses_an_answer_key_the_parser_cannot_read(
     out of `main` (the sibling arm)."""
     assert main(["rebuild", "--rows=synthetic"]) == 0
     capsys.readouterr()
-    bad = _csv(tmp_path / "labels.csv", ",".join(LABEL_COLUMNS), f"r,{WIDE}")
+    bad = _csv_with_a_wide_field(
+        tmp_path / "labels.csv", ",".join(LABEL_COLUMNS), "r,{WIDE}"
+    )
     monkeypatch.setattr(precision, "read_labels", lambda: read_labels(bad))
     assert main(["classify-eval"]) == 2
     err = capsys.readouterr().err

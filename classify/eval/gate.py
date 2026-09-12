@@ -22,12 +22,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# `LabelError` is re-exported: the CLI catches the answer key's refusal by this
-# name at its boundary, while the key's reader stays behind the wall
-# (`tests/test_labels_isolation.py` refuses the reader module's name outside
-# classify/eval/).
-from classify.eval.labels_io import LABELS_CSV, read_labels
-from classify.eval.labels_io import LabelError as LabelError
+from classify.eval.labels_io import LABELS_CSV, LabelError, read_labels
 from classify.eval.precision import SCORED_LABELS
 from classify.split import HELDOUT_FOLD, is_heldout
 from pipeline.warehouse import ROOT
@@ -37,7 +32,11 @@ from pipeline.warehouse import ROOT
 # `answer_key` column names the file without a machine-specific prefix.
 ANSWER_KEY: str = str(LABELS_CSV.relative_to(ROOT))
 
-__all__ = ["ANSWER_KEY", "HELDOUT_FOLD", "LabelScore", "score_heldout"]
+# `LabelError` is exported here: the CLI catches the answer key's refusal by
+# this name at its boundary, while the key's reader stays behind the wall
+# (`tests/test_labels_isolation.py` refuses the reader module's name outside
+# classify/eval/).
+__all__ = ["ANSWER_KEY", "HELDOUT_FOLD", "LabelError", "LabelScore", "score_heldout"]
 
 
 @dataclass(frozen=True)
