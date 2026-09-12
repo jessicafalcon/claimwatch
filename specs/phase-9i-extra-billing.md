@@ -310,9 +310,11 @@ make review-gate SPEC=specs/phase-9i-extra-billing.md && make split-ameli && mak
 - `opendata/sources.py` — the data.ameli declaration block; the module
   docstring becomes "the open-data sources".
 - `ingest/parsed.py` — the bounded euro-total shape beside the count shapes.
-- `opendata/fee_split.py` — new: `read_national_families`, `write_fixture`,
-  `freeze_manifest`, `fee_split`, `FEE_SPLIT_FIELD_NAMES`, `write_fee_split`,
-  `read_fee_split`, `format_fee_split`; `opendata/__init__.py` docstring.
+- `opendata/fee_split.py` — new: `read_national_families`, `read_fixture`,
+  `write_ameli_fixture`, the split arithmetic (`FamilyRow`, `FeeTotals`),
+  `FEE_SPLIT_FIELD_NAMES`, `write_fee_split`, `read_fee_split`,
+  `format_fee_split`; the manifest is `opendata.slice.freeze_manifest`, reused
+  (review round 1, functionality-tester); `opendata/__init__.py` docstring.
 - `fixtures/ameli/ameli-national.csv`, `fixtures/ameli/MANIFEST.sha256`
   — the frozen four-row slice (first freeze).
 - `data/ameli/fee_split.csv` — the tracked artifact; `.gitignore` gains
@@ -406,8 +408,9 @@ Agents are selected by diff surface (CLAUDE.md → "Which review agents run").
   the parameters signature change carried to every caller, scope (one row,
   no formula).
 - **security-reviewer** (mandatory — `opendata/**`, `pipeline/cli.py`, a
-  `Makefile` variable): the hand-placed export is parsed to a declared shape
-  with a size cap and no path derived from `YEAR`; no network import in the
+  `Makefile` variable): the hand-placed export is parsed to a declared shape,
+  streamed row by row with no byte cap and the reason written in the reader
+  (review round 1, security #1), and no path is derived from `YEAR`; no network import in the
   new module; the tracked fixture and artifact carry no personal data and no
   brand (profession families and whole-euro totals); `data/cache/ameli/` stays
   gitignored; the robots decision honoured (no fetch code at all).

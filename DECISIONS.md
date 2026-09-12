@@ -3205,3 +3205,29 @@ Phase 9's render (Phase 9a): the extra-billing share from data.ameli's
   `site-fix` class); a third module for the shared read (the pinned "one new
   module").* (c) The tracked-files guard walks one closed map `{artifact
   path: name set}` over both artifacts (challenge round 1, #4).
+- **The row's tag is the mart's, Modeled.** The share is a division over two
+  published totals, printed in full on the page (the note says the arithmetic
+  in words, `make split-ameli` prints it) — the README glossary's Modeled, "a
+  number produced by arithmetic we print in full", the footing `emp_mean`
+  (an arithmetic mean over the DAMIR fixture) already stands on; Documented
+  is "a number from a named public source", which the totals are and the
+  share is not. *Rejected (review round 1, code-reviewer #1): a per-row
+  Documented tag for a context row — the params mart stamps one tag per
+  write, so a per-row tag is a `Parameter` field and a write-path change, a
+  fix amendment; it is the read-figure BACKLOG row's territory and its
+  trigger now names the tag.*
+- **Review round 1 (2026-09-12): twelve findings, none a BLOCKER, none a
+  correctness finding; every one fixed, the developer's disposition "fix
+  all".** Code: one euro-total helper for both readers; the fixture read once
+  (`read_fixture`, the year off the file, replacing `fixture_year`); the
+  "no national rows" refusal cuts its tokens like every other; the
+  missing-column refusal derives its slice from `FIXTURE_COLUMNS`; the two
+  fixture writers named by meaning (`write_ameli_fixture`,
+  `write_damir_fixture`); the CLI's read paths catch `(ValueError, OSError)`
+  (the `traceback-at-boundary` row's Where cell extended). Security notes:
+  the export reader's no-cap reason written in its docstring and the spec's
+  bullet corrected. Prose: B3.3's blurb says "context, not a formula input"
+  (the row sits among the sourced rows); the "spread, not a bound" clause
+  said once, in the note; SPEC's B3.3 sentence split. Record: the spec's
+  Scope names the reused `freeze_manifest`. The tag finding (#1) is the
+  bullet above.
