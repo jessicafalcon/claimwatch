@@ -3286,8 +3286,9 @@ who-writes-what change that restores the documented layering.
   calls it after `rebuild()` with a cache path inside the tempdir it already
   creates, then compares whole-db `table_counts`. The duplicated
   `_classify_and_build` test helper (a rules-only re-implementation that
-  existed only because there was no shared function) is deleted in favor of
-  the shared function. *Rejected: a new `pipeline/classify_step.py` module
+  existed only because there was no shared function) is rewritten to a thin
+  wrapper over `classify_step`, so the duplication is gone. *Rejected: a new
+  `pipeline/classify_step.py` module
   (the amendment scoped it to a build.py function; build.py already owns the
   step per the Repo map); `idempotency_check` importing from `cli` (a layering
   inversion); leaving the two slow scenario tests as the only coverage (the
