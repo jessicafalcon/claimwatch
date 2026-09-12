@@ -22,6 +22,7 @@ import os
 import sys
 from contextlib import suppress
 
+from classify.cache import DECISIONS
 from classify.eval.gate import HELDOUT_FOLD, format_gate
 from classify.eval.precision import evaluate, format_report
 from classify.labels import POSITIVE, THEMES, UNCLASSIFIED, review_id
@@ -70,6 +71,7 @@ from opendata.sources import AMELI_EXPORT, cache_path, valid_month, valid_year
 from pipeline.build import (
     FETCHED_SNAPSHOTS,
     INPUTS,
+    _staged_reviews,
     captures_for,
     classify_step,
     idempotency_check,
@@ -267,7 +269,9 @@ def _classify_and_print(db, rows_input: str) -> None:
     rules-only, and the gate scores that truthfully (lower recall). The gate
     itself is offline (it grades stored predictions against the hand answer key —
     no model call)."""
-    outcome = classify_step(db, rows_input, decide=make_model_decider())
+    outcome = classify_step(
+        db, rows_input, cache_path=DECISIONS, decide=make_model_decider()
+    )
     if outcome is None:
         print("classification: no stg_reviews yet (nothing to classify)")
         return
@@ -379,27 +383,15 @@ def _do_label_sample(args: argparse.Namespace) -> int:
 def _staged_reviews_text(db) -> list[tuple[str, str]] | None:
     """`(review_id, text)` for every staged review, or None if the warehouse has
     no `stg_reviews` yet. `text` is the review's title and body — the words the
-    rules read; the answer key is never touched here."""
-    if not db.is_file():
+    rules read; the answer key is never touched here. The read and its existence
+    guard are `build._staged_reviews` (one reader, shared with the classify step)."""
+    staged = _staged_reviews(db)
+    if staged is None:
         return None
-    conn = connect("duckdb", database=db)
-    try:
-        exists = conn.execute(
-            "select count(*) from information_schema.tables "
-            "where table_name = 'stg_reviews'"
-        ).fetchone()[0]
-        if not exists:
-            return None
-        rows = conn.execute(
-            "select source, external_id, title, body from stg_reviews"
-        ).fetchall()
-    finally:
-        conn.close()
-    out: list[tuple[str, str]] = []
-    for source, external_id, title, body in rows:
-        text = "\n".join(part for part in (title, body) if part).strip()
-        out.append((review_id(source, external_id), text))
-    return out
+    return [
+        (review_id(s, e), "\n".join(p for p in (t, b) if p).strip())
+        for s, e, t, b in staged
+    ]
 
 
 def _do_classify_eval(_args: argparse.Namespace) -> int:

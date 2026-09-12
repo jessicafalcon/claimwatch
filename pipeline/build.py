@@ -41,9 +41,9 @@ from decimal import Decimal
 from pathlib import Path
 from typing import NamedTuple
 
-from classify.cache import DECISIONS, read_decisions, write_decisions
+from classify.cache import read_decisions, write_decisions
 from classify.combined import classify_all
-from classify.eval.gate import ANSWER_KEY, HELDOUT_FOLD, score_heldout
+from classify.eval.gate import ANSWER_KEY, HELDOUT_FOLD, LabelScore, score_heldout
 from classify.labels import review_id
 from classify.llm import Decide
 from classify.rules import load_rules
@@ -759,7 +759,7 @@ def create_raw(conn) -> None:
 
 
 # The marts that read stg_classified_reviews, which Python fills in the classify
-# step (pipeline/cli.py) after staging: the two theme-share marts (B2.2, B2.5) and
+# step (classify_step, below) after staging: the two theme-share marts (B2.2, B2.5) and
 # the review-level drill (B2.1, 9g). The generic pass runs before classify, so it
 # would build them empty — the classify step runs them instead
 # (build_post_classify_marts), after the table is filled.
@@ -860,7 +860,7 @@ class ClassifyOutcome(NamedTuple):
 
     n_reviews: int
     rows: list[tuple[str, str]]
-    scores: list
+    scores: tuple[LabelScore, ...]
     graded: bool
 
 
@@ -890,8 +890,8 @@ def classify_step(
     db: str | Path,
     run_id: str,
     *,
+    cache_path: str | Path,
     decide: Decide | None = None,
-    cache_path: str | Path = DECISIONS,
 ) -> ClassifyOutcome | None:
     """Run the combined classifier over `stg_reviews` and fill the classify-path
     tables: `stg_classified_reviews` (the review x theme grain), the three
@@ -1394,8 +1394,8 @@ _ROW_COUNT_STAGES = ("raw_reviews", "stg_reviews", "stg_classified_reviews")
 
 def write_pipeline_row_counts(conn, run_id: str) -> None:
     """Fill the `pipeline_row_counts` mart (B5.2): one row per review-pipeline
-    stage, each value a direct count(*) of that stage's table. Runs in the CLI
-    classify path (after stg_classified_reviews is filled), so the classified
+    stage, each value a direct count(*) of that stage's table. Runs in
+    `classify_step` (after stg_classified_reviews is filled), so the classified
     stage is counted; corpus-gated at render like classifier_quality. The table is
     cleared first so a re-populate is idempotent; the stages go in flow order, so a
     re-run is byte-identical."""
