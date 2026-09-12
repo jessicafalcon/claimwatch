@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 import pipeline.cli as cli
-from ingest.parsed import MAX_EURO_TOTAL, euro_total_in_range
+from ingest.parsed import CSV_UNREADABLE, MAX_EURO_TOTAL, euro_total_in_range
 from opendata.fee_split import (
     ARTIFACT,
     FEE_SPLIT_FIELD_NAMES,
@@ -200,12 +200,12 @@ def test_slice_refuses_an_export_the_csv_parser_cannot_read_by_name(
         + ";1\n",
         encoding="utf-8",
     )
-    with pytest.raises(ValueError, match="wide.csv: not a CSV the reader can parse"):
+    with pytest.raises(ValueError, match=f"wide.csv: {CSV_UNREADABLE}"):
         read_national_families(bad, 2024)
     monkeypatch.setattr(cli, "AMELI_EXPORT", bad)
     assert main(["slice-ameli", "--year=2024"]) == 2
     err = capsys.readouterr().err
-    assert err.startswith("refusing: wide.csv: not a CSV the reader can parse")
+    assert err.startswith(f"refusing: wide.csv: {CSV_UNREADABLE}")
     assert "Traceback" not in err
 
 

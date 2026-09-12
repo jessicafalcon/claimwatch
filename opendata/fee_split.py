@@ -35,7 +35,7 @@ from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
-from ingest.parsed import euro_total_in_range
+from ingest.parsed import CSV_UNREADABLE, euro_total_in_range
 from opendata.fit import finite_float, read_name_value_rows, shown, shown_names
 from opendata.sources import (
     AMELI_DELIMITER,
@@ -176,8 +176,7 @@ def _iter_rows(path: Path) -> Iterator[dict[str, str]]:
                 yield {c: (row.get(c) or "") for c in FIXTURE_COLUMNS}
     except csv.Error as exc:
         raise ValueError(
-            f"{path.name}: not a CSV the reader can parse ({exc}); "
-            "not a data.ameli honoraires export"
+            f"{path.name}: {CSV_UNREADABLE} ({exc}); not a data.ameli honoraires export"
         ) from exc
 
 

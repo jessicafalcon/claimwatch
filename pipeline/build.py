@@ -48,7 +48,13 @@ from classify.labels import review_id
 from classify.llm import Decide
 from classify.rules import load_rules
 from ingest.captures import parser_module, read_captures
-from ingest.parsed import MEASURES, PageShapeError, count_in_range, review_rating
+from ingest.parsed import (
+    CSV_UNREADABLE,
+    MEASURES,
+    PageShapeError,
+    count_in_range,
+    review_rating,
+)
 from ingest.sources import (
     CHANNELS,
     ORIGINS,
@@ -277,9 +283,7 @@ def _read_csv(path: Path, columns: tuple[str, ...]) -> list[dict[str, str]]:
                 raise PageShapeError(f"{where}: columns must be exactly {columns}")
             rows = list(reader)
     except csv.Error as exc:
-        raise PageShapeError(
-            f"{where}: not a CSV the reader can parse ({exc})"
-        ) from exc
+        raise PageShapeError(f"{where}: {CSV_UNREADABLE} ({exc})") from exc
     for i, row in enumerate(rows, 2):
         if None in row or None in row.values():
             raise PageShapeError(f"{where}: line {i}: wrong number of cells")

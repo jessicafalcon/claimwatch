@@ -20,6 +20,7 @@ import csv
 from pathlib import Path
 
 from classify.labels import LABEL_SET
+from ingest.parsed import CSV_UNREADABLE
 from pipeline.warehouse import ROOT
 
 LABELS_CSV = ROOT / "classify" / "eval" / "labels.csv"
@@ -29,6 +30,23 @@ LABEL_COLUMNS: tuple[str, ...] = ("review_id", "theme")
 class LabelError(Exception):
     """A labels.csv row outside the declared shape or the closed label set:
     one line naming the file and the line, never a traceback."""
+
+
+def _label(row: dict[str, str], i: int, where: str) -> tuple[str, str]:
+    """One answer-key row as `(review_id, theme)`, both cells present and
+    stripped, the theme in the closed label set — or the `LabelError` naming
+    the line."""
+    if None in row or None in row.values():
+        raise LabelError(f"{where}: line {i}: wrong number of cells")
+    review_id, theme = row["review_id"].strip(), row["theme"].strip()
+    if not review_id:
+        raise LabelError(f"{where}: line {i}: field 'review_id' is empty")
+    if theme not in LABEL_SET:
+        raise LabelError(
+            f"{where}: line {i}: theme {theme!r} is not one of the seven closed "
+            f"labels {tuple(sorted(LABEL_SET))}"
+        )
+    return review_id, theme
 
 
 def read_labels(path: str | Path = LABELS_CSV) -> list[tuple[str, str]]:
@@ -48,17 +66,7 @@ def read_labels(path: str | Path = LABELS_CSV) -> list[tuple[str, str]]:
             if tuple(reader.fieldnames or ()) != LABEL_COLUMNS:
                 raise LabelError(f"{where}: columns must be exactly {LABEL_COLUMNS}")
             for i, row in enumerate(reader, 2):
-                if None in row or None in row.values():
-                    raise LabelError(f"{where}: line {i}: wrong number of cells")
-                review_id, theme = row["review_id"].strip(), row["theme"].strip()
-                if not review_id:
-                    raise LabelError(f"{where}: line {i}: field 'review_id' is empty")
-                if theme not in LABEL_SET:
-                    raise LabelError(
-                        f"{where}: line {i}: theme {theme!r} is not one of the "
-                        f"seven closed labels {tuple(sorted(LABEL_SET))}"
-                    )
-                out.append((review_id, theme))
+                out.append(_label(row, i, where))
     except csv.Error as exc:
-        raise LabelError(f"{where}: not a CSV the reader can parse ({exc})") from exc
+        raise LabelError(f"{where}: {CSV_UNREADABLE} ({exc})") from exc
     return out

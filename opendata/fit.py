@@ -36,7 +36,7 @@ from dataclasses import dataclass
 from math import exp, log
 from pathlib import Path
 
-from ingest.parsed import count_in_range
+from ingest.parsed import CSV_UNREADABLE, count_in_range
 from opendata.slice import DECIMAL_SHAPE
 
 # The tracked fit artifact — under data/, kept out of the gitignore's data/*
@@ -234,7 +234,7 @@ def read_name_value_rows(
                 raw[name] = row[1]
     except csv.Error as exc:
         raise ValueError(
-            f"{where}: not a CSV the reader can parse ({exc}); not a {kind} artifact"
+            f"{where}: {CSV_UNREADABLE} ({exc}); not a {kind} artifact"
         ) from exc
     expected = set(field_names)
     if unknown := sorted(set(raw) - expected):

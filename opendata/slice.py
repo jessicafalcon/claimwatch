@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from io import TextIOBase
 from pathlib import Path
 
-from ingest.parsed import DECIMAL_SHAPE
+from ingest.parsed import CSV_UNREADABLE, DECIMAL_SHAPE
 from opendata.sources import AMOUNT_COLUMN, DELIMITER, LEGAL_TYPES, TYPE_COLUMN
 
 # The two bytes every gzip stream begins with (RFC 1952). We detect gzip by
@@ -132,7 +132,7 @@ def _iter_rows(path: Path) -> Iterator[tuple[str, str]]:
                 yield row.get(AMOUNT_COLUMN, ""), row.get(TYPE_COLUMN, "")
     except csv.Error as exc:
         raise ValueError(
-            f"{path.name}: not a CSV the reader can parse ({exc}); not a DAMIR slice"
+            f"{path.name}: {CSV_UNREADABLE} ({exc}); not a DAMIR slice"
         ) from exc
 
 

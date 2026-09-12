@@ -19,7 +19,7 @@ import pytest
 
 from classify.cache import DECISION_COLUMNS, CacheError, read_decisions
 from classify.eval.labels_io import LABEL_COLUMNS, LabelError, read_labels
-from ingest.parsed import PageShapeError
+from ingest.parsed import CSV_UNREADABLE, PageShapeError
 from ingest.sources import sample_source
 from ingest.trustpilot import COLUMNS as TRUSTPILOT_COLUMNS
 from ingest.trustpilot import parse as parse_trustpilot
@@ -37,10 +37,11 @@ from pipeline.build import (
 )
 from pipeline.cli import main
 from tests import pins
+from tests.repo_text import repo_text
 
 ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = ("ingest", "pipeline", "opendata", "classify", "models", "study")
-REFUSAL = "not a CSV the reader can parse"
+REFUSAL = CSV_UNREADABLE
 URL = "https://ca.trustpilot.com/review/exemple-fictif.com?languages=all"
 STAMP = "2026-09-04T12:00:00"
 
@@ -73,10 +74,11 @@ def _lines(path: Path, header: str, row: str) -> Path:
     return path
 
 
-def _trustpilot_page(wide: str) -> str:
+def _export(path: Path, wide: str) -> Path:
+    """The authorized export's header and one row whose last cell is `wide`."""
     cells = ["x"] * len(TRUSTPILOT_COLUMNS)
     cells[-1] = wide
-    return ",".join(TRUSTPILOT_COLUMNS) + "\n" + ",".join(cells) + "\n"
+    return _lines(path, ",".join(TRUSTPILOT_COLUMNS), ",".join(cells))
 
 
 READERS: tuple[Reader, ...] = (
@@ -128,7 +130,7 @@ READERS: tuple[Reader, ...] = (
     ),
     Reader(
         ("ingest/trustpilot.py", "parse"),
-        lambda d, w: _lines(d / "export.csv", _trustpilot_page(w).rstrip("\n"), ""),
+        lambda d, w: _export(d / "export.csv", w),
         lambda p: parse_trustpilot(
             p.read_text(encoding="utf-8"), URL, STAMP, sample_source("trustpilot")
         ),
@@ -137,13 +139,30 @@ READERS: tuple[Reader, ...] = (
 )
 
 
+READER_NAMES = ("reader", "DictReader")
+
+
 class _CsvCallScan(ast.NodeVisitor):
-    """Records every `csv.reader(...)` / `csv.DictReader(...)` call with its
-    enclosing function name."""
+    """Records every call of the `csv` module's `reader`/`DictReader` with its
+    enclosing function name, however the module or the name was bound:
+    `import csv`, `import csv as c`, `from csv import DictReader [as d]`."""
 
     def __init__(self) -> None:
         self._funcs: list[str] = []
+        self._modules: set[str] = set()  # names bound to the csv module
+        self._readers: set[str] = set()  # names bound to csv.reader/DictReader
         self.sites: list[str] = []
+
+    def visit_Import(self, node: ast.Import) -> None:
+        for alias in node.names:
+            if alias.name == "csv":
+                self._modules.add(alias.asname or "csv")
+
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        if node.module == "csv":
+            for alias in node.names:
+                if alias.name in READER_NAMES:
+                    self._readers.add(alias.asname or alias.name)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         self._funcs.append(node.name)
@@ -154,12 +173,14 @@ class _CsvCallScan(ast.NodeVisitor):
 
     def visit_Call(self, node: ast.Call) -> None:
         func = node.func
-        if (
+        via_module = (
             isinstance(func, ast.Attribute)
-            and func.attr in ("reader", "DictReader")
+            and func.attr in READER_NAMES
             and isinstance(func.value, ast.Name)
-            and func.value.id == "csv"
-        ):
+            and func.value.id in self._modules
+        )
+        via_name = isinstance(func, ast.Name) and func.id in self._readers
+        if via_module or via_name:
             self.sites.append(self._funcs[-1] if self._funcs else "<module>")
         self.generic_visit(node)
 
@@ -176,7 +197,7 @@ def _repo_csv_call_sites() -> set[tuple[str, str]]:
     for pkg in PACKAGES:
         for path in sorted((ROOT / pkg).rglob("*.py")):
             where = str(path.relative_to(ROOT))
-            sites |= _csv_call_sites(path.read_text(encoding="utf-8"), where)
+            sites |= _csv_call_sites(repo_text(path), where)
     return sites
 
 
@@ -187,11 +208,24 @@ def test_the_walk_covers_every_csv_reader_in_the_source_packages():
     assert _repo_csv_call_sites() == {r.site for r in READERS}
 
 
-def test_the_scan_catches_a_new_csv_reader():
-    text = "import csv\n\ndef load(fh):\n    return list(csv.DictReader(fh))\n"
-    assert _csv_call_sites(text, "x.py") == {("x.py", "load")}
-    text = "import csv\n\ndef load(fh):\n    return csv.reader(fh)\n"
-    assert _csv_call_sites(text, "x.py") == {("x.py", "load")}
+@pytest.mark.parametrize(
+    "source",
+    [
+        "import csv\n\ndef load(fh):\n    return list(csv.DictReader(fh))\n",
+        "import csv\n\ndef load(fh):\n    return csv.reader(fh)\n",
+        "import csv as c\n\ndef load(fh):\n    return c.reader(fh)\n",
+        "from csv import DictReader\n\ndef load(fh):\n    return DictReader(fh)\n",
+        "from csv import reader as r\n\ndef load(fh):\n    return r(fh)\n",
+    ],
+    ids=["csv.DictReader", "csv.reader", "import as", "from import", "from import as"],
+)
+def test_the_scan_catches_a_new_csv_reader_however_it_is_imported(source: str):
+    assert _csv_call_sites(source, "x.py") == {("x.py", "load")}
+
+
+def test_the_scan_ignores_a_reader_name_not_bound_to_csv():
+    text = "def load(fh):\n    return reader(fh) + DictReader(fh)\n"
+    assert _csv_call_sites(text, "x.py") == set()
 
 
 @pytest.mark.parametrize("reader", READERS, ids=lambda r: ":".join(r.site))

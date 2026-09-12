@@ -9,6 +9,7 @@ import pytest
 from classify.cache import DECISION_COLUMNS
 from classify.eval import precision
 from classify.eval.labels_io import LABEL_COLUMNS, read_labels
+from ingest.parsed import CSV_UNREADABLE
 from ingest.sources import app_store_source, by_name
 from pipeline import cli
 from pipeline.build import reset
@@ -550,7 +551,7 @@ def test_model_error_is_one_line_exit_2(capsys, monkeypatch):
     assert "refusing: model call failed" in capsys.readouterr().err
 
 
-CSV_REFUSAL = "not a CSV the reader can parse"
+CSV_REFUSAL = CSV_UNREADABLE
 # The interpreter's default field limit stays: the synthetic corpus itself must
 # still read, so the corrupt file carries a field past the real limit.
 WIDE = "9" * pins.CSV_FIELD_PAST_DEFAULT_LIMIT_CHARS

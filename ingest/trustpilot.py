@@ -29,7 +29,7 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-from ingest.parsed import Parsed, refuse, review_rating
+from ingest.parsed import CSV_UNREADABLE, Parsed, refuse, review_rating
 from ingest.sources import Source
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -180,7 +180,5 @@ def parse(body: bytes | str, page_url: str, captured_at: str, source: Source) ->
                 }
             )
     except csv.Error as exc:
-        raise refuse(
-            page_url, None, "export", "is not a CSV the reader can parse"
-        ) from exc
+        raise refuse(page_url, None, "export", f"is {CSV_UNREADABLE}") from exc
     return Parsed(reviews=reviews)
