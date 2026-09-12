@@ -596,7 +596,13 @@ def test_the_no_spec_form_reads_the_branch_spec_for_the_fixtures_check_only(
     with redirect_stdout(buf):
         assert review_gate.main([]) == 0
     assert seen == ["Freeze: fixtures/ameli/\n"]
-    assert "SKIP evidence, records" in buf.getvalue()
+    assert buf.getvalue().splitlines()[0] == review_gate.skip_line(spec, "phase-0a-x")
+    assert review_gate.skip_line(spec, "phase-0a-x") == (
+        "SKIP evidence, records (no SPEC; Freeze: read from specs/phase-0a-x.md)"
+    )
+    assert review_gate.skip_line(None, "fix/x") == (
+        "SKIP evidence, records (no SPEC; branch fix/x has no phase spec)"
+    )
 
 
 def test_resolve_inputs_reads_the_branch_only_without_a_spec(root: Path, monkeypatch):
