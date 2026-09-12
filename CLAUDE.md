@@ -145,7 +145,11 @@ cannot say:
 - `review-gate [SPEC=specs/<f>.md] [BASE=main]` runs test + ruff read-only +
   `check-docs` + `check-backing` + fixtures + `check-pins` (every public
   function or class added or changed since BASE is named in a test); one line
-  per check, exit 1 on FAIL, 2 on a refused SPEC/BASE.
+  per check, exit 1 on FAIL, 2 on a refused SPEC/BASE or a phase branch whose
+  spec is absent. With no `SPEC=` the branch's own spec is read (`phase-<slug>`
+  → `specs/phase-<slug>.md`), so the two forms print the same verdict; a
+  branch with no phase spec keeps fixtures read-only. Both summary lines count
+  checks passed over checks run.
 - `model`, `simulate` and `study` take no variable and print or render
   byte-identical output on a rerun; CI diffs the committed study page.
   `fit-damir` and `split-ameli` take no variable and rewrite their tracked
@@ -612,6 +616,6 @@ calls `python -m study.metabase export|apply`, which are not `make` targets
 `TARGET`-awareness for Snowflake (BACKLOG "The classify-step mart writes are
 not warehouse-aware") as its own Done-when item with an invariant.
 
-Open BACKLOG rows: **38**.
+Open BACKLOG rows: **37**.
 
 (Update this section at the end of every working day.)

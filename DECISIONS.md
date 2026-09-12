@@ -3418,3 +3418,43 @@ wrapped its read in no `try` at all.
   *Rejected: widening the wall's token set with an exception for the error
   type (a denylist edit for one case); catching `Exception` at the CLI (the
   traceback-at-boundary class's opposite failure, a swallowed refusal).*
+
+### Fix — the review gate reads the phase branch's own spec (2026-09-12, branch `fix/review-gate-no-spec`)
+
+Not a phase (no spec; a fix PR from `main`, CLAUDE.md → Git workflow; the
+BACKLOG row "`make review-gate` without `SPEC=` is red on a phase branch…",
+opened by Phase 3a's functionality-tester and triggered at Phase 9i's exit,
+whose first freeze of `fixtures/ameli/` turned the no-SPEC form red on the
+branch). The fix restores this invariant: **the gate's verdict on a range does
+not depend on whether `SPEC=` was typed — with no `SPEC=` the gate reads the
+branch's own spec and runs every check the SPEC form runs; a branch with no
+phase spec keeps fixtures read-only; and both summary lines count the same
+thing.**
+
+- **The no-SPEC form derives the spec from the branch by the rule
+  `/review-round` already applies: `phase-<slug>` → `specs/phase-<slug>.md`.**
+  The branch name is `git rev-parse --abbrev-ref HEAD` through the shared `run`
+  boundary, parsed to one closed shape (`\Aphase-[0-9]+[a-z]?-[a-z0-9-]+\Z`,
+  which every phase branch since 0a matches); anything else — `fix/`,
+  `tooling/`, `docs/`, `main`, a detached `HEAD`, a traversal or case variant —
+  is no spec, and the SKIP line names the branch. The path is built from the
+  matched name, never from the raw output. *Rejected: skipping the fixture
+  check with no SPEC (loses the read-only guard on fix branches, where a
+  fixture change has no `Freeze:` line to license it, and the two forms would
+  still disagree); reading every spec's `Freeze:` lines (a stale grant in an
+  old spec would re-license its fixture forever).*
+- **A phase branch whose spec file is absent is refused, exit 2, naming the
+  branch and the path; a failed git call is refused naming git's line.** The
+  first commit on a phase branch is its spec, so a phase branch with none is a
+  workflow error, not a branch with no spec; an empty branch name read as "no
+  spec" would be the `empty-default` class. `resolve_inputs` is the one seam:
+  a typed SPEC is resolved as given and the branch is never consulted.
+  *Rejected: falling back to the six range checks on a phase branch with no
+  spec (a silent narrowing the developer would read as green).*
+- **Both summary lines print `<passed>/<total> checks passed`.** The FAIL line
+  counted failures and the OK line counted passes, so `2/8` and `8/8` read as
+  the same kind of number and were not.
+- Records: the BACKLOG row is DONE (37 open); CLAUDE.md → Commands says the
+  no-SPEC rule; the Makefile help line names the default. No LESSONS row: the
+  finding was a Phase 3a functionality-tester deferral, not a class a fix
+  commit closed against a review round of this branch.
