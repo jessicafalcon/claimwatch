@@ -22,8 +22,9 @@ import os
 import sys
 from contextlib import suppress
 
-from classify.cache import DECISIONS
+from classify.cache import DECISIONS, CacheError
 from classify.eval.gate import HELDOUT_FOLD, format_gate
+from classify.eval.labels_io import LabelError
 from classify.eval.precision import evaluate, format_report
 from classify.labels import POSITIVE, THEMES, UNCLASSIFIED
 from classify.llm import ModelError, make_model_decider, model_available
@@ -714,5 +715,12 @@ def main(argv: list[str] | None = None) -> int:
         # The developer-run DAMIR download hit no matching month or an empty
         # body: one line, exit 2, never a traceback. The offline fit path (the
         # DONE command, CI) never reaches here.
+        print(f"refusing: {exc}", file=sys.stderr)
+        return 2
+    except (CacheError, LabelError) as exc:
+        # The decision cache (the classify step of `rebuild`) or the answer key
+        # (`rebuild`'s gate, `classify-eval`) is off its declared shape or is a
+        # file the parser cannot read: one line, exit 2, never a traceback —
+        # the two declared reader types `main` did not catch (fix round 1).
         print(f"refusing: {exc}", file=sys.stderr)
         return 2
