@@ -130,6 +130,13 @@ row, a CLI variable, hook stdin, an env var, a file name under `data/cache/`.
   walk a package) read through `tests/repo_text.py::repo_text`, which fails
   by name (*LESSONS: traceback-at-boundary*, reopened and re-closed
   2026-09-07, then closed once more in `tests/`).
+- A reader owns its failure type: the parser's own error (`csv.Error` on a
+  field past its limit, the JSON decoder's) is folded into the one refusal
+  the reader declares, so the boundary catches one declared set. Widening
+  the boundary's `except` tuple to the parser's error is never the fix: the
+  kind changes, not the tuple — `ingest/parsed.py::decode_json`,
+  `opendata/fee_split.py::_iter_rows` (*LESSONS: traceback-at-boundary*,
+  hit twice in Phase 9i; the remaining `csv` readers are a BACKLOG row).
 - A reader that fails returns nothing the caller can check against: the
   failure travels with the value (`None`, a `Refused`, an `(empty, error)`
   pair) and the caller reports the one line and stops — never an empty

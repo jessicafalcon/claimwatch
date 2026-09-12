@@ -79,12 +79,13 @@ names under `data/cache/`, a capture's meta file.
   enters a tracked file, a log line, a test's output, a capture meta, a
   commit message, an exception message. Tracked outputs are numbers, slugs
   and dates: `data/snapshots/*.csv`, `data/damir/claim_cost_fit.csv`,
-  `classify/eval/labels.csv` (`review_id`, `theme` only).
+  `data/ameli/fee_split.csv`, `classify/eval/labels.csv` (`review_id`,
+  `theme` only).
 - The API key and warehouse credentials live in `.env` only; read by name;
   never in Actions, never printed. A refusal prints the variable's NAME.
-- `.gitignore` covers `.env*`, `data/*` minus the two tracked subtrees,
-  `*.duckdb`, `.claude/settings*.json`, `.mcp.json`. `git ls-files data/`
-  shows only the two subtrees.
+- `.gitignore` covers `.env*`, `data/*` minus the three tracked subtrees
+  (`snapshots/`, `damir/`, `ameli/`), `*.duckdb`, `.claude/settings*.json`,
+  `.mcp.json`. `git ls-files data/` shows only the three subtrees.
 
 ## Writing to the repo from a machine
 
