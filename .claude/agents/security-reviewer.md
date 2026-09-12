@@ -29,7 +29,7 @@ When invoked:
 2. Run read-only scans, e.g.
    `grep -rniE "(api[_-]?key|secret|password|token|private_key)\s*[:=]" --include="*.py" --include="*.yml" --include="*.yaml" --include="*.sql" --include="Makefile" .`
    and `git ls-files | grep -E '^data/|\.env|\.duckdb$'` (only
-   `data/snapshots/` and `data/damir/` may be tracked).
+   `data/snapshots/`, `data/damir/` and `data/ameli/` may be tracked).
    Grep captures under `data/cache/`; never cat one into your output (base64
    and raw pages in the transcript are noise and a refusal trigger).
 3. Review against this repo's actual surface below, every changed file, not
@@ -62,8 +62,9 @@ When invoked:
       Excerpts shown in drill-through are paraphrased or minimal and link to
       the public source.
 - [ ] The raw corpus is gitignored; `git ls-files data/` shows only
-      `data/snapshots/` (numbers, a source slug, a day) and `data/damir/`
-      (the fit: numbers only). The label sheet and the decision cache are
+      `data/snapshots/` (numbers, a source slug, a day), `data/damir/`
+      (the fit: numbers only) and `data/ameli/` (the fee split: numbers
+      only). The label sheet and the decision cache are
       gitignored and text-free where tracked.
 - [ ] `fixtures/synthetic/`, `fixtures/opinion-assurances/`,
       `fixtures/trustpilot/` are obviously fake — no real name, no real claim,
@@ -74,7 +75,7 @@ When invoked:
       in Actions secrets used by `weekly.yml`, never in a tracked file, never
       echoed (`env` dumps, `set -x`, an exception message or a `ModelError`
       carrying the key, a capture's meta file).
-- [ ] `.gitignore` still covers `.env*`, `data/*` (minus the two tracked
+- [ ] `.gitignore` still covers `.env*`, `data/*` (minus the three tracked
       subtrees), `*.duckdb`, `.claude/settings*.json`, `.mcp.json`.
 - [ ] Refusals print NAMES of variables, never values.
 
