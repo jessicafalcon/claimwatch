@@ -126,7 +126,10 @@ def test_crawl_delay_is_read_from_our_group_only():
     assert Robots.parse("User-agent: *\nCrawl-delay: 5\n").crawl_delay == 5.0
     assert Robots.parse("User-agent: other\nCrawl-delay: 5\n").crawl_delay is None
     assert Robots.parse("User-agent: *\nCrawl-delay: soon\n").crawl_delay is None
-    for absurd in ("1e400", "nan", "-5"):  # not finite, or negative: none declared
+    # Not finite, or negative: none declared. The last three are the exotic-but-
+    # parseable forms a bare float() once accepted (`1e9` as 1e9, `1_000` as
+    # 1000, `٣` as 3.0) — now dropped by DECIMAL_SHAPE (fix/foreign-shape-shared-home).
+    for absurd in ("1e400", "nan", "-5", "1e9", "1_000", "٣"):
         assert (
             Robots.parse(f"User-agent: *\nCrawl-delay: {absurd}\n").crawl_delay is None
         )
