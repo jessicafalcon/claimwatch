@@ -31,7 +31,12 @@ from classify.rules import classify as classify_reviews
 from classify.rules import load_rules
 from ingest import sources
 from ingest.captures import has_pages, parser_module
-from ingest.parsed import PageShapeError, count_in_range, is_ascii_decimal_integer
+from ingest.parsed import (
+    MAX_COUNT,
+    PageShapeError,
+    count_in_range,
+    is_ascii_decimal_integer,
+)
 from ingest.politeness import MAX_PAGES
 from ingest.sources import SOURCES
 from models.cost_model import format_model
@@ -99,10 +104,15 @@ def positive_int(value: str, name: str) -> int:
     used to build a path (the sheet path is fixed), so a traversal or a
     metacharacter is just a string that is not a positive integer — one refusal
     line, never a traceback and never a surprise value (round 1, code-reviewer;
-    fix/foreign-shape-shared-home)."""
+    fix/foreign-shape-shared-home). The count column bounds it: a value above
+    `MAX_COUNT` is refused too, so the message names the range rather than call a
+    too-large integer 'not a positive integer'."""
     number = count_in_range(value)
     if number is None or number < 1:
-        raise Refused(f"refusing: {name} must be a positive integer, got {value!r}")
+        raise Refused(
+            f"refusing: {name} must be a positive integer at most {MAX_COUNT}, "
+            f"got {value!r}"
+        )
     return number
 
 

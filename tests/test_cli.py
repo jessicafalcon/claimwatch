@@ -141,11 +141,15 @@ def test_cli_scrape_refuses_without_the_confirm_goal(capsys, monkeypatch):
 def test_confirm_stamps_one_invocation_and_reset_consumes_it(capsys, isolated_paths):
     """A4 (d): `confirm` writes the make process id; `reset` with the same id
     is confirmed once and the stamp is gone; a missing stamp, another id or a
-    non-numeric id refuses and deletes nothing."""
+    non-numeric or non-ASCII-digit id refuses and deletes nothing."""
     import pipeline.cli as cli
     import pipeline.warehouse as warehouse
 
     assert main(["confirm", "--make-pid=x", ORIGIN, "--goals=confirm reset"]) == 2
+    assert "not a process id" in capsys.readouterr().err
+    # a non-ASCII digit is not a process id either: make_pid reads through the
+    # shared is_ascii_decimal_integer shape, not str.isdigit (F8).
+    assert main(["confirm", "--make-pid=٣", ORIGIN, "--goals=confirm reset"]) == 2
     assert "not a process id" in capsys.readouterr().err
     corpus = warehouse.DEFAULT_DB
     corpus.write_text("x")
