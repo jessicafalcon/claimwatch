@@ -22,6 +22,11 @@ MAX_COUNT = 2**31 - 1
 _MAX_COUNT_DIGITS = len(str(MAX_COUNT))  # a longer run never reaches int()
 _ASCII_INTEGER = re.compile(r"\A[0-9]+\Z")
 
+# What every `csv` reader says of a file the parser itself cannot read (a
+# `csv.Error`, folded into the refusal the reader declares): one phrase at
+# every site, and the walk in `tests/test_csv_readers.py` pins that spelling.
+CSV_UNREADABLE = "not a CSV the reader can parse"
+
 
 def is_ascii_decimal_integer(value: str) -> bool:
     """Whether `value` is one or more ASCII digits and nothing else — the shape

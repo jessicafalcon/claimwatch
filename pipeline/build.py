@@ -48,7 +48,13 @@ from classify.labels import review_id
 from classify.llm import Decide
 from classify.rules import load_rules
 from ingest.captures import parser_module, read_captures
-from ingest.parsed import MEASURES, PageShapeError, count_in_range, review_rating
+from ingest.parsed import (
+    CSV_UNREADABLE,
+    MEASURES,
+    PageShapeError,
+    count_in_range,
+    review_rating,
+)
 from ingest.sources import (
     CHANNELS,
     ORIGINS,
@@ -265,12 +271,19 @@ def _measures(row: dict[str, str], *, where: str, line: int) -> dict[str, object
 
 
 def _read_csv(path: Path, columns: tuple[str, ...]) -> list[dict[str, str]]:
+    """A tracked CSV as its rows over exactly `columns`, or a `PageShapeError`
+    naming the file: the wrong header, a row with the wrong number of cells,
+    or a file the parser cannot read (`csv.Error`, a field past its limit —
+    folded here, so the reader owns its failure type)."""
     where = str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path)
-    with path.open(encoding="utf-8", newline="") as fh:
-        reader = csv.DictReader(fh)
-        if tuple(reader.fieldnames or ()) != columns:
-            raise PageShapeError(f"{where}: columns must be exactly {columns}")
-        rows = list(reader)
+    try:
+        with path.open(encoding="utf-8", newline="") as fh:
+            reader = csv.DictReader(fh)
+            if tuple(reader.fieldnames or ()) != columns:
+                raise PageShapeError(f"{where}: columns must be exactly {columns}")
+            rows = list(reader)
+    except csv.Error as exc:
+        raise PageShapeError(f"{where}: {CSV_UNREADABLE} ({exc})") from exc
     for i, row in enumerate(rows, 2):
         if None in row or None in row.values():
             raise PageShapeError(f"{where}: line {i}: wrong number of cells")
@@ -1173,9 +1186,26 @@ def write_sim_marts(conn, inputs: cost_model.ModelInputs, run_id: str) -> None:
     conn.execute("commit")
 
 
+# The review fixture's header: the eight columns of the raw review shape, in
+# the order `fixtures/<name>/reviews.csv` carries them.
+FIXTURE_REVIEW_COLUMNS: tuple[str, ...] = (
+    "source",
+    "external_id",
+    "source_url",
+    "captured_at",
+    "review_date",
+    "rating",
+    "title",
+    "body",
+)
+
+
 def read_fixture(name: str) -> list[dict[str, str]]:
-    with (ROOT / "fixtures" / name / "reviews.csv").open(encoding="utf-8") as fh:
-        return list(csv.DictReader(fh))
+    """`fixtures/<name>/reviews.csv` as its rows, through the one strict CSV
+    reader: a header off the eight raw columns, a short row or a file the
+    parser cannot read is a `PageShapeError` naming the file — one line out
+    of `make rebuild ROWS=synthetic`, never a traceback."""
+    return _read_csv(ROOT / "fixtures" / name / "reviews.csv", FIXTURE_REVIEW_COLUMNS)
 
 
 def segment_by_platform(sources: tuple[Source, ...] = SOURCES) -> dict[str, str]:

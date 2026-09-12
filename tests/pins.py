@@ -716,3 +716,13 @@ BEAT5_STAGE_COUNTS = {
     "stg_reviews": 39,
     "stg_classified_reviews": 39,
 }
+
+# A `csv` reader's own failure, `csv.Error` on a field past `csv.field_size_limit()`
+# (the interpreter's default is 131072 characters). The walk over every reader
+# (`tests/test_csv_readers.py`) narrows the limit to this many characters and
+# writes a field one past it, so a small file reaches the parser's error at
+# every reader — the fit artifact's 64 KiB byte cap sits below the default
+# limit and would refuse first. The fee-split test keeps the default limit and
+# writes a field past it.
+CSV_FIELD_LIMIT_NARROWED = 64
+CSV_FIELD_PAST_DEFAULT_LIMIT_CHARS = 140_000

@@ -6,9 +6,15 @@ from __future__ import annotations
 
 import pytest
 
+from classify.cache import DECISION_COLUMNS
+from classify.eval import precision
+from classify.eval.labels_io import LABEL_COLUMNS, read_labels
+from ingest.parsed import CSV_UNREADABLE
 from ingest.sources import app_store_source, by_name
+from pipeline import cli
 from pipeline.build import reset
 from pipeline.cli import main
+from tests import pins
 
 pytestmark = pytest.mark.slow  # slow: kept out of the fast edit-loop hook
 
@@ -543,3 +549,49 @@ def test_model_error_is_one_line_exit_2(capsys, monkeypatch):
     monkeypatch.setattr(cli, "_do_record_snapshots", boom)
     assert main(["record-snapshots"]) == 2
     assert "refusing: model call failed" in capsys.readouterr().err
+
+
+CSV_REFUSAL = CSV_UNREADABLE
+
+
+def _csv_with_a_wide_field(path, header: str, row: str):
+    """`row` with `{WIDE}` filled by a field past the interpreter's default
+    limit — the default stays, since the synthetic corpus itself must still
+    read; the field is built here, when a test runs."""
+    wide = "9" * pins.CSV_FIELD_PAST_DEFAULT_LIMIT_CHARS
+    path.write_text(header + "\n" + row.format(WIDE=wide) + "\n", encoding="utf-8")
+    return path
+
+
+def test_rebuild_refuses_a_decision_cache_the_parser_cannot_read(
+    capsys, monkeypatch, tmp_path, isolated_paths
+):
+    """The classify step of `make rebuild` reads the decision cache; a cache
+    the parser cannot read is the reader's `CacheError`, which `main` turns
+    into one line and exit 2 (fix round 1's BLOCKER: the arm `main` lacked)."""
+    bad = _csv_with_a_wide_field(
+        tmp_path / "decisions.csv", ",".join(DECISION_COLUMNS), "r,v,m,{WIDE}"
+    )
+    monkeypatch.setattr(cli, "DECISIONS", bad)
+    assert main(["rebuild", "--rows=synthetic"]) == 2
+    err = capsys.readouterr().err
+    assert err.startswith(f"refusing: {bad}: {CSV_REFUSAL}")
+    assert "Traceback" not in err and err.count("\n") == 1
+
+
+def test_classify_eval_refuses_an_answer_key_the_parser_cannot_read(
+    capsys, monkeypatch, tmp_path, isolated_paths
+):
+    """`make classify-eval` reads the answer key inside `classify/eval/`; a key
+    the parser cannot read is the reader's `LabelError`, one line and exit 2
+    out of `main` (the sibling arm)."""
+    assert main(["rebuild", "--rows=synthetic"]) == 0
+    capsys.readouterr()
+    bad = _csv_with_a_wide_field(
+        tmp_path / "labels.csv", ",".join(LABEL_COLUMNS), "r,{WIDE}"
+    )
+    monkeypatch.setattr(precision, "read_labels", lambda: read_labels(bad))
+    assert main(["classify-eval"]) == 2
+    err = capsys.readouterr().err
+    assert err.startswith(f"refusing: {bad}: {CSV_REFUSAL}")
+    assert "Traceback" not in err and err.count("\n") == 1

@@ -3335,3 +3335,86 @@ audit). Two edits, one commit, records in a second.
   against, so it lands first).* The test that walks every `csv` reader is
   that fix PR's, the BACKLOG row "Every `csv` reader but one maps
   `ValueError` only…".
+
+### Fix — every `csv` reader owns its failure type (2026-09-12, branch `fix/csv-reader-boundary`)
+
+Not a phase (no spec; a fix PR from `main`, CLAUDE.md → Git workflow; the
+BACKLOG row "Every `csv` reader but one maps `ValueError` only…"). The fix
+restores this invariant: **for every `csv` reader in the source packages, a
+file the parser cannot read (`csv.Error`, a field past `csv.field_size_limit()`)
+comes out as the refusal the reader declares, and every CLI read path catches
+its declared set — one line and exit 2, never a traceback.** Phase 9i's round 2
+folded the parser's error at `fee_split._iter_rows` only; the seven other
+readers still let `csv.Error` (no `ValueError` subclass) past `ValueError`
+tuples, `CacheError`, `LabelError` and `PageShapeError`, and `sample-damir`
+wrapped its read in no `try` at all.
+
+- **Each reader folds `csv.Error` into its own declared type — the kind, not
+  a wider tuple.** `_read_csv` → `PageShapeError`; `read_decisions` →
+  `CacheError`; `read_labels` → `LabelError`; `slice._iter_rows` and
+  `read_name_value_rows` → `ValueError`; `trustpilot.parse` → `refuse(...)`.
+  One phrase at every site, "not a CSV the reader can parse", so a reader of
+  the refusal sees the same sentence whichever file it was. *Rejected: adding
+  `csv.Error` to each boundary's `except` tuple (the class the code-craft
+  sentence names as never the fix: every boundary would then have to know
+  every parser); one shared `read_csv_or_refuse` helper raising one type (the
+  readers declare four different types by design — a cache error is not a
+  page-shape error — and the walk test already keeps them uniform).*
+- **`read_fixture` reads through `_read_csv` with the fixture's eight columns
+  declared (`FIXTURE_REVIEW_COLUMNS`), not through a bare `csv.DictReader`.**
+  One strict reader for tracked CSVs in `build.py`; the synthetic fixture's
+  header is checked where before it was trusted. *Rejected: a second
+  `try/except` in `read_fixture` (a duplicate of `_read_csv` four lines
+  apart).*
+- **`_do_fit_damir` gets the boundary catch with `_do_sample_damir`, though
+  the row named only the sample path.** Both read a DAMIR CSV whose reader
+  raises `ValueError` and neither caught it — the same class at a sibling site
+  (LESSONS `site-fix`); the fix commit's grep of `read_amounts(` and
+  `systematic_sample(` in `cli.py` lists both. *Rejected: fixing the named
+  site only (the `site-fix` class, hit six times).*
+- **The pin is one walk, not one test per reader.** `tests/test_csv_readers.py`
+  scans the six source packages by AST for `csv.reader`/`csv.DictReader` calls
+  and asserts the set equals the readers it walks, so a new reader fails the
+  suite until it joins the walk; each walked reader is handed a file with one
+  field past a narrowed `csv.field_size_limit()` (a pinned 64 characters, the
+  limit restored after) and must raise its declared type naming the file. The
+  limit is narrowed because the fit artifact's 64 KiB byte cap sits below the
+  interpreter's default field limit, so a real over-limit field would refuse
+  on size first there; the 9i fee-split test keeps the default limit and a
+  140 000-character field. *Rejected: a 140 000-character field at every
+  reader (unreachable at the byte-capped artifact); a grep-based site list
+  (a `csv.reader` in a comment or string would count; the AST scan is the
+  `test_number_shapes.py` shape).*
+- **Review round 1 (2026-09-12): eleven findings, one BLOCKER, disposition
+  "fix all".** Correctness (code #1, confirmed by the tester running it;
+  `360e040`): `cli.main` caught `Refused`, `PageShapeError`, `ModelError` and
+  `FetchError` but not `CacheError` or `LabelError` — the two declared types
+  this fix folds `csv.Error` into — so a corrupt decision cache left `make
+  rebuild`, and a corrupt answer key `make rebuild` and `make classify-eval`,
+  as a traceback; one arm for the pair and two CLI boundary tests, each with a
+  field past the interpreter's default limit (the synthetic corpus must still
+  read, so the narrowed limit of the walk cannot serve there). Craft (the
+  next commit): the refusal phrase is `ingest/parsed.py::CSV_UNREADABLE` at
+  every site and in the tests — `ingest.parsed` because it is the one
+  stdlib-only leaf below every reader's package (`opendata` and `pipeline`
+  already take their shapes from it, fix #33; `pipeline` as the home would
+  cycle through `classify`), a first `classify → ingest` edge and no edge
+  back; the AST scan resolves `import csv as c` and
+  `from csv import … [as x]` (code #3, security #1); `_decision`/`_label`
+  hold the per-row checks (code #5); the export entry has its own writer
+  (code #6); the scanner reads through `tests/repo_text.py` (security #2).
+  Records: the code-craft clause is taken back out of the fix PR — a skill
+  edit rides a `tooling/` branch (code #2) — and is a BACKLOG row for the
+  next one, so the count is 38 again. Accepted with the precedent named:
+  the process-global field limit the walk narrows and restores (code #7,
+  security confirmed no leak); `read_fixture` now strict on its header
+  (security #3, the second bullet above).
+- **Round 2's gate caught the arm's import: `LabelError` reaches the CLI
+  through `classify.eval.gate`, re-exported, not from the reader module.**
+  `tests/test_labels_isolation.py` refuses the reader module's name anywhere
+  outside `classify/eval/`, and `360e040` had imported the error type from
+  it; the type is the eval package's boundary contract, so the gate — what
+  raises it out of `rebuild` — exports it (`bb8d45b`).
+  *Rejected: widening the wall's token set with an exception for the error
+  type (a denylist edit for one case); catching `Exception` at the CLI (the
+  traceback-at-boundary class's opposite failure, a swallowed refusal).*

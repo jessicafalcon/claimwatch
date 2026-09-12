@@ -29,7 +29,7 @@ from datetime import date
 from decimal import Decimal
 from pathlib import Path
 
-from ingest.parsed import Parsed, refuse, review_rating
+from ingest.parsed import CSV_UNREADABLE, Parsed, refuse, review_rating
 from ingest.sources import Source
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -142,38 +142,43 @@ def _review_date(value: str, page_url: str, item: str) -> str:
 def parse(body: bytes | str, page_url: str, captured_at: str, source: Source) -> Parsed:
     """One authorized-export page -> its review rows (no snapshot: the rating
     stays hand-read, spec Phase 3c central constraint). A header that is not
-    the export's, or any cell outside its declared shape, refuses the page."""
+    the export's, any cell outside its declared shape, or a file the parser
+    cannot read (`csv.Error`, a field past its limit — folded into the same
+    refusal, as `decode_json` folds the JSON decoder's) refuses the page."""
     text = (
         body.decode("utf-8-sig", errors="replace")
         if isinstance(body, (bytes, bytearray))
         else body
     )
-    reader = csv.DictReader(io.StringIO(text))
-    if tuple(reader.fieldnames or ()) != COLUMNS:
-        raise refuse(page_url, None, "columns", f"are not the export's {COLUMNS}")
     reviews: list[dict[str, object]] = []
-    for k, row in enumerate(reader, 1):
-        item = str(k)
-        if None in row or None in row.values():
-            raise refuse(page_url, item, "row", "has the wrong number of cells")
-        rating = _rating(row[_RATING_COL], page_url, item)
-        review_date = _review_date(row[_DATE_COL], page_url, item)
-        title = row[_TITLE]
-        body_text = row[_BODY]  # may be empty: a rating-only review keeps its title
-        # The review's identity is its own content (like opinion_assurances):
-        # this export carries no stable public review id, so a re-import of the
-        # same review is one fingerprint and inserts nothing.
-        payload = _SEP.join((review_date, title, body_text, format(rating, "f")))
-        reviews.append(
-            {
-                "source": source.platform,
-                "external_id": hashlib.sha256(payload.encode("utf-8")).hexdigest(),
-                "source_url": page_url,
-                "captured_at": captured_at,
-                "review_date": review_date,
-                "rating": rating,
-                "title": title,
-                "body": body_text,
-            }
-        )
+    try:
+        reader = csv.DictReader(io.StringIO(text))
+        if tuple(reader.fieldnames or ()) != COLUMNS:
+            raise refuse(page_url, None, "columns", f"are not the export's {COLUMNS}")
+        for k, row in enumerate(reader, 1):
+            item = str(k)
+            if None in row or None in row.values():
+                raise refuse(page_url, item, "row", "has the wrong number of cells")
+            rating = _rating(row[_RATING_COL], page_url, item)
+            review_date = _review_date(row[_DATE_COL], page_url, item)
+            title = row[_TITLE]
+            body_text = row[_BODY]  # may be empty: a rating-only review keeps its title
+            # The review's identity is its own content (like opinion_assurances):
+            # this export carries no stable public review id, so a re-import of
+            # the same review is one fingerprint and inserts nothing.
+            payload = _SEP.join((review_date, title, body_text, format(rating, "f")))
+            reviews.append(
+                {
+                    "source": source.platform,
+                    "external_id": hashlib.sha256(payload.encode("utf-8")).hexdigest(),
+                    "source_url": page_url,
+                    "captured_at": captured_at,
+                    "review_date": review_date,
+                    "rating": rating,
+                    "title": title,
+                    "body": body_text,
+                }
+            )
+    except csv.Error as exc:
+        raise refuse(page_url, None, "export", f"is {CSV_UNREADABLE}") from exc
     return Parsed(reviews=reviews)

@@ -36,7 +36,7 @@ from dataclasses import dataclass
 from math import exp, log
 from pathlib import Path
 
-from ingest.parsed import count_in_range
+from ingest.parsed import CSV_UNREADABLE, count_in_range
 from opendata.slice import DECIMAL_SHAPE
 
 # The tracked fit artifact — under data/, kept out of the gitignore's data/*
@@ -205,7 +205,9 @@ def read_name_value_rows(
     per line, no duplicate name, and exactly the closed `field_names` set (an
     unknown or missing name refuses by name). `kind` names the artifact in a
     refusal ("fit", "fee split"). What each value must be is the caller's —
-    `finite_float`, the count shape, the euro-total shape."""
+    `finite_float`, the count shape, the euro-total shape. The parser's own
+    failure (`csv.Error`) folds into the `ValueError` this reader declares —
+    the reader owns its failure type."""
     where = path.name
     size = path.stat().st_size
     if size > MAX_ARTIFACT_BYTES:
@@ -214,21 +216,26 @@ def read_name_value_rows(
             f"{MAX_ARTIFACT_BYTES} cap"
         )
     raw: dict[str, str] = {}
-    with path.open(encoding="utf-8", newline="") as fh:
-        reader = csv.reader(fh)
-        if next(reader, None) != ["name", "value"]:
-            raise ValueError(f"{where}: header must be exactly 'name,value'")
-        for lineno, row in enumerate(reader, 2):
-            if len(row) != 2:
-                raise ValueError(
-                    f"{where}: line {lineno}: wrong number of cells ({len(row)})"
-                )
-            name = row[0]
-            if name in raw:
-                raise ValueError(
-                    f"{where}: line {lineno}: duplicate name {shown(name)}"
-                )
-            raw[name] = row[1]
+    try:
+        with path.open(encoding="utf-8", newline="") as fh:
+            reader = csv.reader(fh)
+            if next(reader, None) != ["name", "value"]:
+                raise ValueError(f"{where}: header must be exactly 'name,value'")
+            for lineno, row in enumerate(reader, 2):
+                if len(row) != 2:
+                    raise ValueError(
+                        f"{where}: line {lineno}: wrong number of cells ({len(row)})"
+                    )
+                name = row[0]
+                if name in raw:
+                    raise ValueError(
+                        f"{where}: line {lineno}: duplicate name {shown(name)}"
+                    )
+                raw[name] = row[1]
+    except csv.Error as exc:
+        raise ValueError(
+            f"{where}: {CSV_UNREADABLE} ({exc}); not a {kind} artifact"
+        ) from exc
     expected = set(field_names)
     if unknown := sorted(set(raw) - expected):
         raise ValueError(
