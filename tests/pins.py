@@ -287,7 +287,8 @@ CLASSIFIED_REVIEWS_COLUMNS = ("source", "external_id", "theme", "run_id")
 # The tables the classify step fills that `rebuild()` alone stops before — what
 # `make idempotency-check` must cover once it runs the classify step too
 # (fix/idempotency-classify). classifier_quality is here because the synthetic
-# corpus is graded; on an ungraded corpus it is simply absent from both runs.
+# corpus is graded; on an ungraded corpus it holds 0 rows in both runs (its DDL
+# shell, which rebuild() creates and classify_step leaves empty), still equal.
 CLASSIFY_PATH_TABLES = frozenset(
     {
         "stg_classified_reviews",

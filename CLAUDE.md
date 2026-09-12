@@ -614,7 +614,7 @@ diff (DECISIONS → Fix; BACKLOG row closed).
 spec decides how the publish task calls `python -m study.metabase
 export|apply`, which are not `make` targets — `docs/PLAN.md` §5 says five
 `make` tasks; the classify step's `TARGET`-awareness for Snowflake is still a
-BACKLOG row for it).
+BACKLOG row (Phase 10's Snowflake wiring)).
 
 Open BACKLOG rows: **39**.
 

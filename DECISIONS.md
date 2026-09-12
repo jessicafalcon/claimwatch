@@ -3275,12 +3275,12 @@ classify-path marts included.** Until now `idempotency_check` called
 `stg_classified_reviews`, the three `POST_CLASSIFY_MARTS` and
 `pipeline_row_counts` never entered its per-table diff — machine-checked only
 by two slow scenario tests (BACKLOG, opened `fix/theme-marts-run-id` round 1).
-The classify step's orchestration lived in `pipeline/cli.py::_classify_and_print`,
+The classify step's code lived in `pipeline/cli.py::_classify_and_print`,
 which `pipeline/build.py` cannot import (cli imports build); the Repo map
 already names build.py as the home of "the classify step," so this is a
 who-writes-what change that restores the documented layering.
 
-- **The classify orchestration moves into one `build.py` function,
+- **The classify step's code moves into one `build.py` function,
   `classify_step`, taking a cache path so a throwaway run touches no tracked
   cache.** `_classify_and_print` wraps it and prints; `idempotency_check`
   calls it after `rebuild()` with a cache path inside the tempdir it already
@@ -3298,7 +3298,8 @@ who-writes-what change that restores the documented layering.
   deterministic table would need a denylist-of-one, the smell CLAUDE.md's
   "fix the class, not the case" forbids; including it is stable (delete+insert,
   deterministic offline) and stricter. On an input the answer key does not
-  cover it is simply absent from both runs' counts, still equal. *Rejected:
+  cover it holds 0 rows in both runs (its DDL shell, which `rebuild()` creates —
+  `classify_step` leaves it empty when `graded` is false), still equal. *Rejected:
   filtering `classifier_quality` out of the comparison (the denylist);
   passing `classify_step` a `write_quality=False` flag for the idempotency
   path (behavior divergence between the two callers).*
