@@ -23,8 +23,7 @@ import sys
 from contextlib import suppress
 
 from classify.cache import DECISIONS, CacheError
-from classify.eval.gate import HELDOUT_FOLD, format_gate
-from classify.eval.labels_io import LabelError
+from classify.eval.gate import HELDOUT_FOLD, LabelError, format_gate
 from classify.eval.precision import evaluate, format_report
 from classify.labels import POSITIVE, THEMES, UNCLASSIFIED
 from classify.llm import ModelError, make_model_decider, model_available

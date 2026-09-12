@@ -22,7 +22,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+# `LabelError` is re-exported: the CLI catches the answer key's refusal by this
+# name at its boundary, while the key's reader stays behind the wall
+# (`tests/test_labels_isolation.py` refuses the reader module's name outside
+# classify/eval/).
 from classify.eval.labels_io import LABELS_CSV, read_labels
+from classify.eval.labels_io import LabelError as LabelError
 from classify.eval.precision import SCORED_LABELS
 from classify.split import HELDOUT_FOLD, is_heldout
 from pipeline.warehouse import ROOT
