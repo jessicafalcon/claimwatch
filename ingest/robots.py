@@ -98,6 +98,9 @@ def _parse_groups(text: str) -> list[_Group]:  # noqa: C901 -- the RFC 9309 line
         elif key == "crawl-delay":
             if not DECIMAL_SHAPE.fullmatch(value):
                 continue  # not an ASCII decimal (`1e9`, `1_000`, `٣`): no delay
+            # DECIMAL_SHAPE also admits a French `,` (its DAMIR home), so `1,5`
+            # reads as 1.5 s — a wider acceptance than a robots.txt writes, but a
+            # harmless one for a politeness delay.
             delay = float(value.replace(",", "."))  # shape-checked, cannot raise
             if math.isfinite(delay) and delay >= 0:  # the shape admits `-5`: filter it
                 current.crawl_delay = max(current.crawl_delay or 0.0, delay)  # longest

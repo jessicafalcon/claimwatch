@@ -8,14 +8,18 @@ Workflow rules). Every foreign count and decimal in `ingest/`, `pipeline/` and
 Unicode trap nor a bare `float()` on unshaped text can reappear at a new site.
 
 An AST walk, not a substring grep: a grep denylist is the exact form this class
-retired in tooling round 3 (a spawner-name denylist let `os.popen` slip), and an
-alias or a differently-spelled call evades a substring match. The guard bans the
-two loose coercions outright — `.isdigit`/`.isdecimal` (the methods that lie
-about Unicode) and `float()` outside the shaped-decimal parsers. `int()` and
-`Decimal()` are not banned: in this repo they are always preceded by a bounded
-digit shape (a date's `int(m.group(...))`, `Decimal(text)` after a `Measure`
-pattern), so banning them would force an ever-growing allowlist — the escape
-hatch this guard exists to avoid (fix/foreign-shape-shared-home)."""
+retired in tooling round 3 (a spawner-name denylist let `os.popen` slip). The
+walk sees a real call node — so `float` in a comment, a string or a type hint
+raises nothing — and names the enclosing function. What it flags is a bare
+`float(...)` / `.isdigit()` / `.isdecimal()` call; a value-form alias
+(`f = float; f(x)`) is out of its scope, as it is a grep's — none exists in this
+codebase, and a reviewer catches one. The guard bans the two loose coercions
+outright — `.isdigit`/`.isdecimal` (the methods that lie about Unicode) and
+`float()` outside the shaped-decimal parsers. `int()` and `Decimal()` are not
+banned: in this repo they are always preceded by a bounded digit shape (a date's
+`int(m.group(...))`, `Decimal(text)` after a `Measure` pattern), so banning them
+would force an ever-growing allowlist — the escape hatch this guard exists to
+avoid (fix/foreign-shape-shared-home)."""
 
 from __future__ import annotations
 
@@ -67,7 +71,8 @@ class _CoercionScan(ast.NodeVisitor):
 
 
 def _package_modules() -> list[Path]:
-    return sorted(p for pkg in PACKAGES for p in (ROOT / pkg).glob("*.py"))
+    # rglob, not glob: a future subpackage under one of these must be scanned too.
+    return sorted(p for pkg in PACKAGES for p in (ROOT / pkg).rglob("*.py"))
 
 
 def _scan(path: Path) -> _CoercionScan:
@@ -127,8 +132,8 @@ def test_count_in_range_uses_the_shared_integer_shape():
 
 
 def test_the_scan_catches_a_new_loose_coercion():
-    """The guard's own edge: a fresh `float()` and `.isdigit()` are both seen,
-    with the enclosing function, so a substring alias cannot hide one."""
+    """The guard's own edge: a fresh `float()` and `.isdigit()` are both seen as
+    call nodes, each with its enclosing function named."""
     scan = _CoercionScan()
     scan.visit(ast.parse("def f(x):\n    return float(x) or x.isdigit()\n"))
     assert scan.float_hits == [("f", 2)]

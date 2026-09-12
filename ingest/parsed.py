@@ -19,7 +19,7 @@ from decimal import ROUND_HALF_EVEN, Decimal, InvalidOperation
 # refusal there, never a driver exception at the load (round 2, code-reviewer
 # #2 #3, security-reviewer #1 #2).
 MAX_COUNT = 2**31 - 1
-_MAX_COUNT_DIGITS = 10  # ten digits cover MAX_COUNT; a longer run never reaches int()
+_MAX_COUNT_DIGITS = len(str(MAX_COUNT))  # a longer run never reaches int()
 _ASCII_INTEGER = re.compile(r"\A[0-9]+\Z")
 
 
