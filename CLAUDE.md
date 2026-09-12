@@ -594,10 +594,10 @@ and `fix/foreign-shape-shared-home` (PR #33, 2026-09-12: the shared decimal
 and count shapes given one home in `ingest/parsed.py` and an AST guard against
 a fresh coercion outside them). Phase 9 is complete.
 
-**In review:** Phase 9i on `phase-9i-extra-billing` (spec challenged round 1,
-nine amendments applied; built 2026-09-12, DONE command green; review rounds
-1 and 2 — the exit round — run and their fixes committed 2026-09-12; next:
-`/selfcheck`, the Delivered paragraph, the PR): the extra-billing share
+**Delivered, PR open:** Phase 9i on `phase-9i-extra-billing` (spec
+challenged round 1, nine amendments applied; built 2026-09-12; review rounds
+1 and 2 — the exit round — fixed; DONE command green; Delivered paragraph
+appended 2026-09-12): the extra-billing share
 from data.ameli's `honoraires` table as one sourced B3.3 row with its
 profession-family spread, read by no formula — the
 export is a hand download, since the host's robots file disallows the API and

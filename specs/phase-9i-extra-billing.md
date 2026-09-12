@@ -8,7 +8,7 @@ Phase 9a); PROJECT_BRIEF.md §7 names data.ameli beside Open DAMIR. Depends on
 Phase 9h merged (PR #32) and `fix/foreign-shape-shared-home` (PR #33,
 2026-09-12).
 
-**Status: APPROVED 2026-09-12 — in progress.** No new dependencies: the
+**Status: APPROVED 2026-09-12 — DELIVERED 2026-09-12, PR open.** No new dependencies: the
 reader is stdlib `csv`, the arithmetic is two sums and a division, the rest is
 the existing formulas-as-data path (`models/cost_model.py`,
 `pipeline/build.py::write_model_marts`, `study/panels.py`).
@@ -494,3 +494,59 @@ no falsifier or decision changed, so the stamp is re-hashed (the 9b
 precedent). Re-deferred with a trigger, not fixed here: the no-`SPEC=` gate
 row (a `fix/` PR), the DAMIR sample path's read boundary and the tooling
 texts (BACKLOG).
+
+## Delivered (2026-09-12)
+
+The extra-billing share: what liberal practitioners billed above the public
+tariff as a share of all fees billed, from data.ameli's `honoraires` table,
+one year (2024), the four national profession families — 17.3% over all four,
+1.0% (medical auxiliaries) to 49.3% (dental surgeons) — as one sourced B3.3
+row no formula reads, tagged Modeled like every other params-mart row (the
+glossary's "arithmetic we print in full"; a per-row tag is a write-path
+change, the read-figure BACKLOG row's trigger). The second open-data source is
+declared beside DAMIR in `opendata/sources.py` (address, `;` delimiter, six
+columns, the national codes, the closed four-label set, `valid_year`
+century-bounded); there is no fetch code, since the host's robots file
+disallows the API and download paths — the export is a file a person saved
+from the browser at a constant gitignored path. `opendata/fee_split.py`
+streams that export with no byte cap, drops every leading byte-order mark on
+the header (the browser writes two, with CRLF — DECISIONS → Gotchas), keeps
+the year's four family rows each exactly once with both totals in the bounded
+euro-total shape `ingest/parsed.py` now declares beside the count shapes
+(twelve ASCII digits; the count ceiling sits below the data), refuses by name
+a year with no national rows, a family missing, repeated or suppressed, a
+total off its shape, and folds the parser's own `csv.Error` into that
+refusal; writes the frozen fixture (`Freeze: fixtures/ameli/`, `slice-ameli
+YEAR=YYYY`) and, from it, the tracked artifact `data/ameli/fee_split.csv`
+(`split-ameli`, no variable, byte-identical on a rerun, `extra / (tariff +
+extra)` per family and over the summed totals, six places). The artifact's
+`name,value` read is the one reader both artifacts share (`opendata/fit.py`,
+made public for the second caller), consumed through `read_model_inputs` into
+one `ModelInputs` container; `models/cost_model.py::fee_split_parameters`
+adds the seventeenth params row with the family spread as its range; every
+pre-phase output, crossover and parameter is unchanged on every scenario. The
+page renders the row from its mart cells, with a note that says the
+arithmetic in words, what the totals are (annual national totals, not per
+claim), what the range is (a spread, not a bound) and what the public insurer
+does not reimburse. Two deviations from the spec as stamped, both recorded
+and the stamp re-hashed at exit: the fixture carries the six columns the
+slice reads, not four (one shape, one reader), and the year is read off the
+fixture, not passed. Two review rounds (twelve findings, then sixteen at the
+exit; two correctness, both the `traceback-at-boundary` class at the same
+read boundary — `f5d278c` widened the tuple, `bd14315` changed the kind so the
+reader owns its failure type, the class's second hit in one phase; the rest
+craft, prose and records, all fixed). Records: SPEC and BACKING name the row
+as context; BACKING's B3.3 gains the `data-ameli-honoraires` source and its
+ODbL paragraph; the README says the share exists without a figure and
+defines *extra billing* as the glossary's tenth term; DECISIONS Phase 9i
+holds the dataset reading (annual totals, not a distribution — the BACKLOG
+row's premise did not hold), the brief §7 drift accepted across its three
+sentences, the tag decision, both rounds; BACKLOG: the data.ameli row struck,
+three rows opened (the complementary-side claim size via DAMIR's fee and base
+columns; every `csv` reader's `ValueError`-only boundary, the DAMIR sample
+path with none; two tooling texts for the next `tooling/` branch), the
+no-`SPEC=` gate row re-deferred to a `fix/` PR with its trigger met here.
+Forward: Phase 10's DAG needs no `fit-damir` or `split-ameli` task — `rebuild`
+reads both tracked artifacts from repo paths; the fourth read-figure row, or
+a reader confusing a spread with an explored range, opens the `ReadFigure`
+shape.
