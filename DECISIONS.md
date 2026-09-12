@@ -3118,7 +3118,13 @@ Phase 9's render (Phase 9a): the extra-billing share from data.ameli's
   the reading here and lands what the table uniquely supplies (the trigger
   reinterpreted, the 9h precedent); the brief's sentence is untouched, the
   developer's call outside this diff (challenge round 1, #11), so the exit
-  coherence audit treats brief↔DECISIONS as recorded, accepted drift.*
+  coherence audit treats brief↔DECISIONS as recorded, accepted drift. The
+  same claim stands in two more brief sentences — §7's `claims` bullet
+  ("average claim sizes from … Open DAMIR / data.ameli distributions") and
+  §9's Phase 7 line ("Ingest Open DAMIR / data.ameli slices; fit the
+  claim-cost distributions") — all three read the same way: DAMIR supplies
+  the distributions, data.ameli one national share (review round 2,
+  coherence #6).*
 - **The quantity is the extra-billing share over the four top-level families
   for one year, and its range is the family spread.** `extra / (tariff +
   extra)`: the default over the four summed totals, `low`/`high` the lowest
@@ -3216,9 +3222,13 @@ Phase 9's render (Phase 9a): the extra-billing share from data.ameli's
   write, so a per-row tag is a `Parameter` field and a write-path change, a
   fix amendment; it is the read-figure BACKLOG row's territory and its
   trigger now names the tag.*
-- **Review round 1 (2026-09-12): twelve findings, none a BLOCKER, none a
-  correctness finding; every one fixed, the developer's disposition "fix
-  all".** Code: one euro-total helper for both readers; the fixture read once
+- **Review round 1 (2026-09-12): twelve findings, none a BLOCKER, one a
+  correctness finding — the CLI's read boundary, the `traceback-at-boundary`
+  class in LESSONS; every one fixed, the developer's disposition "fix all".
+  The correctness fix landed in `f5d278c` with the other code fixes, not
+  alone: the one-per-commit rule was missed there and this sentence is its
+  record (review round 2, coherence #2).** Code: one euro-total helper for
+  both readers; the fixture read once
   (`read_fixture`, the year off the file, replacing `fixture_year`); the
   "no national rows" refusal cuts its tokens like every other; the
   missing-column refusal derives its slice from `FIXTURE_COLUMNS`; the two
@@ -3231,3 +3241,26 @@ Phase 9's render (Phase 9a): the extra-billing share from data.ameli's
   said once, in the note; SPEC's B3.3 sentence split. Record: the spec's
   Scope names the reused `freeze_manifest`. The tag finding (#1) is the
   bullet above.
+- **Review round 2, the exit round (2026-09-12): sixteen findings, none a
+  BLOCKER, one correctness; every one fixed or re-deferred with a trigger,
+  the developer's disposition "fix all".** Correctness (security #1, its own
+  commit `bd14315`): `csv.Error` is no `ValueError`, so the round-1 tuple
+  still let a corrupt export out as a traceback; the reader now folds the
+  parser's failure into the refusal it declares (the `decode_json`
+  precedent) — the kind changed, not the tuple; the second hit of the class
+  in one phase, so the sentence for `code-craft` is a BACKLOG row for the
+  next tooling branch, and the same gap on the pre-9i DAMIR sample path is
+  a BACKLOG row, not a fix in this diff. Craft and prose (`e779883`): the
+  label set a `frozenset`; the strip declared; the ceiling's redundancy
+  said; the test named for `read_model_inputs`; the docstring's third-row
+  pointer moved to the fourth; the note says the totals are one year's
+  national per-family totals, states the range fact once and ends on its
+  caveat. Records (this bullet's commit): CLAUDE.md's status; round 1's
+  sentence above; Done-when 2 amended to the six-column fixture the
+  DECISIONS bullet already recorded and the stamp re-hashed (the 9b
+  precedent: falsifiers and decisions unchanged); the spec's Scope names
+  `check-docs` as the glossary cap's guard, not `tests/test_readme.py`; the
+  brief drift bullet names all three brief sentences; the no-`SPEC=` gate
+  row's trigger, met by this phase's first freeze, re-deferred to a `fix/`
+  PR with the wider wording; the skill's "two tracked subtrees" a tooling
+  row.

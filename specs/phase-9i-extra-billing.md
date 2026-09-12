@@ -13,7 +13,7 @@ reader is stdlib `csv`, the arithmetic is two sums and a division, the rest is
 the existing formulas-as-data path (`models/cost_model.py`,
 `pipeline/build.py::write_model_marts`, `study/panels.py`).
 
-Challenged: 2026-09-12, round 1, spec 5e0d85ff — approve with amendments (all nine applied)
+Challenged: 2026-09-12, round 1, spec b99edb8d — approve with amendments (all nine applied; re-hashed at the exit — Done-when 2 says the six-column fixture as built and Invariant 4 cites the test's live name, falsifiers and decisions unchanged)
 
 ## Why
 
@@ -132,9 +132,12 @@ make review-gate SPEC=specs/phase-9i-extra-billing.md && make split-ameli && mak
    1.*
 2. **The fixture is the four rows of one year, frozen; the artifact is plain
    arithmetic over it, tracked and byte-stable.** `make slice-ameli YEAR=YYYY`
-   writes `fixtures/ameli/ameli-national.csv` (four columns:
-   `annee;profession_sante;hono_sans_depassement_totaux;depassements_totaux`,
-   four rows) and its `MANIFEST.sha256`; `make split-ameli` reads the fixture,
+   writes `fixtures/ameli/ameli-national.csv` (the six columns read —
+   `annee;region;departement;profession_sante;hono_sans_depassement_totaux;depassements_totaux`,
+   the national codes kept so the fixture is the export's own rows and one
+   reader serves both; amended at the exit, round 2 #4, to what DECISIONS
+   "decisions the spec did not cover (a)" recorded — four rows) and its
+   `MANIFEST.sha256`; `make split-ameli` reads the fixture,
    computes each family's share `extra / (tariff + extra)` and the
    all-families share over the summed totals, writes `data/ameli/fee_split.csv`
    (`name,value`; whole euros; shares at six places) and prints them; a test
@@ -334,7 +337,8 @@ make review-gate SPEC=specs/phase-9i-extra-billing.md && make split-ameli && mak
   `tests/test_model_marts.py`, `tests/test_beat3.py`, `tests/test_snapshots.py`
   (the closed artifact map), `tests/test_number_shapes.py` (the new shape is a
   shaped parser),
-  `tests/test_makefile.py`, `tests/test_readme.py` (the glossary count).
+  `tests/test_makefile.py`; `make check-docs` guards the glossary cap (ten
+  terms), not a test.
 - `SPEC.md`, `BACKING.md`, `README.md`, `DECISIONS.md`, `BACKLOG.md`,
   `CLAUDE.md`, this spec.
 
@@ -360,7 +364,9 @@ read-only after 9i.)
   at a `fixtures/damir/` re-freeze); the read-figure row's trigger re-pointed
   (round 1, #2); the DAMIR-refresh row's trigger extended to name the fee
   split's vintage; the count updated
-- [ ] LESSONS.md — none until a review round reports a correctness finding; then backtick it and the fix commit writes the row
+- [ ] `LESSONS.md` — the `traceback-at-boundary` row extended twice: review
+  round 1 (the read paths caught `ValueError` only, `f5d278c`) and round 2
+  (`csv.Error` past the widened tuple; the reader folds it, `bd14315`)
 - [ ] `CLAUDE.md` — Current status; Commands (`slice-ameli`, `split-ameli`;
   the `confirm` set unchanged); Repo map (`opendata/fee_split.py`,
   `fixtures/ameli/`, `data/ameli/`); BACKLOG count
@@ -374,7 +380,8 @@ read-only after 9i.)
   term is defined in the panel's note)
 - [ ] `README.md` — Beat 3: one sentence naming the share, carrying no
   figure (round 1, #9); the glossary's tenth term, *extra billing*
-- [ ] this spec — the "Delivered" paragraph appended at exit
+- [ ] `specs/phase-9i-extra-billing.md` — the round-1 and round-2 amendments,
+  the stamp re-hashed at the exit, the "Delivered" paragraph appended at exit
 
 ## Threat model (REQUIRED when the phase adds a `make` target that takes a variable, deletes anything, calls a paid API, or touches the network)
 
@@ -476,3 +483,14 @@ named in the new BACKLOG row (#6); one `ModelInputs` container instead of
 refused by name first (#8); the README sentence carries no figure (#9). The two
 questions: the export is not yet downloaded — the first hour's STOP (#10); the
 brief §7 clause stands with DECISIONS as its record (#11).
+
+**Round 2 (2026-09-12, the exit review; disposition: fix all).** Sixteen
+findings, one correctness (`csv.Error` past the read boundary — the reader
+now folds the parser's failure into its declared refusal, `bd14315`), the
+rest craft, prose and records (`e779883` and the records commit). Two edits
+to the hashed sections: Done-when 2 now names the six-column fixture as
+built (#4), and Invariant 4's falsifier cites the test's live name (#7);
+no falsifier or decision changed, so the stamp is re-hashed (the 9b
+precedent). Re-deferred with a trigger, not fixed here: the no-`SPEC=` gate
+row (a `fix/` PR), the DAMIR sample path's read boundary and the tooling
+texts (BACKLOG).

@@ -595,9 +595,11 @@ and count shapes given one home in `ingest/parsed.py` and an AST guard against
 a fresh coercion outside them). Phase 9 is complete.
 
 **In review:** Phase 9i on `phase-9i-extra-billing` (spec challenged round 1,
-nine amendments applied; built 2026-09-12, DONE command green; review round
-next): the extra-billing share from data.ameli's `honoraires` table as one
-sourced B3.3 row with its profession-family spread, read by no formula — the
+nine amendments applied; built 2026-09-12, DONE command green; review rounds
+1 and 2 — the exit round — run and their fixes committed 2026-09-12; next:
+`/selfcheck`, the Delivered paragraph, the PR): the extra-billing share
+from data.ameli's `honoraires` table as one sourced B3.3 row with its
+profession-family spread, read by no formula — the
 export is a hand download, since the host's robots file disallows the API and
 download paths; `slice-ameli` and `split-ameli` are offline.
 
@@ -607,6 +609,6 @@ export|apply`, which are not `make` targets — `docs/PLAN.md` §5 says five
 `make` tasks — and is the home for the classify-path idempotency target,
 BACKLOG). A `fix/idempotency-classify` PR may land that target sooner.
 
-Open BACKLOG rows: **38**.
+Open BACKLOG rows: **40**.
 
 (Update this section at the end of every working day.)
