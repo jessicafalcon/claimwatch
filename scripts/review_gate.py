@@ -213,7 +213,10 @@ def branch_name(root: Path) -> str:
     code, out = run(["git", "rev-parse", "--abbrev-ref", "HEAD"], root)
     if code != 0:
         raise Refused(f"refusing: cannot read the branch: {tail(out, 1)}")
-    return out.strip()
+    name = out.strip()
+    if not name:
+        raise Refused("refusing: cannot read the branch: git printed an empty name")
+    return name
 
 
 def spec_for_branch(name: str, root: Path) -> Path | None:

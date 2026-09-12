@@ -551,6 +551,9 @@ def test_a_phase_branch_without_its_spec_is_refused(root: Path, capsys, monkeypa
         Refused, match=r"\Arefusing: cannot read the branch: fatal: c\Z"
     ):
         review_gate.branch_name(root)  # a Refused is one line: git's last one
+    monkeypatch.setattr(review_gate, "run", lambda cmd, cwd: (0, " \n"))
+    with pytest.raises(Refused, match=r"git printed an empty name"):
+        review_gate.branch_name(root)  # exit 0 and no name is not "no spec"
     monkeypatch.setattr(review_gate, "ROOT", root)
     monkeypatch.setattr(review_gate, "branch_name", lambda root: "phase-0b-contracts")
     with pytest.raises(SystemExit) as exc:
