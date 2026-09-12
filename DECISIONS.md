@@ -3425,36 +3425,56 @@ Not a phase (no spec; a fix PR from `main`, CLAUDE.md → Git workflow; the
 BACKLOG row "`make review-gate` without `SPEC=` is red on a phase branch…",
 opened by Phase 3a's functionality-tester and triggered at Phase 9i's exit,
 whose first freeze of `fixtures/ameli/` turned the no-SPEC form red on the
-branch). The fix restores this invariant: **the gate's verdict on a range does
-not depend on whether `SPEC=` was typed — with no `SPEC=` the gate reads the
-branch's own spec and runs every check the SPEC form runs; a branch with no
-phase spec keeps fixtures read-only; and both summary lines count the same
-thing.**
+branch). The fix restores this invariant: **the fixtures verdict on a range
+does not depend on whether `SPEC=` was typed — with no `SPEC=` a phase
+branch's own spec is read for the fixtures check's `Freeze:` grants; the
+spec's two own checks (evidence, records) run only when `SPEC=` names it; a
+branch with no phase spec keeps fixtures read-only; and both summary lines
+count the same thing.**
 
-- **The no-SPEC form derives the spec from the branch by the rule
-  `/review-round` already applies: `phase-<slug>` → `specs/phase-<slug>.md`.**
-  The branch name is `git rev-parse --abbrev-ref HEAD` through the shared `run`
+- **The no-SPEC form derives the spec from the branch: `phase-<slug>` →
+  `specs/phase-<slug>.md`, and reads it for the fixtures check only.** The
+  branch name is `git rev-parse --abbrev-ref HEAD` through the shared `run`
   boundary, parsed to one closed shape (`\Aphase-[0-9]+[a-z]?-[a-z0-9-]+\Z`,
-  which every phase branch since 0a matches); anything else — `fix/`,
-  `tooling/`, `docs/`, `main`, a detached `HEAD`, a traversal or case variant —
-  is no spec, and the SKIP line names the branch. The path is built from the
-  matched name, never from the raw output. *Rejected: skipping the fixture
-  check with no SPEC (loses the read-only guard on fix branches, where a
-  fixture change has no `Freeze:` line to license it, and the two forms would
-  still disagree); reading every spec's `Freeze:` lines (a stale grant in an
-  old spec would re-license its fixture forever).*
+  which every phase branch since 0a matches); a name that does not start
+  `phase-` — `fix/`, `tooling/`, `docs/`, `main`, a detached `HEAD` — is no
+  spec, and the SKIP line names the branch; a `phase-` name off the shape is
+  refused by name, never run as "no spec" with a green SKIP line. The derived
+  path goes through `resolve_spec`, the typed form's guard (a file under
+  `specs/`, symlinks resolved), so the two forms cannot read different things.
+  *Rejected: skipping the fixture check with no SPEC (loses the read-only
+  guard on fix branches, where a fixture change has no `Freeze:` line to
+  license it); reading every spec's `Freeze:` lines (a stale grant in an old
+  spec would re-license its fixture forever); running evidence and records
+  from the derived spec too, the round-0 design — see the round-1 bullet.*
 - **A phase branch whose spec file is absent is refused, exit 2, naming the
-  branch and the path; a failed git call is refused naming git's line.** The
-  first commit on a phase branch is its spec, so a phase branch with none is a
-  workflow error, not a branch with no spec; an empty branch name read as "no
-  spec" would be the `empty-default` class. `resolve_inputs` is the one seam:
-  a typed SPEC is resolved as given and the branch is never consulted.
-  *Rejected: falling back to the six range checks on a phase branch with no
-  spec (a silent narrowing the developer would read as green).*
+  branch and the path; a failed git call, or an exit-0 call that printed no
+  name, is refused naming git's last line.** The first commit on a phase
+  branch is its spec, so a phase branch with none is a workflow error, not a
+  branch with no spec; an empty name read as "no spec" would be the
+  `empty-default` class. `resolve_inputs` is the one seam: a typed SPEC is
+  resolved as given and the branch is never consulted.
 - **Both summary lines print `<passed>/<total> checks passed`.** The FAIL line
   counted failures and the OK line counted passes, so `2/8` and `8/8` read as
-  the same kind of number and were not.
-- Records: the BACKLOG row is DONE (37 open); CLAUDE.md → Commands says the
-  no-SPEC rule; the Makefile help line names the default. No LESSONS row: the
-  finding was a Phase 3a functionality-tester deferral, not a class a fix
-  commit closed against a review round of this branch.
+  the same kind of number and were not. The OK line was pinned and the FAIL
+  line never was — the `unpinned` class; LESSONS extended.
+- **Review round 1 (2026-09-12): eleven findings across four agents, one
+  BLOCKER, disposition "fix all".** The round-0 design ran evidence and
+  records from the derived spec too, so the two forms printed the same eight
+  lines; the code-reviewer and the tester (in a worktree: a fresh
+  `phase-99-probe` branch whose only commit is its spec printed `FAIL
+  evidence`, `FAIL records`, `5/8`) showed that `/phase-start` step 6 runs the
+  no-SPEC form on exactly that branch and reads it as "the branch starts
+  green" — both checks are red there by construction, the spec naming tests
+  not yet written and records not yet touched. `6c295bf` narrows the no-SPEC
+  form to the fixtures check, the BACKLOG row's own ask, with no skill edit
+  (a skill edit rides a `tooling/` branch). *Rejected: a `tooling/` PR
+  changing step 6 to expect evidence and records red at phase start (makes
+  the inherited baseline unreadable: red-by-construction lines beside a real
+  red).* The other correctness commits, one each: `57b04a5` (a `phase-` name
+  off the shape refused, code #4/#5), `259b997` (the git refusal one line,
+  code #3), `f7cc163` (the derived path through `resolve_spec`, security #1
+  and code #6: a tracked symlink out of `specs/` was followed on one form and
+  refused on the other), `09ab3df` (an empty name refused, security #2).
+  Records: the LESSONS `unpinned` row carries the summary-line miscount
+  (code #8); the status block says the delivered mechanism (editor #1).

@@ -145,11 +145,14 @@ cannot say:
 - `review-gate [SPEC=specs/<f>.md] [BASE=main]` runs test + ruff read-only +
   `check-docs` + `check-backing` + fixtures + `check-pins` (every public
   function or class added or changed since BASE is named in a test); one line
-  per check, exit 1 on FAIL, 2 on a refused SPEC/BASE or a phase branch whose
-  spec is absent. With no `SPEC=` the branch's own spec is read (`phase-<slug>`
-  → `specs/phase-<slug>.md`), so the two forms print the same verdict; a
-  branch with no phase spec keeps fixtures read-only. Both summary lines count
-  checks passed over checks run.
+  per check, exit 1 on FAIL, 2 on a refused SPEC/BASE or a `phase-` branch
+  whose spec is absent or whose name is off the shape. With no `SPEC=` a phase
+  branch's own spec (`specs/<branch>.md`) is read for the fixtures check's
+  `Freeze:` grants only, so that verdict does not depend on whether `SPEC=`
+  was typed; evidence and records run only with `SPEC=` (`/phase-start` runs
+  the no-SPEC form on a branch whose only commit is the spec, where both are
+  red by construction). Any other branch keeps fixtures read-only. Both
+  summary lines count checks passed over checks run.
 - `model`, `simulate` and `study` take no variable and print or render
   byte-identical output on a rerun; CI diffs the committed study page.
   `fit-damir` and `split-ameli` take no variable and rewrite their tracked
@@ -607,8 +610,9 @@ DECISIONS → Fix; BACKLOG row closed, one opened for the code-craft clause).
 **In progress:** `fix/review-gate-no-spec` (this branch), the last small PR
 off main before Phase 10: the no-`SPEC=` review gate (BACKLOG "`make
 review-gate` without `SPEC=` is red on a phase branch…") — the no-SPEC form
-reads the branch's spec or skips the freeze check, and the two summary lines
-count the same thing.
+reads a phase branch's own spec for the fixtures check, keeps fixtures
+read-only on any other branch, and the two summary lines count the same
+thing.
 
 **Next:** Phase 10 (the Airflow DAG). Its spec decides how the publish task
 calls `python -m study.metabase export|apply`, which are not `make` targets
