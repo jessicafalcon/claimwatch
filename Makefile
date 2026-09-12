@@ -62,7 +62,7 @@ check-backing: ## BACKING rows ↔ sql/marts files ↔ tags ↔ sources ↔ SPEC
 check-pins: ## every public def added or changed since BASE is named in a test — a new one, in a changed test [BASE=main]
 	uv run python scripts/check_pins.py --base=$(call _Q,$(if $(value BASE),$(value BASE),main))
 
-review-gate: ## offline gate [SPEC=specs/<f>.md] [BASE=main]; /review-round runs it first
+review-gate: ## offline gate [SPEC=specs/<f>.md, default: the phase branch's own] [BASE=main]; /review-round runs it first
 	uv run python scripts/review_gate.py $(if $(value SPEC),--spec=$(call _Q,$(value SPEC)),) --base=$(call _Q,$(if $(value BASE),$(value BASE),main))
 
 rebuild: ## build the warehouse from raw [TARGET=duckdb] [ROWS=captured|none|synthetic|samples]
