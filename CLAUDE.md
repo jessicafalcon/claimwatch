@@ -593,14 +593,15 @@ share from data.ameli's `honoraires` table as one sourced B3.3 row (PR #34,
 2026-09-12), and `fix/idempotency-classify` (PR #35, 2026-09-12: the classify
 step's code moved to `pipeline/build.py::classify_step` and run inside
 `idempotency-check`, so the six classify-path tables are in its diff). Phase 9
-is complete.
+is complete. Off main since: `tooling/skill-sentences` (PR #36, 2026-09-12:
+the two skill sentences of the Phase 9i exit audit — DECISIONS → Tooling).
 
-**In progress:** three small PRs off main before Phase 10, one at a time:
-`tooling/skill-sentences` (this branch: the two skill sentences of the Phase
-9i exit audit — DECISIONS → Tooling), then `fix/` for the `csv.Error`
-boundary class (BACKLOG "Every `csv` reader but one maps `ValueError` only…"),
-then `fix/` for the no-`SPEC=` review gate (BACKLOG "`make review-gate`
-without `SPEC=` is red on a phase branch…").
+**In progress:** two small PRs off main before Phase 10, one at a time:
+`fix/csv-reader-boundary` (this branch: every `csv` reader folds `csv.Error`
+into the refusal it declares and the two DAMIR CLI read paths catch it —
+DECISIONS → Fix, 2026-09-12; BACKLOG row closed), then `fix/` for the
+no-`SPEC=` review gate (BACKLOG "`make review-gate` without `SPEC=` is red on
+a phase branch…").
 
 **Next:** Phase 10 (the Airflow DAG). Its spec decides how the publish task
 calls `python -m study.metabase export|apply`, which are not `make` targets
@@ -608,6 +609,6 @@ calls `python -m study.metabase export|apply`, which are not `make` targets
 `TARGET`-awareness for Snowflake (BACKLOG "The classify-step mart writes are
 not warehouse-aware") as its own Done-when item with an invariant.
 
-Open BACKLOG rows: **38**.
+Open BACKLOG rows: **37**.
 
 (Update this section at the end of every working day.)
