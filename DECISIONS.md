@@ -3405,3 +3405,12 @@ wrapped its read in no `try` at all.
   the process-global field limit the walk narrows and restores (code #7,
   security confirmed no leak); `read_fixture` now strict on its header
   (security #3, the second bullet above).
+- **Round 2's gate caught the arm's import: `LabelError` reaches the CLI
+  through `classify.eval.gate`, re-exported, not from the reader module.**
+  `tests/test_labels_isolation.py` refuses the reader module's name anywhere
+  outside `classify/eval/`, and `360e040` had imported the error type from
+  it; the type is the eval package's boundary contract, so the gate — what
+  raises it out of `rebuild` — exports it (`bb8d45b`).
+  *Rejected: widening the wall's token set with an exception for the error
+  type (a denylist edit for one case); catching `Exception` at the CLI (the
+  traceback-at-boundary class's opposite failure, a swallowed refusal).*
