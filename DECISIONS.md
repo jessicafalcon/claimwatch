@@ -3264,3 +3264,45 @@ Phase 9's render (Phase 9a): the extra-billing share from data.ameli's
   row's trigger, met by this phase's first freeze, re-deferred to a `fix/`
   PR with the wider wording; the skill's "two tracked subtrees" a tooling
   row.
+
+### Fix — the classify step runs inside `idempotency-check` (2026-09-12, branch `fix/idempotency-classify`)
+
+Not a phase (no spec; a design-change fix PR from `main`, CLAUDE.md → Git
+workflow). The amendment restores this invariant: **the machine idempotency
+check covers every mart the pipeline writes deterministically offline, the
+classify-path marts included.** Until now `idempotency_check` called
+`rebuild()` only, which stops before the classify step, so
+`stg_classified_reviews`, the three `POST_CLASSIFY_MARTS` and
+`pipeline_row_counts` never entered its per-table diff — machine-checked only
+by two slow scenario tests (BACKLOG, opened `fix/theme-marts-run-id` round 1).
+The classify step's orchestration lived in `pipeline/cli.py::_classify_and_print`,
+which `pipeline/build.py` cannot import (cli imports build); the Repo map
+already names build.py as the home of "the classify step," so this is a
+who-writes-what change that restores the documented layering.
+
+- **The classify orchestration moves into one `build.py` function,
+  `classify_step`, taking a cache path so a throwaway run touches no tracked
+  cache.** `_classify_and_print` wraps it and prints; `idempotency_check`
+  calls it after `rebuild()` with a cache path inside the tempdir it already
+  creates, then compares whole-db `table_counts`. The duplicated
+  `_classify_and_build` test helper (a rules-only re-implementation that
+  existed only because there was no shared function) is deleted in favor of
+  the shared function. *Rejected: a new `pipeline/classify_step.py` module
+  (the amendment scoped it to a build.py function; build.py already owns the
+  step per the Repo map); `idempotency_check` importing from `cli` (a layering
+  inversion); leaving the two slow scenario tests as the only coverage (the
+  BACKLOG row's whole point — the target, not a sibling test, must see the
+  marts).*
+- **Whole-db `table_counts`, so `classifier_quality` is covered too —
+  superseding the amendment's "stays out (corpus-gated)."** Excluding one
+  deterministic table would need a denylist-of-one, the smell CLAUDE.md's
+  "fix the class, not the case" forbids; including it is stable (delete+insert,
+  deterministic offline) and stricter. On an input the answer key does not
+  cover it is simply absent from both runs' counts, still equal. *Rejected:
+  filtering `classifier_quality` out of the comparison (the denylist);
+  passing `classify_step` a `write_quality=False` flag for the idempotency
+  path (behavior divergence between the two callers).*
+- **No warehouse-awareness change.** The classify step's DuckDB-only
+  connection (BACKLOG, `TARGET` not yet threaded) stays as it is; that row is
+  Phase 10's Snowflake wiring. This fix is offline, DuckDB-only, no key. One
+  PR, one concern.
