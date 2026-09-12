@@ -194,7 +194,10 @@ def test_slice_refuses_an_export_the_csv_parser_cannot_read_by_name(
     round 2, security #1; the traceback-at-boundary class)."""
     bad = tmp_path / "wide.csv"
     bad.write_text(
-        HEADER + "\n2024;99;999;Sages-femmes;" + "9" * 140_000 + ";1\n",
+        HEADER
+        + "\n2024;99;999;Sages-femmes;"
+        + "9" * pins.CSV_FIELD_PAST_DEFAULT_LIMIT_CHARS
+        + ";1\n",
         encoding="utf-8",
     )
     with pytest.raises(ValueError, match="wide.csv: not a CSV the reader can parse"):

@@ -45,33 +45,42 @@ def read_decisions(path: str | Path = DECISIONS) -> dict[CacheKey, tuple[str, ..
     """The cached decisions as `{(review_id, prompt_version, model): themes}`.
     Rows sharing a key are one decision (its themes, in file order). A missing or
     header-only file is `{}`. A wrong column set, an empty cell or an out-of-set
-    theme refuses with `CacheError`, naming the line."""
+    theme refuses with `CacheError`, naming the line; so does a file the
+    parser cannot read (`csv.Error`, folded — the reader owns its failure
+    type)."""
     path = Path(path)
     if not path.is_file():
         return {}
     where = str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path)
     out: dict[CacheKey, list[str]] = {}
-    with path.open(encoding="utf-8", newline="") as fh:
-        reader = csv.DictReader(fh)
-        if tuple(reader.fieldnames or ()) != DECISION_COLUMNS:
-            raise CacheError(f"{where}: columns must be exactly {DECISION_COLUMNS}")
-        for i, row in enumerate(reader, 2):
-            if None in row or None in row.values():
-                raise CacheError(f"{where}: line {i}: wrong number of cells")
-            rid = row["review_id"].strip()
-            pv = row["prompt_version"].strip()
-            model = row["model"].strip()
-            theme = row["theme"].strip()
-            required = (("review_id", rid), ("prompt_version", pv), ("model", model))
-            for name, value in required:
-                if not value:
-                    raise CacheError(f"{where}: line {i}: field {name!r} is empty")
-            if theme not in LABEL_SET:
-                raise CacheError(
-                    f"{where}: line {i}: theme {theme!r} is not one of the seven "
-                    f"closed labels {tuple(sorted(LABEL_SET))}"
+    try:
+        with path.open(encoding="utf-8", newline="") as fh:
+            reader = csv.DictReader(fh)
+            if tuple(reader.fieldnames or ()) != DECISION_COLUMNS:
+                raise CacheError(f"{where}: columns must be exactly {DECISION_COLUMNS}")
+            for i, row in enumerate(reader, 2):
+                if None in row or None in row.values():
+                    raise CacheError(f"{where}: line {i}: wrong number of cells")
+                rid = row["review_id"].strip()
+                pv = row["prompt_version"].strip()
+                model = row["model"].strip()
+                theme = row["theme"].strip()
+                required = (
+                    ("review_id", rid),
+                    ("prompt_version", pv),
+                    ("model", model),
                 )
-            out.setdefault((rid, pv, model), []).append(theme)
+                for name, value in required:
+                    if not value:
+                        raise CacheError(f"{where}: line {i}: field {name!r} is empty")
+                if theme not in LABEL_SET:
+                    raise CacheError(
+                        f"{where}: line {i}: theme {theme!r} is not one of the "
+                        f"seven closed labels {tuple(sorted(LABEL_SET))}"
+                    )
+                out.setdefault((rid, pv, model), []).append(theme)
+    except csv.Error as exc:
+        raise CacheError(f"{where}: not a CSV the reader can parse ({exc})") from exc
     return {key: tuple(themes) for key, themes in out.items()}
 
 

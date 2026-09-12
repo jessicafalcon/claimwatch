@@ -456,7 +456,10 @@ def _do_sample_damir(args: argparse.Namespace) -> int:
             "`make confirm fetch-damir MONTH=... ` first (developer-run)"
         )
         return 1
-    sample = systematic_sample(src, n)
+    try:
+        sample = systematic_sample(src, n)
+    except (ValueError, OSError) as exc:  # a read is a boundary: one line, exit 2
+        raise Refused(f"refusing: {exc}") from exc
     if not sample.rows:
         print(
             f"sample-damir: no positive legal-type (0/1) PRS_REM_MNT in {src.name} "
@@ -487,7 +490,10 @@ def _do_fit_damir(_args: argparse.Namespace) -> int:
             "`make sample-damir MONTH=YYYY-MM` (developer-run)"
         )
         return 1
-    amounts = read_amounts(FIXTURE_CSV)
+    try:
+        amounts = read_amounts(FIXTURE_CSV)
+    except (ValueError, OSError) as exc:  # a read is a boundary: one line, exit 2
+        raise Refused(f"refusing: {exc}") from exc
     fit = fit_lognormal(amounts.values)
     gof = goodness_of_fit(amounts.values, fit)
     write_fit(fit, gof, ARTIFACT)

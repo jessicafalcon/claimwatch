@@ -113,18 +113,27 @@ def _open_text(path: Path) -> TextIOBase:
 def _iter_rows(path: Path) -> Iterator[tuple[str, str]]:
     """Yield the `(PRS_REM_MNT, PRS_REM_TYP)` cells of every data row, streaming.
     Raises `ValueError` if the file is missing either declared column — a file
-    that is not the declared shape refuses; it does not read as an empty slice."""
-    with _open_text(path) as fh:
-        reader = csv.DictReader(fh, delimiter=DELIMITER)
-        fields = reader.fieldnames or []
-        missing = [c for c in (AMOUNT_COLUMN, TYPE_COLUMN) if c not in fields]
-        if missing:
-            raise ValueError(
-                f"{path.name}: missing column(s) {missing} "
-                f"(found {reader.fieldnames}); not a DAMIR slice"
-            )
-        for row in reader:
-            yield row.get(AMOUNT_COLUMN, ""), row.get(TYPE_COLUMN, "")
+    that is not the declared shape refuses; it does not read as an empty slice.
+    The parser's own failure (`csv.Error`, a field past its limit — no
+    `ValueError`) folds into the same refusal: the reader owns its failure
+    type, so the CLI boundary catches one declared set (code-craft → Error
+    policy; `fee_split._iter_rows` is the sibling)."""
+    try:
+        with _open_text(path) as fh:
+            reader = csv.DictReader(fh, delimiter=DELIMITER)
+            fields = reader.fieldnames or []
+            missing = [c for c in (AMOUNT_COLUMN, TYPE_COLUMN) if c not in fields]
+            if missing:
+                raise ValueError(
+                    f"{path.name}: missing column(s) {missing} "
+                    f"(found {reader.fieldnames}); not a DAMIR slice"
+                )
+            for row in reader:
+                yield row.get(AMOUNT_COLUMN, ""), row.get(TYPE_COLUMN, "")
+    except csv.Error as exc:
+        raise ValueError(
+            f"{path.name}: not a CSV the reader can parse ({exc}); not a DAMIR slice"
+        ) from exc
 
 
 def legal_amount(amount_cell: str, type_cell: str) -> float | None:
