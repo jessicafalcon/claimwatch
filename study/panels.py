@@ -1222,8 +1222,8 @@ def beat3_panels(conn) -> list[Panel]:
                 "The inputs anchored to public figures — revenue, members, the "
                 "fraud pool, refunds paid, and the typical size of a claim — each "
                 "shown with the public figure behind it and, for the inputs the "
-                "formulas read, the range the study explores. One row is a "
-                "spread, not an input: the share of fees billed above the public "
+                "formulas read, the range the study explores. One row is context, "
+                "not a formula input: the share of fees billed above the public "
                 "tariff. The headline figures above the rows are derived from "
                 "the inputs, at the defaults."
             ),
@@ -1244,8 +1244,7 @@ def beat3_panels(conn) -> list[Panel]:
                 "span the fit plus and minus two standard errors; the median and "
                 "mean cells are read figures with no range of their own; the "
                 "extra-billing row’s low and high are the lowest and highest "
-                "profession family — a spread in the data, not a bound the study "
-                "explores.",
+                "profession family.",
                 text.MEAN_CELL_NOTE,
                 text.EXTRA_BILLING_NOTE,
             ),

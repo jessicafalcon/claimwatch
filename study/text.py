@@ -131,17 +131,21 @@ MEAN_CELL_NOTE = (
     "second is the contrast a reader recomputing from the data would find."
 )
 
-# What B3.3 says about the extra-billing row (9i): what the share is, what its
-# range is (a spread across the four profession families, not a bound the study
-# explores), what the Assurance Maladie does not reimburse and so what the fit
-# does not hold, and that no formula reads it. No figure: the row's cells carry
-# the numbers (challenge round 1, #2).
+# What B3.3 says about the extra-billing row (9i): what the share is and the
+# arithmetic behind it (the division, in words — the row's Modeled tag earned
+# in sight), what its range is (a spread across the four profession families,
+# not a bound the study explores — said here once, review round 1 #10), what
+# the Assurance Maladie does not reimburse and so what the fit does not hold,
+# and that no formula reads it. No figure: the row's cells carry the numbers
+# (challenge round 1, #2).
 EXTRA_BILLING_NOTE = (
-    "One row is a spread in the data, not an input the study explores: the "
-    "share of what liberal practitioners billed that lay above the public "
-    "tariff, from the Assurance Maladie’s own table of fees by profession. "
-    "Its default is the four profession families together; its low and high "
-    "are the lowest and highest family. The Assurance Maladie reimburses none "
+    "One row is context, not a formula input: the share of what liberal "
+    "practitioners billed that lay above the public tariff — the extra billing "
+    "over all fees billed, tariff and extra together — from the Assurance "
+    "Maladie’s own table of fees by profession. Its default is the four "
+    "profession families together; its low and high are the lowest and highest "
+    "family — a spread in the data, not a bound the study explores. The "
+    "Assurance Maladie reimburses none "
     "of the part above the tariff, so that part is absent from the "
     "reimbursement cells the fit is built on — a part of a complementary "
     "insurer’s bill the mean claim above does not hold. No formula reads this "
