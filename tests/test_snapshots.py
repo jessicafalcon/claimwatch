@@ -543,14 +543,15 @@ def test_reseeding_reentering_and_rebuilding_add_no_snapshot_row(tmp_path):
 
 
 def test_the_only_tracked_files_under_data_are_hand_read_snapshot_csvs():
-    """`data/` is gitignored but two subtrees are re-included: `data/snapshots/`
-    (Phase 4's weekly commit `git add`s it) and `data/damir/` (Phase 7b's tracked
-    lognormal fit artifact). Every tracked path under `data/` must be either a
-    `data/snapshots/*.csv` that parses under one of the two declared numbers-only
-    snapshot shapes — the hand-read (`origin=manual`) or the fetched
-    (`origin=fetch`) — or the one `data/damir/claim_cost_fit.csv`, a numbers-only
-    `name,value` fit table: never a capture, a corpus extract or a file carrying
-    reviewer text (round 2, security-reviewer #5; Phase 4; extended Phase 7b)."""
+    """`data/` is gitignored but three subtrees are re-included: `data/snapshots/`
+    (Phase 4's weekly commit `git add`s it), `data/damir/` (Phase 7b's tracked
+    lognormal fit artifact) and `data/ameli/` (Phase 9i's tracked fee split).
+    Every tracked path under `data/` must be either a `data/snapshots/*.csv`
+    that parses under one of the two declared numbers-only snapshot shapes —
+    the hand-read (`origin=manual`) or the fetched (`origin=fetch`) — or one of
+    the two numbers-only `name,value` artifacts: never a capture, a corpus
+    extract or a file carrying reviewer text (round 2, security-reviewer #5;
+    Phase 4; extended Phase 7b and 9i)."""
     import csv as _csv
     import subprocess
 
@@ -561,33 +562,33 @@ def test_the_only_tracked_files_under_data_are_hand_read_snapshot_csvs():
     paths = [p for p in tracked.split("\0") if p]
     assert paths, "the hand-read file is tracked"
 
-    # Phase 7b: the DAMIR fit artifact is the one tracked non-snapshot file. It is
-    # numbers-only — a `name,value` table of the lognormal fit (mu/sigma/n), the
-    # goodness-of-fit deciles and the sample mean (9h) — so it carries no brand
-    # and no personal data. Names are pinned to the EXACT closed set write_fit
-    # emits (not a `emp_p*` prefix), so nothing arbitrary can ride in the name
-    # field either (round 1, sec #3); the set is the writer's own FIT_FIELD_NAMES
-    # tuple, which stays closed because the writer emits exactly it
-    # (tests/test_damir.py::test_fit_field_names_is_the_write_order) — a
-    # hand-typed copy here would only drift (9h challenge round 1, #2). So the
-    # name check is a consistency check; the guard that keeps a brand or a
-    # person out of the tracked file is the trio below it — every value parses
-    # as a number, every row is exactly two cells, and the file's bytes are
-    # pinned (test_artifact_equals_recompute, the byte-prefix pin) — not the
-    # name set (9h review round 1, security-reviewer #2).
+    # The tracked numbers-only artifacts, one closed map: the DAMIR fit (7b) and
+    # the data.ameli fee split (9i), each a `name,value` table whose name set is
+    # its writer's own public tuple — pinned to the EXACT closed set the writer
+    # emits (not a prefix), so nothing arbitrary can ride in the name field
+    # (round 1, sec #3); a hand-typed copy here would only drift (9h challenge
+    # round 1, #2). The name check is a consistency check; the guard that keeps
+    # a brand or a person out of a tracked file is the trio below it — every
+    # value parses as a number, every row is exactly two cells, and the file's
+    # bytes are pinned (the artifact-equals-recompute tests) — not the name set
+    # (9h review round 1, security-reviewer #2). Walked as one map, never a
+    # second `if` branch per artifact (9i challenge round 1, #4).
+    from opendata.fee_split import FEE_SPLIT_FIELD_NAMES
     from opendata.fit import FIT_FIELD_NAMES
 
-    DAMIR_FIT = "data/damir/claim_cost_fit.csv"
-    fit_names = set(FIT_FIELD_NAMES)
+    ARTIFACT_NAMES = {
+        "data/damir/claim_cost_fit.csv": frozenset(FIT_FIELD_NAMES),
+        "data/ameli/fee_split.csv": frozenset(FEE_SPLIT_FIELD_NAMES),
+    }
     for rel in paths:
-        if rel == DAMIR_FIT:
+        if rel in ARTIFACT_NAMES:
             with (root / rel).open(encoding="utf-8", newline="") as fh:
                 rows = list(_csv.reader(fh))
             assert rows[0] == ["name", "value"], rel
             for row in rows[1:]:
                 assert len(row) == 2, (rel, row)
                 name, value = row
-                assert name in fit_names, (rel, name)
+                assert name in ARTIFACT_NAMES[rel], (rel, name)
                 float(value)  # every value is numeric — no free text, no brand
             continue
         parts = Path(rel).parts

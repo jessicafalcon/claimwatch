@@ -1,15 +1,18 @@
 -- cost_model_params — the cost model's parameters, each on a slider (B3.3 the
 --   sourced defaults, B3.4 the declared-unsourced sliders; SPEC.md Beat 3).
 -- Grain: one row per parameter (models.cost_model.parameters): the four scale
---   anchors, the four DAMIR-fit rows (mu, sigma, emp_p50, emp_mean), the eight
---   unsourced knobs (incl. the two hold-timer knobs days_per_round and
---   timer_days). 16 rows.
+--   anchors, the four DAMIR-fit rows (mu, sigma, emp_p50, emp_mean), the
+--   data.ameli fee-split row (extra_billing_share, 9i — a spread across the
+--   four profession families, read by no formula), the eight unsourced knobs
+--   (incl. the two hold-timer knobs days_per_round and timer_days). 17 rows.
 -- The third family of Python-fed marts: this file is DDL only (the fixed
 --   shape); pipeline/build.py::write_model_marts fills it from
 --   models/cost_model.py, the one place the formulas and parameters are
 --   written. No arithmetic in SQL — that keeps the SQL portable, and the
 --   formulas stay one copy.
--- Columns: default_value, low, high are the slider's value and span. sourcing is
+-- Columns: default_value, low, high are the row's value and its low/high pair
+--   (an exploration bound, ±2 SE, a fixed mark or the family spread — the
+--   model's docstring names the four kinds). sourcing is
 --   'sourced' or 'unsourced'; a sourced row names its citation, an unsourced one
 --   leaves citation empty (a declared guess to explore, never a fact).
 -- Provenance (a computed parameter set, not a scraped row): run_id names the

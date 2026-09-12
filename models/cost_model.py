@@ -12,15 +12,19 @@ number therefore cannot drift apart — they are one entry, 1:1 by construction
 (docs/PLAN.md §4 decision 5).
 
 `PARAMETERS` carries the static assumptions; the four DAMIR-fit rows (`mu`,
-`sigma`, `emp_p50`, `emp_mean`) are handed in by the caller as a `Fit` and
-added by `parameters(fit)`, so this layer reads no file, no clock and no key —
-it computes over what it is given. Every parameter carries a range the study's
-sliders span: a sourced figure the record gives as a floor spans the floor to
-twice it (the study's stated exploration bound, not a fact); `mu`/`sigma` span
-the fit plus and minus two standard errors; the two read cells (`emp_p50`,
-`emp_mean`) are fixed marks; an unsourced guess spans the range worth
-exploring. Nothing is a fitted predictive model — the only fit is the
-lognormal the caller supplies, whose own goodness-of-fit is shown upstream.
+`sigma`, `emp_p50`, `emp_mean`) and the data.ameli fee-split row
+(`extra_billing_share`, Phase 9i) are handed in by the caller as one
+`ModelInputs` and added by `parameters(inputs)`, so this layer reads no file,
+no clock and no key — it computes over what it is given. Every parameter
+carries a `low`/`high` pair, of four kinds, each named on the page: a sourced
+figure the record gives as a floor spans the floor to twice it (the study's
+stated exploration bound, not a fact); `mu`/`sigma` span the fit plus and minus
+two standard errors; the two read cells (`emp_p50`, `emp_mean`) are fixed
+marks; the fee-split row's pair is the lowest and highest profession family —
+a spread in the data, not a bound the study explores, and no formula reads
+it; an unsourced guess spans the range worth exploring. Nothing is a fitted
+predictive model — the only fit is the lognormal the caller supplies, whose
+own goodness-of-fit is shown upstream.
 
 The claim count is one division, refunds paid over the mean claim, and the
 model prints it twice: over the lognormal's own mean (`claims`, the count
@@ -71,10 +75,37 @@ class Fit:
 
 
 @dataclass(frozen=True)
+class FeeSplit:
+    """What the cost model needs from the data.ameli fee split
+    (`opendata/fee_split.py`, Phase 9i): the year, the all-families
+    extra-billing share — of what liberal practitioners billed, the part above
+    the public tariff — and the lowest and highest profession-family share,
+    the row's `low`/`high`. A spread read from the data; no formula reads it."""
+
+    year: int
+    share: float
+    low: float
+    high: float
+
+
+@dataclass(frozen=True)
+class ModelInputs:
+    """Everything the model is handed by the one reader in `pipeline/build.py`
+    (`read_model_inputs`): the DAMIR fit and the data.ameli fee split. One
+    container, so a later input is a field here, not a new signature at every
+    caller (Phase 9i, challenge round 1 #7)."""
+
+    fit: Fit
+    fee_split: FeeSplit
+
+
+@dataclass(frozen=True)
 class Parameter:
-    """One assumption on a slider: its default, the unit it is quoted in, whether
-    it is `sourced` (with a citation) or `unsourced` (a declared guess, no
-    citation), and the `low`/`high` the study's slider spans."""
+    """One row of the parameter table: its default, the unit it is quoted in,
+    whether it is `sourced` (with a citation) or `unsourced` (a declared guess,
+    no citation), and its `low`/`high` — the range a slider spans for the
+    inputs the formulas read, a fixed mark for a read cell, the family spread
+    for the fee-split row (the module docstring names the four kinds)."""
 
     name: str
     default: float
@@ -119,6 +150,9 @@ KIND = ("point", "curve")
 _DISCLOSURE_FLOOR_CITE = "PROJECT_BRIEF.md §6 (public disclosure, second-hand; a floor)"
 # The fit artifact the caller reads and hands in as a Fit.
 _FIT_CITE = "data/damir/claim_cost_fit.csv ← open-damir"
+# The fee-split artifact the caller reads and hands in as a FeeSplit; the year
+# it holds is appended, since the row is one year's national figure.
+_FEE_SPLIT_CITE = "data/ameli/fee_split.csv ← data-ameli-honoraires"
 
 # The scale anchors (sourced; the record gives each as a floor, so the range is
 # the floor to twice it — the study's exploration bound, printed as such).
@@ -201,8 +235,9 @@ def fit_parameters(fit: Fit) -> tuple[Parameter, ...]:
     `mu`/`sigma` span the fit ± 2 standard errors (`se_mu = sigma / √n`,
     `se_sigma = sigma / √(2n)`, the closed-form lognormal-MLE standard errors);
     `emp_p50` and `emp_mean` are read figures whose slider is `mu`/`sigma`, so
-    each range is itself (a fixed mark; a third such row is the BACKLOG trigger
-    for a shape of their own). Every cell is rounded at the one site, so the
+    each range is itself (a fixed mark; 9i's spread row went under the same
+    shape, and a fourth such row is the BACKLOG trigger for a shape of their
+    own). Every cell is rounded at the one site, so the
     rows are byte-stable."""
     se_mu = fit.sigma / sqrt(fit.n)
     se_sigma = fit.sigma / sqrt(2 * fit.n)
@@ -246,6 +281,25 @@ def fit_parameters(fit: Fit) -> tuple[Parameter, ...]:
     )
 
 
+def fee_split_parameters(fee_split: FeeSplit) -> tuple[Parameter, ...]:
+    """The one sourced row the data.ameli fee split supplies: the extra-billing
+    share — of what liberal practitioners billed in the year, the part above the
+    public tariff — with its `low`/`high` the lowest and highest of the four
+    profession families, a spread read from the data. Rounded at the one site
+    like every rate, so the row is byte-stable. No formula reads it."""
+    return (
+        Parameter(
+            "extra_billing_share",
+            rounded("rate", fee_split.share),
+            "share of fees billed",
+            "sourced",
+            f"{_FEE_SPLIT_CITE} ({fee_split.year})",
+            rounded("rate", fee_split.low),
+            rounded("rate", fee_split.high),
+        ),
+    )
+
+
 def check_parameter(p: Parameter) -> None:
     """A parameter is well-formed, or this refuses: `sourcing` is one of the two
     words (nothing in between); a sourced one carries a citation and an unsourced
@@ -267,20 +321,26 @@ def check_parameter(p: Parameter) -> None:
         )
 
 
-def parameters(fit: Fit) -> tuple[Parameter, ...]:
+def parameters(inputs: ModelInputs) -> tuple[Parameter, ...]:
     """The full ordered parameter set: the four scale anchors, the four
-    fit-derived rows, then the unsourced knobs — one row per slider the study
-    shows, the fit never a second literal here. Every row is checked well-formed."""
-    params = SCALE_PARAMETERS + fit_parameters(fit) + KNOB_PARAMETERS
+    fit-derived rows, the fee-split row, then the unsourced knobs — one row per
+    line the study shows, neither artifact ever a second literal here. Every
+    row is checked well-formed."""
+    params = (
+        SCALE_PARAMETERS
+        + fit_parameters(inputs.fit)
+        + fee_split_parameters(inputs.fee_split)
+        + KNOB_PARAMETERS
+    )
     for p in params:
         check_parameter(p)
     return params
 
 
-def defaults(fit: Fit) -> dict[str, float]:
+def defaults(inputs: ModelInputs) -> dict[str, float]:
     """`{name: default}` over every parameter — the value set `evaluate` and
     `curves` run at, before any slider moves."""
-    return {p.name: p.default for p in parameters(fit)}
+    return {p.name: p.default for p in parameters(inputs)}
 
 
 # The point formulas, in order (brief §7 plus the derived defaults and the median
@@ -540,12 +600,13 @@ def curves(
     return rows, crossovers
 
 
-def format_model(fit: Fit) -> str:
+def format_model(inputs: ModelInputs) -> str:
     """The one-screen summary `make model` prints: the parameter table (each row
     with its range; a sourced one with its citation), the formula table (each
     expression beside its value and unit at the defaults, per scenario) and the
-    two crossovers. No clock, no key — the same fit always prints the same text."""
-    params = parameters(fit)
+    two crossovers. No clock, no key — the same inputs always print the same
+    text."""
+    params = parameters(inputs)
     values = {p.name: p.default for p in params}
     lines = [
         "cost model — the formulas, their defaults, and where the curves cross",

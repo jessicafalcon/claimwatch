@@ -101,6 +101,7 @@ PARAMETER_NAMES = {
     "sigma": ("Log-spread of the claim cost, from the fit", "logeur"),
     "emp_p50": ("Median reimbursement cell", "eur"),
     "emp_mean": ("Mean reimbursement cell", "eur"),
+    "extra_billing_share": ("Share of fees billed above the tariff", "pct"),
     "flag_rate": ("Flag rate", "pct"),
     "fp_share": ("Share of flags that are wrong", "pct"),
     "contacts": ("Contacts per stuck claim", "count"),
@@ -128,6 +129,29 @@ MEAN_CELL_NOTE = (
     "Because the mean cell is the larger figure, the count computed from it is "
     "the lower of the two. Every later formula uses the fitted count; the "
     "second is the contrast a reader recomputing from the data would find."
+)
+
+# What B3.3 says about the extra-billing row (9i): what the share is and the
+# arithmetic behind it (the division, in words — the row's Modeled tag earned
+# in sight), what its range is (a spread across the four profession families,
+# not a bound the study explores — said here once, review round 1 #10), what
+# the Assurance Maladie does not reimburse and so what the fit does not hold,
+# and what the totals are (one year, national, per family — not per claim;
+# review round 2, editor #3). The opening clause says no formula reads it,
+# once (editor #1). No figure: the row's cells carry the numbers (challenge
+# round 1, #2).
+EXTRA_BILLING_NOTE = (
+    "One row is context, not a formula input: the share of what liberal "
+    "practitioners billed that lay above the public tariff — the extra billing "
+    "over all fees billed, tariff and extra together — from the Assurance "
+    "Maladie’s own table of fees by profession — one year’s national totals "
+    "per profession family, not a per-claim figure. Its default is the four "
+    "profession families together; its low and high are the lowest and highest "
+    "family — a spread in the data, not a bound the study explores. The "
+    "Assurance Maladie reimburses none "
+    "of the part above the tariff, so that part is absent from the "
+    "reimbursement cells the fit is built on — a part of a complementary "
+    "insurer’s bill the mean claim above does not hold."
 )
 
 # The labels of a curve panel's three markers, in the order they are drawn:

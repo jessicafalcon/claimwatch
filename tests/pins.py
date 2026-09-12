@@ -370,6 +370,31 @@ DAMIR_FIT_PRE_9H_SHA256 = (
     "fe7da19a3cf97c9d59f7b809522269c09acebc60ed3a9565e54f168c9c104ec5"
 )
 
+# --- Phase 9i: the data.ameli fee split over fixtures/ameli/ ------------------
+# The split computed by `make split-ameli` over the frozen fixture: the four
+# top-level profession families' national totals for the year (whole euros, as
+# data.ameli publishes them), each family's extra-billing share extra / (tariff
+# + extra) at six places, and the all-families share over the summed totals.
+# Plain divisions a spreadsheet reader redoes; byte-stable from the fixture.
+AMELI_YEAR = 2024
+AMELI_FAMILY_TOTALS = {  # slug: (tariff_eur, extra_eur)
+    "medecins": (25_970_577_462, 4_544_674_945),
+    "dentistes": (6_161_730_539, 5_994_290_373),
+    "sages_femmes": (605_567_923, 7_784_184),
+    "auxiliaires": (18_714_466_964, 194_603_654),
+}
+AMELI_TOTALS_ALL = (51_452_342_888, 10_741_353_156)
+AMELI_SHARES = {
+    "medecins": 0.148931,
+    "dentistes": 0.493113,
+    "sages_femmes": 0.012691,
+    "auxiliaires": 0.010292,
+}
+AMELI_SHARE_ALL = 0.172708
+# The row's low/high: the lowest and highest family share (auxiliaires,
+# dentistes) — a spread in the data, not a bound the study explores.
+AMELI_SHARE_RANGE = (0.010292, 0.493113)
+
 # --- Phase 8a: the cost model (Beat 3) ---------------------------------------
 # Every number below is typed from the built output of models/cost_model.py over
 # the tracked fit (mu/sigma/emp_p50 above), never guessed: the defaults are not
@@ -378,7 +403,8 @@ DAMIR_FIT_PRE_9H_SHA256 = (
 # places, counts to whole (the one rounding site). Only friction_cost and net
 # move with a scenario; every other point output is scenario-invariant.
 COST_MODELED_TAG = "Modeled"
-COST_PARAM_ROWS = 16  # 4 scale + 4 fit (emp_mean, 9h) + 6 knobs + 2 timer knobs (8b)
+# 4 scale + 4 fit (emp_mean, 9h) + 1 fee split (9i) + 6 knobs + 2 timer knobs (8b)
+COST_PARAM_ROWS = 17
 COST_SCENARIOS = ("baseline", "contacts_once", "churn_halved", "both")
 FLAG_RATE_GRID_POINTS = 41  # 0.000..0.200 step 0.005
 COST_OUTPUT_ROWS = len(COST_SCENARIOS) * 15  # 13 point + 2 curve per scenario = 60
@@ -592,8 +618,10 @@ BEAT2_PEER_RATINGS = {
 # retyped). The display names live in study/text.py; their counts are pinned.
 BEAT3_PANELS = ("B3.1", "B3.2", "B3.3", "B3.4")
 BEAT3_FORMULA_ROWS = 15  # thirteen point + two curve formulas, the baseline scenario
-BEAT3_PARAMETER_ROWS = COST_PARAM_ROWS  # 16: 8 sourced + 8 unsourced
-BEAT3_SOURCED_ROWS = 8  # the four scale anchors + the four fit rows
+BEAT3_PARAMETER_ROWS = COST_PARAM_ROWS  # 17: 9 sourced + 8 unsourced
+BEAT3_SOURCED_ROWS = (
+    9  # the four scale anchors + the four fit rows + the fee split (9i)
+)
 BEAT3_UNSOURCED_ROWS = 8  # the six knobs + the two hold-timer knobs
 # B3.3's headline rows (BACKING: revenue per member, the mean claim, the claim
 # volume) plus, from 9h, the claim count at the sample's mean cell — the

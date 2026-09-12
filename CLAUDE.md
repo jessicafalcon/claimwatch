@@ -98,8 +98,12 @@ Delivered paragraph and `make help`, not here.
   (`sha256(review_id) % 5`), `rules.yaml` + `rules.py`, `llm.py` (the ONE
   model call site), `cache.py` (the text-free decision cache), `combined.py`,
   `eval/` (the ONLY reader of the hand-labeled answer key `labels.csv`).
-- `opendata/` — Open DAMIR (no insurer, no brand token): the stdlib `urllib`
-  fetch, the guarded slice, the lognormal fit that writes the tracked fit.
+- `opendata/` — Open DAMIR and data.ameli (no insurer, no brand token):
+  `sources.py` (both declarations), the stdlib `urllib` DAMIR fetch, the
+  guarded slice, the lognormal fit that writes the tracked fit;
+  `fee_split.py`, the hand-downloaded data.ameli export sliced to one year's
+  four profession-family rows and the extra-billing share it writes (no
+  fetch: the host's robots file disallows it).
 - `models/` — `cost_model.py::FORMULAS` and `guardrail_sim.py::RULES`: the
   formulas as data, filled into their marts inside `rebuild()`.
 - `study/` — the static HTML export, one direction {`text.py`, `model.py`} ←
@@ -115,12 +119,15 @@ Delivered paragraph and `make help`, not here.
 - `fixtures/` — read-only after Phase 1, each set with a `MANIFEST.sha256`:
   `synthetic/` (hand-written fake reviews), `anchors/` (brief §6 figures,
   seeded as Documented), a hand-written capture set per parsed source in
-  its exact shape (four), `damir/` (a small, real, brand-free slice).
+  its exact shape (four), `damir/` (a small, real, brand-free slice),
+  `ameli/` (one year's four national profession-family fee rows).
   Re-freezing is a
   `Freeze:` line in the spec plus a DECISIONS entry.
-- `data/` — gitignored working output with two tracked subtrees:
+- `data/` — gitignored working output with three tracked subtrees:
   `data/snapshots/` (figures a person read off a page, and the weekly cron's
-  — numbers only; both loaded as Measured) and `data/damir/claim_cost_fit.csv`.
+  — numbers only; both loaded as Measured), `data/damir/claim_cost_fit.csv`
+  and `data/ameli/fee_split.csv` (numbers only, each recomputed from its
+  frozen fixture by an offline target).
 
 ## Commands (macOS, uv)
 
@@ -140,6 +147,12 @@ cannot say:
   per check, exit 1 on FAIL, 2 on a refused SPEC/BASE.
 - `model`, `simulate` and `study` take no variable and print or render
   byte-identical output on a rerun; CI diffs the committed study page.
+  `fit-damir` and `split-ameli` take no variable and rewrite their tracked
+  artifact byte-identically; `sample-damir [MONTH=] [N=]` and `slice-ameli
+  [YEAR=YYYY]` are offline, developer-run, and write a frozen fixture (a
+  `Freeze:` line and a DECISIONS entry). `slice-ameli` reads a file a person
+  saved from a browser at `data/cache/ameli/honoraires.csv`: the host's
+  robots file disallows its API and download paths, so there is no fetch.
 - **`make rebuild [TARGET=duckdb] [ROWS=captured|none|synthetic|samples]`** —
   raw → staging → marts, then the classify step: the rules plus, only when
   `ANTHROPIC_API_KEY` is set and only for the reviews the rules left
@@ -163,7 +176,7 @@ cannot say:
   not hold against are the Threat model of `specs/phase-3a-snapshots.md`.
   Network and paid targets are developer-run, never by an agent; the
   `ask-gate` hook prompts before `make confirm`.
-- **Variables** (`ROWS`, `TARGET`, `SOURCE`, `N`, `MONTH`, `SPEC`, `BASE`)
+- **Variables** (`ROWS`, `TARGET`, `SOURCE`, `N`, `MONTH`, `YEAR`, `SPEC`, `BASE`)
   are validated in Python against a closed set or shape and never become a
   path by concatenation.
 
@@ -574,24 +587,28 @@ and remove it). Findings are fixed in the main session or explicitly accepted
 
 ## Current status
 
-**Merged:** Phases 0a–9g, each with its spec under `specs/` (the Delivered
-paragraph) and its DECISIONS appendix; the last were 9g, the Metabase
-demonstration (PR #30, 2026-09-11), and its evidence on `fix/9g-demonstration`
-(PR #31, 2026-09-11: the captioned synthetic screenshots, `.env.example`, the
-guards' shared binary-asset reader). Phase 9 is complete.
+**Merged:** Phases 0a–9h, each with its spec under `specs/` (the Delivered
+paragraph) and its DECISIONS appendix; the last were 9h, the claim count at the
+sample's mean reimbursement cell beside the fitted count (PR #32, 2026-09-12),
+and `fix/foreign-shape-shared-home` (PR #33, 2026-09-12: the shared decimal
+and count shapes given one home in `ingest/parsed.py` and an AST guard against
+a fresh coercion outside them). Phase 9 is complete.
 
-**In review:** Phase 9h on `phase-9h-sample-mean` (spec challenged round 1;
-built, reviewed in two rounds and every finding fixed, 2026-09-11; PR next):
-the claim count at the sample's mean reimbursement cell beside the fitted
-count, B3.3; the branch also carries the CLAUDE.md trim.
+**Delivered, PR open:** Phase 9i on `phase-9i-extra-billing` (spec
+challenged round 1, nine amendments applied; built 2026-09-12; review rounds
+1 and 2 — the exit round — fixed; DONE command green; Delivered paragraph
+appended 2026-09-12): the extra-billing share
+from data.ameli's `honoraires` table as one sourced B3.3 row with its
+profession-family spread, read by no formula — the
+export is a hand download, since the host's robots file disallows the API and
+download paths; `slice-ameli` and `split-ameli` are offline.
 
-**Next:** the second pulled-out data phase (data.ameli practitioner fees —
-BACKLOG), then Phase 10 (the Airflow DAG; its
+**Next:** Phase 10 (the Airflow DAG; its
 spec decides how the publish task calls `python -m study.metabase
 export|apply`, which are not `make` targets — `docs/PLAN.md` §5 says five
 `make` tasks — and is the home for the classify-path idempotency target,
 BACKLOG). A `fix/idempotency-classify` PR may land that target sooner.
 
-Open BACKLOG rows: **38**.
+Open BACKLOG rows: **40**.
 
 (Update this section at the end of every working day.)

@@ -14,12 +14,20 @@ from models import cost_model
 from models import guardrail_sim as gs
 from tests import pins
 
-FIT = cost_model.Fit(
-    mu=pins.DAMIR_MU,
-    sigma=pins.DAMIR_SIGMA,
-    n=pins.DAMIR_N,
-    emp_p50=pins.DAMIR_EMP_P50,
-    emp_mean=pins.DAMIR_EMP_MEAN,
+FIT = cost_model.ModelInputs(
+    fit=cost_model.Fit(
+        mu=pins.DAMIR_MU,
+        sigma=pins.DAMIR_SIGMA,
+        n=pins.DAMIR_N,
+        emp_p50=pins.DAMIR_EMP_P50,
+        emp_mean=pins.DAMIR_EMP_MEAN,
+    ),
+    fee_split=cost_model.FeeSplit(
+        year=pins.AMELI_YEAR,
+        share=pins.AMELI_SHARE_ALL,
+        low=pins.AMELI_SHARE_RANGE[0],
+        high=pins.AMELI_SHARE_RANGE[1],
+    ),
 )
 
 

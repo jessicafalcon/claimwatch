@@ -477,6 +477,22 @@ Each entry: the surprise, the official-docs check, what we did.
   prefix is `Bash(git diff:*)` (colon); `Bash(git *)` is not documented and
   is either a no-op or every subcommand, so `/challenge` grants the four
   read-only git prefixes by name.
+- **Phase 9i — the data.ameli browser export carries two byte-order marks and
+  CRLF; one family's sub-rows sum a euro off (2026-09-12).** The API export
+  (read during the spec's research) begins with one UTF-8 byte-order mark; the
+  same table saved from the portal's Export dialog in a browser begins with
+  two (`EF BB BF EF BB BF`) and ends its lines CRLF — `utf-8-sig` strips one
+  and leaves `\ufeffannee`, a "missing column" refusal against the real
+  file. The slice's declared shape is therefore "the header after any leading
+  marks": `opendata/fee_split.py::_iter_rows` opens as plain UTF-8 and strips
+  every leading U+FEFF from the first field, pinned by a two-mark CRLF case in
+  `tests/test_fee_split.py`. Checked on the developer's file before the
+  fixture was cut: the four family rows are present for 2024 with no
+  suppressed token; médecins and chirurgiens-dentistes equal their sub-rows'
+  sums exactly; `Ensemble des auxiliaires médicaux` is one euro below the sum
+  of its five professions on both totals (the publisher's rounding of the
+  family row) — the phase reads the four family rows as published and sums
+  nothing itself, so the artifact is the table's own figures.
 
 
 ## Appendix — by phase
@@ -3073,3 +3089,178 @@ routing), the `unshaped-input` LESSONS row's Where cell extended with each and
 its Status noting the AST guard as the reworked mechanism. Sensitive surface
 (`ingest/**`, `pipeline/cli.py`): the round runs code-reviewer,
 functionality-tester and security-reviewer.
+
+### Phase 9i
+
+Branch `phase-9i-extra-billing`, spec `specs/phase-9i-extra-billing.md`,
+challenged round 1 (approve with amendments — 0 BLOCKER, 6 should-fix, 3
+suggestion, 2 question; the developer's disposition "fix all", every finding
+applied before the stamp). The second of the two data phases pulled out of
+Phase 9's render (Phase 9a): the extra-billing share from data.ameli's
+`honoraires` table as one sourced B3.3 row beside the mean claim.
+
+- **The dataset as read (2026-09-12, the 7b rule: confirm the source before
+  anything is built).** data.ameli `honoraires` — Caisse nationale de
+  l'Assurance Maladie, Open Database License, last modified 2025-12-15, 66,480
+  rows, one row per year (2010–2024) × `profession_sante` × `region` ×
+  `departement`; per row the year's total fees at the public tariff
+  (`hono_sans_depassement_totaux`) and total extra billing
+  (`depassements_totaux`) in whole euros, the per-practitioner means and the
+  sector-2 rates; `NS`/`NC` where suppressed; the national rows are
+  `region = 99` / `departement = 999`; 38 profession labels at the national
+  level, nesting under four families (`Ensemble des médecins`, `Ensemble des
+  chirurgiens-dentistes`, `Sages-femmes`, `Ensemble des auxiliaires médicaux`)
+  whose sub-rows sum to each family. Annual per-practitioner totals, not
+  per-act or per-claim amounts. *So: the BACKLOG row's premise ("a
+  practitioner-fee distribution … fitted the same closed-form way") does not
+  hold, and the brief's §7 clause "data.ameli for practitioner-level fees" as
+  a simulator draw source does not hold for this dataset — the phase records
+  the reading here and lands what the table uniquely supplies (the trigger
+  reinterpreted, the 9h precedent); the brief's sentence is untouched, the
+  developer's call outside this diff (challenge round 1, #11), so the exit
+  coherence audit treats brief↔DECISIONS as recorded, accepted drift. The
+  same claim stands in two more brief sentences — §7's `claims` bullet
+  ("average claim sizes from … Open DAMIR / data.ameli distributions") and
+  §9's Phase 7 line ("Ingest Open DAMIR / data.ameli slices; fit the
+  claim-cost distributions") — all three read the same way: DAMIR supplies
+  the distributions, data.ameli one national share (review round 2,
+  coherence #6).*
+- **The quantity is the extra-billing share over the four top-level families
+  for one year, and its range is the family spread.** `extra / (tariff +
+  extra)`: the default over the four summed totals, `low`/`high` the lowest
+  and highest family share — a fourth kind of `low`/`high` pair beside
+  floor-to-twice, ±2 SE and the fixed marks, named as such in the model's
+  docstring, B3.3's blurb ("and, for the inputs the formulas read, the range
+  the study explores") and its note (`study/text.py::EXTRA_BILLING_NOTE`: a
+  spread in the data, not a bound the study explores; no formula reads the
+  row). The read-figure BACKLOG row's trigger is re-pointed, not claimed
+  unfired (challenge round 1, #2). *Rejected: a lognormal over
+  per-practitioner mean fees (a practitioner-income curve, not a claim cost);
+  a fixed mark with the spread in prose (a figure in a note must be a mart
+  cell); five rows, one per family (clutter for one fact); a formula that
+  multiplies the insurer's refunds by the share (the insurer's claims are not
+  the national fee mix — an invented quantity); the duller route of the same
+  share from the DAMIR month already ingested, whose fee (`PRS_PAI_MNT`) and
+  base (`PRS_REM_BSE`) columns sit on the very cells the fit describes
+  (challenge round 1, #6) — the fixture is a 5,000-cell systematic sample
+  where data.ameli's totals are the exhaustive national population, and
+  `fixtures/damir/` is frozen with one column pair, so reading two more is a
+  re-freeze for a ratio the brief sources to data.ameli by name; the new
+  BACKLOG row names that route for the complementary-side share per cell.*
+- **No fetch target: the export is a hand download; every command offline.**
+  `https://data.ameli.fr/robots.txt` says `User-agent: *` / `Disallow: /api/`,
+  `/explore/download`, `/explore/dataset/*/download`, and the export lives
+  under those paths. The repo honours a host's robots file over its own
+  convenience (Phase 2 declared the App Store feed and did not fetch it; 3a
+  hand-read the listing whose terms forbid robots; 3c imported an authorized
+  offline export), so the developer saves the dataset's CSV export from a
+  browser — a person, not a crawler — to the gitignored
+  `data/cache/ameli/honoraires.csv` and runs `make slice-ameli YEAR=YYYY` once;
+  no `confirm` gate, since nothing fetches or deletes. Disclosed for the
+  record: the spec's research made six small metadata requests to the API
+  with an identifying User-Agent before the robots file was read; none of that
+  output is used as data. *Rejected: a `confirm`-gated `fetch-ameli` over
+  `urllib` (the DAMIR shape) — against the host's stated rule, whatever the
+  API's rate-limit headers suggest; reading the API's JSON instead of the
+  export — the same disallowed prefix.*
+- **A bounded euro-total shape, beside the count shapes, for the totals.**
+  `ingest.parsed.euro_total_in_range`: the shared ASCII integer shape with a
+  ceiling of `10^12 - 1` — no national annual total reaches a trillion euros.
+  The count shape's ceiling (`2^31 - 1`, about €2.1 bn) is below the data
+  (the all-families tariff total is about €51 bn), so routing a total through
+  `count_in_range` would refuse the real file, and a bare `int()` would hold
+  no bound (challenge round 1, #1; the `unshaped-input` class). *Rejected:
+  widening `count_in_range` (a count column's shape would then admit a value
+  its column cannot hold).*
+- **One container of the model's inputs.** `cost_model.ModelInputs(fit,
+  fee_split)` read by one `pipeline/build.py::read_model_inputs` (which
+  absorbed `read_model_fit`); `parameters(inputs)`, `defaults`, the printers
+  and the mart writers take it, so a later input is a field, not a new
+  signature at every caller (challenge round 1, #7). `cost_model.FeeSplit(year,
+  share, low, high)` is what the model needs from the artifact. *Rejected:
+  `parameters(fit, fees)` (every caller changes again at the next input, and
+  the simulator's `defaults()` would name an artifact it never reads);
+  widening `Fit` with fee fields (a DAMIR shape carrying a data.ameli figure
+  — name drift); a literal in `SCALE_PARAMETERS` pinned equal to the artifact
+  (the second-literal pattern 8a refused).*
+- **Two names: `ameli` for the source, `fee_split` for the artifact and its
+  module.** `opendata/sources.py` declares both open-data sources;
+  `opendata/fee_split.py` holds the slice reader, the fixture writer, the
+  split arithmetic, the artifact writer and reader and the printer (the
+  `slice.py` + `fit.py` pair in one file — two sums and a division); the
+  targets are `slice-ameli [YEAR=]` and `split-ameli` on the `fit-damir`
+  verb-source pattern; the artifact is `data/ameli/fee_split.csv`
+  (`FEE_SPLIT_FIELD_NAMES`: the year, each family's two totals and share by
+  slug, the all-families three; whole euros, shares at six places); the
+  fixture is `fixtures/ameli/ameli-national.csv` (challenge round 1, #3).
+- **Decisions the spec did not cover.** (a) The fixture carries the six
+  columns the slice reads (`annee;profession_sante;region;departement;` the
+  two totals), not the four the spec named: one declared shape and one reader
+  serve the export and the fixture (the 7b A1 principle), and `split-ameli`
+  — which takes no variable — reads the fixture's one year off the file
+  (`fixture_year`, refusing two years or none). *Rejected: a four-column
+  fixture with a reader that treats the territory columns as optional — a
+  lenient shape.* (b) The fit artifact's `name,value` read (the size cap, the
+  header, two cells, no duplicate, the closed name set, the cut tokens) moved
+  from private helpers of `opendata/fit.py` into public ones the second
+  reader shares — `read_name_value_rows(path, names, kind)`, `finite_float`,
+  `shown`, `shown_names`, `MAX_ARTIFACT_BYTES` — with `kind` naming the
+  artifact in a refusal; the AST guard's `FLOAT_CALLERS` follows the rename
+  (`_finite_float` → `finite_float`; the tooling entry above names the old
+  spelling as it was). *Rejected: a copy of the reader in `fee_split.py` (the
+  `site-fix` class); a third module for the shared read (the pinned "one new
+  module").* (c) The tracked-files guard walks one closed map `{artifact
+  path: name set}` over both artifacts (challenge round 1, #4).
+- **The row's tag is the mart's, Modeled.** The share is a division over two
+  published totals, printed in full on the page (the note says the arithmetic
+  in words, `make split-ameli` prints it) — the README glossary's Modeled, "a
+  number produced by arithmetic we print in full", the footing `emp_mean`
+  (an arithmetic mean over the DAMIR fixture) already stands on; Documented
+  is "a number from a named public source", which the totals are and the
+  share is not. *Rejected (review round 1, code-reviewer #1): a per-row
+  Documented tag for a context row — the params mart stamps one tag per
+  write, so a per-row tag is a `Parameter` field and a write-path change, a
+  fix amendment; it is the read-figure BACKLOG row's territory and its
+  trigger now names the tag.*
+- **Review round 1 (2026-09-12): twelve findings, none a BLOCKER, one a
+  correctness finding — the CLI's read boundary, the `traceback-at-boundary`
+  class in LESSONS; every one fixed, the developer's disposition "fix all".
+  The correctness fix landed in `f5d278c` with the other code fixes, not
+  alone: the one-per-commit rule was missed there and this sentence is its
+  record (review round 2, coherence #2).** Code: one euro-total helper for
+  both readers; the fixture read once
+  (`read_fixture`, the year off the file, replacing `fixture_year`); the
+  "no national rows" refusal cuts its tokens like every other; the
+  missing-column refusal derives its slice from `FIXTURE_COLUMNS`; the two
+  fixture writers named by meaning (`write_ameli_fixture`,
+  `write_damir_fixture`); the CLI's read paths catch `(ValueError, OSError)`
+  (the `traceback-at-boundary` row's Where cell extended). Security notes:
+  the export reader's no-cap reason written in its docstring and the spec's
+  bullet corrected. Prose: B3.3's blurb says "context, not a formula input"
+  (the row sits among the sourced rows); the "spread, not a bound" clause
+  said once, in the note; SPEC's B3.3 sentence split. Record: the spec's
+  Scope names the reused `freeze_manifest`. The tag finding (#1) is the
+  bullet above.
+- **Review round 2, the exit round (2026-09-12): sixteen findings, none a
+  BLOCKER, one correctness; every one fixed or re-deferred with a trigger,
+  the developer's disposition "fix all".** Correctness (security #1, its own
+  commit `bd14315`): `csv.Error` is no `ValueError`, so the round-1 tuple
+  still let a corrupt export out as a traceback; the reader now folds the
+  parser's failure into the refusal it declares (the `decode_json`
+  precedent) — the kind changed, not the tuple; the second hit of the class
+  in one phase, so the sentence for `code-craft` is a BACKLOG row for the
+  next tooling branch, and the same gap on the pre-9i DAMIR sample path is
+  a BACKLOG row, not a fix in this diff. Craft and prose (`e779883`): the
+  label set a `frozenset`; the strip declared; the ceiling's redundancy
+  said; the test named for `read_model_inputs`; the docstring's third-row
+  pointer moved to the fourth; the note says the totals are one year's
+  national per-family totals, states the range fact once and ends on its
+  caveat. Records (this bullet's commit): CLAUDE.md's status; round 1's
+  sentence above; Done-when 2 amended to the six-column fixture the
+  DECISIONS bullet already recorded and the stamp re-hashed (the 9b
+  precedent: falsifiers and decisions unchanged); the spec's Scope names
+  `check-docs` as the glossary cap's guard, not `tests/test_readme.py`; the
+  brief drift bullet names all three brief sentences; the no-`SPEC=` gate
+  row's trigger, met by this phase's first freeze, re-deferred to a `fix/`
+  PR with the wider wording; the skill's "two tracked subtrees" a tooling
+  row.

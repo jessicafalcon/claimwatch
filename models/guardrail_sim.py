@@ -279,13 +279,13 @@ def summarize(rows: Sequence[Mapping[str, object]]) -> dict[str, dict[str, float
     return out
 
 
-def format_simulation(fit: cost_model.Fit) -> str:
+def format_simulation(inputs: cost_model.ModelInputs) -> str:
     """The one-screen summary `make simulate` prints: the three rules each beside
     the value it gives at the defaults (the first synthetic claim and the default
     timer), the threshold table (one line per timer day, the default marked), and
-    the hold-day summary per scenario. No clock, no key — the same fit always
-    prints the same text."""
-    params = cost_model.defaults(fit)
+    the hold-day summary per scenario. No clock, no key — the same inputs
+    always print the same text."""
+    params = cost_model.defaults(inputs)
     claims = synthetic_claims(params)
     first = claims[0]
     baseline_days = _loop_and_timer_days(params, "baseline")

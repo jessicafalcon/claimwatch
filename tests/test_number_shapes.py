@@ -38,7 +38,7 @@ PACKAGES = ("ingest", "pipeline", "opendata")
 FLOAT_CALLERS = frozenset(
     {
         ("opendata/slice.py", "parse_amount"),
-        ("opendata/fit.py", "_finite_float"),
+        ("opendata/fit.py", "finite_float"),
         ("ingest/robots.py", "_parse_groups"),
     }
 )

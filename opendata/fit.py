@@ -144,10 +144,11 @@ def write_fit(fit: Fit, gof: list[Decile], path: Path = ARTIFACT) -> None:
         writer.writerow(["emp_mean", f"{fit.emp_mean:.{_PARAM_DP}f}"])
 
 
-# The fit artifact is tiny (two parameters, the sample size, two figures per
-# decile and the mean); a file larger than this is not the shape we wrote, so
-# refuse before reading it.
-_MAX_FIT_BYTES = 64 * 1024
+# A tracked `name,value` artifact is tiny (this one: two parameters, the sample
+# size, two figures per decile and the mean; the fee split: a year and fifteen
+# figures); a file larger than this is not a shape we wrote, so refuse before
+# reading it. Shared with `opendata/fee_split.py`, the second artifact.
+MAX_ARTIFACT_BYTES = 64 * 1024
 # The smallest amount a euro slice can carry, and the smallest value the cost
 # model's euro rounding keeps: a mean under one cent is not a mean of euro
 # amounts, and divided by after rounding it would be zero (invariant 7 —
@@ -165,7 +166,7 @@ _SHOWN_CHARS = 40
 _SHOWN_NAMES = 3
 
 
-def _shown(token: str) -> str:
+def shown(token: str) -> str:
     """The repr of a foreign token, cut to `_SHOWN_CHARS` printed characters
     with an ellipsis and the token's length."""
     text = repr(token)
@@ -174,55 +175,43 @@ def _shown(token: str) -> str:
     return text[:_SHOWN_CHARS] + f"… ({len(token)} chars)"
 
 
-def _shown_names(names: list[str]) -> str:
+def shown_names(names: list[str]) -> str:
     """The first `_SHOWN_NAMES` stray names, each cut, and a count of the rest."""
-    head = ", ".join(_shown(n) for n in names[:_SHOWN_NAMES])
+    head = ", ".join(shown(n) for n in names[:_SHOWN_NAMES])
     rest = len(names) - _SHOWN_NAMES
     return head if rest <= 0 else f"{head} and {rest} more"
 
 
-def _finite_float(raw: dict[str, str], name: str, where: str) -> float:
+def finite_float(raw: dict[str, str], name: str, where: str) -> float:
     """A cell as a finite float, accepted only in the one decimal shape the
     amount reader accepts (`opendata.slice.DECIMAL_SHAPE`): `1e5`, `1_000`,
     `nan`, `inf` and `+3` are refused by name before `float()` sees them; a
-    digit string long enough to overflow to infinity is refused after."""
+    digit string long enough to overflow to infinity is refused after. Shared
+    by both artifact readers (this one and `opendata/fee_split.py`)."""
     value = raw[name]
     if not DECIMAL_SHAPE.fullmatch(value):
-        raise ValueError(f"{where}: {name!r} is not a plain decimal: {_shown(value)}")
+        raise ValueError(f"{where}: {name!r} is not a plain decimal: {shown(value)}")
     number = float(value.replace(",", "."))
     if not math.isfinite(number):
-        raise ValueError(f"{where}: {name!r} is not a finite number: {_shown(value)}")
+        raise ValueError(f"{where}: {name!r} is not a finite number: {shown(value)}")
     return number
 
 
-def _positive_int(raw: dict[str, str], name: str, where: str) -> int:
-    """A cell as a positive integer, in the one count shape every parser uses
-    (`ingest.parsed.count_in_range`: ASCII digits, at most ten): zero, a sign,
-    a non-ASCII digit or a longer string is refused by name."""
-    value = raw[name]
-    number = count_in_range(value)
-    if number is None or number <= 0:
-        raise ValueError(
-            f"{where}: {name!r} is not a positive integer: {_shown(value)}"
-        )
-    return number
-
-
-def read_fit(path: Path = ARTIFACT) -> tuple[Fit, list[Decile]]:
-    """Read the tracked fit artifact back into the Fit and its goodness-of-fit
-    deciles — the strict mirror of `write_fit`, the one place besides the writer
-    that knows the artifact's shape. Every declared name must be present, numeric
-    and finite (`n` a positive integer); an unknown, missing, duplicate or
-    non-numeric name refuses with the name, never a silent default; `emp_mean`
-    is a divisor downstream, rounded to cents first, so a value under one cent
-    refuses too. `z` is the
-    standard-normal quantile recomputed per decile (the writer stores none), the
-    same value `goodness_of_fit` used, so the returned deciles carry it."""
+def read_name_value_rows(
+    path: Path, field_names: tuple[str, ...], kind: str
+) -> dict[str, str]:
+    """A tracked `name,value` artifact as `{name: raw value}` — the strict
+    read every such artifact shares: the size cap, the exact header, two cells
+    per line, no duplicate name, and exactly the closed `field_names` set (an
+    unknown or missing name refuses by name). `kind` names the artifact in a
+    refusal ("fit", "fee split"). What each value must be is the caller's —
+    `finite_float`, the count shape, the euro-total shape."""
     where = path.name
     size = path.stat().st_size
-    if size > _MAX_FIT_BYTES:
+    if size > MAX_ARTIFACT_BYTES:
         raise ValueError(
-            f"{where}: fit artifact is {size} bytes, over the {_MAX_FIT_BYTES} cap"
+            f"{where}: {kind} artifact is {size} bytes, over the "
+            f"{MAX_ARTIFACT_BYTES} cap"
         )
     raw: dict[str, str] = {}
     with path.open(encoding="utf-8", newline="") as fh:
@@ -237,31 +226,58 @@ def read_fit(path: Path = ARTIFACT) -> tuple[Fit, list[Decile]]:
             name = row[0]
             if name in raw:
                 raise ValueError(
-                    f"{where}: line {lineno}: duplicate name {_shown(name)}"
+                    f"{where}: line {lineno}: duplicate name {shown(name)}"
                 )
             raw[name] = row[1]
-    expected = set(FIT_FIELD_NAMES)
+    expected = set(field_names)
     if unknown := sorted(set(raw) - expected):
         raise ValueError(
-            f"{where}: name(s) not in the fit artifact's shape: {_shown_names(unknown)}"
+            f"{where}: name(s) not in the {kind} artifact's shape: "
+            f"{shown_names(unknown)}"
         )
     if missing := sorted(expected - set(raw)):
         raise ValueError(
-            f"{where}: name(s) the fit artifact must carry are missing: {missing}"
+            f"{where}: name(s) the {kind} artifact must carry are missing: {missing}"
         )
-    sigma = _finite_float(raw, "sigma", where)
+    return raw
+
+
+def _positive_int(raw: dict[str, str], name: str, where: str) -> int:
+    """A cell as a positive integer, in the one count shape every parser uses
+    (`ingest.parsed.count_in_range`: ASCII digits, at most ten): zero, a sign,
+    a non-ASCII digit or a longer string is refused by name."""
+    value = raw[name]
+    number = count_in_range(value)
+    if number is None or number <= 0:
+        raise ValueError(f"{where}: {name!r} is not a positive integer: {shown(value)}")
+    return number
+
+
+def read_fit(path: Path = ARTIFACT) -> tuple[Fit, list[Decile]]:
+    """Read the tracked fit artifact back into the Fit and its goodness-of-fit
+    deciles — the strict mirror of `write_fit`, the one place besides the writer
+    that knows the artifact's shape. Every declared name must be present, numeric
+    and finite (`n` a positive integer); an unknown, missing, duplicate or
+    non-numeric name refuses with the name, never a silent default; `emp_mean`
+    is a divisor downstream, rounded to cents first, so a value under one cent
+    refuses too. `z` is the
+    standard-normal quantile recomputed per decile (the writer stores none), the
+    same value `goodness_of_fit` used, so the returned deciles carry it."""
+    where = path.name
+    raw = read_name_value_rows(path, FIT_FIELD_NAMES, "fit")
+    sigma = finite_float(raw, "sigma", where)
     if sigma < 0:
         raise ValueError(
             f"{where}: 'sigma' is a standard deviation and must be >= 0: {sigma!r}"
         )
-    emp_mean = _finite_float(raw, "emp_mean", where)
+    emp_mean = finite_float(raw, "emp_mean", where)
     if emp_mean < _MIN_EUR_MEAN:
         raise ValueError(
             f"{where}: 'emp_mean' is a mean of euro amounts and a divisor, "
             f"must be at least one cent ({_MIN_EUR_MEAN}): {emp_mean!r}"
         )
     fit = Fit(
-        mu=_finite_float(raw, "mu", where),
+        mu=finite_float(raw, "mu", where),
         sigma=sigma,
         n=_positive_int(raw, "n", where),
         emp_mean=emp_mean,
@@ -271,8 +287,8 @@ def read_fit(path: Path = ARTIFACT) -> tuple[Fit, list[Decile]]:
         Decile(
             decile=decile,
             z=normal.inv_cdf(decile / 100),
-            empirical=_finite_float(raw, f"emp_p{decile}", where),
-            predicted=_finite_float(raw, f"fit_p{decile}", where),
+            empirical=finite_float(raw, f"emp_p{decile}", where),
+            predicted=finite_float(raw, f"fit_p{decile}", where),
         )
         for decile in DECILES
     ]

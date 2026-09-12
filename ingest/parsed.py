@@ -50,6 +50,30 @@ def count_in_range(value: object) -> int | None:
     return number if 0 <= number <= MAX_COUNT else None
 
 
+# A whole-euro total a public table publishes — data.ameli's annual fee totals
+# by profession (`opendata/fee_split.py`): the shared ASCII integer shape with a
+# ceiling of its own, below one trillion euros, which no national annual total
+# reaches. A separate shape from `count_in_range`, whose ceiling is the 32-bit
+# count column (about €2.1 bn) — below these totals, so routing a total through
+# the count shape would refuse the real data, and a bare `int()` would hold no
+# bound at all (Phase 9i, challenge round 1 #1; the `unshaped-input` class).
+MAX_EURO_TOTAL = 10**12 - 1
+_MAX_EURO_TOTAL_DIGITS = len(str(MAX_EURO_TOTAL))  # a longer run never reaches int()
+
+
+def euro_total_in_range(value: str) -> int | None:
+    """`value` as a non-negative whole-euro total below one trillion — ASCII
+    digits, at most twelve — or None when it is not that shape: a sign, a
+    separator, a suppressed token (`NS`, `NC`), a non-ASCII digit or a longer
+    run is not a total this repo reads."""
+    if not (is_ascii_decimal_integer(value) and len(value) <= _MAX_EURO_TOTAL_DIGITS):
+        return None
+    number = int(value)
+    # Twelve ASCII digits cannot exceed MAX_EURO_TOTAL (10^12 - 1): the ceiling
+    # restates the length guard so the shape reads as one bound (round 2).
+    return number if number <= MAX_EURO_TOTAL else None
+
+
 # A foreign decimal cell: plain ASCII digits with at most one separator — a `.`
 # or a French `,` — and an optional leading minus. The one shape the DAMIR
 # amount reader (`opendata/slice.py`, which re-exports this) and the fit

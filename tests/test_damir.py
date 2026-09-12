@@ -29,7 +29,7 @@ from opendata.slice import (
     parse_amount,
     read_amounts,
     systematic_sample,
-    write_fixture,
+    write_damir_fixture,
 )
 from opendata.sources import cache_path, month_token, valid_month
 from pipeline.cli import main
@@ -354,10 +354,10 @@ def test_the_old_rows_are_a_byte_prefix_of_the_new_artifact():
 
 
 def test_fixture_round_trips_through_the_same_reader(tmp_path):
-    """write_fixture writes the exact two-column shape read_amounts reads — one
+    """write_damir_fixture writes the exact two-column shape read_amounts reads — one
     path, so the legal-type filter is reproducible from the fixture alone."""
     out = tmp_path / "damir-sample.csv"
-    write_fixture([(1.5, "0"), (2.5, "1"), (300.0, "0")], out)
+    write_damir_fixture([(1.5, "0"), (2.5, "1"), (300.0, "0")], out)
     assert read_amounts(out).values == [1.5, 2.5, 300.0]
     assert out.read_text(encoding="utf-8").startswith("PRS_REM_MNT;PRS_REM_TYP\n")
 
