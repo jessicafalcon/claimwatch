@@ -46,12 +46,12 @@ from opendata.fee_split import ARTIFACT as FEE_SPLIT_ARTIFACT
 from opendata.fee_split import FIXTURE_CSV as AMELI_FIXTURE_CSV
 from opendata.fee_split import FIXTURE_DIR as AMELI_FIXTURE_DIR
 from opendata.fee_split import (
-    fixture_year,
     format_fee_split,
+    read_fixture,
     read_national_families,
+    write_ameli_fixture,
     write_fee_split,
 )
-from opendata.fee_split import write_fixture as write_ameli_fixture
 from opendata.fetch import FetchError, fetch_month
 from opendata.fit import (
     ARTIFACT,
@@ -66,7 +66,7 @@ from opendata.slice import (
     freeze_manifest,
     read_amounts,
     systematic_sample,
-    write_fixture,
+    write_damir_fixture,
 )
 from opendata.sources import AMELI_EXPORT, cache_path, valid_month, valid_year
 from pipeline.build import (
@@ -540,7 +540,7 @@ def _do_sample_damir(args: argparse.Namespace) -> int:
             f"({sample.dropped} row(s) dropped) — nothing written"
         )
         return 1
-    write_fixture(sample.rows)
+    write_damir_fixture(sample.rows)
     freeze_manifest()
     print(
         f"sample-damir: {len(sample.rows)} of {sample.total_valid} amounts "
@@ -596,7 +596,7 @@ def _do_slice_ameli(args: argparse.Namespace) -> int:
         return 1
     try:
         national = read_national_families(AMELI_EXPORT, year)
-    except ValueError as exc:
+    except (ValueError, OSError) as exc:  # a read is a boundary: one line, exit 2
         raise Refused(f"refusing: {exc}") from exc
     write_ameli_fixture(national.totals, AMELI_FIXTURE_CSV)
     freeze_manifest(AMELI_FIXTURE_DIR)
@@ -621,10 +621,8 @@ def _do_split_ameli(_args: argparse.Namespace) -> int:
         )
         return 1
     try:
-        totals = read_national_families(
-            AMELI_FIXTURE_CSV, fixture_year(AMELI_FIXTURE_CSV)
-        ).totals
-    except ValueError as exc:
+        totals = read_fixture(AMELI_FIXTURE_CSV).totals
+    except (ValueError, OSError) as exc:  # a read is a boundary: one line, exit 2
         raise Refused(f"refusing: {exc}") from exc
     write_fee_split(totals, FEE_SPLIT_ARTIFACT)
     print(format_fee_split(totals))

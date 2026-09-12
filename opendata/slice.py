@@ -183,7 +183,9 @@ def systematic_sample(path: Path, n: int) -> Sample:
     return Sample(rows=kept, total_valid=total_valid, dropped=dropped, stride=stride)
 
 
-def write_fixture(rows: list[tuple[float, str]], path: Path = FIXTURE_CSV) -> None:
+def write_damir_fixture(
+    rows: list[tuple[float, str]], path: Path = FIXTURE_CSV
+) -> None:
     """Write a two-column `PRS_REM_MNT;PRS_REM_TYP` CSV — the frozen fixture's
     shape, the same shape `read_amounts` reads, so the legal-type filter is
     reproducible offline from the fixture. Amounts are written at two decimals

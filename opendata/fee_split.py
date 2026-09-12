@@ -31,12 +31,12 @@ paths to every crawler, and the repo honours that (Phases 2, 3a, 3c)."""
 from __future__ import annotations
 
 import csv
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
 from ingest.parsed import euro_total_in_range
-from opendata.fit import finite_float, read_name_value_rows, shown
+from opendata.fit import finite_float, read_name_value_rows, shown, shown_names
 from opendata.sources import (
     AMELI_DELIMITER,
     AMELI_DEPARTMENT_COLUMN,
@@ -150,7 +150,10 @@ def _iter_rows(path: Path) -> Iterator[dict[str, str]]:
     Any leading byte-order marks on the first header cell are dropped (one from
     the portal's API export, two from a browser export; none on the fixture).
     A file missing any declared column refuses — it is not this shape, not an
-    empty slice."""
+    empty slice. Streams row by row, so there is no byte cap on the file: a
+    developer-placed download from a known portal is never landed in memory
+    at once (the `opendata/slice.py` reason), and a wrong shape refuses on the
+    header before a data row is read."""
     with path.open(encoding="utf-8", newline="") as fh:
         reader = csv.DictReader(fh, delimiter=AMELI_DELIMITER)
         fields = list(reader.fieldnames or [])
@@ -159,10 +162,10 @@ def _iter_rows(path: Path) -> Iterator[dict[str, str]]:
             reader.fieldnames = fields
         missing = [c for c in FIXTURE_COLUMNS if c not in fields]
         if missing:
+            found = [shown(f) for f in fields[: len(FIXTURE_COLUMNS)]]
             raise ValueError(
-                f"{path.name}: missing column(s) {missing} "
-                f"(found {[shown(f) for f in fields[:6]]}); not a data.ameli "
-                "honoraires export"
+                f"{path.name}: missing column(s) {missing} (found {found}); "
+                "not a data.ameli honoraires export"
             )
         for row in reader:
             yield {c: (row.get(c) or "") for c in FIXTURE_COLUMNS}
@@ -175,32 +178,30 @@ def _is_national(row: dict[str, str]) -> bool:
     )
 
 
-def _total(row: dict[str, str], column: str, label: str, where: str) -> int:
-    """A family row's total in the bounded euro-total shape, or a refusal that
-    names the family and the column — a suppressed `NS`/`NC`, a decimal, a sign
-    or a value past the ceiling would otherwise move the national total."""
-    cell = row[column].strip()
-    value = euro_total_in_range(cell)
+def _euro_total(cell: str, what: str, where: str) -> int:
+    """A total in the bounded euro-total shape, or a refusal that names what it
+    was (`'Sages-femmes' depassements_totaux`, `'tariff_eur_all'`) — a
+    suppressed `NS`/`NC`, a decimal, a sign or a value past the ceiling would
+    otherwise move the national total. The one helper both readers use."""
+    value = euro_total_in_range(cell.strip())
     if value is None:
-        raise ValueError(
-            f"{where}: {label!r} {column} is not a whole-euro total: {shown(cell)}"
-        )
+        raise ValueError(f"{where}: {what} is not a whole-euro total: {shown(cell)}")
     return value
 
 
-def read_national_families(path: Path, year: int) -> NationalSlice:
-    """Keep the year's four national family rows (`region = 99`, `departement =
-    999`, a label in `AMELI_FAMILIES`) out of a data.ameli export or the frozen
-    fixture; drop and count every other row. Refuses by name, in this order: a
-    year with no national rows at all, a family repeated, a family missing, a
-    total off its shape, a family that billed nothing (its share is a division
-    by zero)."""
-    where = path.name
+def _families_from_rows(
+    rows: Iterable[dict[str, str]], year: int, where: str
+) -> NationalSlice:
+    """The year's four national family rows out of the rows given (an export's
+    stream or a fixture's list); drop and count every other row. Refuses by
+    name, in this order: a year with no national rows at all, a family
+    repeated, a family missing, a total off its shape, a family that billed
+    nothing (its share is a division by zero)."""
     wanted = str(year)
     kept: dict[str, dict[str, str]] = {}
     national_years: set[str] = set()
     dropped = 0
-    for row in _iter_rows(path):
+    for row in rows:
         if not _is_national(row):
             dropped += 1
             continue
@@ -213,10 +214,9 @@ def read_national_families(path: Path, year: int) -> NationalSlice:
             raise ValueError(f"{where}: family {label!r} appears twice for {year}")
         kept[label] = row
     if wanted not in national_years:
-        found = sorted(national_years)
         raise ValueError(
             f"{where}: no national rows for {year} (years found: "
-            f"{found[:3]}{'…' if len(found) > 3 else ''})"
+            f"{shown_names(sorted(national_years))})"
         )
     if missing := [label for _slug, label in AMELI_FAMILIES if label not in kept]:
         raise ValueError(f"{where}: family row(s) missing for {year}: {missing}")
@@ -226,8 +226,12 @@ def read_national_families(path: Path, year: int) -> NationalSlice:
         family = FamilyRow(
             slug=slug,
             label=label,
-            tariff_eur=_total(row, AMELI_TARIFF_COLUMN, label, where),
-            extra_eur=_total(row, AMELI_EXTRA_COLUMN, label, where),
+            tariff_eur=_euro_total(
+                row[AMELI_TARIFF_COLUMN], f"{label!r} {AMELI_TARIFF_COLUMN}", where
+            ),
+            extra_eur=_euro_total(
+                row[AMELI_EXTRA_COLUMN], f"{label!r} {AMELI_EXTRA_COLUMN}", where
+            ),
         )
         if family.billed_eur == 0:
             raise ValueError(f"{where}: family {label!r} billed nothing in {year}")
@@ -235,24 +239,35 @@ def read_national_families(path: Path, year: int) -> NationalSlice:
     return NationalSlice(totals=FeeTotals(year, tuple(families)), dropped=dropped)
 
 
-def fixture_year(path: Path = FIXTURE_CSV) -> int:
-    """The one year the frozen fixture holds — `split-ameli` takes no variable,
-    so the year is read off the fixture; a fixture with no rows, two years, or
-    a year off the shape refuses by name."""
-    years = {row[AMELI_YEAR_COLUMN].strip() for row in _iter_rows(path)}
+def read_national_families(path: Path, year: int) -> NationalSlice:
+    """Keep the year's four national family rows (`region = 99`, `departement =
+    999`, a label in `AMELI_FAMILIES`) out of a data.ameli export, streaming;
+    drop and count every other row; refuse by name as `_families_from_rows`
+    says."""
+    return _families_from_rows(_iter_rows(path), year, path.name)
+
+
+def read_fixture(path: Path = FIXTURE_CSV) -> NationalSlice:
+    """The frozen fixture, read once: it holds exactly one year — `split-ameli`
+    takes no variable, so the year is read off the file — and that year's four
+    family rows. No rows, two years, or a year off `valid_year`'s shape refuses
+    by name."""
+    rows = list(_iter_rows(path))
+    years = {row[AMELI_YEAR_COLUMN].strip() for row in rows}
     if len(years) != 1:
         raise ValueError(
             f"{path.name}: the fixture must hold exactly one year, found "
-            f"{sorted(shown(y) for y in years)}"
+            f"{shown_names(sorted(years))}"
         )
     (year,) = years
     try:
-        return valid_year(year)
+        wanted = valid_year(year)
     except ValueError as exc:
         raise ValueError(f"{path.name}: {exc}") from exc
+    return _families_from_rows(rows, wanted, path.name)
 
 
-def write_fixture(totals: FeeTotals, path: Path = FIXTURE_CSV) -> None:
+def write_ameli_fixture(totals: FeeTotals, path: Path = FIXTURE_CSV) -> None:
     """Write the four family rows in exactly the six columns the slice reads,
     the national codes constant, so `read_national_families` reproduces the
     split offline from the fixture alone. A profession family and two whole-euro
@@ -310,15 +325,6 @@ def write_fee_split(totals: FeeTotals, path: Path = ARTIFACT) -> None:
         writer.writerows(rows)
 
 
-def _euro_total(raw: dict[str, str], name: str, where: str) -> int:
-    value = euro_total_in_range(raw[name])
-    if value is None:
-        raise ValueError(
-            f"{where}: {name!r} is not a whole-euro total: {shown(raw[name])}"
-        )
-    return value
-
-
 def _share(raw: dict[str, str], name: str, where: str, expected: float) -> float:
     """A written share: a finite decimal in [0, 1] that equals its own totals'
     division at the written places — never a figure the totals do not give."""
@@ -353,8 +359,12 @@ def read_fee_split(path: Path = ARTIFACT) -> FeeTotals:
         family = FamilyRow(
             slug=slug,
             label=label,
-            tariff_eur=_euro_total(raw, f"tariff_eur_{slug}", where),
-            extra_eur=_euro_total(raw, f"extra_eur_{slug}", where),
+            tariff_eur=_euro_total(
+                raw[f"tariff_eur_{slug}"], repr(f"tariff_eur_{slug}"), where
+            ),
+            extra_eur=_euro_total(
+                raw[f"extra_eur_{slug}"], repr(f"extra_eur_{slug}"), where
+            ),
         )
         if family.billed_eur == 0:
             raise ValueError(f"{where}: family {label!r} billed nothing")
@@ -365,7 +375,7 @@ def read_fee_split(path: Path = ARTIFACT) -> FeeTotals:
         ("tariff_eur_all", totals.tariff_eur_all),
         ("extra_eur_all", totals.extra_eur_all),
     ):
-        if _euro_total(raw, name, where) != expected:
+        if _euro_total(raw[name], repr(name), where) != expected:
             raise ValueError(
                 f"{where}: {name!r} is not the sum of the four families ({expected})"
             )

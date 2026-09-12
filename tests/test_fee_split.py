@@ -24,12 +24,12 @@ from opendata.fee_split import (
     FamilyRow,
     FeeTotals,
     NationalSlice,
-    fixture_year,
     format_fee_split,
     read_fee_split,
+    read_fixture,
     read_national_families,
+    write_ameli_fixture,
     write_fee_split,
-    write_fixture,
 )
 from opendata.fit import MAX_ARTIFACT_BYTES, read_name_value_rows, shown, shown_names
 from opendata.slice import freeze_manifest
@@ -361,33 +361,35 @@ def test_read_name_value_rows_is_the_shared_artifact_read(tmp_path):
 # --- the frozen fixture and the developer-run targets -----------------------
 
 
-def test_fixture_year_requires_exactly_one_year(tmp_path):
-    assert (
-        fixture_year(_write_export(tmp_path / "one.csv", _national_lines("2023")))
-        == 2023
-    )
+def test_read_fixture_requires_exactly_one_year(tmp_path):
+    """The fixture is read once: its one year is read off the file (split-ameli
+    takes no variable); none, two, or a year off the shape refuses by name."""
+    one = _write_export(tmp_path / "one.csv", _national_lines("2023"))
+    assert read_fixture(one).totals.year == 2023
     two = _write_export(
         tmp_path / "two.csv", _national_lines("2023") + _national_lines("2024")
     )
     with pytest.raises(ValueError, match="exactly one year"):
-        fixture_year(two)
+        read_fixture(two)
     with pytest.raises(ValueError, match="must be YYYY"):
-        fixture_year(_write_export(tmp_path / "bad.csv", _national_lines("24")))
+        read_fixture(_write_export(tmp_path / "bad.csv", _national_lines("24")))
+    with pytest.raises(ValueError, match="exactly one year"):
+        read_fixture(_write_export(tmp_path / "empty.csv", []))
 
 
 def test_fixture_round_trips_through_the_same_reader(tmp_path):
-    """write_fixture writes the six declared columns, so the slice reads it
+    """write_ameli_fixture writes the six declared columns, so the slice reads it
     back to the same totals — the split is reproducible from the fixture alone."""
     path = tmp_path / "ameli-national.csv"
-    write_fixture(_small_totals(2022), path)
+    write_ameli_fixture(_small_totals(2022), path)
     assert path.read_text(encoding="utf-8").splitlines()[0] == HEADER
-    assert fixture_year(path) == 2022
+    assert read_fixture(path).totals == _small_totals(2022)
     assert read_national_families(path, 2022).totals == _small_totals(2022)
 
 
 def test_fee_split_freeze_manifest_matches_sha256(tmp_path):
     fixture_dir = tmp_path / "ameli"
-    write_fixture(_small_totals(), fixture_dir / "ameli-national.csv")
+    write_ameli_fixture(_small_totals(), fixture_dir / "ameli-national.csv")
     freeze_manifest(fixture_dir)
     digest, name = (fixture_dir / "MANIFEST.sha256").read_text().split()
     assert name == "ameli-national.csv"
@@ -455,7 +457,7 @@ def test_split_ameli_missing_fixture_is_a_message(capsys, monkeypatch, tmp_path)
 
 def test_split_ameli_writes_and_prints(capsys, monkeypatch, tmp_path):
     fixture = tmp_path / "ameli-national.csv"
-    write_fixture(_small_totals(), fixture)
+    write_ameli_fixture(_small_totals(), fixture)
     artifact = tmp_path / "fee_split.csv"
     monkeypatch.setattr(cli, "AMELI_FIXTURE_CSV", fixture)
     monkeypatch.setattr(cli, "FEE_SPLIT_ARTIFACT", artifact)
@@ -486,9 +488,8 @@ def test_fee_split_module_imports_no_network_module():
 def test_fixture_holds_the_pinned_year_and_totals():
     """The frozen fixture is the four national family rows of the pinned year,
     with the pinned whole-euro totals; its manifest matches its bytes."""
-    year = fixture_year()
-    assert year == pins.AMELI_YEAR
-    national = read_national_families(FIXTURE_CSV, year)
+    national = read_fixture()
+    assert national.totals.year == pins.AMELI_YEAR
     assert national.dropped == 0
     for f in national.totals.families:
         assert (f.tariff_eur, f.extra_eur) == pins.AMELI_FAMILY_TOTALS[f.slug]
@@ -502,7 +503,7 @@ def test_fee_split_artifact_equals_recompute(tmp_path):
     """The committed data/ameli/fee_split.csv equals the split recomputed from
     the frozen fixture — no drift. Recompute into a throwaway file and compare
     bytes, so the tracked file is never touched."""
-    totals = read_national_families(FIXTURE_CSV, fixture_year()).totals
+    totals = read_fixture().totals
     recomputed = tmp_path / "recompute.csv"
     write_fee_split(totals, recomputed)
     assert ARTIFACT.read_bytes() == recomputed.read_bytes()
