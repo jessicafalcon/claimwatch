@@ -19,18 +19,28 @@ from decimal import ROUND_HALF_EVEN, Decimal, InvalidOperation
 # refusal there, never a driver exception at the load (round 2, code-reviewer
 # #2 #3, security-reviewer #1 #2).
 MAX_COUNT = 2**31 - 1
-_COUNT = re.compile(
-    r"\A[0-9]{1,10}\Z"
-)  # ten digits cover MAX_COUNT; longer never reaches int()
+_MAX_COUNT_DIGITS = 10  # ten digits cover MAX_COUNT; a longer run never reaches int()
+_ASCII_INTEGER = re.compile(r"\A[0-9]+\Z")
+
+
+def is_ascii_decimal_integer(value: str) -> bool:
+    """Whether `value` is one or more ASCII digits and nothing else — the shape
+    a bare integer takes where it is neither a count in range nor a parser's
+    value (the confirm stamp's process id, `pipeline/cli.py`). Unlike
+    `str.isdigit`, a superscript (`²`) or an other-script digit (`٣`) is not the
+    shape, so nothing non-ASCII reaches `int()`; `count_in_range` adds only the
+    count column's ten-digit range on top of it."""
+    return bool(_ASCII_INTEGER.fullmatch(value))
 
 
 def count_in_range(value: object) -> int | None:
     """`value` as a non-negative integer the count column holds — a JSON
-    integer (never a bool) or a digit string — or None when it is neither."""
+    integer (never a bool) or an ASCII digit string in range — or None when it
+    is neither."""
     if isinstance(value, bool):
         return None
     if isinstance(value, str):
-        if not _COUNT.fullmatch(value):
+        if not (is_ascii_decimal_integer(value) and len(value) <= _MAX_COUNT_DIGITS):
             return None
         number = int(value)
     elif isinstance(value, int):
@@ -38,6 +48,18 @@ def count_in_range(value: object) -> int | None:
     else:
         return None
     return number if 0 <= number <= MAX_COUNT else None
+
+
+# A foreign decimal cell: plain ASCII digits with at most one separator — a `.`
+# or a French `,` — and an optional leading minus. The one shape the DAMIR
+# amount reader (`opendata/slice.py`, which re-exports this) and the fit
+# artifact's reader (`opendata/fit.py`) accept; `1e5`, `1_000`, `nan`, `inf`,
+# `+3` and a non-ASCII digit (`٣`) are not the shape. It lives here beside the
+# count shapes so `ingest` may use it too (`ingest/robots.py`'s Crawl-delay)
+# without importing `opendata` — the import edge runs `opendata -> ingest.parsed`,
+# never the reverse. `[0-9]`, not `\d`: Python's `\d` is Unicode-aware and would
+# admit `٣` (`unshaped-input` LESSONS row; fix/foreign-shape-shared-home).
+DECIMAL_SHAPE = re.compile(r"-?[0-9]+(?:[.,][0-9]+)?")
 
 
 @dataclass(frozen=True)
