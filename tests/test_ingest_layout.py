@@ -565,7 +565,8 @@ def test_every_shape_carries_its_own_anchors():
         captures._STAMP,
         captures.page_pattern("xml"),
         app_store._DIGITS,
-        parsed._COUNT,
+        parsed._ASCII_INTEGER,
+        parsed.DECIMAL_SHAPE,
         opinion_assurances._REVIEW_TYPE,
     )
     good = (
@@ -577,6 +578,7 @@ def test_every_shape_carries_its_own_anchors():
         "page-1.xml",
         "12",
         "12",
+        "1.5",
         "https://schema.org/review",
     )
     for shape, value in zip(shapes, good, strict=True):

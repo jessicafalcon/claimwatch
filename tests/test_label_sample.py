@@ -12,7 +12,7 @@ import pytest
 
 from classify.eval.labels_io import LABEL_COLUMNS
 from pipeline.build import rebuild
-from pipeline.cli import main, positive_int
+from pipeline.cli import Refused, main, positive_int
 from pipeline.label_sample import SHEET, SHEET_COLUMNS, label_sample
 from pipeline.warehouse import ROOT, database_for
 from tests import pins
@@ -105,6 +105,13 @@ def test_positive_int_accepts_a_positive_integer():
     assert positive_int("1", "N") == 1
 
 
+def test_positive_int_refuses_a_value_above_the_count_range():
+    # Over MAX_COUNT: count_in_range returns None, and the refusal names the
+    # range rather than call a too-large integer "not a positive integer" (F3).
+    with pytest.raises(Refused, match="at most 2147483647"):
+        positive_int(str(2**31), "N")
+
+
 @pytest.mark.parametrize(
     "bad",
     [
@@ -117,6 +124,8 @@ def test_positive_int_accepts_a_positive_integer():
         "abc",
         "²",  # superscript two: str.isdigit True, int() raises ValueError
         "٣",  # Arabic-Indic three: str.isdigit True, int() would give 3
+        "2147483648",  # one over MAX_COUNT: refused by the count range (F3)
+        "99999999999",  # eleven digits: past the count shape before int()
     ],
 )
 def test_n_rejects_empty_path_and_metachar_and_env(bad: str):

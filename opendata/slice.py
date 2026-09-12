@@ -23,12 +23,12 @@ from __future__ import annotations
 import csv
 import gzip
 import hashlib
-import re
 from collections.abc import Iterator
 from dataclasses import dataclass
 from io import TextIOBase
 from pathlib import Path
 
+from ingest.parsed import DECIMAL_SHAPE
 from opendata.sources import AMOUNT_COLUMN, DELIMITER, LEGAL_TYPES, TYPE_COLUMN
 
 # The two bytes every gzip stream begins with (RFC 1952). We detect gzip by
@@ -74,16 +74,15 @@ class Sample:
         return [amount for amount, _ in self.rows]
 
 
-# A DAMIR amount is plain decimal digits with at most one separator — a `.` or a
-# French `,`. Pinning the shape here rejects the exotic forms `float()` would
-# otherwise accept (underscores `1_000`, scientific `1e5`, `inf`/`nan`), so the
-# guard over this foreign column stays a declared shape, not "whatever float()
-# parses" (round 1, code-reviewer #7).
-DECIMAL_SHAPE = re.compile(r"-?\d+(?:[.,]\d+)?")
-# The one numeric shape a foreign decimal cell may take, here and in the fit
-# artifact's reader (`opendata/fit.py`): plain digits, at most one `.` or `,`
-# separator, an optional leading minus. `1e5`, `1_000`, `nan`, `inf`, `+3` are
-# not the shape (9h review round 2, code-reviewer #1).
+# The one numeric shape a foreign decimal cell may take — plain ASCII digits,
+# at most one `.` or French `,` separator, an optional leading minus — lives in
+# `ingest.parsed.DECIMAL_SHAPE` (imported above) and is re-exported here for the
+# DAMIR readers that have always named it `opendata.slice.DECIMAL_SHAPE`. It
+# rejects the exotic forms `float()` would otherwise accept (`1_000`, `1e5`,
+# `nan`, `inf`, `+3`) and, since the fix, a non-ASCII digit (`٣`); so the guard
+# over this foreign column stays a declared shape, not "whatever float() parses"
+# (round 1, code-reviewer #7; 9h round 2, code-reviewer #1;
+# fix/foreign-shape-shared-home).
 
 
 def parse_amount(cell: str) -> float | None:

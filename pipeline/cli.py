@@ -31,7 +31,12 @@ from classify.rules import classify as classify_reviews
 from classify.rules import load_rules
 from ingest import sources
 from ingest.captures import has_pages, parser_module
-from ingest.parsed import PageShapeError
+from ingest.parsed import (
+    MAX_COUNT,
+    PageShapeError,
+    count_in_range,
+    is_ascii_decimal_integer,
+)
 from ingest.politeness import MAX_PAGES
 from ingest.sources import SOURCES
 from models.cost_model import format_model
@@ -91,19 +96,24 @@ def _rel(path):
 
 
 def positive_int(value: str, name: str) -> int:
-    """A user value that must be a positive integer, validated in Python — the
-    same guard shape as `resolve_choice` for a closed set. Empty, a
+    """A user value that must be a positive integer (`N`), read through the one
+    shared count shape `ingest.parsed.count_in_range` — ASCII digits only, in
+    the count column's range — so a superscript (`²`) or other-script digit
+    (`٣`) is not the shape and nothing non-ASCII reaches `int()`. Empty, a
     non-digit (`../x`, `"; …`), a sign or zero is refused; the value is never
     used to build a path (the sheet path is fixed), so a traversal or a
-    metacharacter is just a string that is not a positive integer. The digit
-    check is ASCII-only: `str.isdigit` is true for superscripts (`²`, which
-    `int()` then refuses with a `ValueError`) and other-script digits (`٣`,
-    which `int()` would silently accept as 3), so `isascii()` guards the
-    `int()` and the closed shape stays ASCII decimal — one refusal line, never
-    a traceback and never a surprise value (round 1, code-reviewer)."""
-    if not (value.isascii() and value.isdigit()) or int(value) <= 0:
-        raise Refused(f"refusing: {name} must be a positive integer, got {value!r}")
-    return int(value)
+    metacharacter is just a string that is not a positive integer — one refusal
+    line, never a traceback and never a surprise value (round 1, code-reviewer;
+    fix/foreign-shape-shared-home). The count column bounds it: a value above
+    `MAX_COUNT` is refused too, so the message names the range rather than call a
+    too-large integer 'not a positive integer'."""
+    number = count_in_range(value)
+    if number is None or number < 1:
+        raise Refused(
+            f"refusing: {name} must be a positive integer at most {MAX_COUNT}, "
+            f"got {value!r}"
+        )
+    return number
 
 
 def resolve_choice(value: str, allowed: tuple[str, ...], default: str) -> str:
@@ -136,7 +146,11 @@ def confirmed(make_pid: str) -> bool:
         stamped = None  # absent, unreadable, or a link to nowhere
     with suppress(OSError):
         CONFIRM_STAMP.unlink()  # consumed whatever its state (exit pass)
-    return stamped is not None and make_pid.isdigit() and stamped == make_pid
+    return (
+        stamped is not None
+        and is_ascii_decimal_integer(make_pid)
+        and stamped == make_pid
+    )
 
 
 def _do_confirm(args: argparse.Namespace) -> int:
@@ -154,7 +168,7 @@ def _do_confirm(args: argparse.Namespace) -> int:
     an environment that chooses what make reads or runs (`MAKEFILES`, `PATH`),
     a same-user process writing `data/` while make runs — the Threat model
     states."""
-    if not args.make_pid.isdigit():
+    if not is_ascii_decimal_integer(args.make_pid):
         raise Refused("refusing: --make-pid is not a process id")
     if args.goals_origin != "default":
         raise Refused(

@@ -142,6 +142,7 @@ def test_parse_amount_keeps_only_positive_numbers():
         "1.5e3",
         "0x10",
         "+3",  # exotic float() forms, refused
+        "٣",  # other-script digit: not the ASCII shape (float() would give 3.0)
     )
     for j in junk:
         assert parse_amount(j) is None, j

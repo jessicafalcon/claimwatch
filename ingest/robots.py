@@ -25,6 +25,7 @@ import re
 from dataclasses import dataclass, field
 from urllib.parse import urlsplit
 
+from ingest.parsed import DECIMAL_SHAPE
 from ingest.politeness import USER_AGENT
 
 PRODUCT_TOKEN = USER_AGENT.split("/", 1)[0].lower()  # "friction-ledger"
@@ -95,11 +96,13 @@ def _parse_groups(text: str) -> list[_Group]:  # noqa: C901 -- the RFC 9309 line
             if value:  # an empty `Disallow:` is "nothing disallowed": no rule
                 current.rules.append((key == "allow", value))
         elif key == "crawl-delay":
-            try:
-                delay = float(value)
-            except ValueError:
-                continue  # not a number: no delay is declared
-            if math.isfinite(delay) and delay >= 0:  # inf, nan, negative: none declared
+            if not DECIMAL_SHAPE.fullmatch(value):
+                continue  # not an ASCII decimal (`1e9`, `1_000`, `٣`): no delay
+            # DECIMAL_SHAPE also admits a French `,` (its DAMIR home), so `1,5`
+            # reads as 1.5 s — a wider acceptance than a robots.txt writes, but a
+            # harmless one for a politeness delay.
+            delay = float(value.replace(",", "."))  # shape-checked, cannot raise
+            if math.isfinite(delay) and delay >= 0:  # the shape admits `-5`: filter it
                 current.crawl_delay = max(current.crawl_delay or 0.0, delay)  # longest
     return groups
 

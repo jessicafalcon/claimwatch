@@ -2974,3 +2974,102 @@ CLAUDE.md trim and its docs-only round (Process, above).
   scale by a test (`71b0a33`); the B3.3 note is pinned to carry no figure the
   marts do not hold (`88d1f89`). The round found no correctness finding in
   round 1's fixes, so the review cap did not fire.
+
+### Fix — the shared count and decimal shapes get one home and one alphabet (2026-09-12, branch `fix/foreign-shape-shared-home`)
+
+Not a phase (no spec; a fix PR from `main`, CLAUDE.md → Git workflow). The
+amendment is committed alone, before the code. Challenged 2026-09-12, round 1
+(`senior-architect`): verdict *rework* — the first draft's mechanism did not
+restore the invariant it claimed (`DECIMAL_SHAPE`'s Unicode `\d` still admits
+`٣` as `3.0`), and it risked a negative crawl interval and a `name-drift` on
+the process id; all five findings folded in below.
+
+The property this fix is written against: **a foreign count or decimal on a
+read path is a non-negative ASCII decimal of the one shared shape, or it
+declares nothing — refused, or on a scraped page dropped, by name; no
+`ingest`/`pipeline`/`opendata` module parses a number outside a shared shape.**
+
+Phase 9h's entry declares `ingest.parsed.count_in_range` "the one count shape
+every parser uses" and `opendata.slice.DECIMAL_SHAPE` "the amount reader's
+shape" — but the 9h selfcheck found four hand-rolled sites outside them, and
+the challenge found the shared decimal shape itself is not ASCII-tight:
+- `opendata.slice.DECIMAL_SHAPE` is `r"-?\d+(?:[.,]\d+)?"`, and Python's `\d`
+  is Unicode-aware, so `DECIMAL_SHAPE.fullmatch("٣")` is true and `float("٣")`
+  is `3.0` (verified). The shape it is supposed to be — plain ASCII digits —
+  it is not.
+- `ingest/robots.py::_parse_groups` coerces a scraped `Crawl-delay` with bare
+  `float(value)` (only `inf`/`nan` caught by `math.isfinite`), so `1e9`,
+  `1_000` and `٣` all pass; a leading `-` reaches `fetch.py`'s crawl-interval
+  path, where the ceiling check `crawl_delay > MAX_CRAWL_DELAY_S`
+  (`ingest/fetch.py:228`) does not catch a negative, so `-5` would set a
+  negative interval.
+- `pipeline/cli.py` open-codes an ASCII integer three times: `positive_int`
+  (`value.isascii() and value.isdigit()`) and the two raw `make_pid.isdigit()`
+  at the confirm stamp (not ASCII-guarded).
+
+`unshaped-input` is already `promoted → code-craft → Guards`; a promoted class
+that recurs reworks its mechanism, not its row (LESSONS → Promotion).
+
+- **One home, one alphabet.** `DECIMAL_SHAPE` moves down to `ingest.parsed`
+  beside `count_in_range` (the import-safe home: the edge already runs
+  `opendata/fit.py → ingest.parsed`, never the reverse); `opendata.slice`
+  re-exports it, so every current importer (`opendata/fit.py`,
+  `tests/test_damir.py`) is unchanged. Its digit class becomes ASCII `[0-9]`
+  (not Unicode `\d`), so `٣` is no longer the shape — this extends the 9h
+  "shared shapes" decision by one line, and real DAMIR is ASCII so no real
+  number changes. A shared ASCII decimal-integer predicate joins the two
+  shapes in `ingest.parsed`, named for its shape (an ASCII decimal integer),
+  and `count_in_range` is expressed in terms of it (it adds only the
+  ten-digit range). *Rejected: a new `shapes.py` module (a package for shapes
+  `ingest.parsed` already anchors); leaving `DECIMAL_SHAPE` in `opendata`
+  (the two-homes drift the 9h "one shape per kind, shared" rule forbids).*
+
+- **`robots.py`'s `Crawl-delay` reads through the shared decimal shape, then
+  keeps its finiteness and `>= 0` guard; a value that is not a non-negative
+  finite ASCII decimal declares no delay, by name.** The drop (not refuse)
+  stays — a directive RFC 9309 lets us ignore is no reason to distrust the
+  file — but `1e9`, `1_000`, `٣` and `-5` now take the "no delay" branch
+  instead of a `float`; the `>= 0`/`isfinite` guard is retained after the
+  shape check, so nothing negative or non-finite reaches `fetch.py`'s
+  interval. *Rejected: dropping the `>= 0` guard on the trust that the shape
+  covers it (it does not: the shape admits a sign — Finding 2); refusing the
+  whole file on a malformed delay.*
+
+- **`pipeline/cli.py`: `positive_int` reads through `count_in_range` (N is a
+  count in range — its own domain); the confirm-stamp `make_pid` reads through
+  the shared ASCII decimal-integer predicate, named for its shape, not
+  `count_in_range`.** A process id is not a count and not a parser's value, so
+  routing it through "a count in range" would misname it (the promoted
+  `name-drift` class) and cap it at ten digits for no reason; the shape-named
+  predicate holds it to ASCII digits without either. Because `make_pid` goes
+  through a shared shape, the layout guard below needs no exemption for it.
+  *Rejected: `make_pid` through `count_in_range` (name-drift); a bare
+  in-place `isascii()+isdigit()` on `make_pid` (a fourth hand-rolled copy the
+  layout guard would then have to exempt — an exemption is a denylist by
+  another name).*
+
+- **The reworked mechanism is an AST check, not a substring grep**
+  (`tests/test_number_shapes.py`). A test walks the `ast` of every
+  `ingest`/`pipeline`/`opendata` module and bans the two loose coercions:
+  `.isdigit`/`.isdecimal` (the methods that lie about Unicode) anywhere, and
+  `float()` outside the three shaped-decimal parsers (`opendata.slice.parse_amount`,
+  `opendata.fit._finite_float`, `ingest.robots._parse_groups` — each matches
+  `DECIMAL_SHAPE` first). *Built narrower than this amendment's first
+  enumeration (`float`, `int`, `Decimal`, `.isdigit`, `.isdecimal`): a grep of
+  the three packages found `int()`/`Decimal()` used at ~8 legitimate sites,
+  each already behind a bounded digit shape (a date's `int(m.group(...))`,
+  `Decimal(text)` after a `Measure` pattern), so banning them would have forced
+  an ever-growing allowlist — the escape hatch the guard exists to avoid, the
+  `site-fix`/`empty-default` smell. The two loose coercions carry the class;
+  `int`/`Decimal` are left to the shapes that already precede them. Rejected: a
+  grep denylist of `float(`/`.isdigit(` (the form the `unshaped-input` row
+  retired in tooling round 3 when a spawner-name denylist let `os.popen` slip;
+  an alias or a differently-spelled call evades a substring match).*
+
+Scope: `ingest/parsed.py`, `opendata/slice.py`, `ingest/robots.py`,
+`pipeline/cli.py`, their tests, and the AST layout test. One commit per
+correctness finding (the shape home-and-alphabet move first, then each
+routing), the `unshaped-input` LESSONS row's Where cell extended with each and
+its Status noting the AST guard as the reworked mechanism. Sensitive surface
+(`ingest/**`, `pipeline/cli.py`): the round runs code-reviewer,
+functionality-tester and security-reviewer.
