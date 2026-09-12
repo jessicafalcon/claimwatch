@@ -153,22 +153,32 @@ def _iter_rows(path: Path) -> Iterator[dict[str, str]]:
     empty slice. Streams row by row, so there is no byte cap on the file: a
     developer-placed download from a known portal is never landed in memory
     at once (the `opendata/slice.py` reason), and a wrong shape refuses on the
-    header before a data row is read."""
-    with path.open(encoding="utf-8", newline="") as fh:
-        reader = csv.DictReader(fh, delimiter=AMELI_DELIMITER)
-        fields = list(reader.fieldnames or [])
-        if fields:
-            fields[0] = fields[0].lstrip(_BOM)
-            reader.fieldnames = fields
-        missing = [c for c in FIXTURE_COLUMNS if c not in fields]
-        if missing:
-            found = [shown(f) for f in fields[: len(FIXTURE_COLUMNS)]]
-            raise ValueError(
-                f"{path.name}: missing column(s) {missing} (found {found}); "
-                "not a data.ameli honoraires export"
-            )
-        for row in reader:
-            yield {c: (row.get(c) or "") for c in FIXTURE_COLUMNS}
+    header before a data row is read. The parser's own failure (`csv.Error`, a
+    field past its limit — not a `ValueError`) is folded into the one refusal
+    this reader declares, as `decode_json` folds the JSON decoder's, so the
+    CLI boundary catches the declared type and never a traceback (review round
+    2, security #1)."""
+    try:
+        with path.open(encoding="utf-8", newline="") as fh:
+            reader = csv.DictReader(fh, delimiter=AMELI_DELIMITER)
+            fields = list(reader.fieldnames or [])
+            if fields:
+                fields[0] = fields[0].lstrip(_BOM)
+                reader.fieldnames = fields
+            missing = [c for c in FIXTURE_COLUMNS if c not in fields]
+            if missing:
+                found = [shown(f) for f in fields[: len(FIXTURE_COLUMNS)]]
+                raise ValueError(
+                    f"{path.name}: missing column(s) {missing} (found {found}); "
+                    "not a data.ameli honoraires export"
+                )
+            for row in reader:
+                yield {c: (row.get(c) or "") for c in FIXTURE_COLUMNS}
+    except csv.Error as exc:
+        raise ValueError(
+            f"{path.name}: not a CSV the reader can parse ({exc}); "
+            "not a data.ameli honoraires export"
+        ) from exc
 
 
 def _is_national(row: dict[str, str]) -> bool:

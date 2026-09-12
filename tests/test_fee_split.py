@@ -185,6 +185,27 @@ def test_slice_reads_a_bom_header_and_refuses_a_missing_column(tmp_path):
         read_national_families(comma, 2024)
 
 
+def test_slice_refuses_an_export_the_csv_parser_cannot_read_by_name(
+    capsys, monkeypatch, tmp_path
+):
+    """The parser's own failure — a field past `csv`'s limit, a `csv.Error` that
+    is no `ValueError` — is the reader's refusal naming the file, so the CLI's
+    read boundary turns it into one line and exit 2, never a traceback (review
+    round 2, security #1; the traceback-at-boundary class)."""
+    bad = tmp_path / "wide.csv"
+    bad.write_text(
+        HEADER + "\n2024;99;999;Sages-femmes;" + "9" * 140_000 + ";1\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="wide.csv: not a CSV the reader can parse"):
+        read_national_families(bad, 2024)
+    monkeypatch.setattr(cli, "AMELI_EXPORT", bad)
+    assert main(["slice-ameli", "--year=2024"]) == 2
+    err = capsys.readouterr().err
+    assert err.startswith("refusing: wide.csv: not a CSV the reader can parse")
+    assert "Traceback" not in err
+
+
 def test_euro_total_shape_is_ascii_bounded_and_refuses_by_name():
     """The bounded euro-total shape: ASCII digits below one trillion — the
     count shape's ceiling (2^31 - 1) is below the national totals, so this is
