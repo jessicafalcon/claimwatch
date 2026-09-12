@@ -439,7 +439,6 @@ def test_gate_prints_one_line_per_check_and_the_total(monkeypatch, tmp_path: Pat
         "collected_tests",
         lambda root: (0, {"tests/test_a.py::test_x"}, ""),
     )
-    monkeypatch.setattr(review_gate, "resolve_spec", lambda arg, root=None: spec)
     import io
     from contextlib import redirect_stdout
 
@@ -540,6 +539,11 @@ def test_a_phase_branch_without_its_spec_is_refused(root: Path, capsys, monkeypa
     same refusal naming git's line, never an empty name read as no spec."""
     with pytest.raises(Refused, match=r"phase-0b-contracts names specs/phase-0b"):
         review_gate.spec_for_branch("phase-0b-contracts", root)
+    # the derived path gets the typed form's containment: a symlink out of
+    # specs/ is refused on both forms, never read on one and refused on the other
+    (root / "specs" / "phase-0c-link.md").symlink_to(root / "outside.md")
+    with pytest.raises(Refused, match=r"phase-0c-link names .*must be a path under"):
+        review_gate.spec_for_branch("phase-0c-link", root)
     with pytest.raises(Refused, match=r"cannot read the branch: fatal: not a git"):
         review_gate.branch_name(root)  # tmp_path is no git repository
     monkeypatch.setattr(review_gate, "run", lambda cmd, cwd: (128, "a\nb\nfatal: c"))
@@ -597,7 +601,7 @@ def test_resolve_inputs_reads_the_branch_only_without_a_spec(root: Path, monkeyp
     absent one goes through the branch — one seam, so the two forms cannot read
     different specs for the same range."""
     monkeypatch.setattr(review_gate, "ROOT", root)
-    monkeypatch.setattr(review_gate, "resolve_spec", lambda arg, root=None: root)
+    monkeypatch.setattr(review_gate, "resolve_spec", lambda arg, root: root / arg)
     monkeypatch.setattr(
         review_gate, "branch_name", lambda root: (_ for _ in ()).throw(AssertionError)
     )

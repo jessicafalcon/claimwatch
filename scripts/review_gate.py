@@ -227,13 +227,12 @@ def spec_for_branch(name: str, root: Path) -> Path | None:
                 " phase-<n><letter?>-<slug> (pass SPEC=specs/<file>.md)"
             )
         return None
-    path = root / "specs" / f"{name}.md"
-    if not path.is_file():
-        raise Refused(
-            f"refusing: branch {name} names specs/{name}.md, which does not exist"
-            " (pass SPEC=specs/<file>.md)"
-        )
-    return path
+    rel = f"specs/{name}.md"
+    try:
+        return resolve_spec(rel, root)  # the typed form's guard: a file under specs/
+    except Refused as exc:
+        why = str(exc).removeprefix("refusing: ")
+        raise Refused(f"refusing: branch {name} names {rel}: {why}") from None
 
 
 def resolve_inputs(spec_arg: str, base_arg: str) -> tuple[Path | None, str, str]:
@@ -241,7 +240,7 @@ def resolve_inputs(spec_arg: str, base_arg: str) -> tuple[Path | None, str, str]
     absent one is the branch's own spec; raises Refused, never a traceback."""
     base = resolve_base(base_arg)
     if spec_arg:
-        return resolve_spec(spec_arg), "", base
+        return resolve_spec(spec_arg, ROOT), "", base
     branch = branch_name(ROOT)
     return spec_for_branch(branch, ROOT), branch, base
 
