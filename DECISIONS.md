@@ -3309,3 +3309,29 @@ who-writes-what change that restores the documented layering.
   connection (BACKLOG, `TARGET` not yet threaded) stays as it is; that row is
   Phase 10's Snowflake wiring. This fix is offline, DuckDB-only, no key. One
   PR, one concern.
+
+### Tooling — two skill sentences (2026-09-12, branch `tooling/skill-sentences`)
+
+Not a phase (no spec, no BACKING row). The first of three small PRs before
+Phase 10, the BACKLOG row "Two tooling texts lag the code" (Phase 9i exit
+audit). Two edits, one commit, records in a second.
+
+- **secure-by-construction counts three tracked `data/` subtrees.** Phase 9i
+  added `data/ameli/` beside `snapshots/` and `damir/`, and `.gitignore` and
+  CLAUDE.md said so while the standard still said two; the third tracked
+  output, `data/ameli/fee_split.csv`, joins the numbers-only list. The
+  reviewer preloaded with the text now reads the same count the repo keeps.
+- **code-craft → Error policy says a reader owns its failure type.** The
+  `traceback-at-boundary` class hit twice in Phase 9i's rounds — a widened
+  `(ValueError, OSError)` tuple, then `csv.Error` past it — and CLAUDE.md's
+  rule turns a class hit twice into a mechanism. The sentence is the
+  mechanism: the parser's own error is folded into the one refusal the
+  reader declares (the `decode_json` and `fee_split._iter_rows` shape), so
+  the boundary catches one declared set and a wider `except` tuple is never
+  the fix. *Rejected: a ruff or AST rule that refuses `csv.Error` in an
+  `except` tuple outside a reader (a denylist of one parser; the JSON and
+  decode errors would each need their own arm), and waiting for the csv
+  fix PR to write the sentence (the standard is what that fix is reviewed
+  against, so it lands first).* The test that walks every `csv` reader is
+  that fix PR's, the BACKLOG row "Every `csv` reader but one maps
+  `ValueError` only…".
