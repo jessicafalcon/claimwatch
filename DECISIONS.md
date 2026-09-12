@@ -3360,7 +3360,7 @@ wrapped its read in no `try` at all.
   every parser); one shared `read_csv_or_refuse` helper raising one type (the
   readers declare four different types by design — a cache error is not a
   page-shape error — and the walk test already keeps them uniform).*
-- **`read_fixture` reads through `_read_csv` with the eight raw columns
+- **`read_fixture` reads through `_read_csv` with the fixture's eight columns
   declared (`FIXTURE_REVIEW_COLUMNS`), not through a bare `csv.DictReader`.**
   One strict reader for tracked CSVs in `build.py`; the synthetic fixture's
   header is checked where before it was trusted. *Rejected: a second
@@ -3395,7 +3395,11 @@ wrapped its read in no `try` at all.
   field past the interpreter's default limit (the synthetic corpus must still
   read, so the narrowed limit of the walk cannot serve there). Craft (the
   next commit): the refusal phrase is `ingest/parsed.py::CSV_UNREADABLE` at
-  every site and in the tests; the AST scan resolves `import csv as c` and
+  every site and in the tests — `ingest.parsed` because it is the one
+  stdlib-only leaf below every reader's package (`opendata` and `pipeline`
+  already take their shapes from it, fix #33; `pipeline` as the home would
+  cycle through `classify`), a first `classify → ingest` edge and no edge
+  back; the AST scan resolves `import csv as c` and
   `from csv import … [as x]` (code #3, security #1); `_decision`/`_label`
   hold the per-row checks (code #5); the export entry has its own writer
   (code #6); the scanner reads through `tests/repo_text.py` (security #2).

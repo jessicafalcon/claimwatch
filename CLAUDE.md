@@ -88,8 +88,9 @@ Delivered paragraph and `make help`, not here.
   `sql_lint.py` (the portability/clock denylist), `label_sample.py`.
 - `ingest/` — the scrapers: `sources.py` (every source as one declaration;
   the one place a brand-carrying address may appear), `politeness.py`,
-  `robots.py` (RFC 9309), `parsed.py` (what every parser hands back and the
-  declared bounds), `captures.py`, a parser per fetched source — four; two
+  `robots.py` (RFC 9309), `parsed.py` (what every parser hands back, the
+  declared bounds, and the shapes and refusal phrase every reader package
+  imports), `captures.py`, a parser per fetched source — four; two
   sources are hand-read (`trustpilot.py` reads an authorized OFFLINE
   export), `fetch.py` (the only `httpx` import).
   A *capture* is one run's saved copy of the pages exactly as they arrived,
