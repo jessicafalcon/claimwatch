@@ -1243,8 +1243,7 @@ def beat3_panels(conn) -> list[Panel]:
                 "second-hand from the project brief, each a floor; the fit rows "
                 "span the fit plus and minus two standard errors; the median and "
                 "mean cells are read figures with no range of their own; the "
-                "extra-billing row’s low and high are the lowest and highest "
-                "profession family.",
+                "extra-billing row’s range is the note below.",
                 text.MEAN_CELL_NOTE,
                 text.EXTRA_BILLING_NOTE,
             ),

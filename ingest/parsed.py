@@ -69,6 +69,8 @@ def euro_total_in_range(value: str) -> int | None:
     if not (is_ascii_decimal_integer(value) and len(value) <= _MAX_EURO_TOTAL_DIGITS):
         return None
     number = int(value)
+    # Twelve ASCII digits cannot exceed MAX_EURO_TOTAL (10^12 - 1): the ceiling
+    # restates the length guard so the shape reads as one bound (round 2).
     return number if number <= MAX_EURO_TOTAL else None
 
 

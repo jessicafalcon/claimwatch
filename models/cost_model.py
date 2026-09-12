@@ -235,8 +235,9 @@ def fit_parameters(fit: Fit) -> tuple[Parameter, ...]:
     `mu`/`sigma` span the fit ± 2 standard errors (`se_mu = sigma / √n`,
     `se_sigma = sigma / √(2n)`, the closed-form lognormal-MLE standard errors);
     `emp_p50` and `emp_mean` are read figures whose slider is `mu`/`sigma`, so
-    each range is itself (a fixed mark; a third such row is the BACKLOG trigger
-    for a shape of their own). Every cell is rounded at the one site, so the
+    each range is itself (a fixed mark; 9i's spread row went under the same
+    shape, and a fourth such row is the BACKLOG trigger for a shape of their
+    own). Every cell is rounded at the one site, so the
     rows are byte-stable."""
     se_mu = fit.sigma / sqrt(fit.n)
     se_sigma = fit.sigma / sqrt(2 * fit.n)

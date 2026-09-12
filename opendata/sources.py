@@ -104,7 +104,8 @@ AMELI_DATASET_URL = "https://data.ameli.fr/explore/dataset/honoraires/"
 
 # Where the developer's browser download lands — a fixed path under the one
 # cache-root binding, gitignored; no variable ever names it. The portal's CSV
-# export is `;`-delimited with a UTF-8 byte-order mark on the header.
+# export is `;`-delimited with a UTF-8 byte-order mark on the header — one
+# from the API, two with CRLF from a browser's Export (DECISIONS → Gotchas).
 AMELI_EXPORT = CACHE_ROOT / "ameli" / "honoraires.csv"
 AMELI_DELIMITER = ";"
 

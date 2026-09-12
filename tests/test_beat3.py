@@ -244,18 +244,21 @@ def test_b3_3_shows_the_extra_billing_share_with_its_family_range(synthetic_db):
 
 def test_the_extra_billing_note_carries_no_figure_the_marts_do_not_hold():
     """The note says what the share is, what its range is, what the public
-    insurer does not reimburse and that no formula reads the row — and carries
-    no number, no percentage, no profession's own figure (9i, challenge #2)."""
+    insurer does not reimburse, what the totals are (a year's national totals,
+    not per claim) and, once, that no formula reads the row — and carries no
+    number, no percentage, no profession's own figure (9i, challenge #2;
+    review round 2, editor #1 and #3)."""
     note = text.EXTRA_BILLING_NOTE
     assert not any(ch.isdigit() for ch in note)
     assert "%" not in note
     for said in (
+        "context, not a formula input",
+        "not a per-claim figure",
         "a spread in the data",
         "lowest and highest family",
         "reimburses none of the part above the tariff",
-        "No formula reads this row",
     ):
-        assert said in note
+        assert note.count(said) == 1, said
 
 
 def test_the_mean_cell_note_carries_no_figure_the_marts_do_not_hold():

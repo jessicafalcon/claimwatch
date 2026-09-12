@@ -73,7 +73,7 @@ FIXTURE_COLUMNS: tuple[str, ...] = (
 # A share is written at six places — `_PARAM_DP` of the fit artifact: a range's
 # ends and a default shown as a one-place percentage need no more.
 _SHARE_DP = 6
-_LABELS = {label: slug for slug, label in AMELI_FAMILIES}
+_LABELS = frozenset(label for _slug, label in AMELI_FAMILIES)
 
 
 @dataclass(frozen=True)
@@ -192,7 +192,10 @@ def _euro_total(cell: str, what: str, where: str) -> int:
     """A total in the bounded euro-total shape, or a refusal that names what it
     was (`'Sages-femmes' depassements_totaux`, `'tariff_eur_all'`) — a
     suppressed `NS`/`NC`, a decimal, a sign or a value past the ceiling would
-    otherwise move the national total. The one helper both readers use."""
+    otherwise move the national total. The one helper both readers use. The
+    cell is stripped first — the foreign-CSV cell convention
+    `opendata/slice.py::parse_amount` set; the shape itself takes no
+    whitespace (review round 2, code #3)."""
     value = euro_total_in_range(cell.strip())
     if value is None:
         raise ValueError(f"{where}: {what} is not a whole-euro total: {shown(cell)}")

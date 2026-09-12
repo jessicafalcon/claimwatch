@@ -242,7 +242,7 @@ def test_models_imports_only_stdlib_math():
         assert not (attrs & _FORBIDDEN_ATTRS), (path.name, attrs & _FORBIDDEN_ATTRS)
 
 
-def test_read_model_fit_refuses_a_malformed_artifact(tmp_path):
+def test_read_model_inputs_refuses_a_malformed_artifact(tmp_path):
     """A hand-corrupted artifact — the fit or, since 9i, the fee split — is
     refused as a PageShapeError naming which, so the model and rebuild CLI paths
     surface one line and exit 2 (main catches it), never a traceback."""

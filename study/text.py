@@ -136,20 +136,22 @@ MEAN_CELL_NOTE = (
 # in sight), what its range is (a spread across the four profession families,
 # not a bound the study explores — said here once, review round 1 #10), what
 # the Assurance Maladie does not reimburse and so what the fit does not hold,
-# and that no formula reads it. No figure: the row's cells carry the numbers
-# (challenge round 1, #2).
+# and what the totals are (one year, national, per family — not per claim;
+# review round 2, editor #3). The opening clause says no formula reads it,
+# once (editor #1). No figure: the row's cells carry the numbers (challenge
+# round 1, #2).
 EXTRA_BILLING_NOTE = (
     "One row is context, not a formula input: the share of what liberal "
     "practitioners billed that lay above the public tariff — the extra billing "
     "over all fees billed, tariff and extra together — from the Assurance "
-    "Maladie’s own table of fees by profession. Its default is the four "
+    "Maladie’s own table of fees by profession — one year’s national totals "
+    "per profession family, not a per-claim figure. Its default is the four "
     "profession families together; its low and high are the lowest and highest "
     "family — a spread in the data, not a bound the study explores. The "
     "Assurance Maladie reimburses none "
     "of the part above the tariff, so that part is absent from the "
     "reimbursement cells the fit is built on — a part of a complementary "
-    "insurer’s bill the mean claim above does not hold. No formula reads this "
-    "row."
+    "insurer’s bill the mean claim above does not hold."
 )
 
 # The labels of a curve panel's three markers, in the order they are drawn:
