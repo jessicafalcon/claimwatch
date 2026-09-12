@@ -477,6 +477,22 @@ Each entry: the surprise, the official-docs check, what we did.
   prefix is `Bash(git diff:*)` (colon); `Bash(git *)` is not documented and
   is either a no-op or every subcommand, so `/challenge` grants the four
   read-only git prefixes by name.
+- **Phase 9i — the data.ameli browser export carries two byte-order marks and
+  CRLF; one family's sub-rows sum a euro off (2026-09-12).** The API export
+  (read during the spec's research) begins with one UTF-8 byte-order mark; the
+  same table saved from the portal's Export dialog in a browser begins with
+  two (`EF BB BF EF BB BF`) and ends its lines CRLF — `utf-8-sig` strips one
+  and leaves `\ufeffannee`, a "missing column" refusal against the real
+  file. The slice's declared shape is therefore "the header after any leading
+  marks": `opendata/fee_split.py::_iter_rows` opens as plain UTF-8 and strips
+  every leading U+FEFF from the first field, pinned by a two-mark CRLF case in
+  `tests/test_fee_split.py`. Checked on the developer's file before the
+  fixture was cut: the four family rows are present for 2024 with no
+  suppressed token; médecins and chirurgiens-dentistes equal their sub-rows'
+  sums exactly; `Ensemble des auxiliaires médicaux` is one euro below the sum
+  of its five professions on both totals (the publisher's rounding of the
+  family row) — the phase reads the four family rows as published and sums
+  nothing itself, so the artifact is the table's own figures.
 
 
 ## Appendix — by phase
