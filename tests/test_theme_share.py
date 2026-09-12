@@ -2,21 +2,20 @@
 theme-share marts (theme_share_by_month B2.2, theme_share_by_segment B2.5).
 
 Offline, no key, DuckDB temp files. The classification path the CLI runs after a
-rebuild is replicated here (rebuild -> classify_all rules-only ->
-write_classified_reviews -> build_post_classify_marts), so the marts are exercised
-without the CLI's printing or fixed db paths."""
+rebuild is exercised here through the shared `pipeline.build.classify_step`
+(rules-only, no key, the decision cache beside the throwaway db), so the marts
+are exercised without the CLI's printing, fixed db paths or tracked cache."""
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
-from classify.combined import classify_all
-from classify.labels import review_id
-from classify.rules import load_rules
 from pipeline.build import (
     build_post_classify_marts,
+    classify_step,
     rebuild,
-    write_classified_reviews,
 )
 from pipeline.warehouse import connect, database_for
 from tests import pins
@@ -25,30 +24,10 @@ pytestmark = pytest.mark.slow  # slow: kept out of the fast edit-loop hook
 
 
 def _classify_and_build(db, run_id: str = "t") -> None:
-    """Fill stg_classified_reviews and build the theme-share marts over the
-    warehouse at `db` — the CLI classify step's work, rules-only (no key)."""
-    conn = connect("duckdb", database=db)
-    try:
-        staged = conn.execute(
-            "select source, external_id, title, body from stg_reviews"
-        ).fetchall()
-    finally:
-        conn.close()
-    identity = {review_id(s, e): (s, e) for s, e, _, _ in staged}
-    reviews = [
-        (review_id(s, e), "\n".join(p for p in (t, b) if p).strip())
-        for s, e, t, b in staged
-    ]
-    rows, _ = classify_all(reviews, rules=load_rules())  # decide=None -> rules only
-    classified = sorted(
-        (identity[rid][0], identity[rid][1], theme) for rid, theme in rows
-    )
-    conn = connect("duckdb", database=db)
-    try:
-        write_classified_reviews(conn, classified, run_id=run_id)
-        build_post_classify_marts(conn)
-    finally:
-        conn.close()
+    """Run the shared classify step over the warehouse at `db` — rules-only (no
+    model decider) with the decision cache beside the throwaway db, the same
+    `classify_step` the CLI wraps, so a re-run touches no tracked cache."""
+    classify_step(db, run_id, cache_path=Path(db).with_name("decisions.csv"))
 
 
 def _built(tmp_path, rows: str = "synthetic"):

@@ -214,6 +214,17 @@ def test_second_rebuild_from_captures_adds_no_rows():
     assert first["raw_reviews"] == pins.SAMPLES_RAW_REVIEWS
 
 
+def test_idempotency_check_covers_the_classify_path_tables():
+    """The fix's Done-when: idempotency-check runs the classify step too, so the
+    classify-path tables — which `rebuild()` alone stops before — are in its
+    per-table diff, not left to the two slow scenario tests. classifier_quality
+    is present because the synthetic corpus is graded (whole-db compare, no
+    carve-out); on an ungraded corpus it is absent from both runs, still equal."""
+    ok, first, second = idempotency_check("duckdb", "synthetic")
+    assert ok and first == second
+    assert set(first) >= pins.CLASSIFY_PATH_TABLES
+
+
 def test_second_capture_of_unchanged_pages_adds_no_rows(tmp_path):
     """A re-scrape a week later, nothing edited: raw keeps the first capture's
     rows and gains none; staging is unchanged."""

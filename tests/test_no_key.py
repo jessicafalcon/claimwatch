@@ -97,12 +97,19 @@ def test_no_key_rebuild_classify_step_is_green(monkeypatch, tmp_path, capsys):
     # the 'not yet classified' band, writing nothing under the repo's data/.
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     from classify.cache import read_decisions, write_decisions
-    from pipeline import cli
+    from pipeline import build, cli
     from pipeline.build import rebuild
 
+    # Redirect the classify step's cache (now build.read/write_decisions, called
+    # by build.classify_step) to a temp path, so the no-key run writes nothing
+    # under the repo's data/. The extra cache_path arg the step passes is ignored.
     cache = tmp_path / "decisions.csv"
-    monkeypatch.setattr(cli, "read_decisions", lambda: read_decisions(cache))
-    monkeypatch.setattr(cli, "write_decisions", lambda d: write_decisions(d, cache))
+    monkeypatch.setattr(
+        build, "read_decisions", lambda *a, **k: read_decisions(cache)
+    )
+    monkeypatch.setattr(
+        build, "write_decisions", lambda d, *a, **k: write_decisions(d, cache)
+    )
 
     rebuild("duckdb", "synthetic", root=tmp_path, run_id="t")
     cli._classify_and_print(database_for("synthetic", tmp_path), "synthetic")
@@ -151,11 +158,15 @@ def test_theme_share_shows_unclassified_band(monkeypatch, tmp_path):
     # the marts.
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     from classify.cache import read_decisions, write_decisions
-    from pipeline import cli
+    from pipeline import build, cli
 
     cache = tmp_path / "decisions.csv"
-    monkeypatch.setattr(cli, "read_decisions", lambda: read_decisions(cache))
-    monkeypatch.setattr(cli, "write_decisions", lambda d: write_decisions(d, cache))
+    monkeypatch.setattr(
+        build, "read_decisions", lambda *a, **k: read_decisions(cache)
+    )
+    monkeypatch.setattr(
+        build, "write_decisions", lambda d, *a, **k: write_decisions(d, cache)
+    )
 
     rebuild("duckdb", "synthetic", root=tmp_path, run_id="t")
     db = database_for("synthetic", tmp_path)

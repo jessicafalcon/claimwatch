@@ -66,21 +66,17 @@ def _isolate_fetched_snapshots(
 
 def build_study_db(root: Path, rows: str = "synthetic") -> Path:
     """A fully built study warehouse in `root`, returned as its db path: `rebuild`
-    plus the CLI's classify step, which fills the theme-share marts (B2.2, B2.5)
-    and classifier_quality (B2.4) that `rebuild` alone does not build. The model
-    decider and the decision cache are neutralised, so the classification is
-    rules-only, deterministic, and writes nothing under data/ — the same result
-    `make rebuild` produces with no key (source: pipeline/cli.py::_do_rebuild)."""
-    from pipeline import cli
-    from pipeline.build import rebuild
+    plus the shared classify step (`pipeline.build.classify_step`), which fills
+    the theme-share marts (B2.2, B2.5), pipeline_row_counts (B5.2) and
+    classifier_quality (B2.4) that `rebuild` alone does not build. The step runs
+    rules-only (no model decider) with its decision cache inside `root`, so the
+    classification is deterministic and writes nothing under data/ — the same
+    result `make rebuild` produces with no key."""
+    from pipeline.build import classify_step, rebuild
 
     rebuild("duckdb", rows, root=root)
     db = database_for(rows, root)
-    with pytest.MonkeyPatch.context() as mp:
-        mp.setattr(cli, "make_model_decider", lambda: None)  # never call the model
-        mp.setattr(cli, "read_decisions", lambda *a, **k: {})  # ignore any dev cache
-        mp.setattr(cli, "write_decisions", lambda *a, **k: None)  # no data/ write
-        cli._classify_and_print(db, rows)
+    classify_step(db, rows, cache_path=root / "decisions.csv")  # decide=None -> rules
     return db
 
 
