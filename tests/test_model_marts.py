@@ -10,7 +10,7 @@ import ast
 import pytest
 
 from models import cost_model
-from pipeline.build import read_model_fit, rebuild
+from pipeline.build import read_model_inputs, rebuild
 from pipeline.cli import main
 from pipeline.warehouse import ROOT, connect, database_for
 from tests import pins
@@ -48,7 +48,7 @@ def _rows(conn, table: str, columns: str) -> list[tuple]:
 def test_outputs_mart_equals_formulas_at_defaults(tmp_path):
     """Every cost_model_outputs value equals the FORMULAS callable evaluated over
     the defaults for its scenario — mart and code cannot drift."""
-    fit = read_model_fit()
+    fit = read_model_inputs()
     values = cost_model.defaults(fit)
     expected: dict[tuple[str, str], float | None] = {}
     for scenario in cost_model.SCENARIOS:
@@ -74,7 +74,7 @@ def test_curves_mart_equals_curves_at_defaults(tmp_path):
     """Every cost_curves grid row equals curves() over the defaults for its
     scenario — the B3.2 chart's fraud/friction/net/marker columns cannot drift
     from the callable (invariant 1, the curve half)."""
-    fit = read_model_fit()
+    fit = read_model_inputs()
     values = cost_model.defaults(fit)
     expected: dict[tuple[str, float], tuple] = {}
     for scenario in cost_model.SCENARIOS:
@@ -103,7 +103,7 @@ def test_curves_mart_equals_curves_at_defaults(tmp_path):
 def test_params_mart_has_one_row_per_parameter(tmp_path):
     """cost_model_params holds one row per parameter, each cell equal to the
     Parameter it came from."""
-    params = cost_model.parameters(read_model_fit())
+    params = cost_model.parameters(read_model_inputs())
     conn = _built(tmp_path)
     try:
         rows = conn.execute(
@@ -237,15 +237,20 @@ def test_models_imports_only_stdlib_math():
 
 
 def test_read_model_fit_refuses_a_malformed_artifact(tmp_path):
-    """A hand-corrupted fit artifact is refused as a PageShapeError, so the model
-    and rebuild CLI paths surface one line and exit 2 (main catches it), never a
-    traceback."""
+    """A hand-corrupted artifact — the fit or, since 9i, the fee split — is
+    refused as a PageShapeError naming which, so the model and rebuild CLI paths
+    surface one line and exit 2 (main catches it), never a traceback."""
     from ingest.parsed import PageShapeError
 
     bad = tmp_path / "bad.csv"
     bad.write_text("name,value\nmu,abc\n", encoding="utf-8")  # non-numeric, short
     with pytest.raises(PageShapeError, match="fit artifact is unreadable"):
-        read_model_fit(bad)
+        read_model_inputs(fit_path=bad)
+    with pytest.raises(PageShapeError, match="fee split artifact is unreadable"):
+        read_model_inputs(fee_split_path=bad)
+    inputs = read_model_inputs()
+    assert inputs.fee_split.year == pins.AMELI_YEAR
+    assert inputs.fee_split.low < inputs.fee_split.share < inputs.fee_split.high
 
 
 def test_make_model_is_byte_identical_on_rerun(capsys):

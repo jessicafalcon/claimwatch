@@ -1,0 +1,17 @@
+name,value
+year,2024
+tariff_eur_medecins,25970577462
+extra_eur_medecins,4544674945
+share_medecins,0.148931
+tariff_eur_dentistes,6161730539
+extra_eur_dentistes,5994290373
+share_dentistes,0.493113
+tariff_eur_sages_femmes,605567923
+extra_eur_sages_femmes,7784184
+share_sages_femmes,0.012691
+tariff_eur_auxiliaires,18714466964
+extra_eur_auxiliaires,194603654
+share_auxiliaires,0.010292
+tariff_eur_all,51452342888
+extra_eur_all,10741353156
+share_all,0.172708

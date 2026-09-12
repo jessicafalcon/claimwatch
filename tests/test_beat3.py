@@ -17,7 +17,7 @@ import duckdb
 import pytest
 
 from models.cost_model import FORMULAS, SCENARIOS
-from pipeline.build import read_model_fit
+from pipeline.build import read_model_inputs
 from pipeline.warehouse import ROOT, connect
 from study import export, panels, text
 from study.model import (
@@ -209,6 +209,55 @@ def test_b3_3_prints_the_mean_cell_count_beside_the_claim_count(synthetic_db):
         assert text.FIXED_RANGE in _row(sec, key)
 
 
+def test_b3_3_shows_the_extra_billing_share_with_its_family_range(synthetic_db):
+    """9i: the fee-split row renders among the sourced rows through the display
+    map, right after the mean cell, as a percentage with its citation; its low
+    and high are the family extremes (a spread, not a fixed mark); the blurb
+    and the note say what the range is; B3.3 alone names the fee-split artifact
+    and the data.ameli table as sources."""
+    b33 = _panel(synthetic_db, "B3.3")
+    keys = [s.key for s in b33.series]
+    assert keys.index("extra_billing_share") == keys.index("emp_mean") + 1
+    row = next(s for s in b33.series if s.key == "extra_billing_share")
+    cells = {p.label: p for p in row.points}
+    assert cells["default"].value == pins.AMELI_SHARE_ALL
+    assert (cells["low"].value, cells["high"].value) == pins.AMELI_SHARE_RANGE
+    assert cells["low"].value < cells["default"].value < cells["high"].value
+    assert (
+        cells["default"].unit == "pct" and cells["default"].tag == pins.COST_MODELED_TAG
+    )
+    assert "data-ameli-honoraires" in cells["default"].detail
+    assert text.EXTRA_BILLING_NOTE in b33.notes
+    assert "for the inputs the formulas read, the range the study explores" in b33.blurb
+    assert (
+        panels.FEE_SPLIT_FILE in b33.sources and panels.AMELI_DATASET_URL in b33.sources
+    )
+    for other in ("B3.1", "B3.2", "B3.4"):
+        assert panels.FEE_SPLIT_FILE not in _panel(synthetic_db, other).sources
+    sec = _section(_html(synthetic_db), "B3.3")
+    rendered = _row(sec, "extra_billing_share")
+    assert "Share of fees billed above the tariff" in rendered
+    assert display(pins.AMELI_SHARE_ALL, "pct") in rendered
+    assert text.FIXED_RANGE not in rendered
+    assert "a spread in the data, not a bound the study explores" in sec
+
+
+def test_the_extra_billing_note_carries_no_figure_the_marts_do_not_hold():
+    """The note says what the share is, what its range is, what the public
+    insurer does not reimburse and that no formula reads the row — and carries
+    no number, no percentage, no profession's own figure (9i, challenge #2)."""
+    note = text.EXTRA_BILLING_NOTE
+    assert not any(ch.isdigit() for ch in note)
+    assert "%" not in note
+    for said in (
+        "a spread in the data",
+        "lowest and highest family",
+        "reimburses none of the part above the tariff",
+        "No formula reads this row",
+    ):
+        assert said in note
+
+
 def test_the_mean_cell_note_carries_no_figure_the_marts_do_not_hold():
     """The note says only what its two cells show: no typed number, no
     percentage, no decile, no tail clause (pinned decision 3; round 2,
@@ -263,12 +312,17 @@ def test_no_beat3_panel_prints_source_pending(synthetic_db):
     page = _html(synthetic_db)
     for pid in pins.BEAT3_PANELS:
         assert "source pending" not in _section(page, pid), pid
-    for pid in ("B3.1", "B3.2", "B3.3"):
+    for pid in ("B3.1", "B3.2"):
         sec = _section(page, pid)
         assert f"source file {panels.FIT_FILE}" in sec  # a file, not "opened to"
         assert f'href="{panels._FIT_SOURCES[1]}"' in sec  # the Open DAMIR address
+    b33 = _section(page, "B3.3")  # 9i: two files, the fee split beside the fit
+    assert f"source files {panels.FEE_SPLIT_FILE}, {panels.FIT_FILE}" in b33
+    assert f'href="{panels._FIT_SOURCES[1]}"' in b33
+    assert f'href="{panels.AMELI_DATASET_URL}"' in b33  # the data.ameli address
     assert f"source file {panels.MODEL_FILE}" in _section(page, "B3.4")
-    assert (ROOT / panels.FIT_FILE).is_file() and (ROOT / panels.MODEL_FILE).is_file()
+    for rel in (panels.FIT_FILE, panels.FEE_SPLIT_FILE, panels.MODEL_FILE):
+        assert (ROOT / rel).is_file(), rel
 
 
 def test_beat3_renders_numbers_over_a_none_input(none_db):
@@ -379,7 +433,7 @@ def test_rows_render_in_formulas_and_parameters_order(synthetic_db):
     assert list(text.FORMULA_NAMES) == [f.name for f in FORMULAS]
     from models.cost_model import parameters
 
-    in_model = [p.name for p in parameters(read_model_fit())]
+    in_model = [p.name for p in parameters(read_model_inputs())]
     assert list(text.PARAMETER_NAMES) == in_model  # `make model`'s row order
     b33 = _IDENT.findall(_section(page, "B3.3"))[len(pins.BEAT3_HEADLINES) :]
     b34 = _IDENT.findall(_section(page, "B3.4"))

@@ -153,8 +153,16 @@ def test_rows_outside_the_set_is_refused():
             resolve_choice(bad, INPUTS, "none")
 
 
-@pytest.mark.parametrize("target", ["rebuild", "idempotency-check"])
-@pytest.mark.parametrize("var, flag", [("TARGET", "--target"), ("ROWS", "--rows")])
+@pytest.mark.parametrize(
+    "target, var, flag",
+    [
+        ("rebuild", "TARGET", "--target"),
+        ("rebuild", "ROWS", "--rows"),
+        ("idempotency-check", "TARGET", "--target"),
+        ("idempotency-check", "ROWS", "--rows"),
+        ("slice-ameli", "YEAR", "--year"),  # 9i: the one new variable target
+    ],
+)
 def test_pipeline_variables_reach_python_as_one_literal(target, var, flag):
     """Whatever the origin, the recipe carries the UNEXPANDED value as one
     single-quoted token — no shell, no make function runs."""

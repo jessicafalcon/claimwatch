@@ -1,5 +1,6 @@
 """The one process behind `make rebuild|idempotency-check|reset|scrape|
-fetch-damir|sample-damir|fit-damir` (and the other offline targets). It
+fetch-damir|sample-damir|fit-damir|slice-ameli|split-ameli` (and the other
+offline targets). It
 validates every user value against a closed set, derives nothing from it as a
 path, then acts — the settled shape in specs/TEMPLATE.md's Threat model. Make
 passes each value UNEXPANDED and single-quoted via `$(call _Q,$(value VAR))`;
@@ -41,6 +42,16 @@ from ingest.politeness import MAX_PAGES
 from ingest.sources import SOURCES
 from models.cost_model import format_model
 from models.guardrail_sim import format_simulation
+from opendata.fee_split import ARTIFACT as FEE_SPLIT_ARTIFACT
+from opendata.fee_split import FIXTURE_CSV as AMELI_FIXTURE_CSV
+from opendata.fee_split import FIXTURE_DIR as AMELI_FIXTURE_DIR
+from opendata.fee_split import (
+    fixture_year,
+    format_fee_split,
+    read_national_families,
+    write_fee_split,
+)
+from opendata.fee_split import write_fixture as write_ameli_fixture
 from opendata.fetch import FetchError, fetch_month
 from opendata.fit import (
     ARTIFACT,
@@ -57,14 +68,14 @@ from opendata.slice import (
     systematic_sample,
     write_fixture,
 )
-from opendata.sources import cache_path, valid_month
+from opendata.sources import AMELI_EXPORT, cache_path, valid_month, valid_year
 from pipeline.build import (
     FETCHED_SNAPSHOTS,
     INPUTS,
     build_post_classify_marts,
     captures_for,
     idempotency_check,
-    read_model_fit,
+    read_model_inputs,
     rebuild,
     record_snapshots,
     reset,
@@ -564,37 +575,104 @@ def _do_fit_damir(_args: argparse.Namespace) -> int:
     return 0
 
 
-def _do_model(_args: argparse.Namespace) -> int:
-    """Offline, no variable, no warehouse: read the tracked lognormal fit and
-    print the parameter table (each row with its range; a sourced one with its
-    citation), the formula table (each expression beside its value at the
-    defaults, per scenario) and the two crossovers. Writes nothing. Run twice:
-    identical text — nothing on this path reads a clock or a key. A missing fit
-    artifact is a clear message and exit 1, not a traceback."""
+def _do_slice_ameli(args: argparse.Namespace) -> int:
+    """Offline, developer-run: keep one year's four national profession-family
+    rows out of the hand-downloaded data.ameli export and write them as the
+    frozen fixture, re-freezing its MANIFEST. YEAR is a closed `YYYY` shape
+    validated here; it filters rows and never names a path (the export and the
+    fixture paths are constants). No `confirm` gate — it fetches nothing and
+    deletes no data. A missing export is a clear message and exit 1; an export
+    off the declared shape is one refusal line naming what was off, exit 2."""
+    try:
+        year = valid_year(args.year)  # empty / ../x / "; / 1999 -> Refused
+    except ValueError as exc:
+        raise Refused(f"refusing: {exc}") from exc
+    if not AMELI_EXPORT.is_file():
+        print(
+            f"slice-ameli: no export at {_rel(AMELI_EXPORT)} — save the data.ameli "
+            "`honoraires` CSV export (`;`-delimited) from your browser there first "
+            "(developer-run; the host's robots file disallows a fetch)"
+        )
+        return 1
+    try:
+        national = read_national_families(AMELI_EXPORT, year)
+    except ValueError as exc:
+        raise Refused(f"refusing: {exc}") from exc
+    write_ameli_fixture(national.totals, AMELI_FIXTURE_CSV)
+    freeze_manifest(AMELI_FIXTURE_DIR)
+    print(
+        f"slice-ameli: {len(national.totals.families)} national family rows for "
+        f"{year} ({national.dropped} other rows dropped) -> "
+        f"{_rel(AMELI_FIXTURE_CSV)} + MANIFEST.sha256"
+    )
+    return 0
+
+
+def _do_split_ameli(_args: argparse.Namespace) -> int:
+    """Offline, deterministic, no variable: read the frozen data.ameli fixture
+    (its one year read off the file), compute each family's extra-billing share
+    and the all-families share, write the tracked fee-split artifact and print
+    it. Two sums and a division — no key, no clock, no RNG. A missing fixture
+    is a clear message and exit 1; a fixture off its shape is one refusal line."""
+    if not AMELI_FIXTURE_CSV.is_file():
+        print(
+            f"split-ameli: no fixture at {_rel(AMELI_FIXTURE_CSV)} yet — save the "
+            "data.ameli export, then `make slice-ameli YEAR=YYYY` (developer-run)"
+        )
+        return 1
+    try:
+        totals = read_national_families(
+            AMELI_FIXTURE_CSV, fixture_year(AMELI_FIXTURE_CSV)
+        ).totals
+    except ValueError as exc:
+        raise Refused(f"refusing: {exc}") from exc
+    write_fee_split(totals, FEE_SPLIT_ARTIFACT)
+    print(format_fee_split(totals))
+    print(f"fee split written -> {_rel(FEE_SPLIT_ARTIFACT)}")
+    return 0
+
+
+def _missing_artifact(command: str) -> int | None:
+    """The model paths need both tracked artifacts; a missing one is a clear
+    message naming the target that writes it, and exit 1 — not a traceback."""
     if not ARTIFACT.is_file():
         print(
-            f"model: no fit artifact at {_rel(ARTIFACT)} — run `make fit-damir` "
+            f"{command}: no fit artifact at {_rel(ARTIFACT)} — run `make fit-damir` "
             "first (developer-run)"
         )
         return 1
-    print(format_model(read_model_fit()))
+    if not FEE_SPLIT_ARTIFACT.is_file():
+        print(
+            f"{command}: no fee split artifact at {_rel(FEE_SPLIT_ARTIFACT)} — run "
+            "`make split-ameli` first (developer-run)"
+        )
+        return 1
+    return None
+
+
+def _do_model(_args: argparse.Namespace) -> int:
+    """Offline, no variable, no warehouse: read the two tracked artifacts and
+    print the parameter table (each row with its range; a sourced one with its
+    citation), the formula table (each expression beside its value at the
+    defaults, per scenario) and the two crossovers. Writes nothing. Run twice:
+    identical text — nothing on this path reads a clock or a key. A missing
+    artifact is a clear message and exit 1, not a traceback."""
+    if (code := _missing_artifact("model")) is not None:
+        return code
+    print(format_model(read_model_inputs()))
     return 0
 
 
 def _do_simulate(_args: argparse.Namespace) -> int:
-    """Offline, no variable, no warehouse: read the tracked lognormal fit and
+    """Offline, no variable, no warehouse: read the two tracked artifacts and
     print the three rules (each beside its value at the defaults), the SLA
     threshold table (one line per timer day, the default marked) and the hold-day
     summary per fix. Writes nothing. Run twice: identical text — nothing on this
-    path reads a clock or a key. A missing fit artifact is a clear message and
-    exit 1, not a traceback."""
-    if not ARTIFACT.is_file():
-        print(
-            f"simulate: no fit artifact at {_rel(ARTIFACT)} — run `make fit-damir` "
-            "first (developer-run)"
-        )
-        return 1
-    print(format_simulation(read_model_fit()))
+    path reads a clock or a key. A missing artifact is a clear message and exit
+    1, not a traceback."""
+    if (code := _missing_artifact("simulate")) is not None:
+        return code
+    print(format_simulation(read_model_inputs()))
     return 0
 
 
@@ -662,6 +740,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--month", default="")
     p.add_argument("--n", default="")
     sub.add_parser("fit-damir", add_help=False)  # no user variable
+    p = sub.add_parser("slice-ameli", add_help=False)
+    p.add_argument("--year", default="")
+    sub.add_parser("split-ameli", add_help=False)  # no user variable
     sub.add_parser("model", add_help=False)  # no user variable
     sub.add_parser("simulate", add_help=False)  # no user variable
 
@@ -678,6 +759,8 @@ def main(argv: list[str] | None = None) -> int:
         "fetch-damir": _do_fetch_damir,
         "sample-damir": _do_sample_damir,
         "fit-damir": _do_fit_damir,
+        "slice-ameli": _do_slice_ameli,
+        "split-ameli": _do_split_ameli,
         "model": _do_model,
         "simulate": _do_simulate,
     }

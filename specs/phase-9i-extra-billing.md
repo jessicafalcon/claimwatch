@@ -1,4 +1,4 @@
-# Phase 9i — the extra-billing share (PROPOSED)
+# Phase 9i — the extra-billing share
 
 Contract for the `phase-9i-extra-billing` branch. Source: post-plan extension —
 BACKLOG row *data.ameli practitioner-fee distributions are not ingested*
@@ -8,7 +8,7 @@ Phase 9a); PROJECT_BRIEF.md §7 names data.ameli beside Open DAMIR. Depends on
 Phase 9h merged (PR #32) and `fix/foreign-shape-shared-home` (PR #33,
 2026-09-12).
 
-**Status: PROPOSED — do not start until approved.** No new dependencies: the
+**Status: APPROVED 2026-09-12 — in progress.** No new dependencies: the
 reader is stdlib `csv`, the arithmetic is two sums and a division, the rest is
 the existing formulas-as-data path (`models/cost_model.py`,
 `pipeline/build.py::write_model_marts`, `study/panels.py`).

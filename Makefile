@@ -5,8 +5,8 @@
 
 .PHONY: help setup test lint check-docs check-backing check-pins review-gate \
         rebuild idempotency-check confirm reset scrape record-snapshots \
-        label-sample classify-eval fetch-damir sample-damir fit-damir model \
-        simulate study
+        label-sample classify-eval fetch-damir sample-damir fit-damir \
+        slice-ameli split-ameli model simulate study
 
 # User variables reach recipes ONLY as make values via `$(call _Q,$(value VAR))`
 # — UNEXPANDED and single-quoted — so a value like `SPEC='$(shell …)'` or
@@ -37,7 +37,7 @@
 # Goals run in order even under -j: `reset` must not start before `confirm`
 # has stamped (exit pass, security-reviewer #1; pinned by a -j2 probe).
 .NOTPARALLEL:
-unexport SPEC BASE TARGET ROWS SOURCE N MONTH
+unexport SPEC BASE TARGET ROWS SOURCE N MONTH YEAR
 _Q = '$(subst ','\'',$(1))'
 
 help: ## list the targets
@@ -98,6 +98,12 @@ sample-damir: ## draw a representative fixture from a cached DAMIR month into fi
 
 fit-damir: ## fit the lognormal to fixtures/damir and write data/damir/claim_cost_fit.csv (offline, deterministic)
 	uv run python -m pipeline fit-damir
+
+slice-ameli: ## keep one year's four national family rows of the hand-downloaded data.ameli export (data/cache/ameli/honoraires.csv) as fixtures/ameli [YEAR=YYYY] (offline, developer-run)
+	uv run python -m pipeline slice-ameli --year=$(call _Q,$(value YEAR))
+
+split-ameli: ## compute the extra-billing share from fixtures/ameli and write data/ameli/fee_split.csv (offline, deterministic)
+	uv run python -m pipeline split-ameli
 
 model: ## print the cost model — parameters, formulas beside their values, the two crossovers (offline, no variable, writes nothing)
 	uv run python -m pipeline model

@@ -27,8 +27,9 @@ from classify.eval.gate import ANSWER_KEY
 from classify.labels import POSITIVE, THEMES, UNCLASSIFIED
 from models.cost_model import FORMULAS, SCENARIOS, Formula, rounded
 from models.guardrail_sim import SIM_SCENARIOS
+from opendata.fee_split import ARTIFACT as FEE_SPLIT_ARTIFACT
 from opendata.fit import ARTIFACT
-from opendata.sources import DATASET_API
+from opendata.sources import AMELI_DATASET_URL, DATASET_API
 from pipeline.build import INPUTS
 from pipeline.warehouse import ROOT, default_schema
 from study import text
@@ -882,6 +883,10 @@ _SOURCINGS: tuple[Sourcing, ...] = ("sourced", "unsourced")
 FIT_FILE = str(ARTIFACT.relative_to(ROOT))
 MODEL_FILE = "models/cost_model.py"
 _FIT_SOURCES = (FIT_FILE, DATASET_API)
+# B3.3 alone also names the fee-split artifact and the data.ameli table it was
+# read from (9i): the extra-billing row is its row, no other panel's.
+FEE_SPLIT_FILE = str(FEE_SPLIT_ARTIFACT.relative_to(ROOT))
+_B33_SOURCES = (*_FIT_SOURCES, FEE_SPLIT_FILE, AMELI_DATASET_URL)
 # The scenario B3.1–B3.3 read; the three toggled scenarios are Beat 4's (9d).
 BASELINE = "baseline"
 
@@ -1216,15 +1221,17 @@ def beat3_panels(conn) -> list[Panel]:
             blurb=(
                 "The inputs anchored to public figures — revenue, members, the "
                 "fraud pool, refunds paid, and the typical size of a claim — each "
-                "shown with the public figure behind it and the range the study "
-                "explores. The headline figures above the rows are derived from "
-                "these inputs, at the defaults."
+                "shown with the public figure behind it and, for the inputs the "
+                "formulas read, the range the study explores. One row is a "
+                "spread, not an input: the share of fees billed above the public "
+                "tariff. The headline figures above the rows are derived from "
+                "the inputs, at the defaults."
             ),
             tag="Modeled",
             kind="parameters",
             headline=_headline_rows(formulas),
             series=_parameter_rows(conn, "sourced", "B3.3"),
-            sources=_FIT_SOURCES,
+            sources=_B33_SOURCES,
             notes=(
                 "Each range is shown as a fixed mark, not a slider you drag: low, "
                 "default and high come from the model’s own table, so a reader "
@@ -1234,9 +1241,13 @@ def beat3_panels(conn) -> list[Panel]:
                 "fact.",
                 "Stated here: the four scale anchors are public disclosures cited "
                 "second-hand from the project brief, each a floor; the fit rows "
-                "span the fit plus and minus two standard errors, and the median "
-                "and mean cells are read figures with no range of their own.",
+                "span the fit plus and minus two standard errors; the median and "
+                "mean cells are read figures with no range of their own; the "
+                "extra-billing row’s low and high are the lowest and highest "
+                "profession family — a spread in the data, not a bound the study "
+                "explores.",
                 text.MEAN_CELL_NOTE,
+                text.EXTRA_BILLING_NOTE,
             ),
         ),
         Panel(

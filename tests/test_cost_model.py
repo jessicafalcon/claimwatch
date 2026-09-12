@@ -16,8 +16,10 @@ from models.cost_model import (
     FORMULAS,
     POINT_FORMULAS,
     SCENARIOS,
+    FeeSplit,
     Fit,
     Formula,
+    ModelInputs,
     Parameter,
     _apply_scenario,
     _crossover,
@@ -26,18 +28,27 @@ from models.cost_model import (
     curves,
     defaults,
     evaluate,
+    fee_split_parameters,
     fit_parameters,
     format_model,
     parameters,
 )
 from tests import pins
 
-FIT = Fit(
-    mu=pins.DAMIR_MU,
-    sigma=pins.DAMIR_SIGMA,
-    n=pins.DAMIR_N,
-    emp_p50=pins.DAMIR_EMP_P50,
-    emp_mean=pins.DAMIR_EMP_MEAN,
+FIT = ModelInputs(
+    fit=Fit(
+        mu=pins.DAMIR_MU,
+        sigma=pins.DAMIR_SIGMA,
+        n=pins.DAMIR_N,
+        emp_p50=pins.DAMIR_EMP_P50,
+        emp_mean=pins.DAMIR_EMP_MEAN,
+    ),
+    fee_split=FeeSplit(
+        year=pins.AMELI_YEAR,
+        share=pins.AMELI_SHARE_ALL,
+        low=pins.AMELI_SHARE_RANGE[0],
+        high=pins.AMELI_SHARE_RANGE[1],
+    ),
 )
 
 
@@ -198,7 +209,7 @@ def test_fit_parameters_are_the_four_read_rows_two_of_them_fixed_marks():
     """The fit supplies four sourced rows in order — mu, sigma, emp_p50,
     emp_mean — each cited to the artifact; the two cells read off the sample
     are fixed marks (low == default == high), the two log-moments are not."""
-    rows = fit_parameters(FIT)
+    rows = fit_parameters(FIT.fit)
     assert tuple(p.name for p in rows) == ("mu", "sigma", "emp_p50", "emp_mean")
     for p in rows:
         assert p.sourcing == "sourced" and "claim_cost_fit.csv" in p.citation
@@ -207,6 +218,30 @@ def test_fit_parameters_are_the_four_read_rows_two_of_them_fixed_marks():
     emp_mean = rows[-1]
     assert emp_mean.default == round(pins.DAMIR_EMP_MEAN, 2) and emp_mean.unit == "€"
     assert [p.name for p in parameters(FIT)][4:8] == [p.name for p in rows]
+
+
+def test_extra_billing_share_row_spans_the_family_extremes_and_no_formula_reads_it():
+    """9i, invariants 2 and 5: the fee-split row sits right after the four fit
+    rows — sourced, cited to its artifact and year, a percentage-kind rate —
+    with its default the all-families share and its low/high the lowest and
+    highest family share (a spread, not a fixed mark); the weighted share lies
+    between the extremes, so `check_parameter` holds unchanged; no formula's
+    expression names it, and every pinned output is what it was."""
+    (row,) = fee_split_parameters(FIT.fee_split)
+    assert row.name == "extra_billing_share" and row.sourcing == "sourced"
+    assert "fee_split.csv" in row.citation and str(pins.AMELI_YEAR) in row.citation
+    assert row.default == pins.AMELI_SHARE_ALL
+    assert (row.low, row.high) == pins.AMELI_SHARE_RANGE
+    assert row.low < row.default < row.high  # a spread, not a fixed mark
+    names = [p.name for p in parameters(FIT)]
+    assert names.index("extra_billing_share") == names.index("emp_mean") + 1
+    assert names.index("extra_billing_share") + 1 == names.index("flag_rate")
+    assert not any("extra_billing_share" in f.expression for f in FORMULAS)
+    assert "extra_billing_share" not in {f.name for f in FORMULAS}
+    values = defaults(FIT)
+    for scenario in SCENARIOS:
+        assert evaluate(values, scenario) == pins.COST_OUTPUTS[scenario]
+    assert "extra_billing_share" in format_model(FIT)
 
 
 def test_claims_at_mean_cell_is_the_division_by_hand():

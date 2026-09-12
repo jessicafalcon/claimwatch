@@ -54,6 +54,7 @@ from ingest.sources import (
     sample_source,
 )
 from models import cost_model, guardrail_sim
+from opendata.fee_split import read_fee_split
 from opendata.fit import read_fit
 from pipeline import warehouse
 from pipeline.warehouse import ROOT, connect
@@ -847,26 +848,47 @@ def write_classifier_quality(
 _MODEL_TAG = "Modeled"
 
 
-def read_model_fit(path: Path | None = None) -> cost_model.Fit:
-    """Read the tracked lognormal fit and shape it into the cost model's `Fit`:
-    the two log-moments, the sample size behind them, the median cell
-    (`emp_p50`) and the sample's mean cell (`emp_mean`, 9h). This is the one
-    place the artifact is read for the model — the
-    caller hands the result to `write_model_marts`, so `models/` reads no file.
-    A malformed or unreadable artifact (a hand-corrupted tracked file) is refused
-    as a `PageShapeError`, so the `model` and `rebuild` CLI paths print one line
-    and exit 2 rather than a traceback; `path` lets a test exercise that."""
+def read_model_inputs(
+    fit_path: Path | None = None, fee_split_path: Path | None = None
+) -> cost_model.ModelInputs:
+    """Read the two tracked open-data artifacts and shape them into the cost
+    model's `ModelInputs`: the lognormal fit (the two log-moments, the sample
+    size behind them, the median cell `emp_p50` and the sample's mean cell
+    `emp_mean`, 9h) and the data.ameli fee split (the year, the all-families
+    extra-billing share and the lowest and highest family share, 9i). This is
+    the one place either artifact is read for the model — the caller hands the
+    result to the mart writers, so `models/` reads no file. A malformed or
+    unreadable artifact (a hand-corrupted tracked file) is refused as a
+    `PageShapeError`, so the `model`, `simulate` and `rebuild` CLI paths print
+    one line and exit 2 rather than a traceback; the paths let a test exercise
+    that."""
     try:
-        fit, gof = read_fit() if path is None else read_fit(path)
+        fit, gof = read_fit() if fit_path is None else read_fit(fit_path)
     except (ValueError, OSError) as exc:
         raise PageShapeError(f"the fit artifact is unreadable: {exc}") from exc
+    try:
+        totals = (
+            read_fee_split()
+            if fee_split_path is None
+            else read_fee_split(fee_split_path)
+        )
+    except (ValueError, OSError) as exc:
+        raise PageShapeError(f"the fee split artifact is unreadable: {exc}") from exc
     emp_p50 = next(d.empirical for d in gof if d.decile == 50)
-    return cost_model.Fit(
-        mu=fit.mu, sigma=fit.sigma, n=fit.n, emp_p50=emp_p50, emp_mean=fit.emp_mean
+    return cost_model.ModelInputs(
+        fit=cost_model.Fit(
+            mu=fit.mu, sigma=fit.sigma, n=fit.n, emp_p50=emp_p50, emp_mean=fit.emp_mean
+        ),
+        fee_split=cost_model.FeeSplit(
+            year=totals.year,
+            share=totals.share_all,
+            low=totals.lowest_share,
+            high=totals.highest_share,
+        ),
     )
 
 
-def write_model_marts(conn, fit: cost_model.Fit, run_id: str) -> None:
+def write_model_marts(conn, inputs: cost_model.ModelInputs, run_id: str) -> None:
     """Fill the three cost-model marts (B3.1–B3.4) from `models/cost_model.py` —
     the one place the formulas and parameters are written. Every number is a
     `FORMULAS` callable evaluated over the parameters or a `PARAMETERS` cell; no
@@ -875,7 +897,7 @@ def write_model_marts(conn, fit: cost_model.Fit, run_id: str) -> None:
     `run_id` is provenance (in no key or sort) and the Modeled tag is stamped.
     `rebuild()` calls this after `build_derived` on every input, so every caller
     sees filled marts."""
-    params = cost_model.parameters(fit)
+    params = cost_model.parameters(inputs)
     values = {p.name: p.default for p in params}
     conn.execute("begin transaction")
     try:
@@ -983,7 +1005,7 @@ def _insert_rows(conn, table: str, columns: str, rows: list[list]) -> None:
         )
 
 
-def write_sim_marts(conn, fit: cost_model.Fit, run_id: str) -> None:
+def write_sim_marts(conn, inputs: cost_model.ModelInputs, run_id: str) -> None:
     """Fill the two simulator marts (B4.1–B4.3) from models/guardrail_sim.py — the
     one place the draw, the hold and the share-under count are written; the
     threshold itself is the cost model's formula, read at baseline. Every number
@@ -993,7 +1015,7 @@ def write_sim_marts(conn, fit: cost_model.Fit, run_id: str) -> None:
     rows in scenario / rank and day order, so a re-run is byte-identical.
     `rebuild()` calls this after write_model_marts on every input, so every caller
     sees filled marts."""
-    params = cost_model.defaults(fit)
+    params = cost_model.defaults(inputs)
     sim_rows = [
         [
             row["scenario"],
@@ -1458,9 +1480,9 @@ def rebuild(
         # step — they compute over the tracked fit, so they fill inside rebuild()
         # on every input, and idempotency-check (which calls rebuild() only) sees
         # them. One read of the fit feeds both writers.
-        fit = read_model_fit()
-        write_model_marts(conn, fit, run_id or "model")
-        write_sim_marts(conn, fit, run_id or "model")
+        inputs = read_model_inputs()
+        write_model_marts(conn, inputs, run_id or "model")
+        write_sim_marts(conn, inputs, run_id or "model")
         # The repo facts (B5.1) are constant on any input and need no key, no
         # reviews and no classify step, so they fill here beside the model marts —
         # on every ROWS input, none included, and covered by idempotency-check.
