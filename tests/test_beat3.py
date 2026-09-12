@@ -186,6 +186,40 @@ def test_b3_3_shows_the_derived_headline_figures_from_the_outputs_mart(synthetic
     assert ">€494.45<" in sec and ">707,858<" in sec
 
 
+def test_b3_3_prints_the_mean_cell_count_beside_the_claim_count(synthetic_db):
+    """9h: the fourth headline row is the claim count at the sample's mean cell,
+    right after the claim volume, read from the outputs mart; the note names
+    the two means and their direction; the mean cell is a fixed mark among the
+    sourced rows."""
+    b33 = _panel(synthetic_db, "B3.3")
+    keys = [s.key for s in b33.headline]
+    assert keys.index("claims_at_mean_cell") == keys.index("claims") + 1
+    contrast = next(s for s in b33.headline if s.key == "claims_at_mean_cell")
+    (cell,) = contrast.points
+    assert cell.value == pins.COST_OUTPUTS["baseline"]["claims_at_mean_cell"]
+    assert cell.tag == pins.COST_MODELED_TAG
+    assert text.MEAN_CELL_NOTE in b33.notes
+    sec = _section(_html(synthetic_db), "B3.3")
+    assert sec.index(">707,858<") < sec.index(">412,935<")
+    assert "Claims per year at the mean cell" in sec
+    assert "the count computed from it is the lower of the two" in sec
+    for key in pins.BEAT3_FIXED_PARAMETERS:
+        fixed = next(s for s in b33.series if s.key == key)
+        assert len({p.value for p in fixed.points}) == 1
+        assert text.FIXED_RANGE in _row(sec, key)
+
+
+def test_the_mean_cell_note_carries_no_figure_the_marts_do_not_hold():
+    """The note says only what its two cells show: no typed number, no
+    percentage, no decile, no tail clause (pinned decision 3; round 2,
+    functionality-tester's surviving mutation)."""
+    note = text.MEAN_CELL_NOTE
+    assert not any(ch.isdigit() for ch in note)
+    for banned in ("%", "decile", "tail", "weight", "largest"):
+        assert banned not in note
+    assert "the lower of the two" in note
+
+
 def test_b3_3_and_b3_4_render_every_parameter_with_default_unit_and_range(
     synthetic_db,
 ):

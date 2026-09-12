@@ -157,8 +157,12 @@ climbs; friction cost rises with the false positives that same rate creates.
   positives, fraud saved, friction cost, and the net — each formula shown beside
   the value it produces. The hold timer's three formulas (the loop length, the
   friction per day, and the threshold amount) print in the same list, used by
-  Beat 4 at the defaults. The list is the baseline scenario; the three toggled
-  scenarios are B4.1's. Tag: *Modeled*.
+  Beat 4 at the defaults, and so does the contrast count — claims per year at
+  the sample's own mean reimbursement cell (each cell an aggregated total for
+  a group of claims in the open DAMIR data), the same division as the claim
+  volume over the plain average of the cells, used by nothing downstream. The
+  list is the baseline scenario; the three toggled scenarios are B4.1's. Tag:
+  *Modeled*.
 - **B3.2 — The crossover chart.** Fraud euros saved and friction euros cost, both
   as curves over the flag rate, with a "you are here" marker. Where the two
   curves cross, the flagging as a whole starts to cost more than it recovers.
@@ -173,9 +177,12 @@ climbs; friction cost rises with the false positives that same rate creates.
 - **B3.3 — The sourced defaults.** The parameters anchored to public figures —
   revenue per member (~€800/year), the fraud pool (a published savings figure as
   a lower bound), and claim volume derived from published refund totals and open
-  reimbursement distributions. The three headline figures — revenue per
-  member, the mean claim, the claim volume — are derived from these inputs and
-  shown above the parameter rows. Tag: *Modeled*, each default cited.
+  reimbursement distributions. The headline figures — revenue per member, the
+  mean claim, the claim volume and, beside the volume, the claim count at the
+  sample's mean reimbursement cell — are derived from these inputs and shown
+  above the parameter rows; the note beneath says which of the two means is
+  the larger and so which count is the lower. Tag: *Modeled*, each default
+  cited.
 - **B3.4 — The declared-unsourced parameters.** The parameters with no public
   source — the false-positive share, the churn probability, contacts per stuck
   claim, the flag rate, how quickly extra flags stop catching new fraud, and the

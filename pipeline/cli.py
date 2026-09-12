@@ -527,10 +527,11 @@ def _do_sample_damir(args: argparse.Namespace) -> int:
 
 def _do_fit_damir(_args: argparse.Namespace) -> int:
     """Offline, deterministic: fit a lognormal to the frozen DAMIR fixture and
-    write the tracked fit artifact (mu, sigma, n + the goodness-of-fit deciles)
-    Phase 8 reads. Closed-form arithmetic, no key, no clock, no RNG — the same
-    fixture always gives the same numbers. Prints the fit and the fit-vs-real
-    table. A missing fixture is a clear message and exit 1, not a traceback."""
+    write the tracked fit artifact (mu, sigma, n, the goodness-of-fit deciles
+    and the sample mean cell) Phase 8 reads. Closed-form arithmetic, no key, no
+    clock, no RNG — the same fixture always gives the same numbers. Prints the
+    fit and the fit-vs-real table. A missing fixture is a clear message and
+    exit 1, not a traceback."""
     if not FIXTURE_CSV.is_file():
         print(
             f"fit-damir: no fixture at {_rel(FIXTURE_CSV)} yet — run "

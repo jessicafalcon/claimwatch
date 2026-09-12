@@ -85,7 +85,11 @@ on that with arithmetic printed in full, so anyone can redo it by hand.
   flagged; where they cross, the next flag destroys more than it recovers
   *(Modeled — B3.2)*.
 - The sourced inputs — revenue per member, the fraud pool, claim volume — each
-  shown with its source *(Modeled — B3.3)*.
+  shown with its source; the claim volume the study uses comes from the
+  average claim size the fitted curve gives, and beside it the page shows a
+  second, lower count a reader gets by dividing instead by the plain average
+  of the public reimbursement totals (each a grouped figure in the open data),
+  so that recompute is on the page to check *(Modeled — B3.3)*.
 - The parameters with no public source, drawn on a differently-styled range and
   labelled "explore the range" *(Modeled — B3.4)*.
 
@@ -123,7 +127,7 @@ sits only at the edges, in one narrow place, never trusted on its own. Three
 facts you can check in the code:
 
 - A language model makes a decision in exactly **1** place *(Measured — B5.1)*.
-- **14** cost-model formulas are printed next to the numbers they produce
+- **15** cost-model formulas are printed next to the numbers they produce
   *(Measured — B5.1)*.
 - Every number in the study wears one of **4** evidence tags *(Measured — B5.1)*.
 

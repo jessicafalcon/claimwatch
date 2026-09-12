@@ -15,7 +15,11 @@ from models import guardrail_sim as gs
 from tests import pins
 
 FIT = cost_model.Fit(
-    mu=pins.DAMIR_MU, sigma=pins.DAMIR_SIGMA, n=pins.DAMIR_N, emp_p50=pins.DAMIR_EMP_P50
+    mu=pins.DAMIR_MU,
+    sigma=pins.DAMIR_SIGMA,
+    n=pins.DAMIR_N,
+    emp_p50=pins.DAMIR_EMP_P50,
+    emp_mean=pins.DAMIR_EMP_MEAN,
 )
 
 

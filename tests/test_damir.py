@@ -15,12 +15,15 @@ import pytest
 
 import pipeline.cli as cli
 from opendata.fit import (
+    FIT_FIELD_NAMES,
     fit_lognormal,
+    format_fit,
     goodness_of_fit,
     read_fit,
     write_fit,
 )
 from opendata.slice import (
+    DECIMAL_SHAPE,
     FIXTURE_CSV,
     freeze_manifest,
     parse_amount,
@@ -144,6 +147,23 @@ def test_parse_amount_keeps_only_positive_numbers():
         assert parse_amount(j) is None, j
 
 
+def test_decimal_shape_is_the_one_numeric_shape_both_readers_use(tmp_path):
+    """The amount reader and the fit-artifact reader accept one decimal shape:
+    the exotic float() forms parse_amount refuses are refused by the artifact
+    reader too, by name (9h round 2, code-reviewer #1)."""
+    assert DECIMAL_SHAPE.fullmatch("12.50") and DECIMAL_SHAPE.fullmatch("-0.5")
+    lines = _valid_fit_file(tmp_path).read_text(encoding="utf-8").splitlines()
+    for exotic in ("1e5", "1_000", "1.5e3", "0x10", "+3", " 3", "nan", "inf"):
+        p = tmp_path / "exotic.csv"
+        p.write_text(
+            "\n".join(f"mu,{exotic}" if x.startswith("mu,") else x for x in lines)
+            + "\n",
+            "utf-8",
+        )
+        with pytest.raises(ValueError, match="mu"):
+            read_fit(p)
+
+
 def test_amount_domain_guard_drops_and_counts(tmp_path):
     """A slice with a blank amount, text, zero, a negative, a supplementary-part
     type (>= 2) and a blank type keeps only the positive legal-type rows and
@@ -256,7 +276,7 @@ def test_write_fit_is_byte_identical_on_rerun(tmp_path):
     assert a.read_bytes() == b.read_bytes()
 
 
-def test_artifact_carries_mu_sigma_n_and_deciles(tmp_path):
+def test_artifact_carries_mu_sigma_n_deciles_and_the_mean(tmp_path):
     amounts = [float(x) for x in range(1, 201)]
     fit = fit_lognormal(amounts)
     gof = goodness_of_fit(amounts, fit)
@@ -266,6 +286,70 @@ def test_artifact_carries_mu_sigma_n_and_deciles(tmp_path):
     assert text.startswith("name,value\n")
     for name in ("mu,", "sigma,", "n,", "emp_p50,", "fit_p50,"):
         assert name in text
+    assert text.endswith("emp_mean,100.500000\n")  # the last row, six places
+
+
+def test_format_fit_prints_the_mean_cell_beside_the_parameters():
+    """The `make fit-damir` summary prints the sample mean at the parameters'
+    six places, labelled as no fit, beside mu and sigma — what the artifact
+    carries is what the screen says."""
+    amounts = [float(x) for x in range(1, 201)]
+    fit = fit_lognormal(amounts)
+    out = format_fit(fit, goodness_of_fit(amounts, fit))
+    lines = out.splitlines()
+    assert lines[0] == "lognormal fit over 200 DAMIR reimbursed amounts (PRS_REM_MNT):"
+    assert lines[1].startswith(f"  mu    = {fit.mu:.6f}")
+    assert lines[2].startswith(f"  sigma = {fit.sigma:.6f}")
+    assert lines[3].startswith("  mean  = 100.500000   (arithmetic mean")
+    assert "no fit" in lines[3]
+
+
+def test_fit_field_names_is_the_write_order(tmp_path):
+    """The one closed name set: the writer emits exactly FIT_FIELD_NAMES in that
+    order, so the reader (which requires the set) and the tracked-files test
+    (which reads it) cannot drift from what the file carries."""
+    import csv as _csv
+
+    amounts = [float(x) for x in range(1, 201)]
+    fit = fit_lognormal(amounts)
+    out = tmp_path / "fit.csv"
+    write_fit(fit, goodness_of_fit(amounts, fit), out)
+    with out.open(encoding="utf-8", newline="") as fh:
+        rows = list(_csv.reader(fh))
+    assert rows[0] == ["name", "value"]
+    assert tuple(name for name, _value in rows[1:]) == FIT_FIELD_NAMES
+    assert FIT_FIELD_NAMES[:3] == ("mu", "sigma", "n")
+    assert FIT_FIELD_NAMES[-1] == "emp_mean"
+
+
+def test_mean_cell_recomputed_by_hand():
+    """The mean the artifact carries is the plain arithmetic mean of the kept
+    fixture amounts — sum over count, no fit involved — at the six places the
+    writer uses (a reader's spreadsheet figure, invariant 2)."""
+    if not FIXTURE_CSV.is_file():
+        pytest.skip("fixtures/damir/ not built yet")
+    from tests import pins
+
+    amounts = read_amounts(FIXTURE_CSV).values
+    by_hand = round(sum(amounts) / len(amounts), 6)
+    assert by_hand == pins.DAMIR_EMP_MEAN
+    assert round(fit_lognormal(amounts).emp_mean, 6) == by_hand
+    fit, _gof = read_fit()
+    assert fit.emp_mean == pins.DAMIR_EMP_MEAN
+
+
+def test_the_old_rows_are_a_byte_prefix_of_the_new_artifact():
+    """Invariant 1: the committed artifact is the pre-9h file plus one last
+    line, so every value the file carried before keeps its bytes."""
+    import hashlib
+
+    from opendata.fit import ARTIFACT
+    from tests import pins
+
+    data = ARTIFACT.read_bytes()
+    head, last = data.rstrip(b"\n").rsplit(b"\n", 1)
+    assert last.startswith(b"emp_mean,")
+    assert hashlib.sha256(head + b"\n").hexdigest() == pins.DAMIR_FIT_PRE_9H_SHA256
 
 
 def test_fixture_round_trips_through_the_same_reader(tmp_path):
@@ -408,6 +492,7 @@ def test_read_fit_returns_the_pinned_fit():
     assert round(fit.mu, 6) == pins.DAMIR_MU
     assert round(fit.sigma, 6) == pins.DAMIR_SIGMA
     assert fit.n == pins.DAMIR_N
+    assert fit.emp_mean == pins.DAMIR_EMP_MEAN
     assert next(d.empirical for d in gof if d.decile == 50) == pins.DAMIR_EMP_P50
 
 
@@ -424,8 +509,8 @@ def test_read_fit_refuses_unknown_missing_or_non_numeric_names(tmp_path):
         read_fit(missing)
 
     added = tmp_path / "added.csv"
-    added.write_text("\n".join(lines) + "\nmean,42.0\n", "utf-8")
-    with pytest.raises(ValueError, match="mean"):
+    added.write_text("\n".join(lines) + "\nstray,42.0\n", "utf-8")
+    with pytest.raises(ValueError, match="stray"):
         read_fit(added)
 
     nonnum = tmp_path / "nonnum.csv"
@@ -463,6 +548,87 @@ def test_read_fit_refuses_duplicate_oversized_and_bad_n(tmp_path):
     )
     with pytest.raises(ValueError, match="over the"):
         read_fit(oversized)
+
+
+def test_read_fit_refuses_an_artifact_without_the_mean(tmp_path):
+    """Invariant 7: a pre-9h-shaped artifact (no emp_mean row) refuses by name —
+    never the lognormal mean in its place, never a silent default."""
+    lines = _valid_fit_file(tmp_path).read_text(encoding="utf-8").splitlines()
+    old_shape = tmp_path / "old.csv"
+    old_shape.write_text(
+        "\n".join(x for x in lines if not x.startswith("emp_mean,")) + "\n", "utf-8"
+    )
+    with pytest.raises(ValueError, match="emp_mean"):
+        read_fit(old_shape)
+
+
+def test_read_fit_refuses_a_non_positive_mean(tmp_path):
+    """emp_mean is a divisor (claims at the mean cell) that the model rounds to
+    cents first: zero, negative, non-finite and sub-cent values refuse by name
+    rather than reaching the model as a ZeroDivisionError or a negative count
+    (a sub-cent value passed a plain `> 0` guard — round 1, security #1)."""
+    lines = _valid_fit_file(tmp_path).read_text(encoding="utf-8").splitlines()
+    for bad in ("0", "-12.5", "inf", "nan", "0.004"):
+        p = tmp_path / f"mean_{bad}.csv"
+        p.write_text(
+            "\n".join(
+                f"emp_mean,{bad}" if x.startswith("emp_mean,") else x for x in lines
+            )
+            + "\n",
+            "utf-8",
+        )
+        with pytest.raises(ValueError, match="emp_mean"):
+            read_fit(p)
+
+
+def test_read_fit_refusals_cap_the_echoed_token(tmp_path):
+    """A refusal names the field and shows the foreign token cut to a few
+    dozen characters: a corrupted cell or name of thousands of characters
+    never lands whole on the refusal line (round 1, security #3)."""
+    lines = _valid_fit_file(tmp_path).read_text(encoding="utf-8").splitlines()
+    long = "x" * 5000
+    big_value = tmp_path / "big_value.csv"
+    big_value.write_text(
+        "\n".join(f"mu,{long}" if x.startswith("mu,") else x for x in lines) + "\n",
+        "utf-8",
+    )
+    with pytest.raises(ValueError, match="mu") as exc:
+        read_fit(big_value)
+    assert len(str(exc.value)) < 200 and "5000 chars" in str(exc.value)
+    big_name = tmp_path / "big_name.csv"
+    big_name.write_text("\n".join(lines) + f"\n{long},1\n", "utf-8")
+    with pytest.raises(ValueError, match="not in the fit artifact") as exc:
+        read_fit(big_name)
+    assert len(str(exc.value)) < 200
+    astral = "\U0001f600" * 5000  # each escapes to ten printed characters
+    wide = tmp_path / "wide.csv"
+    wide.write_text(
+        "\n".join(f"mu,{astral}" if x.startswith("mu,") else x for x in lines) + "\n",
+        "utf-8",
+    )
+    with pytest.raises(ValueError, match="mu") as exc:
+        read_fit(wide)
+    assert len(str(exc.value)) < 200  # the cap is on printed characters
+    many = tmp_path / "many.csv"
+    many.write_text(
+        "\n".join(lines) + "\n" + "\n".join(f"stray{i},1" for i in range(3000)) + "\n",
+        "utf-8",
+    )
+    with pytest.raises(ValueError, match="and 2997 more") as exc:
+        read_fit(many)
+    assert len(str(exc.value)) < 200  # a list of strays is counted, not listed
+
+
+def test_read_fit_is_order_independent(tmp_path):
+    """read_fit keys on names, not position: a valid artifact with its rows
+    shuffled reads to the same Fit and deciles (the writer's order is pinned
+    separately by test_fit_field_names_is_the_write_order; round 1,
+    functionality-tester coverage note)."""
+    ordered = _valid_fit_file(tmp_path)
+    header, *rows = ordered.read_text(encoding="utf-8").splitlines()
+    shuffled = tmp_path / "shuffled.csv"
+    shuffled.write_text("\n".join([header, *reversed(rows)]) + "\n", "utf-8")
+    assert read_fit(shuffled) == read_fit(ordered)
 
 
 def test_read_fit_refuses_a_negative_sigma(tmp_path):

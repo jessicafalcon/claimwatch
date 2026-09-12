@@ -958,8 +958,9 @@ def _formula_rows(conn, scenario: str, panel_id: str) -> tuple[Series, ...]:
 
 
 def _headline_rows(formula_rows: tuple[Series, ...]) -> tuple[Series, ...]:
-    """B3.3's three derived headline figures (BACKING: revenue per member, the
-    mean claim, the claim volume) — the baseline formula rows of those names.
+    """B3.3's derived headline figures (BACKING: revenue per member, the mean
+    claim, the claim volume; from 9h the claim count at the sample's mean cell
+    beside the volume) — the baseline formula rows of those names.
     Filters the B3.1 rows the panel build already read, so the outputs mart is
     read once, not once more for the headline (round 1, code-reviewer #6)."""
     return tuple(s for s in formula_rows if s.key in text.HEADLINE_FORMULAS)
@@ -1216,8 +1217,8 @@ def beat3_panels(conn) -> list[Panel]:
                 "The inputs anchored to public figures — revenue, members, the "
                 "fraud pool, refunds paid, and the typical size of a claim — each "
                 "shown with the public figure behind it and the range the study "
-                "explores. The three headline figures above the rows are derived "
-                "from these inputs, at the defaults."
+                "explores. The headline figures above the rows are derived from "
+                "these inputs, at the defaults."
             ),
             tag="Modeled",
             kind="parameters",
@@ -1234,7 +1235,8 @@ def beat3_panels(conn) -> list[Panel]:
                 "Stated here: the four scale anchors are public disclosures cited "
                 "second-hand from the project brief, each a floor; the fit rows "
                 "span the fit plus and minus two standard errors, and the median "
-                "cell is a read figure with no range of its own.",
+                "and mean cells are read figures with no range of their own.",
+                text.MEAN_CELL_NOTE,
             ),
         ),
         Panel(

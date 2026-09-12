@@ -562,18 +562,23 @@ def test_the_only_tracked_files_under_data_are_hand_read_snapshot_csvs():
     assert paths, "the hand-read file is tracked"
 
     # Phase 7b: the DAMIR fit artifact is the one tracked non-snapshot file. It is
-    # numbers-only — a `name,value` table of the lognormal fit (mu/sigma/n) and the
-    # goodness-of-fit deciles — so it carries no brand and no personal data. Names
-    # are pinned to the EXACT closed set write_fit emits (not a `emp_p*` prefix),
-    # so nothing arbitrary can ride in the name field either (round 1, sec #3).
-    from opendata.fit import DECILES
+    # numbers-only — a `name,value` table of the lognormal fit (mu/sigma/n), the
+    # goodness-of-fit deciles and the sample mean (9h) — so it carries no brand
+    # and no personal data. Names are pinned to the EXACT closed set write_fit
+    # emits (not a `emp_p*` prefix), so nothing arbitrary can ride in the name
+    # field either (round 1, sec #3); the set is the writer's own FIT_FIELD_NAMES
+    # tuple, which stays closed because the writer emits exactly it
+    # (tests/test_damir.py::test_fit_field_names_is_the_write_order) — a
+    # hand-typed copy here would only drift (9h challenge round 1, #2). So the
+    # name check is a consistency check; the guard that keeps a brand or a
+    # person out of the tracked file is the trio below it — every value parses
+    # as a number, every row is exactly two cells, and the file's bytes are
+    # pinned (test_artifact_equals_recompute, the byte-prefix pin) — not the
+    # name set (9h review round 1, security-reviewer #2).
+    from opendata.fit import FIT_FIELD_NAMES
 
     DAMIR_FIT = "data/damir/claim_cost_fit.csv"
-    fit_names = (
-        {"mu", "sigma", "n"}
-        | {f"emp_p{d}" for d in DECILES}
-        | {f"fit_p{d}" for d in DECILES}
-    )
+    fit_names = set(FIT_FIELD_NAMES)
     for rel in paths:
         if rel == DAMIR_FIT:
             with (root / rel).open(encoding="utf-8", newline="") as fh:

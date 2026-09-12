@@ -360,6 +360,15 @@ DAMIR_N = 5000
 # The median DAMIR cell (emp_p50), read back by opendata.fit.read_fit and the
 # contrast printed beside mean_claim in the cost model.
 DAMIR_EMP_P50 = 49.76
+# Phase 9h: the sample's arithmetic mean cell (emp_mean), sum over count of the
+# kept fixture amounts at six places — no fit involved; the artifact's last row
+# and the divisor of claims_at_mean_cell. A spreadsheet reader gets this figure.
+DAMIR_EMP_MEAN = 847.590174
+# The sha256 of the artifact as committed before 9h (mu, sigma, n, the deciles):
+# the new file is exactly that plus the emp_mean line (invariant 1).
+DAMIR_FIT_PRE_9H_SHA256 = (
+    "fe7da19a3cf97c9d59f7b809522269c09acebc60ed3a9565e54f168c9c104ec5"
+)
 
 # --- Phase 8a: the cost model (Beat 3) ---------------------------------------
 # Every number below is typed from the built output of models/cost_model.py over
@@ -369,10 +378,10 @@ DAMIR_EMP_P50 = 49.76
 # places, counts to whole (the one rounding site). Only friction_cost and net
 # move with a scenario; every other point output is scenario-invariant.
 COST_MODELED_TAG = "Modeled"
-COST_PARAM_ROWS = 15  # 4 scale + 3 fit + 6 knobs + 2 timer knobs (8b)
+COST_PARAM_ROWS = 16  # 4 scale + 4 fit (emp_mean, 9h) + 6 knobs + 2 timer knobs (8b)
 COST_SCENARIOS = ("baseline", "contacts_once", "churn_halved", "both")
 FLAG_RATE_GRID_POINTS = 41  # 0.000..0.200 step 0.005
-COST_OUTPUT_ROWS = len(COST_SCENARIOS) * 14  # 12 point + 2 curve per scenario = 56
+COST_OUTPUT_ROWS = len(COST_SCENARIOS) * 15  # 13 point + 2 curve per scenario = 60
 # The unit each formula's value is rounded and displayed in — a field of the
 # Formula entry (fix/cost-outputs-unit), stored in cost_model_outputs.unit so the
 # page, `make model` and the dashboard format one number one way. Every key is
@@ -382,6 +391,7 @@ COST_FORMULA_UNITS = {
     "mean_claim": "eur",
     "median_cell": "eur",
     "claims": "count",
+    "claims_at_mean_cell": "count",  # 9h: the contrast count
     "flagged": "count",
     "false_pos": "count",
     "fraud_saved": "eur",
@@ -406,6 +416,7 @@ COST_OUTPUTS = {
         "mean_claim": 494.45,
         "median_cell": 49.76,
         "claims": 707858,
+        "claims_at_mean_cell": 412935,  # refunded_eur / emp_mean (9h)
         "flagged": 35393,
         "false_pos": 17696,
         "fraud_saved": 1318719.82,
@@ -420,6 +431,7 @@ COST_OUTPUTS = {
         "mean_claim": 494.45,
         "median_cell": 49.76,
         "claims": 707858,
+        "claims_at_mean_cell": 412935,  # refunded_eur / emp_mean (9h)
         "flagged": 35393,
         "false_pos": 17696,
         "fraud_saved": 1318719.82,
@@ -434,6 +446,7 @@ COST_OUTPUTS = {
         "mean_claim": 494.45,
         "median_cell": 49.76,
         "claims": 707858,
+        "claims_at_mean_cell": 412935,  # refunded_eur / emp_mean (9h)
         "flagged": 35393,
         "false_pos": 17696,
         "fraud_saved": 1318719.82,
@@ -448,6 +461,7 @@ COST_OUTPUTS = {
         "mean_claim": 494.45,
         "median_cell": 49.76,
         "claims": 707858,
+        "claims_at_mean_cell": 412935,  # refunded_eur / emp_mean (9h)
         "flagged": 35393,
         "false_pos": 17696,
         "fraud_saved": 1318719.82,
@@ -577,11 +591,14 @@ BEAT2_PEER_RATINGS = {
 # (whose Beat 3 figures are COST_OUTPUTS / COST_CROSSOVERS above, reused, not
 # retyped). The display names live in study/text.py; their counts are pinned.
 BEAT3_PANELS = ("B3.1", "B3.2", "B3.3", "B3.4")
-BEAT3_FORMULA_ROWS = 14  # twelve point + two curve formulas, the baseline scenario
-BEAT3_PARAMETER_ROWS = COST_PARAM_ROWS  # 15: 7 sourced + 8 unsourced
-BEAT3_SOURCED_ROWS = 7  # the four scale anchors + the three fit rows
+BEAT3_FORMULA_ROWS = 15  # thirteen point + two curve formulas, the baseline scenario
+BEAT3_PARAMETER_ROWS = COST_PARAM_ROWS  # 16: 8 sourced + 8 unsourced
+BEAT3_SOURCED_ROWS = 8  # the four scale anchors + the four fit rows
 BEAT3_UNSOURCED_ROWS = 8  # the six knobs + the two hold-timer knobs
-BEAT3_HEADLINES = ("customer_value", "mean_claim", "claims")  # B3.3, BACKING
+# B3.3's headline rows (BACKING: revenue per member, the mean claim, the claim
+# volume) plus, from 9h, the claim count at the sample's mean cell — the
+# contrast beside the claim volume, a fourth row through the same map.
+BEAT3_HEADLINES = ("customer_value", "mean_claim", "claims", "claims_at_mean_cell")
 # The outputs-mart rounding unit → display unit is `panels._DISPLAY_UNIT`; the
 # test asserts against that one map, never a copy of it (round 1, code-reviewer
 # #5), so the pin cannot drift from the code it checks.
@@ -597,6 +614,7 @@ BEAT3_MARKERS = (
 # crosses to the next.
 BEAT3_CURVE_DOMAIN = {4_530_293.45: 5_000_000.0, 5_000_000.01: 6_000_000.0}
 BEAT3_FIXED_PARAMETER = "emp_p50"  # low == default == high: the fixed mark
+BEAT3_FIXED_PARAMETERS = ("emp_p50", "emp_mean")  # the two read cells (9h)
 BEAT3_FRAGMENTS = {
     "formula value (fraud_saved, eur)": ">€1,318,719.82<",
     "curve euro tick": ">€1,250,000.00<",
@@ -642,7 +660,7 @@ BEAT5_MODEL_SITES = 1  # one place a model decides: classify/llm.py (== len(site
 BEAT5_EVIDENCE_TAGS = 4  # Measured, Documented, Modeled, Pending (== len(TAGS))
 BEAT5_FRAGMENTS = {
     "model sites (stat, count)": ">1<",
-    "formulas shown (stat, count)": ">14<",  # == len(cost_model.FORMULAS)
+    "formulas shown (stat, count)": ">15<",  # == len(cost_model.FORMULAS), 15 from 9h
     "evidence tags (stat, count)": ">4<",
 }
 # The per-stage row counts over the synthetic corpus (pipeline_row_counts): as

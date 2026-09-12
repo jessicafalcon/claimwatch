@@ -20,9 +20,12 @@ two down the page. No clock, no randomness: the same slice always gives the
 same numbers.
 
 The fit and the goodness-of-fit land in one tracked, numbers-only CSV
-(`data/damir/claim_cost_fit.csv`) that Phase 8's cost model and simulator read.
-A test recomputes it from the frozen fixture and pins every value, so CI
-reproduces the sourced fit offline."""
+(`data/damir/claim_cost_fit.csv`) that Phase 8's cost model and simulator read,
+with the sample's own arithmetic mean (`emp_mean`, Phase 9h) as the last row:
+the contrast the study prints beside the lognormal's mean, a number a reader
+recomputes from the fixture with no fit involved. A test recomputes the file
+from the frozen fixture and pins every value, so CI reproduces the sourced fit
+offline."""
 
 from __future__ import annotations
 
@@ -32,6 +35,9 @@ import statistics
 from dataclasses import dataclass
 from math import exp, log
 from pathlib import Path
+
+from ingest.parsed import count_in_range
+from opendata.slice import DECIMAL_SHAPE
 
 # The tracked fit artifact — under data/, kept out of the gitignore's data/*
 # by an explicit `!data/damir/` negation (the data/snapshots/ precedent).
@@ -50,11 +56,30 @@ _AMOUNT_DP = 2
 
 @dataclass(frozen=True)
 class Fit:
-    """The lognormal fit: the two parameters and the sample size behind them."""
+    """The lognormal fit: the two parameters, the sample size behind them, and
+    the sample's arithmetic mean (`emp_mean`, `mean(x)` — no fit involved, the
+    contrast to the lognormal's own mean `exp(mu + sigma²/2)`)."""
 
     mu: float
     sigma: float
     n: int
+    emp_mean: float
+
+
+# Every name the artifact carries, in write order: the two parameters and the
+# sample size, then `emp_p<d>`/`fit_p<d>` for each decile, then the sample mean
+# last (Phase 9h, appended so the pre-9h file is a byte prefix of the new one).
+# The reader
+# requires exactly this set and the tracked-files test reads this tuple; the
+# writer emits each row with its own format, and a test pins its column
+# sequence to this tuple — one closed set, no copy that can drift.
+FIT_FIELD_NAMES: tuple[str, ...] = (
+    "mu",
+    "sigma",
+    "n",
+    *(name for d in DECILES for name in (f"emp_p{d}", f"fit_p{d}")),
+    "emp_mean",
+)
 
 
 @dataclass(frozen=True)
@@ -80,7 +105,7 @@ def fit_lognormal(amounts: list[float]) -> Fit:
     logs = [log(x) for x in amounts]
     mu = statistics.fmean(logs)
     sigma = statistics.pstdev(logs, mu)
-    return Fit(mu=mu, sigma=sigma, n=len(amounts))
+    return Fit(mu=mu, sigma=sigma, n=len(amounts), emp_mean=statistics.fmean(amounts))
 
 
 def goodness_of_fit(amounts: list[float], fit: Fit) -> list[Decile]:
@@ -113,38 +138,74 @@ def write_fit(fit: Fit, gof: list[Decile], path: Path = ARTIFACT) -> None:
         for row in gof:
             writer.writerow([f"emp_p{row.decile}", f"{row.empirical:.{_AMOUNT_DP}f}"])
             writer.writerow([f"fit_p{row.decile}", f"{row.predicted:.{_AMOUNT_DP}f}"])
+        # The mean is a divisor downstream (claims at the mean cell), so it is
+        # written at the parameters' precision: a reader's hand division from
+        # six places lands on one count, from two it could straddle two.
+        writer.writerow(["emp_mean", f"{fit.emp_mean:.{_PARAM_DP}f}"])
 
 
-# The fit artifact is tiny (three parameters + two figures per decile); a file
-# larger than this is not the shape we wrote, so refuse before reading it.
+# The fit artifact is tiny (two parameters, the sample size, two figures per
+# decile and the mean); a file larger than this is not the shape we wrote, so
+# refuse before reading it.
 _MAX_FIT_BYTES = 64 * 1024
+# The smallest amount a euro slice can carry, and the smallest value the cost
+# model's euro rounding keeps: a mean under one cent is not a mean of euro
+# amounts, and divided by after rounding it would be zero (invariant 7 —
+# never a traceback downstream; review round 1, security-reviewer #1).
+_MIN_EUR_MEAN = 0.01
 
 
-def _fit_field_names() -> tuple[str, ...]:
-    """Every name the artifact must carry, in write order: the three parameters
-    then `emp_p<d>`/`fit_p<d>` for each decile — the mirror of `write_fit`."""
-    names = ["mu", "sigma", "n"]
-    for decile in DECILES:
-        names += [f"emp_p{decile}", f"fit_p{decile}"]
-    return tuple(names)
+# A refusal names what it refused, but a foreign token (a cell or a name the
+# file carried) is shown at most this long, measured on the printed repr so an
+# escaped multi-byte character cannot stretch it: the file is capped at 64 KiB,
+# and one corrupted cell must not put that much free text on one refusal line
+# (review round 1, security-reviewer #3; round 2, #2). A list of stray names
+# shows the first few and counts the rest (round 2, security-reviewer #1).
+_SHOWN_CHARS = 40
+_SHOWN_NAMES = 3
+
+
+def _shown(token: str) -> str:
+    """The repr of a foreign token, cut to `_SHOWN_CHARS` printed characters
+    with an ellipsis and the token's length."""
+    text = repr(token)
+    if len(text) <= _SHOWN_CHARS:
+        return text
+    return text[:_SHOWN_CHARS] + f"… ({len(token)} chars)"
+
+
+def _shown_names(names: list[str]) -> str:
+    """The first `_SHOWN_NAMES` stray names, each cut, and a count of the rest."""
+    head = ", ".join(_shown(n) for n in names[:_SHOWN_NAMES])
+    rest = len(names) - _SHOWN_NAMES
+    return head if rest <= 0 else f"{head} and {rest} more"
 
 
 def _finite_float(raw: dict[str, str], name: str, where: str) -> float:
+    """A cell as a finite float, accepted only in the one decimal shape the
+    amount reader accepts (`opendata.slice.DECIMAL_SHAPE`): `1e5`, `1_000`,
+    `nan`, `inf` and `+3` are refused by name before `float()` sees them; a
+    digit string long enough to overflow to infinity is refused after."""
     value = raw[name]
-    try:
-        number = float(value)
-    except ValueError as exc:
-        raise ValueError(f"{where}: {name!r} is not a number: {value!r}") from exc
+    if not DECIMAL_SHAPE.fullmatch(value):
+        raise ValueError(f"{where}: {name!r} is not a plain decimal: {_shown(value)}")
+    number = float(value.replace(",", "."))
     if not math.isfinite(number):
-        raise ValueError(f"{where}: {name!r} is not a finite number: {value!r}")
+        raise ValueError(f"{where}: {name!r} is not a finite number: {_shown(value)}")
     return number
 
 
 def _positive_int(raw: dict[str, str], name: str, where: str) -> int:
+    """A cell as a positive integer, in the one count shape every parser uses
+    (`ingest.parsed.count_in_range`: ASCII digits, at most ten): zero, a sign,
+    a non-ASCII digit or a longer string is refused by name."""
     value = raw[name]
-    if not (value.isascii() and value.isdigit()) or int(value) <= 0:
-        raise ValueError(f"{where}: {name!r} is not a positive integer: {value!r}")
-    return int(value)
+    number = count_in_range(value)
+    if number is None or number <= 0:
+        raise ValueError(
+            f"{where}: {name!r} is not a positive integer: {_shown(value)}"
+        )
+    return number
 
 
 def read_fit(path: Path = ARTIFACT) -> tuple[Fit, list[Decile]]:
@@ -152,7 +213,9 @@ def read_fit(path: Path = ARTIFACT) -> tuple[Fit, list[Decile]]:
     deciles — the strict mirror of `write_fit`, the one place besides the writer
     that knows the artifact's shape. Every declared name must be present, numeric
     and finite (`n` a positive integer); an unknown, missing, duplicate or
-    non-numeric name refuses with the name, never a silent default. `z` is the
+    non-numeric name refuses with the name, never a silent default; `emp_mean`
+    is a divisor downstream, rounded to cents first, so a value under one cent
+    refuses too. `z` is the
     standard-normal quantile recomputed per decile (the writer stores none), the
     same value `goodness_of_fit` used, so the returned deciles carry it."""
     where = path.name
@@ -169,15 +232,19 @@ def read_fit(path: Path = ARTIFACT) -> tuple[Fit, list[Decile]]:
         for lineno, row in enumerate(reader, 2):
             if len(row) != 2:
                 raise ValueError(
-                    f"{where}: line {lineno}: wrong number of cells: {row!r}"
+                    f"{where}: line {lineno}: wrong number of cells ({len(row)})"
                 )
             name = row[0]
             if name in raw:
-                raise ValueError(f"{where}: line {lineno}: duplicate name {name!r}")
+                raise ValueError(
+                    f"{where}: line {lineno}: duplicate name {_shown(name)}"
+                )
             raw[name] = row[1]
-    expected = set(_fit_field_names())
+    expected = set(FIT_FIELD_NAMES)
     if unknown := sorted(set(raw) - expected):
-        raise ValueError(f"{where}: name(s) not in the fit artifact's shape: {unknown}")
+        raise ValueError(
+            f"{where}: name(s) not in the fit artifact's shape: {_shown_names(unknown)}"
+        )
     if missing := sorted(expected - set(raw)):
         raise ValueError(
             f"{where}: name(s) the fit artifact must carry are missing: {missing}"
@@ -187,10 +254,17 @@ def read_fit(path: Path = ARTIFACT) -> tuple[Fit, list[Decile]]:
         raise ValueError(
             f"{where}: 'sigma' is a standard deviation and must be >= 0: {sigma!r}"
         )
+    emp_mean = _finite_float(raw, "emp_mean", where)
+    if emp_mean < _MIN_EUR_MEAN:
+        raise ValueError(
+            f"{where}: 'emp_mean' is a mean of euro amounts and a divisor, "
+            f"must be at least one cent ({_MIN_EUR_MEAN}): {emp_mean!r}"
+        )
     fit = Fit(
         mu=_finite_float(raw, "mu", where),
         sigma=sigma,
         n=_positive_int(raw, "n", where),
+        emp_mean=emp_mean,
     )
     normal = statistics.NormalDist()
     gof = [
@@ -212,6 +286,8 @@ def format_fit(fit: Fit, gof: list[Decile]) -> str:
         f"lognormal fit over {fit.n} DAMIR reimbursed amounts (PRS_REM_MNT):",
         f"  mu    = {fit.mu:.{_PARAM_DP}f}   (mean of ln amount)",
         f"  sigma = {fit.sigma:.{_PARAM_DP}f}   (population std of ln amount)",
+        f"  mean  = {fit.emp_mean:.{_PARAM_DP}f}   (arithmetic mean of the amounts, "
+        "no fit — the contrast to exp(mu + sigma²/2))",
         "the fit shown — each decile, real amount vs the fitted curve:",
         f"  {'decile':>6}  {'z':>8}  {'real €':>12}  {'fitted €':>12}",
     ]

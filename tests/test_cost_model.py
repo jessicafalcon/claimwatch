@@ -26,13 +26,18 @@ from models.cost_model import (
     curves,
     defaults,
     evaluate,
+    fit_parameters,
     format_model,
     parameters,
 )
 from tests import pins
 
 FIT = Fit(
-    mu=pins.DAMIR_MU, sigma=pins.DAMIR_SIGMA, n=pins.DAMIR_N, emp_p50=pins.DAMIR_EMP_P50
+    mu=pins.DAMIR_MU,
+    sigma=pins.DAMIR_SIGMA,
+    n=pins.DAMIR_N,
+    emp_p50=pins.DAMIR_EMP_P50,
+    emp_mean=pins.DAMIR_EMP_MEAN,
 )
 
 
@@ -61,6 +66,17 @@ def test_make_model_prints_each_expression_beside_its_value():
         assert f.expression in out
     assert "-> 0.095" in out  # the baseline crossover
     assert "-> 0.05" in out  # the marginal crossover / the default marker
+    # One column for every point formula: the name is padded to the longest
+    # name, so the "=" sits at the same offset on each line (9h, preflight).
+    width = max(len(f.name) for f in POINT_FORMULAS)
+    for f in POINT_FORMULAS:
+        assert f"  {f.name.ljust(width)} = {f.expression}" in out
+    # The parameter table too: the longest name sets the column (round 2,
+    # coherence-auditor #2), so the default column starts at one offset.
+    params = parameters(FIT)
+    p_width = max(len(p.name) for p in params)
+    for p in params:
+        assert f"  {p.name.ljust(p_width)} {p.default:>16} " in out
 
 
 def test_make_model_prints_the_unit_beside_each_value():
@@ -166,6 +182,53 @@ def test_timer_formulas_recomputed_by_hand():
         assert (
             out["timer_amount_eur"] == pins.COST_OUTPUTS[scenario]["timer_amount_eur"]
         )
+
+
+def test_the_reader_one_cent_floor_is_the_model_euro_rounding_scale():
+    """opendata.fit refuses a mean under one cent because models.cost_model
+    rounds euros to two places: the two constants are one fact, bound here
+    since fit.py cannot import the model (round 2, code-reviewer #2)."""
+    from opendata.fit import _MIN_EUR_MEAN
+
+    one_euro_unit = 10 ** -_ROUNDING["eur"]  # 0.01: what euro rounding keeps
+    assert one_euro_unit == _MIN_EUR_MEAN  # the constant on the right: SIM300
+
+
+def test_fit_parameters_are_the_four_read_rows_two_of_them_fixed_marks():
+    """The fit supplies four sourced rows in order — mu, sigma, emp_p50,
+    emp_mean — each cited to the artifact; the two cells read off the sample
+    are fixed marks (low == default == high), the two log-moments are not."""
+    rows = fit_parameters(FIT)
+    assert tuple(p.name for p in rows) == ("mu", "sigma", "emp_p50", "emp_mean")
+    for p in rows:
+        assert p.sourcing == "sourced" and "claim_cost_fit.csv" in p.citation
+    fixed = {p.name for p in rows if p.low == p.default == p.high}
+    assert fixed == {"emp_p50", "emp_mean"}
+    emp_mean = rows[-1]
+    assert emp_mean.default == round(pins.DAMIR_EMP_MEAN, 2) and emp_mean.unit == "€"
+    assert [p.name for p in parameters(FIT)][4:8] == [p.name for p in rows]
+
+
+def test_claims_at_mean_cell_is_the_division_by_hand():
+    """9h, invariant 3: the contrast count is refunds paid over the sample's
+    mean cell, redone by hand from the parameter table; the same on every
+    scenario (nothing a scenario toggles enters it); the pinned figure is the
+    same whether the reader divides by the page's two-place cell or the
+    artifact's six-place one."""
+    values = defaults(FIT)
+    emp_mean = next(p for p in parameters(FIT) if p.name == "emp_mean")
+    assert emp_mean.sourcing == "sourced" and emp_mean.citation
+    assert emp_mean.low == emp_mean.default == emp_mean.high  # a fixed mark
+    by_hand = round(values["refunded_eur"] / emp_mean.default)
+    assert by_hand == pins.COST_OUTPUTS["baseline"]["claims_at_mean_cell"]
+    assert round(values["refunded_eur"] / pins.DAMIR_EMP_MEAN) == by_hand
+    for scenario in SCENARIOS:
+        assert evaluate(values, scenario)["claims_at_mean_cell"] == by_hand
+    contrast = next(f for f in POINT_FORMULAS if f.name == "claims_at_mean_cell")
+    assert contrast.expression.startswith("refunded_eur / emp_mean")
+    names = [f.name for f in POINT_FORMULAS]
+    assert names.index("claims_at_mean_cell") == names.index("claims") + 1
+    assert "claims_at_mean_cell" in format_model(FIT)
 
 
 def test_mean_claim_prints_its_bias_and_the_median_cell():
