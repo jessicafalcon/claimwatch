@@ -3048,15 +3048,23 @@ that recurs reworks its mechanism, not its row (LESSONS → Promotion).
   layout guard would then have to exempt — an exemption is a denylist by
   another name).*
 
-- **The reworked mechanism is an AST check, not a substring grep.** A test
-  walks the `ast` of every `ingest`/`pipeline`/`opendata` module and flags a
-  numeric coercion (`float`, `int`, `Decimal`, `.isdigit`, `.isdecimal`, a
-  `re.compile` of a numeric pattern) that is not one of the shared shapes'
-  own definitions — the promotion rule's reworked mechanism. *Rejected: a
-  grep denylist of `float(`/`.isdigit(` (the exact form the `unshaped-input`
-  row retired in tooling round 3 when a spawner-name denylist let `os.popen`
-  slip; `int(...)`, `Decimal(...)`, an alias all evade a substring match, and
-  the `site-fix` class bit twice on partial guards).*
+- **The reworked mechanism is an AST check, not a substring grep**
+  (`tests/test_number_shapes.py`). A test walks the `ast` of every
+  `ingest`/`pipeline`/`opendata` module and bans the two loose coercions:
+  `.isdigit`/`.isdecimal` (the methods that lie about Unicode) anywhere, and
+  `float()` outside the three shaped-decimal parsers (`opendata.slice.parse_amount`,
+  `opendata.fit._finite_float`, `ingest.robots._parse_groups` — each matches
+  `DECIMAL_SHAPE` first). *Built narrower than this amendment's first
+  enumeration (`float`, `int`, `Decimal`, `.isdigit`, `.isdecimal`): a grep of
+  the three packages found `int()`/`Decimal()` used at ~8 legitimate sites,
+  each already behind a bounded digit shape (a date's `int(m.group(...))`,
+  `Decimal(text)` after a `Measure` pattern), so banning them would have forced
+  an ever-growing allowlist — the escape hatch the guard exists to avoid, the
+  `site-fix`/`empty-default` smell. The two loose coercions carry the class;
+  `int`/`Decimal` are left to the shapes that already precede them. Rejected: a
+  grep denylist of `float(`/`.isdigit(` (the form the `unshaped-input` row
+  retired in tooling round 3 when a spawner-name denylist let `os.popen` slip;
+  an alias or a differently-spelled call evades a substring match).*
 
 Scope: `ingest/parsed.py`, `opendata/slice.py`, `ingest/robots.py`,
 `pipeline/cli.py`, their tests, and the AST layout test. One commit per
