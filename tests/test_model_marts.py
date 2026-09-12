@@ -10,7 +10,13 @@ import ast
 import pytest
 
 from models import cost_model
-from pipeline.build import read_model_inputs, rebuild
+from models.guardrail_sim import format_simulation
+from pipeline.build import (
+    read_model_inputs,
+    rebuild,
+    write_model_marts,
+    write_sim_marts,
+)
 from pipeline.cli import main
 from pipeline.warehouse import ROOT, connect, database_for
 from tests import pins
@@ -251,6 +257,25 @@ def test_read_model_fit_refuses_a_malformed_artifact(tmp_path):
     inputs = read_model_inputs()
     assert inputs.fee_split.year == pins.AMELI_YEAR
     assert inputs.fee_split.low < inputs.fee_split.share < inputs.fee_split.high
+
+
+def test_mart_writers_and_the_simulator_printer_take_the_inputs_container(tmp_path):
+    """9i: write_model_marts, write_sim_marts and format_simulation take the one
+    ModelInputs container the reader hands out — the fee-split row lands in the
+    params mart, a second write over the same inputs changes no row but run_id,
+    and the simulator's text names nothing of the fee split (no rule reads it)."""
+    inputs = read_model_inputs()
+    conn = _built(tmp_path)
+    before = _rows(conn, "cost_model_params", "name, default_value, low, high")
+    write_model_marts(conn, inputs, "again")
+    write_sim_marts(conn, inputs, "again")
+    assert _rows(conn, "cost_model_params", "name, default_value, low, high") == before
+    names = {r[0] for r in before}
+    assert "extra_billing_share" in names and len(names) == pins.COST_PARAM_ROWS
+    assert {r[0] for r in _rows(conn, "cost_model_params", "run_id, name")} == {"again"}
+    assert _rows(conn, "guardrail_sim", "count(*), 1")[0][0] == pins.GUARDRAIL_SIM_ROWS
+    text = format_simulation(inputs)
+    assert "guardrail simulator" in text and "extra_billing" not in text
 
 
 def test_make_model_is_byte_identical_on_rerun(capsys):
