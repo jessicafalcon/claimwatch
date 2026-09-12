@@ -542,6 +542,11 @@ def test_a_phase_branch_without_its_spec_is_refused(root: Path, capsys, monkeypa
         review_gate.spec_for_branch("phase-0b-contracts", root)
     with pytest.raises(Refused, match=r"cannot read the branch: fatal: not a git"):
         review_gate.branch_name(root)  # tmp_path is no git repository
+    monkeypatch.setattr(review_gate, "run", lambda cmd, cwd: (128, "a\nb\nfatal: c"))
+    with pytest.raises(
+        Refused, match=r"\Arefusing: cannot read the branch: fatal: c\Z"
+    ):
+        review_gate.branch_name(root)  # a Refused is one line: git's last one
     monkeypatch.setattr(review_gate, "ROOT", root)
     monkeypatch.setattr(review_gate, "branch_name", lambda root: "phase-0b-contracts")
     with pytest.raises(SystemExit) as exc:
