@@ -2348,11 +2348,12 @@ PR `fix/theme-marts-run-id` (the two theme marts carry `run_id`), merged first.
 
 Gotcha: `rebuild()` builds the generic and model/simulator marts but NOT the
 classify step (the theme marts B2.2/B2.5 and the filling of classifier_quality
-B2.4) — that is the CLI's `_do_rebuild` → `_classify_and_print`. So a test that
+B2.4) — that is `build.classify_step` (the CLI's `_do_rebuild` → `_classify_and_print`
+wraps it; fix/idempotency-classify moved the step there). So a test that
 needs the Beat 2 marts must run the classify step too; `tests/conftest.py::
-build_study_db` does (rebuild + the CLI step with the model decider and the
-decision cache neutralised, so it is rules-only, deterministic, and writes
-nothing under `data/`). A corpus panel over `ROWS=none` (no reviews, no classify)
+build_study_db` does (rebuild + `classify_step` with `decide=None` and its cache
+in a temp path, so it is rules-only, deterministic, and writes nothing under
+`data/`). A corpus panel over `ROWS=none` (no reviews, no classify)
 finds the theme marts absent, not empty, so the gate probes
 `information_schema.tables` and renders "no data yet".
 
