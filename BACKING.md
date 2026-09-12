@@ -60,7 +60,7 @@ every rule below except the last sentence, which is editorial (PROJECT_BRIEF.md
 | B2.5 Held-claim complaint share among every classified review, digital-first vs traditional mutuelles | theme_share_by_segment | `sql/marts/theme_share_by_segment.sql` | https://apps.apple.com/; https://play.google.com/; https://www.opinion-assurances.fr/; https://www.trustpilot.com/ | Measured |
 | B3.1 Cost-model formulas printed next to their output | cost_model_outputs | `sql/marts/cost_model_outputs.sql` | `open-damir` | Modeled |
 | B3.2 Fraud saved vs friction cost curves over the flag rate, with the crossover | cost_curves | `sql/marts/cost_curves.sql` | `open-damir` | Modeled |
-| B3.3 Sourced defaults: revenue per member, fraud pool, claim volume | cost_model_params | `sql/marts/cost_model_params.sql` | `open-damir` | Modeled |
+| B3.3 Sourced defaults: revenue per member, fraud pool, claim volume and, beside them, the extra-billing share of national practitioner fees — a context figure no formula reads | cost_model_params | `sql/marts/cost_model_params.sql` | `open-damir`; `data-ameli-honoraires` | Modeled |
 | B3.4 Declared-unsourced parameters with their explore-the-range span drawn, styled apart | cost_model_params | `sql/marts/cost_model_params.sql` | — | Modeled |
 | B4.1 Fix 1 ask once: contacts per stuck claim drop to one, the curves move | cost_curves | `sql/marts/cost_curves.sql` | `open-damir` | Modeled |
 | B4.2 Fix 2 a clock on every hold: the computed hold-length threshold | sla_threshold | `sql/marts/sla_threshold.sql` | `open-damir` | Modeled |
@@ -91,6 +91,29 @@ name `open-damir` as their upstream; so is the contrast count
 the sample's mean cell, which B3.3 shows beside the claim volume and nothing
 downstream reads. (When Phase 9 renders B3.3's headline derived figures it
 reads those from `cost_model_outputs`, not `cost_model_params`.)
+
+**On the `data-ameli-honoraires` upstream (B3.3).** Phase 9i landed the second
+open-data source: data.ameli's `honoraires` table (Caisse nationale de
+l'Assurance Maladie, Open Database License — attribution: the panel names the
+table's address and this paragraph its publisher), one row per year ×
+profession × territory, each carrying that year's total fees billed at the
+public tariff and total *extra billing* (dépassements d'honoraires — the part
+billed above the tariff, which the Assurance Maladie never reimburses). It is
+annual per-practitioner totals, not per-act or per-claim amounts, so it holds
+no claim-cost distribution to fit and feeds no simulator draw; what it uniquely
+supplies is the **extra-billing share**, `extra / (tariff + extra)`, which the
+DAMIR reimbursement cannot, since extra billing is absent from a reimbursement
+by construction. The frozen `fixtures/ameli/` is one year's four national
+top-level profession-family rows (the table's other labels nest under them, so
+the four are the whole; the host's robots file disallows its API and download
+paths to every crawler, so the export was saved by hand from a browser, never
+fetched); `make split-ameli` writes the tracked `data/ameli/fee_split.csv`
+(the year, each family's two totals and share, the all-families three). One
+`cost_model_params` row, `extra_billing_share`: its default the all-families
+share, its low and high the lowest and highest family — a spread in the data,
+not a bound the study explores, read by no formula, shown in B3.3 with a note
+saying that the part above the tariff is absent from the cells the fit is
+built on. The row's tag is the mart's, Modeled; no other row changes.
 
 **What Beat 4 landed (Phase 8b).** The synthetic claims are the same fit read at
 a thousand evenly spaced quantiles — a real distribution, synthetic claims: no

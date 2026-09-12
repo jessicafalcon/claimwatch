@@ -181,8 +181,14 @@ climbs; friction cost rises with the false positives that same rate creates.
   mean claim, the claim volume and, beside the volume, the claim count at the
   sample's mean reimbursement cell — are derived from these inputs and shown
   above the parameter rows; the note beneath says which of the two means is
-  the larger and so which count is the lower. Tag: *Modeled*, each default
-  cited.
+  the larger and so which count is the lower. One sourced row is a context
+  figure no formula reads: the share of what liberal practitioners billed in
+  a year that lay above the public tariff — *extra billing*, the part the
+  Assurance Maladie never reimburses and so absent from the reimbursement
+  cells the fit is built on — from the Assurance Maladie's own data.ameli
+  table of fees by profession; its low and high are the lowest and highest
+  of the four profession families, a spread in the data, not a bound the
+  study explores. Tag: *Modeled*, each default cited.
 - **B3.4 — The declared-unsourced parameters.** The parameters with no public
   source — the false-positive share, the churn probability, contacts per stuck
   claim, the flag rate, how quickly extra flags stop catching new fraud, and the

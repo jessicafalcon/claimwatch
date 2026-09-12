@@ -89,7 +89,11 @@ on that with arithmetic printed in full, so anyone can redo it by hand.
   average claim size the fitted curve gives, and beside it the page shows a
   second, lower count a reader gets by dividing instead by the plain average
   of the public reimbursement totals (each a grouped figure in the open data),
-  so that recompute is on the page to check *(Modeled — B3.3)*.
+  so that recompute is on the page to check. One sourced row is context, not
+  an input: the share of what practitioners billed that lay above the public
+  tariff, which the public insurer never reimburses and the fitted claim size
+  therefore leaves out, from the Assurance Maladie's own fee table
+  *(Modeled — B3.3)*.
 - The parameters with no public source, drawn on a differently-styled range and
   labelled "explore the range" *(Modeled — B3.4)*.
 
@@ -166,6 +170,10 @@ we chose boring.
 - **The crossover** — the flag rate where friction cost overtakes fraud saved, so
   the next flag destroys more than it recovers, like the point where checking one
   more claim starts to lose money.
+- **Extra billing** — the part of a practitioner's fee above the public tariff,
+  which the public insurer never reimburses, like a specialist charging more
+  than the tariff for a visit and the patient or their complementary insurer
+  paying the difference.
 
 ## Running it
 
