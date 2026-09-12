@@ -587,34 +587,27 @@ and remove it). Findings are fixed in the main session or explicitly accepted
 
 ## Current status
 
-**Merged:** Phases 0a–9h, each with its spec under `specs/` (the Delivered
-paragraph) and its DECISIONS appendix; the last were 9h, the claim count at the
-sample's mean reimbursement cell beside the fitted count (PR #32, 2026-09-12),
-and `fix/foreign-shape-shared-home` (PR #33, 2026-09-12: the shared decimal
-and count shapes given one home in `ingest/parsed.py` and an AST guard against
-a fresh coercion outside them). Phase 9 is complete.
+**Merged:** Phases 0a–9i, each with its spec under `specs/` (the Delivered
+paragraph) and its DECISIONS appendix; the last were 9i, the extra-billing
+share from data.ameli's `honoraires` table as one sourced B3.3 row (PR #34,
+2026-09-12), and `fix/idempotency-classify` (PR #35, 2026-09-12: the classify
+step's code moved to `pipeline/build.py::classify_step` and run inside
+`idempotency-check`, so the six classify-path tables are in its diff). Phase 9
+is complete.
 
-**Delivered, PR open:** Phase 9i on `phase-9i-extra-billing` (spec
-challenged round 1, nine amendments applied; built 2026-09-12; review rounds
-1 and 2 — the exit round — fixed; DONE command green; Delivered paragraph
-appended 2026-09-12): the extra-billing share
-from data.ameli's `honoraires` table as one sourced B3.3 row with its
-profession-family spread, read by no formula — the
-export is a hand download, since the host's robots file disallows the API and
-download paths; `slice-ameli` and `split-ameli` are offline.
-
-**Delivered, in review:** `fix/idempotency-classify` (built 2026-09-12): the
-classify step's code moved from `pipeline/cli.py::_classify_and_print` into
-`pipeline/build.py::classify_step` (the Repo map's home for the step), and
-`idempotency-check` now runs it after `rebuild()` with an isolated cache and
-compares whole-db `table_counts`, so the six classify-path tables are in its
-diff (DECISIONS → Fix; BACKLOG row closed).
+**In progress:** three small PRs off main before Phase 10, one at a time:
+`tooling/skill-sentences` (this branch: the two skill sentences of the Phase
+9i exit audit — DECISIONS → Tooling), then `fix/` for the `csv.Error`
+boundary class (BACKLOG "Every `csv` reader but one maps `ValueError` only…"),
+then `fix/` for the no-`SPEC=` review gate (BACKLOG "`make review-gate`
+without `SPEC=` is red on a phase branch…").
 
 **Next:** Phase 10 (the Airflow DAG). Its spec decides how the publish task
 calls `python -m study.metabase export|apply`, which are not `make` targets
-(`docs/PLAN.md` §5 names five `make` tasks). The classify step's
-`TARGET`-awareness for Snowflake stays a Phase 10 BACKLOG row.
+(`docs/PLAN.md` §5 names five `make` tasks), and takes the classify step's
+`TARGET`-awareness for Snowflake (BACKLOG "The classify-step mart writes are
+not warehouse-aware") as its own Done-when item with an invariant.
 
-Open BACKLOG rows: **39**.
+Open BACKLOG rows: **38**.
 
 (Update this section at the end of every working day.)
