@@ -421,10 +421,10 @@ def test_cli_refusals_are_one_line_exit_2(argv: list[str]):
 
 def test_gate_prints_one_line_per_check_and_the_total(monkeypatch, tmp_path: Path):
     """Evidence row 1: the printed shape — `ok   <check>` per check and
-    `review-gate OK: 8/8 checks passed` with a SPEC, `6/6` on a branch with no
-    phase spec, and the SPEC form's eight lines again when the branch's own spec
-    is read — pinned with every subprocess stubbed green (the real gate runs
-    `make test`, which is this suite)."""
+    `review-gate OK: 8/8 checks passed` with a SPEC, `6/6` without: on a branch
+    with no phase spec, and on a phase branch, whose own spec is read for the
+    fixtures check only (the SKIP line names it) — pinned with every subprocess
+    stubbed green (the real gate runs `make test`, which is this suite)."""
     spec = tmp_path / "specs" / "s.md"
     spec.parent.mkdir()
     spec.write_text(_spec("| 1 | `tests/test_a.py::test_x` |"))
@@ -458,12 +458,7 @@ def test_gate_prints_one_line_per_check_and_the_total(monkeypatch, tmp_path: Pat
         "ok   records",
         "review-gate OK: 8/8 checks passed",
     ]
-    with_spec = lines
-    buf = io.StringIO()
-    with redirect_stdout(buf):
-        assert review_gate.main([]) == 0
-    assert buf.getvalue().splitlines() == [
-        "SKIP evidence, records (no phase spec for branch fix/x)",
+    six_green = [
         "ok   test",
         "ok   lint",
         "ok   docs",
@@ -472,12 +467,22 @@ def test_gate_prints_one_line_per_check_and_the_total(monkeypatch, tmp_path: Pat
         "ok   pins",
         "review-gate OK: 6/6 checks passed",
     ]
-    # the no-SPEC form on a phase branch is the SPEC form: same eight lines
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        assert review_gate.main([]) == 0
+    assert buf.getvalue().splitlines() == [
+        "SKIP evidence, records (no SPEC; branch fix/x has no phase spec)",
+        *six_green,
+    ]
+    # a phase branch: its spec is read, the two spec checks still wait for SPEC=
     monkeypatch.setattr(review_gate, "branch_name", lambda root: "phase-0a-x")
     buf = io.StringIO()
     with redirect_stdout(buf):
         assert review_gate.main([]) == 0
-    assert buf.getvalue().splitlines() == with_spec
+    assert buf.getvalue().splitlines() == [
+        "SKIP evidence, records (no SPEC; Freeze: read from specs/phase-0a-x.md)",
+        *six_green,
+    ]
     # a Makefile that did not read is the evidence check's one line, never
     # "not in the Makefile" for every target the spec names (empty-default)
     monkeypatch.setattr(
@@ -538,6 +543,41 @@ def test_a_phase_branch_without_its_spec_is_refused(root: Path, capsys, monkeypa
     out, err = capsys.readouterr()
     assert out == ""
     assert len(err.strip().splitlines()) == 1
+
+
+def test_the_no_spec_form_reads_the_branch_spec_for_the_fixtures_check_only(
+    root: Path, monkeypatch
+):
+    """On a phase branch with no SPEC the fixtures check sees the spec's text
+    (its `Freeze:` grants license a re-frozen fixture, the BACKLOG row's
+    failure), and evidence/records are not run — `/phase-start` runs this form
+    on a branch whose only commit is the spec, where both are red by
+    construction."""
+    spec = root / "specs" / "phase-0a-x.md"
+    spec.write_text("Freeze: fixtures/ameli/\n")
+    seen: list[str | None] = []
+
+    def range_checks(spec_text: str | None, base: str):
+        seen.append(spec_text)
+        return [("fixtures", True, ""), ("pins", True, "")], set()
+
+    monkeypatch.setattr(review_gate, "ROOT", root)
+    monkeypatch.setattr(review_gate, "run", lambda cmd, cwd: (0, ""))
+    monkeypatch.setattr(review_gate, "range_checks", range_checks)
+    monkeypatch.setattr(review_gate, "branch_name", lambda root: "phase-0a-x")
+    monkeypatch.setattr(
+        review_gate,
+        "collected_tests",
+        lambda root: (_ for _ in ()).throw(AssertionError),
+    )
+    import io
+    from contextlib import redirect_stdout
+
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        assert review_gate.main([]) == 0
+    assert seen == ["Freeze: fixtures/ameli/\n"]
+    assert "SKIP evidence, records" in buf.getvalue()
 
 
 def test_resolve_inputs_reads_the_branch_only_without_a_spec(root: Path, monkeypatch):

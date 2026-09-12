@@ -3,10 +3,14 @@
 FAIL, 2 on a refused SPEC/BASE or a phase branch whose spec is absent, never
 a traceback. Run via `make review-gate [SPEC=specs/<file>.md] [BASE=main]` —
 the first thing `/review-round N` does, before any agent is spawned. With no
-SPEC the branch's own spec is read (`phase-<slug>` → `specs/phase-<slug>.md`,
-the rule `/review-round` applies), so the two forms print the same verdict on
-the same range; a branch with no phase spec (`fix/`, `tooling/`, `docs/`,
-`main`, a detached HEAD) runs the six range checks and skips the spec's two.
+SPEC a phase branch's own spec (`phase-<slug>` → `specs/phase-<slug>.md`) is
+read for the fixtures check's `Freeze:` grants only, so the fixtures verdict
+does not depend on whether SPEC was typed; the spec's two own checks
+(evidence, records) run only when SPEC names it — they are red by
+construction on a phase branch whose only commit is the spec, which is where
+`/phase-start` runs the no-SPEC form and expects green. A branch with no
+phase spec (`fix/`, `tooling/`, `docs/`, `main`, a detached HEAD) keeps
+fixtures read-only.
 
   a. test      — `make test` (last 20 lines on red)
   b. lint      — `ruff check` + `ruff format --check` (read-only; never
@@ -60,6 +64,7 @@ from review_common import (
     resolve_spec,
     run,
     section,
+    shown,
     tail,
 )
 
@@ -235,6 +240,17 @@ def resolve_inputs(spec_arg: str, base_arg: str) -> tuple[Path | None, str, str]
     return spec_for_branch(branch, ROOT), branch, base
 
 
+def skip_line(spec: Path | None, branch: str) -> str:
+    """The one line the no-SPEC form prints for the two checks it does not run,
+    naming the spec whose `Freeze:` grants the fixtures check read, or the
+    branch that has none."""
+    if spec is not None:
+        return (
+            f"SKIP evidence, records (no SPEC; Freeze: read from {shown(spec, ROOT)})"
+        )
+    return f"SKIP evidence, records (no SPEC; branch {branch} has no phase spec)"
+
+
 def collected_tests(root: Path) -> tuple[int, set[str], str]:
     """(exit code, collected ids, output). A non-zero code means the suite did
     not collect — the caller FAILs evidence explicitly, never via an empty set."""
@@ -304,7 +320,7 @@ def main(argv: list[str] | None = None) -> int:
     range_results, diff = range_checks(spec_text, base)
     results.extend(range_results)
 
-    if spec_text is not None:
+    if args.spec and spec_text is not None:
         code, ids, out = collected_tests(ROOT)
         if code != 0:
             results.append(
@@ -319,7 +335,7 @@ def main(argv: list[str] | None = None) -> int:
             ("records", not fails, "\n".join(fails + [f"WARN {w}" for w in warns]))
         )
     else:
-        print(f"SKIP evidence, records (no phase spec for branch {branch})")
+        print(skip_line(spec, branch))
 
     failed = 0
     for name, ok, detail in results:
