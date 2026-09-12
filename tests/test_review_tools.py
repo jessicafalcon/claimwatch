@@ -500,30 +500,37 @@ def test_gate_prints_one_line_per_check_and_the_total(monkeypatch, tmp_path: Pat
 
 @pytest.mark.parametrize(
     "name",
-    [
-        "fix/x",
-        "tooling/skill-sentences",
-        "main",
-        "HEAD",
-        "phase-3a-snapshots/extra",
-        "phase-3a snapshots",
-        "-phase-3a-x",
-        "PHASE-3A-X",
-        "phase-3a-../ok",
-        "phase-x-y",
-        "",
-    ],
+    ["fix/x", "tooling/skill-sentences", "main", "HEAD", "-phase-3a-x", "PHASE-3A-X"],
 )
 def test_a_branch_off_the_phase_shape_has_no_spec(root: Path, name: str):
     """The no-SPEC form derives a spec from one closed branch shape
-    (`phase-<n><letter?>-<slug>`); every other name — a fix branch, main, a
-    detached HEAD, a traversal, a case or whitespace variant — is no spec, so
-    fixtures stay read-only there and nothing is read from a derived path."""
+    (`phase-<n><letter?>-<slug>`); a name that does not start `phase-` — a fix
+    branch, main, a detached HEAD, a leading dash, a case variant — is no spec,
+    so fixtures stay read-only there and nothing is read from a derived path."""
     (root / "specs" / "phase-3a-snapshots.md").write_text("# spec\n")
     assert review_gate.spec_for_branch(name, root) is None
     assert review_gate.spec_for_branch("phase-3a-snapshots", root) == (
         root / "specs" / "phase-3a-snapshots.md"
     )
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "phase-3a-snapshots/extra",
+        "phase-3a snapshots",
+        "phase-3a-../ok",
+        "phase-x-y",
+        "phase-",
+        "phase-3a-",
+    ],
+)
+def test_a_phase_prefixed_name_off_the_shape_is_refused(root: Path, name: str):
+    """A `phase-` name the shape does not match — a trailing segment, a space,
+    a traversal, no number — is refused by name, never run as "no spec" with a
+    green SKIP line: `/review-round` would ask for SPEC= on the same branch."""
+    with pytest.raises(Refused, match=r"starts phase- but is not"):
+        review_gate.spec_for_branch(name, root)
 
 
 def test_a_phase_branch_without_its_spec_is_refused(root: Path, capsys, monkeypatch):

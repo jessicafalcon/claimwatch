@@ -218,8 +218,14 @@ def branch_name(root: Path) -> str:
 
 def spec_for_branch(name: str, root: Path) -> Path | None:
     """`specs/<name>.md` for a phase branch; None for any other branch. A phase
-    branch whose spec is absent is refused — its first commit is the spec."""
+    branch whose spec is absent is refused — its first commit is the spec — and
+    so is a `phase-` name off the shape, never read as "no spec" and run green."""
     if not _PHASE_BRANCH.match(name):
+        if name.startswith("phase-"):
+            raise Refused(
+                f"refusing: branch {name} starts phase- but is not"
+                " phase-<n><letter?>-<slug> (pass SPEC=specs/<file>.md)"
+            )
         return None
     path = root / "specs" / f"{name}.md"
     if not path.is_file():
