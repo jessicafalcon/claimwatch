@@ -59,7 +59,9 @@ def count_in_range(value: object) -> int | None:
 # without importing `opendata` — the import edge runs `opendata -> ingest.parsed`,
 # never the reverse. `[0-9]`, not `\d`: Python's `\d` is Unicode-aware and would
 # admit `٣` (`unshaped-input` LESSONS row; fix/foreign-shape-shared-home).
-DECIMAL_SHAPE = re.compile(r"-?[0-9]+(?:[.,][0-9]+)?")
+# Written whole (`\A…\Z`), like every shape in this repo, so the value property
+# holds under `.search`, not only the callers' `.fullmatch`.
+DECIMAL_SHAPE = re.compile(r"\A-?[0-9]+(?:[.,][0-9]+)?\Z")
 
 
 @dataclass(frozen=True)
