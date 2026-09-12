@@ -136,8 +136,7 @@ row, a CLI variable, hook stdin, an env var, a file name under `data/cache/`.
   its `except` tuple to the parser's error is never the fix: the kind
   changes, not the tuple — `ingest/parsed.py::decode_json`,
   `opendata/fee_split.py::_iter_rows` (*LESSONS: traceback-at-boundary*,
-  hit twice in Phase 9i; `tests/test_csv_readers.py` walks every `csv`
-  reader with a field past the parser's limit).
+  hit twice in Phase 9i; the remaining `csv` readers are a BACKLOG row).
 - A reader that fails returns nothing the caller can check against: the
   failure travels with the value (`None`, a `Refused`, an `(empty, error)`
   pair) and the caller reports the one line and stops — never an empty

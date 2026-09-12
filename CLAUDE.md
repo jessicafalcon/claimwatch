@@ -599,7 +599,8 @@ the two skill sentences of the Phase 9i exit audit — DECISIONS → Tooling).
 **In progress:** two small PRs off main before Phase 10, one at a time:
 `fix/csv-reader-boundary` (this branch: every `csv` reader folds `csv.Error`
 into the refusal it declares and the two DAMIR CLI read paths catch it —
-DECISIONS → Fix, 2026-09-12; BACKLOG row closed), then `fix/` for the
+DECISIONS → Fix, 2026-09-12; BACKLOG row closed, one opened for the code-craft
+clause), then `fix/` for the
 no-`SPEC=` review gate (BACKLOG "`make review-gate` without `SPEC=` is red on
 a phase branch…").
 
@@ -609,6 +610,6 @@ calls `python -m study.metabase export|apply`, which are not `make` targets
 `TARGET`-awareness for Snowflake (BACKLOG "The classify-step mart writes are
 not warehouse-aware") as its own Done-when item with an invariant.
 
-Open BACKLOG rows: **37**.
+Open BACKLOG rows: **38**.
 
 (Update this section at the end of every working day.)

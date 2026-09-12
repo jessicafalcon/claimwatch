@@ -3385,3 +3385,23 @@ wrapped its read in no `try` at all.
   reader (unreachable at the byte-capped artifact); a grep-based site list
   (a `csv.reader` in a comment or string would count; the AST scan is the
   `test_number_shapes.py` shape).*
+- **Review round 1 (2026-09-12): eleven findings, one BLOCKER, disposition
+  "fix all".** Correctness (code #1, confirmed by the tester running it;
+  `360e040`): `cli.main` caught `Refused`, `PageShapeError`, `ModelError` and
+  `FetchError` but not `CacheError` or `LabelError` — the two declared types
+  this fix folds `csv.Error` into — so a corrupt decision cache left `make
+  rebuild`, and a corrupt answer key `make rebuild` and `make classify-eval`,
+  as a traceback; one arm for the pair and two CLI boundary tests, each with a
+  field past the interpreter's default limit (the synthetic corpus must still
+  read, so the narrowed limit of the walk cannot serve there). Craft (the
+  next commit): the refusal phrase is `ingest/parsed.py::CSV_UNREADABLE` at
+  every site and in the tests; the AST scan resolves `import csv as c` and
+  `from csv import … [as x]` (code #3, security #1); `_decision`/`_label`
+  hold the per-row checks (code #5); the export entry has its own writer
+  (code #6); the scanner reads through `tests/repo_text.py` (security #2).
+  Records: the code-craft clause is taken back out of the fix PR — a skill
+  edit rides a `tooling/` branch (code #2) — and is a BACKLOG row for the
+  next one, so the count is 38 again. Accepted with the precedent named:
+  the process-global field limit the walk narrows and restores (code #7,
+  security confirmed no leak); `read_fixture` now strict on its header
+  (security #3, the second bullet above).
