@@ -284,6 +284,22 @@ RULES_HELDOUT = {
 CLASSIFIED_REVIEWS_ROWS = STG_REVIEWS_ROWS  # 39
 CLASSIFIED_REVIEWS_COLUMNS = ("source", "external_id", "theme", "run_id")
 
+# The tables the classify step fills that `rebuild()` alone stops before — what
+# `make idempotency-check` must cover once it runs the classify step too
+# (fix/idempotency-classify). classifier_quality is here because the synthetic
+# corpus is graded; on an ungraded corpus it holds 0 rows in both runs (its DDL
+# shell, which rebuild() creates and classify_step leaves empty), still equal.
+CLASSIFY_PATH_TABLES = frozenset(
+    {
+        "stg_classified_reviews",
+        "theme_share_by_month",
+        "theme_share_by_segment",
+        "review_drill",
+        "pipeline_row_counts",
+        "classifier_quality",
+    }
+)
+
 # review_drill (B2.1, 9g): one row per classified review x theme, the non-text
 # allowlist behind each theme bar. NEVER body/title/source_url — the join reaches
 # stg_reviews which carries them, so this exact column set is the guard. review_id

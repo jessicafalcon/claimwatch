@@ -2348,11 +2348,12 @@ PR `fix/theme-marts-run-id` (the two theme marts carry `run_id`), merged first.
 
 Gotcha: `rebuild()` builds the generic and model/simulator marts but NOT the
 classify step (the theme marts B2.2/B2.5 and the filling of classifier_quality
-B2.4) — that is the CLI's `_do_rebuild` → `_classify_and_print`. So a test that
+B2.4) — that is `build.classify_step` (the CLI's `_do_rebuild` → `_classify_and_print`
+wraps it; fix/idempotency-classify moved the step there). So a test that
 needs the Beat 2 marts must run the classify step too; `tests/conftest.py::
-build_study_db` does (rebuild + the CLI step with the model decider and the
-decision cache neutralised, so it is rules-only, deterministic, and writes
-nothing under `data/`). A corpus panel over `ROWS=none` (no reviews, no classify)
+build_study_db` does (rebuild + `classify_step` with `decide=None` and its cache
+in a temp path, so it is rules-only, deterministic, and writes nothing under
+`data/`). A corpus panel over `ROWS=none` (no reviews, no classify)
 finds the theme marts absent, not empty, so the gate probes
 `information_schema.tables` and renders "no data yet".
 
@@ -3264,3 +3265,47 @@ Phase 9's render (Phase 9a): the extra-billing share from data.ameli's
   row's trigger, met by this phase's first freeze, re-deferred to a `fix/`
   PR with the wider wording; the skill's "two tracked subtrees" a tooling
   row.
+
+### Fix — the classify step runs inside `idempotency-check` (2026-09-12, branch `fix/idempotency-classify`)
+
+Not a phase (no spec; a design-change fix PR from `main`, CLAUDE.md → Git
+workflow). The amendment restores this invariant: **the machine idempotency
+check covers every mart the pipeline writes deterministically offline, the
+classify-path marts included.** Until now `idempotency_check` called
+`rebuild()` only, which stops before the classify step, so
+`stg_classified_reviews`, the three `POST_CLASSIFY_MARTS` and
+`pipeline_row_counts` never entered its per-table diff — machine-checked only
+by two slow scenario tests (BACKLOG, opened `fix/theme-marts-run-id` round 1).
+The classify step's code lived in `pipeline/cli.py::_classify_and_print`,
+which `pipeline/build.py` cannot import (cli imports build); the Repo map
+already names build.py as the home of "the classify step," so this is a
+who-writes-what change that restores the documented layering.
+
+- **The classify step's code moves into one `build.py` function,
+  `classify_step`, taking a cache path so a throwaway run touches no tracked
+  cache.** `_classify_and_print` wraps it and prints; `idempotency_check`
+  calls it after `rebuild()` with a cache path inside the tempdir it already
+  creates, then compares whole-db `table_counts`. The duplicated
+  `_classify_and_build` test helper (a rules-only re-implementation that
+  existed only because there was no shared function) is rewritten to a thin
+  wrapper over `classify_step`, so the duplication is gone. *Rejected: a new
+  `pipeline/classify_step.py` module
+  (the amendment scoped it to a build.py function; build.py already owns the
+  step per the Repo map); `idempotency_check` importing from `cli` (a layering
+  inversion); leaving the two slow scenario tests as the only coverage (the
+  BACKLOG row's whole point — the target, not a sibling test, must see the
+  marts).*
+- **Whole-db `table_counts`, so `classifier_quality` is covered too —
+  superseding the amendment's "stays out (corpus-gated)."** Excluding one
+  deterministic table would need a denylist-of-one, the smell CLAUDE.md's
+  "fix the class, not the case" forbids; including it is stable (delete+insert,
+  deterministic offline) and stricter. On an input the answer key does not
+  cover it holds 0 rows in both runs (its DDL shell, which `rebuild()` creates —
+  `classify_step` leaves it empty when `graded` is false), still equal. *Rejected:
+  filtering `classifier_quality` out of the comparison (the denylist);
+  passing `classify_step` a `write_quality=False` flag for the idempotency
+  path (behavior divergence between the two callers).*
+- **No warehouse-awareness change.** The classify step's DuckDB-only
+  connection (BACKLOG, `TARGET` not yet threaded) stays as it is; that row is
+  Phase 10's Snowflake wiring. This fix is offline, DuckDB-only, no key. One
+  PR, one concern.

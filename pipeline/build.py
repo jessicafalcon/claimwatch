@@ -36,10 +36,17 @@ import sys
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 
+from classify.cache import read_decisions, write_decisions
+from classify.combined import classify_all
+from classify.eval.gate import ANSWER_KEY, HELDOUT_FOLD, LabelScore, score_heldout
+from classify.labels import review_id
+from classify.llm import Decide
+from classify.rules import load_rules
 from ingest.captures import parser_module, read_captures
 from ingest.parsed import MEASURES, PageShapeError, count_in_range, review_rating
 from ingest.sources import (
@@ -752,7 +759,7 @@ def create_raw(conn) -> None:
 
 
 # The marts that read stg_classified_reviews, which Python fills in the classify
-# step (pipeline/cli.py) after staging: the two theme-share marts (B2.2, B2.5) and
+# step (classify_step, below) after staging: the two theme-share marts (B2.2, B2.5) and
 # the review-level drill (B2.1, 9g). The generic pass runs before classify, so it
 # would build them empty — the classify step runs them instead
 # (build_post_classify_marts), after the table is filled.
@@ -843,6 +850,106 @@ def write_classifier_quality(
         conn.execute("rollback")
         raise
     conn.execute("commit")
+
+
+@dataclass(frozen=True)
+class ClassifyOutcome:
+    """What `classify_step` hands back for the caller to print: the review count,
+    the review x theme rows (for the label tallies), the gate's per-label scores,
+    and whether the held-out fold was gradeable for this corpus. The writes are
+    already done — this is display data, not a second source of truth."""
+
+    n_reviews: int
+    rows: list[tuple[str, str]]
+    scores: tuple[LabelScore, ...]
+    graded: bool
+
+
+def _staged_review_rows(db: str | Path) -> list[tuple[str, str, str, str]] | None:
+    """`(source, external_id, title, body)` for every staged review, or None when
+    the warehouse has no `stg_reviews` yet. One read feeds both the identity map
+    and `_review_texts` — the answer key is never touched here."""
+    db = Path(db)
+    if not db.is_file():
+        return None
+    conn = connect("duckdb", database=db)
+    try:
+        exists = conn.execute(
+            "select count(*) from information_schema.tables "
+            "where table_name = 'stg_reviews'"
+        ).fetchone()[0]
+        if not exists:
+            return None
+        return conn.execute(
+            "select source, external_id, title, body from stg_reviews"
+        ).fetchall()
+    finally:
+        conn.close()
+
+
+def _review_texts(staged: list[tuple[str, str, str, str]]) -> list[tuple[str, str]]:
+    """`(review_id, text)` per staged row — the words the rules read (title and
+    body, blank-joined). The one home for that projection: the classify step and
+    the CLI's eval command both derive their reviews from it."""
+    return [
+        (review_id(s, e), "\n".join(p for p in (t, b) if p).strip())
+        for s, e, t, b in staged
+    ]
+
+
+def classify_step(
+    db: str | Path,
+    run_id: str,
+    *,
+    cache_path: str | Path,
+    decide: Decide | None = None,
+) -> ClassifyOutcome | None:
+    """Run the combined classifier over `stg_reviews` and fill the classify-path
+    tables: `stg_classified_reviews` (the review x theme grain), the three
+    `POST_CLASSIFY_MARTS`, `pipeline_row_counts` (B5.2) and — only when the answer
+    key covers the held-out fold — `classifier_quality` (B2.4). Returns the counts
+    and gate scores for the caller to print, or None when there is no `stg_reviews`
+    yet (nothing to classify). The model is reached only through `decide`
+    (None -> rules only, the no-key run); `cache_path` is where the decision cache
+    is read and rewritten, so a throwaway run (idempotency-check) names its own
+    path and touches no tracked cache. Deterministic given the cache; the gate is
+    offline. review_id maps a `(review_id, theme)` row back to `(source,
+    external_id)` in Python, so nothing hashes in SQL, and `run_id` is provenance
+    (byte-stable per input; not in any natural key)."""
+    staged = _staged_review_rows(db)
+    if staged is None:
+        return None
+    identity = {review_id(s, e): (s, e) for s, e, _, _ in staged}
+    reviews = _review_texts(staged)
+    decisions = read_decisions(cache_path)
+    rows, decisions = classify_all(
+        reviews, rules=load_rules(), decide=decide, decisions=decisions
+    )
+    write_decisions(decisions, cache_path)
+
+    classified = sorted(
+        (identity[rid][0], identity[rid][1], theme) for rid, theme in rows
+    )
+    scores = score_heldout(rows)
+    graded = any(s.predicted or s.actual for s in scores)
+    conn = connect("duckdb", database=db)
+    try:
+        write_classified_reviews(conn, classified, run_id=run_id)
+        build_post_classify_marts(conn)
+        write_pipeline_row_counts(conn, run_id=run_id)
+        if graded:
+            write_classifier_quality(
+                conn,
+                scores,
+                answer_key=ANSWER_KEY,
+                heldout_fold=HELDOUT_FOLD,
+                run_id=run_id,
+            )
+    finally:
+        conn.close()
+    return ClassifyOutcome(
+        n_reviews=len(reviews), rows=rows, scores=scores, graded=graded
+    )
 
 
 _MODEL_TAG = "Modeled"
@@ -1297,8 +1404,8 @@ _ROW_COUNT_STAGES = ("raw_reviews", "stg_reviews", "stg_classified_reviews")
 
 def write_pipeline_row_counts(conn, run_id: str) -> None:
     """Fill the `pipeline_row_counts` mart (B5.2): one row per review-pipeline
-    stage, each value a direct count(*) of that stage's table. Runs in the CLI
-    classify path (after stg_classified_reviews is filled), so the classified
+    stage, each value a direct count(*) of that stage's table. Runs in
+    `classify_step` (after stg_classified_reviews is filled), so the classified
     stage is counted; corpus-gated at render like classifier_quality. The table is
     cleared first so a re-populate is idempotent; the stages go in flow order, so a
     re-run is byte-identical."""
@@ -1500,28 +1607,39 @@ def idempotency_check(
     manual_file: str | Path | None = None,
     fetched_file: str | Path | None = None,
 ) -> tuple[bool, dict[str, int], dict[str, int]]:
-    """Rebuild twice into one fresh database (different `run_id` each time, to
-    prove `run_id` is not in the natural key) and compare per-table counts. Uses a
-    throwaway file so it depends on no prior state and touches no working db."""
+    """Rebuild AND run the classify step twice into one fresh database (a
+    different `run_id` each time, to prove `run_id` is not in any natural key),
+    then compare every table's count — the classify-path tables
+    (`stg_classified_reviews`, the three `POST_CLASSIFY_MARTS`,
+    `pipeline_row_counts`, and `classifier_quality` when the corpus is graded)
+    included, since `rebuild()` alone stops before them. The classify step runs
+    rules-only (no model decider, the no-key run) with its decision cache in the
+    throwaway directory, so the check is offline and touches no tracked cache.
+    Uses a throwaway file so it depends on no prior state and touches no working
+    db. DuckDB only — threading `TARGET` through the classify step is Phase 10."""
     with tempfile.TemporaryDirectory() as tmp:
-        first = rebuild(
-            target,
-            rows,
-            root=tmp,
-            run_id="run-1",
-            cache_dir=cache_dir,
-            manual_file=manual_file,
-            fetched_file=fetched_file,
-        )
-        second = rebuild(
-            target,
-            rows,
-            root=tmp,
-            run_id="run-2",
-            cache_dir=cache_dir,
-            manual_file=manual_file,
-            fetched_file=fetched_file,
-        )
+        db = warehouse.database_for(rows, tmp)
+        cache = Path(tmp) / "decisions.csv"
+
+        def _build_and_count(run_id: str) -> dict[str, int]:
+            rebuild(
+                target,
+                rows,
+                root=tmp,
+                run_id=run_id,
+                cache_dir=cache_dir,
+                manual_file=manual_file,
+                fetched_file=fetched_file,
+            )
+            classify_step(db, run_id, cache_path=cache)  # decide=None -> rules only
+            conn = connect("duckdb", database=db)
+            try:
+                return table_counts(conn)
+            finally:
+                conn.close()
+
+        first = _build_and_count("run-1")
+        second = _build_and_count("run-2")
     return first == second, first, second
 
 

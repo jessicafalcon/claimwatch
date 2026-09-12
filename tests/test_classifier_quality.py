@@ -6,13 +6,20 @@ fold 4, and the mart is deterministic across reruns."""
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from classify.eval.gate import ANSWER_KEY, HELDOUT_FOLD, LabelScore, score_heldout
 from classify.labels import review_id
 from classify.rules import classify as rules_classify
 from classify.rules import load_rules
-from pipeline.build import rebuild, write_classifier_quality
+from pipeline.build import (
+    ClassifyOutcome,
+    classify_step,
+    rebuild,
+    write_classifier_quality,
+)
 from pipeline.warehouse import connect, database_for
 from tests import pins
 
@@ -68,6 +75,24 @@ def test_mart_exists_empty_after_rebuild(tmp_path):
         assert (
             conn.execute("select count(*) from classifier_quality").fetchone()[0] == 0
         )
+    finally:
+        conn.close()
+
+
+def test_classify_step_writes_no_quality_on_an_ungraded_corpus(tmp_path):
+    # A1 (never fake a Measured number): on a corpus the answer key does not cover,
+    # classify_step must leave classifier_quality empty, not fill it with all-null
+    # Measured rows. `samples` has reviews but no held-out labels, so it grades
+    # nothing. Pins the `if graded:` guard in classify_step (a mutation to it
+    # survived the rest of the suite — round 1 functionality-tester).
+    rebuild("duckdb", "samples", root=tmp_path, run_id="t")
+    db = database_for("samples", tmp_path)
+    outcome = classify_step(db, "t", cache_path=Path(db).with_name("decisions.csv"))
+    assert isinstance(outcome, ClassifyOutcome) and outcome.graded is False
+    conn = connect("duckdb", database=db)
+    try:
+        count = conn.execute("select count(*) from classifier_quality").fetchone()[0]
+        assert count == 0
     finally:
         conn.close()
 

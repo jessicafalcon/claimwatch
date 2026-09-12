@@ -185,23 +185,22 @@ def test_b52_is_corpus_gated(synthetic_db, none_db, tmp_path):
 
 
 # --- invariant 5: pipeline_row_counts is stable across a re-classify -----------
-# `make idempotency-check` runs rebuild() only (before classify), so it never
-# fills this mart; its stability is proven here, not by that target.
+# `make idempotency-check` now runs the classify step too, so it covers this mart
+# by row count; this proves the stronger byte-identity of its rows across a
+# re-classify on the same warehouse (same input, so run_id is constant here).
 def test_pipeline_row_counts_stable_across_reclassify(tmp_path):
-    from pipeline import cli
-    from pipeline.build import rebuild
+    from pathlib import Path
+
+    from pipeline.build import classify_step, rebuild
     from pipeline.warehouse import database_for
 
     root = tmp_path / "reclass"
     rebuild("duckdb", "synthetic", root=root)
     db = database_for("synthetic", root)
+    cache = Path(db).with_name("decisions.csv")
 
     def _classify_once() -> None:
-        with pytest.MonkeyPatch.context() as mp:
-            mp.setattr(cli, "make_model_decider", lambda: None)
-            mp.setattr(cli, "read_decisions", lambda *a, **k: {})
-            mp.setattr(cli, "write_decisions", lambda *a, **k: None)
-            cli._classify_and_print(db, "synthetic")
+        classify_step(db, "synthetic", cache_path=cache)  # decide=None -> rules only
 
     counts_sql = "select stage, value, run_id, tag from pipeline_row_counts order by 1"
     _classify_once()

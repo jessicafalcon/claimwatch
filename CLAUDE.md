@@ -603,12 +603,18 @@ profession-family spread, read by no formula — the
 export is a hand download, since the host's robots file disallows the API and
 download paths; `slice-ameli` and `split-ameli` are offline.
 
-**Next:** Phase 10 (the Airflow DAG; its
-spec decides how the publish task calls `python -m study.metabase
-export|apply`, which are not `make` targets — `docs/PLAN.md` §5 says five
-`make` tasks — and is the home for the classify-path idempotency target,
-BACKLOG). A `fix/idempotency-classify` PR may land that target sooner.
+**Delivered, in review:** `fix/idempotency-classify` (built 2026-09-12): the
+classify step's code moved from `pipeline/cli.py::_classify_and_print` into
+`pipeline/build.py::classify_step` (the Repo map's home for the step), and
+`idempotency-check` now runs it after `rebuild()` with an isolated cache and
+compares whole-db `table_counts`, so the six classify-path tables are in its
+diff (DECISIONS → Fix; BACKLOG row closed).
 
-Open BACKLOG rows: **40**.
+**Next:** Phase 10 (the Airflow DAG). Its spec decides how the publish task
+calls `python -m study.metabase export|apply`, which are not `make` targets
+(`docs/PLAN.md` §5 names five `make` tasks). The classify step's
+`TARGET`-awareness for Snowflake stays a Phase 10 BACKLOG row.
+
+Open BACKLOG rows: **39**.
 
 (Update this section at the end of every working day.)

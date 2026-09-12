@@ -22,11 +22,10 @@ import os
 import sys
 from contextlib import suppress
 
-from classify.cache import read_decisions, write_decisions
-from classify.combined import classify_all
-from classify.eval.gate import ANSWER_KEY, HELDOUT_FOLD, format_gate, score_heldout
+from classify.cache import DECISIONS
+from classify.eval.gate import HELDOUT_FOLD, format_gate
 from classify.eval.precision import evaluate, format_report
-from classify.labels import POSITIVE, THEMES, UNCLASSIFIED, review_id
+from classify.labels import POSITIVE, THEMES, UNCLASSIFIED
 from classify.llm import ModelError, make_model_decider, model_available
 from classify.rules import classify as classify_reviews
 from classify.rules import load_rules
@@ -72,17 +71,16 @@ from opendata.sources import AMELI_EXPORT, cache_path, valid_month, valid_year
 from pipeline.build import (
     FETCHED_SNAPSHOTS,
     INPUTS,
-    build_post_classify_marts,
+    _review_texts,
+    _staged_review_rows,
     captures_for,
+    classify_step,
     idempotency_check,
     read_model_inputs,
     rebuild,
     record_snapshots,
     reset,
     reviews_per_month,
-    write_classified_reviews,
-    write_classifier_quality,
-    write_pipeline_row_counts,
 )
 from pipeline.label_sample import SHEET, label_sample
 from pipeline.warehouse import ROOT, TARGETS, connect, database_for
@@ -260,77 +258,40 @@ def _do_rebuild(args: argparse.Namespace) -> int:
 
 
 def _classify_and_print(db, rows_input: str) -> None:
-    """Run the combined classification (rules + model) over the warehouse's
-    `stg_reviews`, grade it on the held-out fold, write the `classifier_quality`
-    mart (B2.4), and print both summaries. The model is called from
-    `classify/llm.py` only, and only when a key is set (developer-run, paid) and
-    only for rules-`unclassified` reviews not already in the cache. With no key the
-    ambiguous reviews stay `unclassified` — the gray 'not yet classified' band —
-    the classifier is rules-only, and the gate scores that truthfully (lower
-    recall). Deterministic given the cache; the gate itself is offline (it grades
-    stored predictions against the hand answer key — no model call)."""
-    reviews = _staged_reviews_text(db)
-    if reviews is None:
+    """Run the classify step over the warehouse's `stg_reviews` and print both
+    summaries. The step's code and every write live in
+    `pipeline.build.classify_step` (the Repo map's home for the classify step),
+    which this wraps with the model decider and the display; here the decider is
+    `make_model_decider()` (None when no key) and the decision cache is the
+    tracked default. The model is called from `classify/llm.py` only, and only
+    when a key is set (developer-run, paid) and only for rules-`unclassified`
+    reviews not already in the cache. With no key the ambiguous reviews stay
+    `unclassified` — the gray 'not yet classified' band — the classifier is
+    rules-only, and the gate scores that truthfully (lower recall). The gate
+    itself is offline (it grades stored predictions against the hand answer key —
+    no model call)."""
+    outcome = classify_step(
+        db, rows_input, cache_path=DECISIONS, decide=make_model_decider()
+    )
+    if outcome is None:
         print("classification: no stg_reviews yet (nothing to classify)")
         return
-    decide = make_model_decider()  # None when no key
-    decisions = read_decisions()
-    rows, decisions = classify_all(
-        reviews, rules=load_rules(), decide=decide, decisions=decisions
-    )
-    write_decisions(decisions)
 
-    # Persist the classification at the (source, external_id, theme) grain and
-    # build the theme-share marts (B2.2, B2.5) over it. review_id maps back to
-    # (source, external_id) so nothing hashes in SQL. run_id is the rebuild input
-    # name: provenance, byte-stable per input.
-    identity = _review_identities(db)
-    classified = sorted(
-        (identity[rid][0], identity[rid][1], theme) for rid, theme in rows
-    )
-
-    # Grade on the held-out fold. The CLI hands the gate the classifier's
-    # predictions and gets scores back — it reads no answer key (the wall). The
-    # gate scores only reviews both classified and labeled (amendment A1), so a
-    # corpus the answer key does not cover grades nothing — write no mart then,
-    # rather than a mart of all-`None` Measured rows for a corpus we did not grade.
-    scores = score_heldout(rows)
-    graded = any(s.predicted or s.actual for s in scores)
-    conn = connect("duckdb", database=db)
-    try:
-        write_classified_reviews(conn, classified, run_id=rows_input)
-        build_post_classify_marts(conn)
-        # B5.2: the per-stage row counts, after the classified stage exists, so
-        # pipeline_row_counts counts it too (corpus-gated at render like the theme
-        # marts). Idempotency-check runs rebuild() only, so a named test proves
-        # this mart's stability instead of that target (spec invariant 5).
-        write_pipeline_row_counts(conn, run_id=rows_input)
-        if graded:
-            write_classifier_quality(
-                conn,
-                scores,
-                answer_key=ANSWER_KEY,
-                heldout_fold=HELDOUT_FOLD,
-                run_id=rows_input,
-            )
-    finally:
-        conn.close()
-
-    theme_rows = sum(1 for _, label in rows if label in THEMES)
-    positive = sum(1 for _, label in rows if label == POSITIVE)
-    unclassified = sum(1 for _, label in rows if label == UNCLASSIFIED)
+    theme_rows = sum(1 for _, label in outcome.rows if label in THEMES)
+    positive = sum(1 for _, label in outcome.rows if label == POSITIVE)
+    unclassified = sum(1 for _, label in outcome.rows if label == UNCLASSIFIED)
     key_note = (
         "rules + model"
         if model_available()
         else "rules only — no ANTHROPIC_API_KEY, ambiguous reviews are unclassified"
     )
     print(f"classification ({key_note}; one row per review x theme):")
-    print(f"  reviews         {len(reviews)}")
+    print(f"  reviews         {outcome.n_reviews}")
     print(f"  theme rows      {theme_rows}")
     print(f"  positive        {positive}")
     print(f"  unclassified    {unclassified}   (the 'not yet classified' band)")
-    if graded:
-        print(format_gate(scores))
+    if outcome.graded:
+        print(format_gate(outcome.scores))
     else:
         print(
             f"classifier quality — no reviews on the held-out fold {HELDOUT_FOLD} "
@@ -423,51 +384,13 @@ def _do_label_sample(args: argparse.Namespace) -> int:
 def _staged_reviews_text(db) -> list[tuple[str, str]] | None:
     """`(review_id, text)` for every staged review, or None if the warehouse has
     no `stg_reviews` yet. `text` is the review's title and body — the words the
-    rules read; the answer key is never touched here."""
-    if not db.is_file():
+    rules read; the answer key is never touched here. The read, its existence
+    guard and the text projection are `build._staged_review_rows`/`_review_texts`
+    (one reader and one projection, shared with the classify step)."""
+    staged = _staged_review_rows(db)
+    if staged is None:
         return None
-    conn = connect("duckdb", database=db)
-    try:
-        exists = conn.execute(
-            "select count(*) from information_schema.tables "
-            "where table_name = 'stg_reviews'"
-        ).fetchone()[0]
-        if not exists:
-            return None
-        rows = conn.execute(
-            "select source, external_id, title, body from stg_reviews"
-        ).fetchall()
-    finally:
-        conn.close()
-    out: list[tuple[str, str]] = []
-    for source, external_id, title, body in rows:
-        text = "\n".join(part for part in (title, body) if part).strip()
-        out.append((review_id(source, external_id), text))
-    return out
-
-
-def _review_identities(db) -> dict[str, tuple[str, str]]:
-    """`review_id -> (source, external_id)` for every staged review, so the
-    classifier's `(review_id, theme)` rows map back to the review's natural key
-    when they are persisted — the identity is a Python hash, never recomputed in
-    SQL. Empty when the warehouse has no `stg_reviews`."""
-    if not db.is_file():
-        return {}
-    conn = connect("duckdb", database=db)
-    try:
-        exists = conn.execute(
-            "select count(*) from information_schema.tables "
-            "where table_name = 'stg_reviews'"
-        ).fetchone()[0]
-        if not exists:
-            return {}
-        rows = conn.execute("select source, external_id from stg_reviews").fetchall()
-    finally:
-        conn.close()
-    return {
-        review_id(source, external_id): (source, external_id)
-        for source, external_id in rows
-    }
+    return _review_texts(staged)
 
 
 def _do_classify_eval(_args: argparse.Namespace) -> int:
@@ -675,7 +598,10 @@ def _do_simulate(_args: argparse.Namespace) -> int:
 
 
 def _do_idempotency(args: argparse.Namespace) -> int:
-    target = resolve_choice(args.target, TARGETS, "duckdb")
+    # idempotency-check runs the classify step (build.classify_step), which is
+    # DuckDB-only until Phase 10 wires TARGET through it; TARGET=snowflake is
+    # refused with one line here, not silently counted against an empty temp file.
+    target = resolve_choice(args.target, ("duckdb",), "duckdb")
     rows = resolve_choice(args.rows, INPUTS, "synthetic")
     ok, first, second = idempotency_check(target, rows)
     for name in sorted(set(first) | set(second)):
