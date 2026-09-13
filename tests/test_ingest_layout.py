@@ -186,6 +186,31 @@ def test_no_module_outside_the_seam_spells_an_engine_name():
     )
 
 
+_DRIVER_IMPORT = re.compile(r"^\s*(?:import|from)\s+(?:duckdb|snowflake)\b", re.M)
+
+
+def test_no_module_outside_the_seam_imports_a_database_driver():
+    """Portability: the seam's docstring says nothing else imports a database
+    driver, and until round 2 of Phase 10a nothing pinned it — the Metabase
+    export caught `duckdb.Error` by name (10b's seed #4, landed early). The
+    engine's error is `warehouse.DriverError`; the connection is
+    `warehouse.connect`."""
+    hits = {
+        str(p.relative_to(ROOT)): [
+            i
+            for i, line in enumerate(repo_text(p).splitlines(), 1)
+            if _DRIVER_IMPORT.match(line)
+        ]
+        for p in _modules()
+        if p.relative_to(ROOT).as_posix() != SEAM and not is_binary_asset(p)
+    }
+    assert {k: v for k, v in hits.items() if v} == {}, hits
+    assert _DRIVER_IMPORT.search("import duckdb\n") and _DRIVER_IMPORT.search(
+        "from snowflake import x"
+    )
+    assert not _DRIVER_IMPORT.search("from pipeline import warehouse")
+
+
 def test_no_module_spells_an_engines_schema_name():
     """Portability: `pipeline/warehouse.py` is the one file that knows DuckDB
     from Snowflake, and it reads the default schema from the engine. A

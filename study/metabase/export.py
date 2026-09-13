@@ -19,7 +19,6 @@ import sqlite3
 from decimal import Decimal
 from pathlib import Path
 
-import duckdb
 import yaml
 
 from pipeline import warehouse
@@ -62,7 +61,7 @@ def _columns(duck_conn, table: str) -> list[str]:
     is refused in one line naming it, not a raw duckdb traceback at the boundary."""
     try:
         cur = duck_conn.execute(f"select * from {table} limit 0")
-    except duckdb.Error as error:
+    except warehouse.DriverError as error:
         raise ExportError(
             f"mart {table!r} not found — run `make rebuild` (then the classify "
             f"step) before exporting"
