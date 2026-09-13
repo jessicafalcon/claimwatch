@@ -134,7 +134,7 @@ def build_sqlite(
     sqlite_path = Path(sqlite_path)
     sqlite_path.parent.mkdir(parents=True, exist_ok=True)
     sqlite_path.unlink(missing_ok=True)
-    duck_conn = warehouse.connect("duckdb", database=duck_db)
+    duck_conn = warehouse.connect(warehouse.LOCAL, database=duck_db)
     sqlite_conn = sqlite3.connect(sqlite_path)
     try:
         for table, order_by in EXPORTED_MARTS:

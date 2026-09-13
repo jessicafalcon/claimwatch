@@ -29,6 +29,7 @@ def _scrub_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
         "BASE",
         "TARGET",
         "ROWS",
+        "STAGE",
         "CONFIRM",
         "SOURCE",
         "MAKEFLAGS",

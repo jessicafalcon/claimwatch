@@ -270,7 +270,7 @@ def test_export_command_routes_rows_to_the_matching_database(monkeypatch):
 
     seen = {}
 
-    def fake_build(duck_db=None):
+    def fake_build(duck_db=None, sqlite_path=None):
         seen["db"] = duck_db
         return Path("x")
 

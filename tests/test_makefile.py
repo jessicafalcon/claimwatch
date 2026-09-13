@@ -16,7 +16,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from review_common import make_targets
 
 from pipeline.build import INPUTS
-from pipeline.cli import CONFIRM_STAMP, Refused, confirmed, resolve_choice
+from pipeline.cli import CONFIRM_STAMP, STAGES, Refused, confirmed, resolve_choice
 from pipeline.warehouse import TARGETS
 
 pytestmark = pytest.mark.slow  # slow: kept out of the fast edit-loop hook
@@ -27,6 +27,7 @@ SCRUB = (
     "BASE",
     "TARGET",
     "ROWS",
+    "STAGE",
     "CONFIRM",
     "SOURCE",
     "MAKEFLAGS",
@@ -147,6 +148,40 @@ def test_idempotency_check_variables_are_a_closed_set():
             resolve_choice(bad, INPUTS, "synthetic")
 
 
+def test_stage_is_a_closed_set():
+    """Phase 10a: STAGE validates against the closed set; empty is the whole
+    (today's `make rebuild`); case, a list, a path or a metacharacter is just a
+    name not in the set."""
+    assert STAGES == ("all", "load", "clean", "classify")
+    assert resolve_choice("", STAGES, "all") == "all"
+    for stage in ("load", "clean", "classify", "all"):
+        assert resolve_choice(stage, STAGES, "all") == stage
+    for bad in (*BAD_VALUES, "Load", "all,load", "load clean", "derive"):
+        with pytest.raises(Refused):
+            resolve_choice(bad, STAGES, "all")
+
+
+def test_env_exported_stage_reaches_the_recipe_and_is_validated_in_python():
+    """The container's mechanism (10a): a STAGE (or ROWS) set in the environment
+    reaches the recipe as one literal — `unexport` strips only the child
+    environment — and Python is the guard."""
+    assert "--stage='load'" in _make_n("rebuild", {}, {"STAGE": "load"})
+    assert "--stage='../x'" in _make_n("rebuild", {}, {"STAGE": "../x"})
+    with pytest.raises(Refused):
+        resolve_choice("../x", STAGES, "all")
+    assert "--rows='synthetic'" in _make_n("publish", {}, {"ROWS": "synthetic"})
+
+
+def test_publish_passes_rows_unexpanded_as_one_literal():
+    """`make publish` is one recipe line — the Metabase export for the named
+    input — and nothing else; an empty ROWS reaches Python empty (its default
+    is the corpus, resolved there)."""
+    out = _make_n("publish", {"ROWS": "synthetic"}, {})
+    assert out.strip() == "uv run python -m study.metabase export --rows='synthetic'"
+    assert _make_n("publish", {}, {}).strip().endswith("--rows=''")
+    assert "study export" not in out  # the HTML page is not a publish step
+
+
 def test_rows_outside_the_set_is_refused():
     for bad in ("../x", "prod", '"; rm -rf', "SYNTHETIC", "fixtures/app-store"):
         with pytest.raises(Refused):
@@ -161,6 +196,8 @@ def test_rows_outside_the_set_is_refused():
         ("idempotency-check", "TARGET", "--target"),
         ("idempotency-check", "ROWS", "--rows"),
         ("slice-ameli", "YEAR", "--year"),  # 9i: the one new variable target
+        ("rebuild", "STAGE", "--stage"),  # 10a
+        ("publish", "ROWS", "--rows"),  # 10a
     ],
 )
 def test_pipeline_variables_reach_python_as_one_literal(target, var, flag):

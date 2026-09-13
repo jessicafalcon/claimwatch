@@ -1,12 +1,12 @@
 # The Friction Ledger — one command per stage. `make help` lists them.
 # Pipeline targets land with their phases (CLAUDE.md → Commands):
 # rebuild, idempotency-check, reset (Phase 1); scrape (Phase 2); label-sample,
-# classify-eval (5); model, simulate (8); study (9).
+# classify-eval (5); model, simulate (8); study (9); publish (10a).
 
 .PHONY: help setup test lint check-docs check-backing check-pins review-gate \
         rebuild idempotency-check confirm reset scrape record-snapshots \
         label-sample classify-eval fetch-damir sample-damir fit-damir \
-        slice-ameli split-ameli model simulate study
+        slice-ameli split-ameli model simulate study publish
 
 # User variables reach recipes ONLY as make values via `$(call _Q,$(value VAR))`
 # — UNEXPANDED and single-quoted — so a value like `SPEC='$(shell …)'` or
@@ -37,7 +37,7 @@
 # Goals run in order even under -j: `reset` must not start before `confirm`
 # has stamped (exit pass, security-reviewer #1; pinned by a -j2 probe).
 .NOTPARALLEL:
-unexport SPEC BASE TARGET ROWS SOURCE N MONTH YEAR
+unexport SPEC BASE TARGET ROWS STAGE SOURCE N MONTH YEAR
 _Q = '$(subst ','\'',$(1))'
 
 help: ## list the targets
@@ -65,8 +65,8 @@ check-pins: ## every public def added or changed since BASE is named in a test �
 review-gate: ## offline gate [SPEC=specs/<f>.md] [BASE=main]; with no SPEC a phase branch's spec licenses fixtures only; /review-round runs it first
 	uv run python scripts/review_gate.py $(if $(value SPEC),--spec=$(call _Q,$(value SPEC)),) --base=$(call _Q,$(if $(value BASE),$(value BASE),main))
 
-rebuild: ## build the warehouse from raw [TARGET=duckdb] [ROWS=captured|none|synthetic|samples]
-	uv run python -m pipeline rebuild --target=$(call _Q,$(value TARGET)) --rows=$(call _Q,$(value ROWS))
+rebuild: ## build the warehouse from raw [TARGET=duckdb] [ROWS=captured|none|synthetic|samples] [STAGE=all|load|clean|classify] — one stage into the input's own file, or all three in order
+	uv run python -m pipeline rebuild --target=$(call _Q,$(value TARGET)) --rows=$(call _Q,$(value ROWS)) --stage=$(call _Q,$(value STAGE))
 
 idempotency-check: ## rebuild twice, diff per-table row counts (run-twice property) [ROWS=synthetic]
 	uv run python -m pipeline idempotency-check --target=$(call _Q,$(value TARGET)) --rows=$(call _Q,$(value ROWS))
@@ -113,3 +113,6 @@ simulate: ## print the guardrail simulator — the three rules, the SLA threshol
 
 study: ## render the static HTML study to study/friction_ledger.html from the synthetic marts (offline, no variable; CI diffs the committed bytes)
 	uv run python -m study export
+
+publish: ## write the file the Metabase demonstration reads, data/metabase/metabase.sqlite, from the named input's marts [ROWS=captured] (offline, no credentials; the DAG's last task)
+	uv run python -m study.metabase export --rows=$(call _Q,$(value ROWS))

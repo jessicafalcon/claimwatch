@@ -726,3 +726,9 @@ BEAT5_STAGE_COUNTS = {
 # writes a field past it.
 CSV_FIELD_LIMIT_NARROWED = 64
 CSV_FIELD_PAST_DEFAULT_LIMIT_CHARS = 140_000
+
+# The one Airflow DAG (Phase 10a): five BashOperator tasks — the brief's
+# scrape -> load_raw -> clean -> classify -> publish — in a file that fits on
+# one screen. The task names themselves are `study.text.DAG_TASKS`.
+DAG_TASK_COUNT = 5
+DAG_LINE_CAP = 40

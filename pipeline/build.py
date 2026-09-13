@@ -70,7 +70,7 @@ from models import cost_model, guardrail_sim
 from opendata.fee_split import read_fee_split
 from opendata.fit import read_fit
 from pipeline import warehouse
-from pipeline.warehouse import ROOT, connect
+from pipeline.warehouse import LOCAL, ROOT, connect
 
 # The closed set of rebuild inputs, named by what they are (`ROWS=`, spec
 # Phase 3a, pinned decision 5): the scraper's captures under data/ (the real
@@ -885,7 +885,7 @@ def _staged_review_rows(db: str | Path) -> list[tuple[str, str, str, str]] | Non
     db = Path(db)
     if not db.is_file():
         return None
-    conn = connect("duckdb", database=db)
+    conn = connect(LOCAL, database=db)
     try:
         exists = conn.execute(
             "select count(*) from information_schema.tables "
@@ -945,7 +945,7 @@ def classify_step(
     )
     scores = score_heldout(rows)
     graded = any(s.predicted or s.actual for s in scores)
-    conn = connect("duckdb", database=db)
+    conn = connect(LOCAL, database=db)
     try:
         write_classified_reviews(conn, classified, run_id=run_id)
         build_post_classify_marts(conn)
@@ -1555,10 +1555,97 @@ def record_snapshots(
     return new
 
 
+# The two stages of a rebuild, in the order they run (Phase 10a): `load`
+# creates the raw tables and loads the input; `clean` derives staging and the
+# marts and fills the model, simulator and facts marts. The classify step is
+# the third stage at the CLI (`classify_step`), never inside rebuild(), as
+# before. A whole rebuild is both stages in one call; the DAG's `load_raw` and
+# `clean` tasks are one stage each into the same file, so the stages and the
+# whole share every function and every order (spec 10a, invariant 2).
+BUILD_STAGES = ("load", "clean")
+
+
+class StageError(Exception):
+    """A one-line refusal on the staged path: a stage asked to run over a
+    warehouse the earlier stage never built (`clean` before `load`, `classify`
+    before `clean`), named by the table that is missing."""
+
+
+def _require_raw_tables(conn, where: Path) -> None:
+    """`clean` reads the raw tables `load` creates; over a file without them
+    the staging SQL would fail inside the engine with its own message. Refuse
+    first, naming the missing table and the stage that writes it."""
+    for path in _sql_files("raw"):
+        if not _table_exists(conn, path.stem):
+            raise StageError(
+                f"STAGE=clean: table {path.stem!r} is missing in {where} — run "
+                "`make rebuild STAGE=load` first"
+            )
+
+
+def _load_stage(
+    conn,
+    rows: str,
+    run_id: str | None,
+    *,
+    cache_dir: str | Path | None,
+    manual_file: str | Path | None,
+    fetched_file: str | Path | None,
+) -> None:
+    """`load`: the raw DDL and every load for the input."""
+    create_raw(conn)
+    if rows != "none":
+        # every declaration the input loads, the samples' under `samples`,
+        # so every captured row joins exactly one page (A4 (c))
+        declared = SOURCES + (
+            tuple(sample_source(p) for p in PARSERS) if rows == "samples" else ()
+        )
+        write_source_pages(conn, run_id or "declared", declared)
+        load_snapshots(conn, read_anchors(), run_id or "anchors", rows)
+    if rows == "synthetic":
+        load_reviews(
+            conn,
+            _fixture_reviews_with_segment(read_fixture("synthetic")),
+            run_id or "synthetic",
+        )
+    if rows == "captured":
+        path = Path(manual_file) if manual_file is not None else MANUAL_SNAPSHOTS
+        load_snapshots(conn, read_manual_snapshots(path), run_id or "manual", rows)
+        fetched = Path(fetched_file) if fetched_file is not None else FETCHED_SNAPSHOTS
+        load_snapshots(conn, read_fetched_snapshots(fetched), run_id or "fetched", rows)
+    for source, capture_dir, prefix in captures_for(rows, cache_dir):
+        for capture_id, parsed in read_captures(capture_dir, source):
+            stamp = prefix if rows == "samples" else f"{prefix}/{capture_id}"
+            load_reviews(
+                conn,
+                _reviews_with_segment(parsed.reviews, source.segment),
+                run_id or stamp,
+            )
+            load_snapshots(conn, parsed.snapshots, run_id or stamp, rows)
+
+
+def _clean_stage(conn, run_id: str | None) -> None:
+    """`clean`: staging and the marts, then the three writers that need no key,
+    no reviews and no classify step."""
+    build_derived(conn)
+    # the model and simulator marts need no key, no reviews and no classify
+    # step — they compute over the tracked fit, so they fill inside rebuild()
+    # on every input, and idempotency-check (which calls rebuild() only) sees
+    # them. One read of the fit feeds both writers.
+    inputs = read_model_inputs()
+    write_model_marts(conn, inputs, run_id or "model")
+    write_sim_marts(conn, inputs, run_id or "model")
+    # The repo facts (B5.1) are constant on any input and need no key, no
+    # reviews and no classify step, so they fill here beside the model marts —
+    # on every ROWS input, none included, and covered by idempotency-check.
+    write_determinism_facts(conn, run_id or "model")
+
+
 def rebuild(
-    target: str = "duckdb",
+    target: str = LOCAL,
     rows: str = "none",
     *,
+    stages: tuple[str, ...] = BUILD_STAGES,
     root: str | Path | None = None,
     run_id: str | None = None,
     cache_dir: str | Path | None = None,
@@ -1574,63 +1661,36 @@ def rebuild(
     through the real parsers. Every input goes through the same guards. The
     file is always `warehouse.database_for(rows, root)`: a caller names the
     directory the files live in, never the file an input lands in, so the
-    literal `sample` can exist only in the samples file (A8 (e))."""
+    literal `sample` can exist only in the samples file (A8 (e)). `stages` is
+    which of `BUILD_STAGES` to run, in their fixed order — both by default;
+    `("clean",)` alone over a file `load` never built refuses naming the
+    missing table."""
     if rows not in INPUTS:
         raise ValueError(f"rows input {rows!r} not in {INPUTS}")
-    conn = connect(target, database=warehouse.database_for(rows, root))
+    if not stages or any(stage not in BUILD_STAGES for stage in stages):
+        raise ValueError(f"stages {stages!r} not within {BUILD_STAGES}")
+    db = warehouse.database_for(rows, root)
+    conn = connect(target, database=db)
     try:
-        create_raw(conn)
-        if rows != "none":
-            # every declaration the input loads, the samples' under `samples`,
-            # so every captured row joins exactly one page (A4 (c))
-            declared = SOURCES + (
-                tuple(sample_source(p) for p in PARSERS) if rows == "samples" else ()
-            )
-            write_source_pages(conn, run_id or "declared", declared)
-            load_snapshots(conn, read_anchors(), run_id or "anchors", rows)
-        if rows == "synthetic":
-            load_reviews(
+        if "load" in stages:
+            _load_stage(
                 conn,
-                _fixture_reviews_with_segment(read_fixture("synthetic")),
-                run_id or "synthetic",
+                rows,
+                run_id,
+                cache_dir=cache_dir,
+                manual_file=manual_file,
+                fetched_file=fetched_file,
             )
-        if rows == "captured":
-            path = Path(manual_file) if manual_file is not None else MANUAL_SNAPSHOTS
-            load_snapshots(conn, read_manual_snapshots(path), run_id or "manual", rows)
-            fetched = (
-                Path(fetched_file) if fetched_file is not None else FETCHED_SNAPSHOTS
-            )
-            load_snapshots(
-                conn, read_fetched_snapshots(fetched), run_id or "fetched", rows
-            )
-        for source, capture_dir, prefix in captures_for(rows, cache_dir):
-            for capture_id, parsed in read_captures(capture_dir, source):
-                stamp = prefix if rows == "samples" else f"{prefix}/{capture_id}"
-                load_reviews(
-                    conn,
-                    _reviews_with_segment(parsed.reviews, source.segment),
-                    run_id or stamp,
-                )
-                load_snapshots(conn, parsed.snapshots, run_id or stamp, rows)
-        build_derived(conn)
-        # the model and simulator marts need no key, no reviews and no classify
-        # step — they compute over the tracked fit, so they fill inside rebuild()
-        # on every input, and idempotency-check (which calls rebuild() only) sees
-        # them. One read of the fit feeds both writers.
-        inputs = read_model_inputs()
-        write_model_marts(conn, inputs, run_id or "model")
-        write_sim_marts(conn, inputs, run_id or "model")
-        # The repo facts (B5.1) are constant on any input and need no key, no
-        # reviews and no classify step, so they fill here beside the model marts —
-        # on every ROWS input, none included, and covered by idempotency-check.
-        write_determinism_facts(conn, run_id or "model")
+        if "clean" in stages:
+            _require_raw_tables(conn, db)
+            _clean_stage(conn, run_id)
         return table_counts(conn)
     finally:
         conn.close()
 
 
 def idempotency_check(
-    target: str = "duckdb",
+    target: str = LOCAL,
     rows: str = "synthetic",
     *,
     cache_dir: str | Path | None = None,
@@ -1646,7 +1706,7 @@ def idempotency_check(
     rules-only (no model decider, the no-key run) with its decision cache in the
     throwaway directory, so the check is offline and touches no tracked cache.
     Uses a throwaway file so it depends on no prior state and touches no working
-    db. DuckDB only — threading `TARGET` through the classify step is Phase 10."""
+    db. DuckDB only — threading `TARGET` through the classify step is Phase 10b."""
     with tempfile.TemporaryDirectory() as tmp:
         db = warehouse.database_for(rows, tmp)
         cache = Path(tmp) / "decisions.csv"
@@ -1662,7 +1722,7 @@ def idempotency_check(
                 fetched_file=fetched_file,
             )
             classify_step(db, run_id, cache_path=cache)  # decide=None -> rules only
-            conn = connect("duckdb", database=db)
+            conn = connect(LOCAL, database=db)
             try:
                 return table_counts(conn)
             finally:
@@ -1688,14 +1748,14 @@ def built_databases() -> list[Path]:
     return [base] + [p for p in beside if p != base]
 
 
-def reset(target: str = "duckdb", *, database: str | Path | None = None) -> list[Path]:
+def reset(target: str = LOCAL, *, database: str | Path | None = None) -> list[Path]:
     """Delete the DuckDB files (and their write-ahead logs): with no `database`,
     every file this repo built — the real corpus and one per rebuild input,
     past or present (`built_databases`). The CLI gates this on the `confirm`
     goal of the same invocation; this function does the deletion once
     confirmed. Returns
     the files removed."""
-    if target != "duckdb":
+    if target != LOCAL:
         raise ValueError(f"reset only handles the DuckDB file, not {target!r}")
     dbs = built_databases() if database is None else [Path(database)]
     removed: list[Path] = []

@@ -1,0 +1,50 @@
+# dags/docker-compose.yml — the laptop Airflow for the demonstration (Phase 10a).
+# Developer-run, never CI (CI is offline, no Docker). One container running
+# `airflow standalone` (scheduler, DAG processor, API server, executor in one
+# process over the bundled SQLite metadata database) — verified live before the
+# spec was stamped (DECISIONS → Phase 10a).
+#
+# What the container can and cannot touch, by the mounts (spec 10a, done-when 5):
+#   - the repo, READ-ONLY at /opt/friction-ledger: the tasks read code, SQL,
+#     fixtures and the lock; no task can rewrite a tracked file;
+#   - data/ is a container-private named volume: the DuckDB file, the captures,
+#     the decision cache, the confirm stamp and the Metabase export land there,
+#     never in the host's data/ (where the real corpus lives);
+#   - the three tracked, numbers-only subtrees the rebuild reads are bound
+#     read-only inside that volume;
+#   - no env_file: no API key reaches the container, so the classify task is the
+#     no-key run by construction, and no credential of any kind is mounted;
+#   - the UI is published on the Mac's loopback address only.
+# The run's input is ROWS=synthetic from the environment (validated in Python
+# like a command-line value), so every table the run builds holds hand-written
+# fake reviews — synthetic fixture data, not a study finding. The scrape task
+# still runs the real polite fetch; its captures stay in the volume, unloaded.
+#
+# Run (from the repo root):
+#   cd dags && docker compose up --build            # first run builds the image
+#   docker compose logs airflow | grep -i password  # the generated admin login
+#   open http://127.0.0.1:8080                      # trigger friction_ledger
+#   docker compose down -v                          # remove the container + volume
+services:
+  airflow:
+    build: .
+    image: friction-ledger-airflow:3.3.1-python3.12
+    command: standalone
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/friction-ledger/dags
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      ROWS: synthetic
+      UV_PROJECT_ENVIRONMENT: /home/airflow/friction-ledger-venv
+      UV_CACHE_DIR: /home/airflow/uv-cache
+      UV_LOCKED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+    volumes:
+      - ..:/opt/friction-ledger:ro
+      - friction-data:/opt/friction-ledger/data
+      - ../data/snapshots:/opt/friction-ledger/data/snapshots:ro
+      - ../data/damir:/opt/friction-ledger/data/damir:ro
+      - ../data/ameli:/opt/friction-ledger/data/ameli:ro
+volumes:
+  friction-data:

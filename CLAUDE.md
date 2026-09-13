@@ -31,7 +31,7 @@ in the middle, and come out on the right as the numbers the study shows.
  (unsolicited voices)  (claim cost distros)  (revenue, fraud savings)
         \                     |                      /
          v                    v                     v
-          scrape -> load_raw -> clean -> classify -> publish     (one Airflow DAG, Phase 10)
+          scrape -> load_raw -> clean -> classify -> publish     (one Airflow DAG: dags/)
                               |
                               v
                   Warehouse (DuckDB by default; Snowflake behind TARGET=)
@@ -116,7 +116,11 @@ Delivered paragraph and `make help`, not here.
   demonstration (the SQLite export, the idempotent applier, `config.yaml`,
   `DEMONSTRATION.md` with synthetic-only screenshots); `study/paraphrases.yaml`
   — the only review text the drill shows.
-- `dags/` *(Phase 10)* — `friction_ledger.py`.
+- `dags/` — `friction_ledger.py` (the one DAG: five BashOperators over `make`,
+  no logic), the one-container Airflow (`Dockerfile`, `docker-compose.yml`:
+  the repo mounted read-only, `data/` a private volume, `ROWS=synthetic` from
+  the environment, no `env_file`), `DEMONSTRATION.md` with its synthetic-only
+  screenshot.
 - `fixtures/` — read-only after Phase 1, each set with a `MANIFEST.sha256`:
   `synthetic/` (hand-written fake reviews), `anchors/` (brief §6 figures,
   seeded as Documented), a hand-written capture set per parsed source in
@@ -161,8 +165,13 @@ cannot say:
   `Freeze:` line and a DECISIONS entry). `slice-ameli` reads a file a person
   saved from a browser at `data/cache/ameli/honoraires.csv`: the host's
   robots file disallows its API and download paths, so there is no fetch.
-- **`make rebuild [TARGET=duckdb] [ROWS=captured|none|synthetic|samples]`** —
-  raw → staging → marts, then the classify step: the rules plus, only when
+- **`make rebuild [TARGET=duckdb] [ROWS=captured|none|synthetic|samples]
+  [STAGE=all|load|clean|classify]`** — raw → staging → marts, then the
+  classify step; `STAGE=` runs one of the three (`load`: the raw DDL and the
+  loads; `clean`: staging, marts and the three key-free writers; `classify`:
+  the classify step) into the input's own file — the DAG's middle tasks — and
+  a stage over a file the earlier stage never built refuses naming the
+  missing table. The classify step: the rules plus, only when
   `ANTHROPIC_API_KEY` is set and only for the reviews the rules left
   `unclassified`, one cached model call each — with no key those reviews stay
   `unclassified` and the run is green. The held-out gate and the theme marts
@@ -174,6 +183,12 @@ cannot say:
   through its real parser; CI). A raw table already in the file must match
   its `sql/raw/` declaration column by column or the rebuild refuses naming
   both sides (`make confirm reset` first).
+- `publish [ROWS=captured]` writes `data/metabase/metabase.sqlite`, the file
+  the Metabase demonstration reads, from the named input's marts — offline,
+  no credentials, byte-identical on a rerun; the DAG's last task. The HTML
+  page is not a publish step (`study` renders the frozen synthetic input).
+  The Airflow container (`dags/docker-compose.yml`) is developer-run, never
+  CI; its `scrape` task is the same `make confirm scrape`.
 - **`make confirm <target>`** arms the destructive or network target that
   follows it in the SAME invocation and nothing else: `reset` (DESTRUCTIVE),
   `scrape [SOURCE=]` (NETWORK: robots.txt first and every page checked
@@ -611,22 +626,21 @@ fixtures check, keeps fixtures read-only on any other branch, and both
 summary lines count checks passed over checks run — DECISIONS → Fix; BACKLOG
 row closed).
 
-**In progress:** `phase-10a-airflow` (this branch): the spec
-`specs/phase-10a-airflow.md` (PROPOSED; challenged 2026-09-13 round 1 — rework,
-all findings amended) is the branch's only commit. Phase 10 is split on the
-≤ ~6 rule: **10a** the five-task DAG over bare `make` commands (`rebuild
-STAGE=`, `publish`), `warehouse.LOCAL` replacing every engine literal with a
-layout test, the one-container Airflow demonstration (repo mounted read-only,
-`data/` a private volume, `ROWS=synthetic` from the environment, no
-`env_file`); **10b** the seam's Snowflake branch, `TARGET` threaded through
-the classify step and the exports, the Snowflake run — its spec after 10a
-merges, seeded by round 1's findings #1–#4, #7, #9, #15, #17 (10a's Out of
-scope). STOP: the developer's Docker check of `airflow standalone` (10a stack
-risk 1), approval, `/phase-start 10a-airflow`, then build.
+**In progress:** `phase-10a-airflow` (this branch): spec
+`specs/phase-10a-airflow.md` (challenged 2026-09-13 round 1 — rework, all
+findings amended; approved 2026-09-13). Phase 10 is split on the ≤ ~6 rule:
+**10a** the five-task DAG over bare `make` commands (`rebuild STAGE=`,
+`publish`), `warehouse.LOCAL` replacing every engine literal with a layout
+test, the one-container Airflow demonstration; **10b** the seam's Snowflake
+branch, `TARGET` threaded through the classify step and the exports, the
+Snowflake run — its spec after 10a merges, seeded by round 1's findings #1–#4,
+#7, #9, #15, #17 (10a's Out of scope). Built: everything but the developer's
+demonstration run and its screenshot (`dags/screenshots/01-dag-run.png`),
+which `tests/test_dag.py` waits for.
 
 **Next:** Phase 10b (the Snowflake seam and run), after 10a merges — see 10a's
 Out of scope for its seeds; BACKLOG rows 33 and 50 are its triggers.
 
-Open BACKLOG rows: **37**.
+Open BACKLOG rows: **38**.
 
 (Update this section at the end of every working day.)

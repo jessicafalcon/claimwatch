@@ -69,8 +69,10 @@ from opendata.slice import (
 )
 from opendata.sources import AMELI_EXPORT, cache_path, valid_month, valid_year
 from pipeline.build import (
+    BUILD_STAGES,
     FETCHED_SNAPSHOTS,
     INPUTS,
+    StageError,
     _review_texts,
     _staged_review_rows,
     captures_for,
@@ -83,7 +85,7 @@ from pipeline.build import (
     reviews_per_month,
 )
 from pipeline.label_sample import SHEET, label_sample
-from pipeline.warehouse import ROOT, TARGETS, connect, database_for
+from pipeline.warehouse import LOCAL, ROOT, TARGETS, connect, database_for
 
 # The one binding of the confirmation stamp: under the gitignored data/ root,
 # never tracked, written by `make confirm` and consumed by the next `reset` or
@@ -226,22 +228,39 @@ def _prompt(question: str, refusal: str) -> bool:
     return False
 
 
+# `make rebuild STAGE=`: the whole, or one of the three stages the DAG runs as
+# its middle tasks (Phase 10a). `load` and `clean` are `build.BUILD_STAGES`;
+# `classify` is the classify step alone; `all` is the three in order — today's
+# `make rebuild`. A closed set, validated like TARGET and ROWS.
+STAGES = ("all", *BUILD_STAGES, "classify")
+
+
 def _do_rebuild(args: argparse.Namespace) -> int:
-    target = resolve_choice(args.target, TARGETS, "duckdb")
+    target = resolve_choice(args.target, TARGETS, LOCAL)
     rows = resolve_choice(args.rows, INPUTS, "captured")
-    if rows == "captured" and not any(
-        has_pages(root, parser_module(src.parser).EXTENSION)
-        for src, root, _ in captures_for(rows)
-        if src.parser is not None
+    stage = resolve_choice(args.stage, STAGES, "all")
+    db = database_for(rows)
+    if stage == "classify":
+        return _classify_and_print(db, rows)
+    if (
+        stage in ("all", "load")
+        and rows == "captured"
+        and not any(
+            has_pages(root, parser_module(src.parser).EXTENSION)
+            for src, root, _ in captures_for(rows)
+            if src.parser is not None
+        )
     ):
         shown = sources.CACHE_ROOT.relative_to(sources.CACHE_ROOT.parents[1])
         print(
             f"no captures under {shown} — nothing to load from the scraper; "
             "`make confirm scrape` fetches them (developer-run)"
         )
-    db = database_for(rows)
-    for name, n in rebuild(target, rows).items():  # the file is the input's own
+    stages = BUILD_STAGES if stage == "all" else (stage,)
+    for name, n in rebuild(target, rows, stages=stages).items():  # the input's own file
         print(f"{name:24} {n}")
+    if stage == "load":
+        return 0  # staging is the next stage; nothing derived to print yet
     conn = connect(target, database=db)
     try:
         months = reviews_per_month(conn)
@@ -253,11 +272,12 @@ def _do_rebuild(args: argparse.Namespace) -> int:
         print(f"  {source:{width}} {month}  {n}")
     if not months:
         print("  (none)")
-    _classify_and_print(db, rows)
-    return 0
+    if stage == "clean":
+        return 0  # the classify step is the next stage
+    return _classify_and_print(db, rows)
 
 
-def _classify_and_print(db, rows_input: str) -> None:
+def _classify_and_print(db, rows_input: str) -> int:
     """Run the classify step over the warehouse's `stg_reviews` and print both
     summaries. The step's code and every write live in
     `pipeline.build.classify_step` (the Repo map's home for the classify step),
@@ -274,8 +294,10 @@ def _classify_and_print(db, rows_input: str) -> None:
         db, rows_input, cache_path=DECISIONS, decide=make_model_decider()
     )
     if outcome is None:
-        print("classification: no stg_reviews yet (nothing to classify)")
-        return
+        raise StageError(
+            f"STAGE=classify: table 'stg_reviews' is missing in {_rel(db)} — run "
+            "`make rebuild STAGE=clean` first"
+        )
 
     theme_rows = sum(1 for _, label in outcome.rows if label in THEMES)
     positive = sum(1 for _, label in outcome.rows if label == POSITIVE)
@@ -298,6 +320,7 @@ def _classify_and_print(db, rows_input: str) -> None:
             "are in the answer key for this corpus; classifier_quality left empty "
             "(the answer key covers the synthetic corpus; real labels are Phase 7)"
         )
+    return 0
 
 
 def _do_scrape(args: argparse.Namespace) -> int:
@@ -605,9 +628,9 @@ def _do_simulate(_args: argparse.Namespace) -> int:
 
 def _do_idempotency(args: argparse.Namespace) -> int:
     # idempotency-check runs the classify step (build.classify_step), which is
-    # DuckDB-only until Phase 10 wires TARGET through it; TARGET=snowflake is
+    # DuckDB-only until Phase 10b threads TARGET through it; TARGET=snowflake is
     # refused with one line here, not silently counted against an empty temp file.
-    target = resolve_choice(args.target, ("duckdb",), "duckdb")
+    target = resolve_choice(args.target, (LOCAL,), LOCAL)
     rows = resolve_choice(args.rows, INPUTS, "synthetic")
     ok, first, second = idempotency_check(target, rows)
     for name in sorted(set(first) | set(second)):
@@ -625,7 +648,7 @@ def _do_reset(args: argparse.Namespace) -> int:
     # reset handles only the DuckDB file; TARGET=snowflake is refused with one
     # line here, not a traceback from reset() downstream.
     armed = confirmed(args.make_pid)  # consumed first, before any refusal (A9)
-    target = resolve_choice(args.target, ("duckdb",), "duckdb")
+    target = resolve_choice(args.target, (LOCAL,), LOCAL)
     if not armed:
         ok = _prompt(
             "Drop every DuckDB file this repo built (the corpus and one per "
@@ -649,6 +672,8 @@ def main(argv: list[str] | None = None) -> int:
         p = sub.add_parser(name, add_help=False)
         p.add_argument("--target", default="")
         p.add_argument("--rows", default="")
+        if name == "rebuild":
+            p.add_argument("--stage", default="")
     p = sub.add_parser("confirm", add_help=False)
     p.add_argument("--make-pid", dest="make_pid", default="")
     p.add_argument("--goals", default="")  # make's own goal list, in order
@@ -699,7 +724,14 @@ def main(argv: list[str] | None = None) -> int:
     except Refused as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    except (PageShapeError, ModelError, FetchError, CacheError, LabelError) as exc:
+    except (
+        PageShapeError,
+        ModelError,
+        FetchError,
+        CacheError,
+        LabelError,
+        StageError,
+    ) as exc:
         # Every declared refusal a command's library can raise, one line and
         # exit 2, never a traceback: a stored capture off its declared shape
         # (hand-edited, or a parser tightened since it was written); a model
@@ -708,7 +740,8 @@ def main(argv: list[str] | None = None) -> int:
         # or an empty body (the offline fit path never reaches here); the
         # decision cache or the answer key off its declared shape or a file
         # the parser cannot read (`rebuild`'s classify step and gate,
-        # `classify-eval`). A new declared type joins this tuple, never a
-        # fresh arm (fix/csv-reader-boundary, round 2).
+        # `classify-eval`); a stage run over a warehouse the earlier stage never
+        # built (10a). A new declared type joins this tuple, never a fresh arm
+        # (fix/csv-reader-boundary, round 2).
         print(f"refusing: {exc}", file=sys.stderr)
         return 2

@@ -26,11 +26,15 @@ data points.
 is rendered from a small set of hand-written example reviews. The figures we
 *count from reviews* — Beat 2's theme shares and classifier quality (Measured) —
 are therefore illustrative fixtures on it, not findings; your own rebuild over
-the captured reviews fills them from real data:
+the captured reviews fills the warehouse from real data:
 
 ```
 make rebuild ROWS=captured && make study
 ```
+
+(`make study` still renders the committed synthetic page; the real counts are in
+your warehouse and in the Metabase demonstration below — a captured render of
+the page is a BACKLOG row.)
 
 Beat 1's rating, channel-gap and stat-row points are **Documented** from public
 sources, and Beat 3 and Beat 4 are **Modeled** from public claim-cost data and
@@ -138,7 +142,12 @@ facts you can check in the code:
 The row counts at each pipeline stage, the eval scores, and the one command that
 rebuilds everything are the reproducibility panel *(Measured — B5.2)*. One
 command rebuilds every number from the raw reviews: `make rebuild`. Run it twice
-and the counts do not move.
+and the counts do not move. The same steps, the way a company would schedule
+them, are the one Airflow DAG in [`dags/friction_ledger.py`](dags/friction_ledger.py):
+scrape → load_raw → clean → classify → publish, five boxes in a row, each running
+one `make` command. The DAG holds no logic of its own, so what the scheduler runs
+and what you run by hand are the same five commands; the walk with a running
+Airflow is [`dags/DEMONSTRATION.md`](dags/DEMONSTRATION.md).
 
 *How we made sure.* We use plain SQL, not dbt: at a handful of SQL models the
 extra tool adds more to learn than it saves, and knowing when not to reach for a
@@ -181,7 +190,13 @@ we chose boring.
 API key and no network:
 
 - `make rebuild` — raw → cleaned → tagged, then the cost model and simulator.
-- `make study` — render the static HTML study; byte-identical on a rerun.
+  `STAGE=load|clean|classify` runs one of its three stages into the same file
+  (the DAG's middle tasks); the default is all three in order.
+- `make study` — render the static HTML study; byte-identical on a rerun. It
+  renders the frozen synthetic input, the committed page: a rebuild over your
+  captured reviews fills the warehouse, not this page.
+- `make publish` — write the file the Metabase demonstration reads from your
+  rebuild (`ROWS=captured` by default); the DAG's last task.
 - `make model` and `make simulate` — print the cost model and the guardrail
   simulator, each formula beside its value.
 - `make test` — the suite; `make check-docs` and `make check-backing` — the

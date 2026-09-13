@@ -21,7 +21,7 @@ import hashlib
 from pathlib import Path
 
 from classify.labels import review_id
-from pipeline.warehouse import ROOT, connect, database_for
+from pipeline.warehouse import LOCAL, ROOT, connect, database_for
 
 SHEET = ROOT / "data" / "label_sample.csv"
 SHEET_COLUMNS: tuple[str, ...] = ("review_id", "source_url", "text")
@@ -39,7 +39,7 @@ def _staged_reviews(db: Path) -> list[tuple[str, str, str]] | None:
     the review's title and body, the context a labeler reads."""
     if not db.is_file():
         return None
-    conn = connect("duckdb", database=db)
+    conn = connect(LOCAL, database=db)
     try:
         exists = conn.execute(
             "select count(*) from information_schema.tables "

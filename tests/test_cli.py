@@ -74,7 +74,7 @@ def test_cli_reset_refuses_non_duckdb_target(capsys):
 def test_cli_idempotency_check_refuses_non_duckdb_target(capsys):
     """idempotency-check runs the DuckDB-only classify step, so TARGET=snowflake is
     refused with one line (exit 2) here — never rebuilt into Snowflake then counted
-    against an empty temp DuckDB file (a silent green). Phase 10 threads TARGET
+    against an empty temp DuckDB file (a silent green). Phase 10b threads TARGET
     through the classify step and lifts this restriction."""
     code = main(["idempotency-check", "--target=snowflake"])
     assert code == 2

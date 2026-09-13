@@ -14,17 +14,20 @@ import pytest
 
 from ingest.parsed import PageShapeError
 from pipeline.build import (
+    BUILD_STAGES,
+    StageError,
     _columns,
     _table_exists,
     build_derived,
     check_raw_declaration,
+    classify_step,
     content_hash,
     create_raw,
     load_reviews,
     rebuild,
     table_counts,
 )
-from pipeline.warehouse import connect, database_for, default_schema
+from pipeline.warehouse import LOCAL, connect, database_for, default_schema
 
 pytestmark = pytest.mark.slow  # slow: kept out of the fast edit-loop hook
 
@@ -524,3 +527,70 @@ def test_the_database_file_is_derived_from_the_input_never_named(tmp_path):
             load_snapshots(conn, [], "t")  # rows_input is required
     finally:
         conn.close()
+
+
+# --- Phase 10a: the stage split -----------------------------------------------
+def _counts(root: Path) -> dict[str, int]:
+    conn = connect(LOCAL, database=database_for("synthetic", root))
+    try:
+        return table_counts(conn)
+    finally:
+        conn.close()
+
+
+def _classify(root: Path, run_id: str) -> None:
+    classify_step(database_for("synthetic", root), run_id, cache_path=root / "c.csv")
+
+
+def test_three_stages_in_order_equal_one_whole_rebuild(tmp_path):
+    """Invariant 2: `load`, `clean` and the classify step, run one at a time
+    into the same file, leave table for table the counts one whole rebuild plus
+    the classify step leaves — the DAG's middle tasks are the whole, split."""
+    whole, staged = tmp_path / "whole", tmp_path / "staged"
+    rebuild(LOCAL, "synthetic", root=whole, run_id="r")
+    _classify(whole, "r")
+    assert BUILD_STAGES == ("load", "clean")
+    for stage in BUILD_STAGES:
+        rebuild(LOCAL, "synthetic", stages=(stage,), root=staged, run_id="r")
+    _classify(staged, "r")
+    assert _counts(staged) == _counts(whole)
+    for table, n in pins.BEAT5_STAGE_COUNTS.items():
+        assert _counts(staged)[table] == n, table
+
+
+def test_a_stage_run_twice_adds_no_rows(tmp_path):
+    """Invariant 2: a repeated stage is idempotent like the whole — raw is keyed
+    on the natural key, the marts are replaced."""
+    for stage in BUILD_STAGES:
+        rebuild(LOCAL, "synthetic", stages=(stage,), root=tmp_path, run_id="run-1")
+        once = _counts(tmp_path)
+        rebuild(LOCAL, "synthetic", stages=(stage,), root=tmp_path, run_id="run-2")
+        assert _counts(tmp_path) == once, stage
+    _classify(tmp_path, "run-1")
+    once = _counts(tmp_path)
+    _classify(tmp_path, "run-2")
+    assert _counts(tmp_path) == once
+
+
+def test_clean_or_classify_before_load_refuses_naming_the_missing_table(
+    tmp_path, monkeypatch, capsys
+):
+    """A stage over a warehouse the earlier stage never built refuses in one
+    line naming the table and the stage that writes it — in the library
+    (`clean`) and at the CLI boundary (`classify`, exit 2), never the engine's
+    own error."""
+    with pytest.raises(StageError, match=r"STAGE=clean: table 'raw_\w+' is missing"):
+        rebuild(LOCAL, "synthetic", stages=("clean",), root=tmp_path)
+    with pytest.raises(ValueError, match="stages"):
+        rebuild(LOCAL, "synthetic", stages=("derive",), root=tmp_path)
+    import pipeline.warehouse as warehouse
+    from pipeline.cli import main
+
+    monkeypatch.setattr(warehouse, "DEFAULT_DB", tmp_path / "cli" / "w.duckdb")
+    assert main(["rebuild", "--rows=synthetic", "--stage=classify"]) == 2
+    err = capsys.readouterr().err
+    assert err.startswith("refusing: STAGE=classify: table 'stg_reviews' is missing")
+    assert err.count("\n") == 1 and "STAGE=clean" in err
+    assert main(["rebuild", "--rows=synthetic", "--stage=clean"]) == 2
+    err = capsys.readouterr().err
+    assert err.startswith("refusing: STAGE=clean: table 'raw_") and err.count("\n") == 1

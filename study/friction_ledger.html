@@ -607,7 +607,7 @@
 <h3>B5.2 · Rerun it and the numbers hold <span class="chip chip-measured">Measured</span></h3>
 <p class="blurb">The same reviews always produce the same numbers. This is how many reviews the pipeline holds at each step — as scraped, after removing duplicates, and after tagging by theme — so anyone can rebuild the study from the raw data and check every count.</p>
 <div class="fixture">Built from hand-written example reviews: a check that the study’s machinery works, not a result. The counted figures appear when the study is built over captured reviews.</div>
-<p class="note">How good the tagging is — precision and recall on reviews the classifier never saw — is the classifier-quality table above. One command rebuilds every number in this study from the raw reviews: `make rebuild`. Run it twice and the counts do not move.</p>
+<p class="note">How good the tagging is — precision and recall on reviews the classifier never saw — is the classifier-quality table above. One command rebuilds every number in this study from the raw reviews: `make rebuild`. Run it twice and the counts do not move. The same steps, as a scheduler would run them, are the one Airflow DAG (`dags/friction_ledger.py`): scrape → load_raw → clean → classify → publish — five commands and no logic of its own.</p>
 <p class="evidence">Evidence: B5.2 · Measured · source file pipeline/build.py</p>
 </section>
 </main></body></html>
