@@ -207,6 +207,20 @@ def test_the_compose_mounts_the_repo_read_only_isolates_data_carries_no_env_file
     assert "ANTHROPIC_API_KEY" not in env and not any("KEY" in k for k in env)
 
 
+def _bind_sources(doc: dict) -> list[str]:
+    """Every host path the compose binds, relative to the repo root: a source
+    is a bind unless it names one of the compose's own volumes, so a bare `..`
+    or `.` (the whole checkout) is a source the assertions see, not a shape the
+    filter drops (round 2, functionality-tester)."""
+    named = set(doc.get("volumes", {}))
+    out = []
+    for volume in doc["services"]["airflow"]["volumes"]:
+        source = volume.split(":", 1)[0]
+        if source not in named:
+            out.append(source.removeprefix("../"))
+    return out
+
+
 def test_the_compose_mounts_only_tracked_paths_the_tasks_read():
     """Amendment A1 (invariant 5, exact): every bind source is one tracked
     top-level entry of HEAD (or one of the three tracked data/ subtrees) —
@@ -215,8 +229,7 @@ def test_the_compose_mounts_only_tracked_paths_the_tasks_read():
     `model_call_sites` scans, the packages themselves and the project files,
     so a new read path outside the mounts names itself here."""
     doc = yaml.safe_load(repo_text(COMPOSE))
-    binds = [v for v in doc["services"]["airflow"]["volumes"] if v.startswith("../")]
-    sources = [v.split(":", 1)[0][3:] for v in binds]
+    sources = _bind_sources(doc)
     tracked = set(
         subprocess.run(
             ["git", "ls-tree", "--name-only", "HEAD"],
@@ -231,6 +244,12 @@ def test_the_compose_mounts_only_tracked_paths_the_tasks_read():
         assert source in tracked or source in subtrees, source
     mounted = {s for s in sources if "/" not in s}
     assert mounted.isdisjoint({"..", ".", ".claude", ".github", "tests", "scripts"})
+    # the guard itself: the pre-A1 whole-checkout bind is a source, not a skip
+    planted = {
+        "services": {"airflow": {"volumes": ["..:/x:ro", "v:/d"]}},
+        "volumes": {"v": None},
+    }
+    assert _bind_sources(planted) == [".."]
     assert set(sources) - mounted == subtrees
     # what the tasks read, derived from the source: every repo-root path a
     # package opens, the packages the facts writer scans, the project files
