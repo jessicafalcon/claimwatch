@@ -146,7 +146,7 @@ cannot say:
   `check-docs` + `check-backing` + fixtures + `check-pins` (every public
   function or class added or changed since BASE is named in a test); one line
   per check, exit 1 on FAIL, 2 on a refused SPEC/BASE or a `phase-` branch
-  whose spec is absent or whose name is off the shape. With no `SPEC=` a phase
+  whose spec is absent or whose name does not match the phase-branch pattern. With no `SPEC=` a phase
   branch's own spec (`specs/<branch>.md`) is read for the fixtures check's
   `Freeze:` grants only, so that verdict does not depend on whether `SPEC=`
   was typed; evidence and records run only with `SPEC=` (`/phase-start` runs
@@ -611,8 +611,8 @@ DECISIONS → Fix; BACKLOG row closed, one opened for the code-craft clause).
 off main before Phase 10: the no-`SPEC=` review gate (BACKLOG "`make
 review-gate` without `SPEC=` is red on a phase branch…") — the no-SPEC form
 reads a phase branch's own spec for the fixtures check, keeps fixtures
-read-only on any other branch, and the two summary lines count the same
-thing.
+read-only on any other branch, and both summary lines count checks passed
+over checks run.
 
 **Next:** Phase 10 (the Airflow DAG). Its spec decides how the publish task
 calls `python -m study.metabase export|apply`, which are not `make` targets

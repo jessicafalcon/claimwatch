@@ -3438,8 +3438,8 @@ count the same thing.**
   boundary, parsed to one closed shape (`\Aphase-[0-9]+[a-z]?-[a-z0-9-]+\Z`,
   which every phase branch since 0a matches); a name that does not start
   `phase-` — `fix/`, `tooling/`, `docs/`, `main`, a detached `HEAD` — is no
-  spec, and the SKIP line names the branch; a `phase-` name off the shape is
-  refused by name, never run as "no spec" with a green SKIP line. The derived
+  spec, and the SKIP line names the branch; a `phase-` name that does not
+  match the pattern is refused by name, never run as "no spec" with a green SKIP line. The derived
   path goes through `resolve_spec`, the typed form's guard (a file under
   `specs/`, symlinks resolved), so the two forms cannot read different things.
   *Rejected: skipping the fixture check with no SPEC (loses the read-only
@@ -3463,7 +3463,9 @@ count the same thing.**
   records from the derived spec too, so the two forms printed the same eight
   lines; the code-reviewer and the tester (in a worktree: a fresh
   `phase-99-probe` branch whose only commit is its spec printed `FAIL
-  evidence`, `FAIL records`, `5/8`) showed that `/phase-start` step 6 runs the
+  evidence`, `FAIL records` and `5/8` — the third red line was `test`, the
+  probe's own artifact: this branch's scripts against main's old summary
+  test) showed that `/phase-start` step 6 runs the
   no-SPEC form on exactly that branch and reads it as "the branch starts
   green" — both checks are red there by construction, the spec naming tests
   not yet written and records not yet touched. `6c295bf` narrows the no-SPEC
@@ -3471,10 +3473,28 @@ count the same thing.**
   (a skill edit rides a `tooling/` branch). *Rejected: a `tooling/` PR
   changing step 6 to expect evidence and records red at phase start (makes
   the inherited baseline unreadable: red-by-construction lines beside a real
-  red).* The other correctness commits, one each: `57b04a5` (a `phase-` name
-  off the shape refused, code #4/#5), `259b997` (the git refusal one line,
-  code #3), `f7cc163` (the derived path through `resolve_spec`, security #1
-  and code #6: a tracked symlink out of `specs/` was followed on one form and
-  refused on the other), `09ab3df` (an empty name refused, security #2).
-  Records: the LESSONS `unpinned` row carries the summary-line miscount
-  (code #8); the status block says the delivered mechanism (editor #1).
+  red).* The other correctness commits, one each, numbered by the round's
+  consolidated table: `57b04a5` (#2, a `phase-` name that does not match the
+  pattern refused), `259b997` (#3, the git refusal one line), `f7cc163` (#4,
+  the derived path through `resolve_spec`: a tracked symlink out of `specs/`
+  was followed on one form and refused on the other), `09ab3df` (#5, an
+  empty name refused). Records: the LESSONS `unpinned` row carries the
+  summary-line miscount (#7); the status block says the delivered mechanism
+  (#8). The gate's own pins line then caught the extracted `skip_line`
+  helper unnamed in a test (`bdaa654`).
+- **Review round 2 (2026-09-12): nine findings, none correctness, disposition
+  "fix all" but one.** The tester reran the fresh-branch probe with this
+  branch's test file copied too: the no-SPEC form prints the SKIP line naming
+  the spec and `6/6`, `6/8` with `SPEC=`; the symlink, bad-pattern and
+  empty-name paths each refuse in one line before any check; four mutations
+  each caught by a named test. The craft commit: `resolve_inputs` returns an
+  `Inputs` record whose `typed` flag is the one switch for the spec's two
+  checks (#2); a derived spec that is not UTF-8 is refused naming its branch,
+  not `SPEC` (#1, missed in round 1 — a pre-existing line the derived read
+  made reachable); the fixtures verdict is pinned both ways over one spec
+  text (#3, the invariant's own pin); `branch_name`'s happy path and the
+  bad-pattern exit through `main` are pinned (#4, #5); the summary test is
+  split (#6). Records: this bullet's numbering and the probe's third red
+  line (#7); "off the shape" said literally (#8). *Accepted as-is (#9): git's
+  last stderr line may carry a local path in a worktree error — no
+  credential or personal-data class, the reviewer's own recommendation.*
