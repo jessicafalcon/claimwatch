@@ -118,8 +118,9 @@ Delivered paragraph and `make help`, not here.
   — the only review text the drill shows.
 - `dags/` — `friction_ledger.py` (the one DAG: five BashOperators over `make`,
   no logic), the one-container Airflow (`Dockerfile`, `docker-compose.yml`:
-  the repo mounted read-only, `data/` a private volume, `ROWS=synthetic` from
-  the environment, no `env_file`), `DEMONSTRATION.md` with its synthetic-only
+  the tracked paths the tasks read mounted read-only and nothing else of the
+  checkout, `data/` a private volume, `ROWS=synthetic` from the environment,
+  no `env_file`), `DEMONSTRATION.md` with its synthetic-only
   screenshot.
 - `fixtures/` — read-only after Phase 1, each set with a `MANIFEST.sha256`:
   `synthetic/` (hand-written fake reviews), `anchors/` (brief §6 figures,

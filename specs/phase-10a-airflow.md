@@ -144,8 +144,10 @@ The `scrape` task is not in the DONE command: it is the network target
    `Dockerfile` (`FROM apache/airflow:3.3.1-python3.12` — the official image's
    Python-3.12 variant, matching `.python-version`; `make` by apt as root, `uv`
    by pip as `airflow`, the documented extension pattern) and a one-service
-   `docker-compose.yml` running `airflow standalone` with: the repo mounted
-   **read-only** at a fixed path; `data/` a container-private named volume with
+   `docker-compose.yml` running `airflow standalone` with: the tracked
+   top-level paths the tasks read, each mounted **read-only** under a fixed
+   path (amendment A1; the first draft mounted the whole repo); `data/` a
+   container-private named volume with
    the three tracked numbers-only subtrees (`data/snapshots/`, `data/damir/`,
    `data/ameli/`) bound read-only inside it, so the rebuild reads its fit and
    its snapshots and writes its DuckDB file, its captures, its decision cache

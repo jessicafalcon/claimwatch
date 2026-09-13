@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import ast
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -18,6 +19,7 @@ import yaml
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 from review_common import make_targets
 
+from pipeline.build import _CODE_PACKAGES
 from pipeline.cli import STAGES
 from pipeline.warehouse import ROOT
 from study.text import DAG_TASKS
@@ -55,6 +57,13 @@ LOGIC = (
 _IMAGE = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
 _LINK = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
 _CAPTION = "synthetic fixture data — not a study finding"
+# Amendment A1: the tracked top-level paths the five tasks read, each a
+# read-only bind — the whole mount, so nothing gitignored can be inside it.
+PROJECT_FILES = ("Makefile", "pyproject.toml", "uv.lock", ".python-version")
+SOURCE_PACKAGES = ("pipeline", "ingest", "classify", "models", "opendata", "study")
+DATA_PACKAGES = ("sql", "fixtures", "dags")
+DATA_SUBTREES = ("snapshots", "damir", "ameli")
+_ROOT_READ = re.compile(r'\bROOT / "([^"/]+)"')
 
 
 def _tree() -> ast.Module:
@@ -172,12 +181,12 @@ def test_the_compose_mounts_the_repo_read_only_isolates_data_carries_no_env_file
     assert "env_file" not in svc and svc["command"] == "standalone"
     assert svc["ports"] == ["127.0.0.1:8080:8080"]
     volumes = svc["volumes"]
-    assert volumes[0] == f"..:{MOUNT}:ro"
-    assert volumes[1] == f"friction-data:{MOUNT}/data"
-    assert set(volumes[2:]) == {
-        f"../data/{sub}:{MOUNT}/data/{sub}:ro"
-        for sub in ("snapshots", "damir", "ameli")
-    }
+    assert f"friction-data:{MOUNT}/data" in volumes
+    assert not any(v.startswith(("..:", ".:")) for v in volumes)  # no whole tree (A1)
+    for sub in ("snapshots", "damir", "ameli"):
+        assert f"../data/{sub}:{MOUNT}/data/{sub}:ro" in volumes
+    binds = [v for v in volumes if v.startswith("../")]
+    assert all(v.endswith(":ro") for v in binds), binds
     assert set(doc["volumes"]) == {"friction-data"}
     env = svc["environment"]
     assert env["ROWS"] == "synthetic"
@@ -186,6 +195,48 @@ def test_the_compose_mounts_the_repo_read_only_isolates_data_carries_no_env_file
     for var in ("UV_PROJECT_ENVIRONMENT", "UV_CACHE_DIR"):
         assert not env[var].startswith(MOUNT), var
     assert "ANTHROPIC_API_KEY" not in env and not any("KEY" in k for k in env)
+
+
+def test_the_compose_mounts_only_tracked_paths_the_tasks_read():
+    """Amendment A1 (invariant 5, exact): every bind source is one tracked
+    top-level entry of HEAD (or one of the three tracked data/ subtrees) —
+    never `..`, `.claude`, `.github` or a gitignored name — and the mounted
+    set covers every `ROOT / "<top>"` the source packages read, every package
+    `model_call_sites` scans, the packages themselves and the project files,
+    so a new read path outside the mounts names itself here."""
+    doc = yaml.safe_load(repo_text(COMPOSE))
+    binds = [v for v in doc["services"]["airflow"]["volumes"] if v.startswith("../")]
+    sources = [v.split(":", 1)[0][3:] for v in binds]
+    tracked = set(
+        subprocess.run(
+            ["git", "ls-tree", "--name-only", "HEAD"],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.split()
+    )
+    subtrees = {f"data/{sub}" for sub in DATA_SUBTREES}
+    for source in sources:
+        assert source in tracked or source in subtrees, source
+    mounted = {s for s in sources if "/" not in s}
+    assert mounted.isdisjoint({"..", ".", ".claude", ".github", "tests", "scripts"})
+    assert set(sources) - mounted == subtrees
+    # what the tasks read, derived from the source: every repo-root path a
+    # package opens, the packages the facts writer scans, the project files
+    reads: set[str] = set()
+    for package in SOURCE_PACKAGES:
+        for path in sorted((ROOT / package).rglob("*.py")):
+            reads |= set(_ROOT_READ.findall(repo_text(path)))
+    needed = (
+        (reads - {"data"})
+        | set(_CODE_PACKAGES)
+        | set(SOURCE_PACKAGES)
+        | set(DATA_PACKAGES)
+        | set(PROJECT_FILES)
+    )
+    assert needed <= mounted, sorted(needed - mounted)
+    assert mounted <= needed, sorted(mounted - needed)  # nothing mounted idly
 
 
 def test_the_dockerfile_pins_the_python312_image_and_returns_to_the_airflow_user():

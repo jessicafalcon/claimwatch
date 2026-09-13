@@ -3602,7 +3602,20 @@ re-pointed at it).
   directory for the same reason; here the tasks must read the repo. *Rejected:
   the whole repo read-write (the first draft — `.env`, `data/cache/` bodies,
   `*.duckdb` and `.git` handed to the image); a copy of the repo baked into the
-  image (a stale corpus in a layer).*
+  image (a stale corpus in a layer).* **Amendment A1 (review round 1,
+  2026-09-13, security-reviewer #2/#3):** the read-only whole-repo bind still
+  carried the root `.env`, `.git/`, `.venv/` and the local Claude config into
+  the container readable — the compose test checked `env_file` and
+  `environment:` only. The bind is now one read-only mount per tracked
+  top-level path the five tasks read (the four project files and nine
+  packages), so a gitignored file cannot be inside the mount whatever its
+  name; `tests/test_dag.py::test_the_compose_mounts_only_tracked_paths_the_tasks_read`
+  pins every bind source to `git ls-tree HEAD` and the mounted set to every
+  `ROOT / "<top>"` the source packages read. *Not taken: an empty overlay per
+  local-only path (`/dev/null`, `tmpfs`) — named paths only, while the
+  credential patterns in `.gitignore` are globs; a `git archive` copy — the
+  stale-copy rejection above.* The demonstration is re-run by the developer
+  over the amended compose.
 - **One container, `airflow standalone`, from a Dockerfile on the image's
   Python-3.12 variant.** Verified live before the stamp (the developer's
   Docker run, 2026-09-13): `apache/airflow:3.3.1` `standalone` runs the
