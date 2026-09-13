@@ -598,21 +598,25 @@ and remove it). Findings are fixed in the main session or explicitly accepted
 **Merged:** Phases 0a–9i, each with its spec under `specs/` (the Delivered
 paragraph) and its DECISIONS appendix; the last was 9i, the extra-billing
 share from data.ameli's `honoraires` table as one sourced B3.3 row (PR #34,
-2026-09-12). Phase 9 is complete. Off main since, all 2026-09-12:
-`fix/idempotency-classify` (PR #35: the classify step's code moved to
-`pipeline/build.py::classify_step` and run inside `idempotency-check`, so the
-six classify-path tables are in its diff), `tooling/skill-sentences` (PR #36:
-the two skill sentences of the Phase 9i exit audit — DECISIONS → Tooling),
-`fix/csv-reader-boundary` (PR #37: every `csv` reader folds `csv.Error` into
-the refusal it declares and the two DAMIR CLI read paths catch it —
-DECISIONS → Fix; BACKLOG row closed, one opened for the code-craft clause).
+2026-09-12). Phase 9 is complete. The four small PRs off main since, all
+merged 2026-09-12/13: `fix/idempotency-classify` (PR #35: the classify step's
+code moved to `pipeline/build.py::classify_step` and run inside
+`idempotency-check`, so the six classify-path tables are in its diff),
+`tooling/skill-sentences` (PR #36: the two skill sentences of the Phase 9i
+exit audit — DECISIONS → Tooling), `fix/csv-reader-boundary` (PR #37: every
+`csv` reader folds `csv.Error` into the refusal it declares and the two DAMIR
+CLI read paths catch it — DECISIONS → Fix), `fix/review-gate-no-spec` (PR
+#38: the no-`SPEC=` review gate reads a phase branch's own spec for the
+fixtures check, keeps fixtures read-only on any other branch, and both
+summary lines count checks passed over checks run — DECISIONS → Fix; BACKLOG
+row closed).
 
-**In progress:** `fix/review-gate-no-spec` (this branch), the last small PR
-off main before Phase 10: the no-`SPEC=` review gate (BACKLOG "`make
-review-gate` without `SPEC=` is red on a phase branch…") — the no-SPEC form
-reads a phase branch's own spec for the fixtures check, keeps fixtures
-read-only on any other branch, and both summary lines count checks passed
-over checks run.
+**In progress:** `phase-10-airflow` (this branch): the spec
+`specs/phase-10-airflow.md` (PROPOSED, not yet challenged) is the branch's
+first commit — the five-task DAG over `make` (`rebuild STAGE=`, `publish`),
+the Snowflake branch of the seam behind an optional extra, `TARGET` threaded
+through the classify step and the exports, both demonstration runs over
+synthetic reviews. STOP: `/challenge`, disposition, approval, then build.
 
 **Next:** Phase 10 (the Airflow DAG). Its spec decides how the publish task
 calls `python -m study.metabase export|apply`, which are not `make` targets
