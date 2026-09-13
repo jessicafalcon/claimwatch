@@ -19,7 +19,6 @@ import sys
 from pipeline.build import INPUTS
 from pipeline.cli import Refused, resolve_choice
 from pipeline.warehouse import database_for
-from study.metabase import export
 from study.metabase.apply import (
     Credentials,
     MetabaseError,
@@ -55,9 +54,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "export":
             rows = resolve_choice(args.rows, INPUTS, "captured")
-            path = build_sqlite(
-                duck_db=database_for(rows), sqlite_path=export.DEFAULT_SQLITE
-            )
+            path = build_sqlite(duck_db=database_for(rows))
             print(f"wrote {path} (from ROWS={rows})")
             return 0
         config = load_config()

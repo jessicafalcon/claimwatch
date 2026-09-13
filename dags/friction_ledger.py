@@ -17,6 +17,8 @@ with DAG(
     dag_id="friction_ledger",
     schedule=None,
     catchup=False,
+    # required by Airflow; inert under schedule=None — the phase's approval
+    # date (specs/phase-10a-airflow.md, the Status line), never a clock read
     start_date=datetime(2026, 9, 13),
 ):
     scrape = BashOperator(
