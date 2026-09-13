@@ -43,8 +43,19 @@ def _env(extra: dict[str, str]) -> dict[str, str]:
 
 
 def _make_n(target: str, cmdline: dict[str, str], env: dict[str, str]) -> str:
+    """The recipe lines `make -n` would run, and nothing else: under a parent
+    make (`make test` → pytest → here; GNU make 4 sets MAKELEVEL) make also
+    prints its Entering/Leaving-directory lines, which are make's, not the
+    recipe's — `--no-print-directory` asks for the recipe alone (the probe
+    below uses `-s` for the same reason)."""
     res = subprocess.run(
-        ["make", "-n", target, *(f"{k}={v}" for k, v in cmdline.items())],
+        [
+            "make",
+            "-n",
+            "--no-print-directory",
+            target,
+            *(f"{k}={v}" for k, v in cmdline.items()),
+        ],
         cwd=ROOT,
         capture_output=True,
         text=True,
@@ -176,8 +187,13 @@ def test_publish_passes_rows_unexpanded_as_one_literal():
     """`make publish` is one recipe line — the Metabase export for the named
     input — and nothing else; an empty ROWS reaches Python empty (its default
     is the corpus, resolved there)."""
+    recipe = "uv run python -m study.metabase export --rows='synthetic'"
     out = _make_n("publish", {"ROWS": "synthetic"}, {})
-    assert out.strip() == "uv run python -m study.metabase export --rows='synthetic'"
+    assert out.strip() == recipe
+    # under a parent make (CI's `make test`), still the recipe and nothing else
+    assert (
+        _make_n("publish", {"ROWS": "synthetic"}, {"MAKELEVEL": "1"}).strip() == recipe
+    )
     assert _make_n("publish", {}, {}).strip().endswith("--rows=''")
     assert "study export" not in out  # the HTML page is not a publish step
 
