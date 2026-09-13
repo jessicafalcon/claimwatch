@@ -2,9 +2,9 @@
 Airflow is never imported here — Docker only — so the DAG file is read with
 `ast`: five BashOperator tasks in the brief's order, each one bare `make`
 command of a declared target, no logic, one screen; the page's task tuple
-equals the file's; the compose mounts the repo read-only, owns `data/`,
-carries no env_file and binds the UI to the loopback address; the
-demonstration doc and its captioned screenshot exist. Offline."""
+equals the file's; the compose binds the tracked paths the tasks read,
+read-only, owns `data/`, carries no env_file and binds the UI to the loopback
+address; the demonstration doc and its captioned screenshot exist. Offline."""
 
 from __future__ import annotations
 
@@ -179,10 +179,10 @@ def test_the_readme_and_spec_name_the_dags_tasks_in_the_dags_order():
         assert diagram in repo_text(ROOT / doc), doc
 
 
-def test_the_compose_mounts_the_repo_read_only_isolates_data_carries_no_env_file_and_binds_the_ui_locally():  # noqa: E501 -- the invariant it pins, named whole
-    """Invariant 5, by the mounts: the repo is a read-only bind at the DAG's
-    root, `data/` is a named volume (never the host's data/), the three tracked
-    numbers-only subtrees are read-only binds inside it, the input is
+def test_the_compose_binds_read_only_isolates_data_carries_no_env_file_and_binds_the_ui_locally():  # noqa: E501 -- the invariant it pins, named whole
+    """Invariant 5, by the mounts: every bind from the checkout is read-only
+    (A1 names them), `data/` is a named volume (never the host's data/), the
+    three tracked numbers-only subtrees are read-only binds inside it, the input is
     ROWS=synthetic from the environment, no env_file, the UI on 127.0.0.1, and
     uv's environment and cache are outside the mount."""
     doc = yaml.safe_load(repo_text(COMPOSE))

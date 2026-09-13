@@ -7,9 +7,11 @@
 # What the container can and cannot touch, by the mounts (spec 10a, done-when 5):
 #   - the tracked top-level paths the five tasks read (the four project files
 #     and nine packages), each a READ-ONLY bind under /opt/friction-ledger —
-#     the whole mount, so no gitignored file of the checkout (.env, .git/,
-#     .venv/, local Claude config) can be inside it whatever its name, and no
-#     task can rewrite a tracked file (spec 10a, amendment A1);
+#     the whole mount, so no gitignored top-level entry of the checkout (.env,
+#     .git/, .venv/, local Claude config) can be inside it whatever its name,
+#     and no task can rewrite a tracked file (spec 10a, amendment A1); a package
+#     bind carries that package's host bytecode cache, the tracked source's own
+#     by-product, read-only;
 #   - data/ is a container-private named volume: the DuckDB file, the captures,
 #     the decision cache, the confirm stamp and the Metabase export land there,
 #     never in the host's data/ (where the real corpus lives);

@@ -33,8 +33,8 @@ make rebuild ROWS=captured && make study
 ```
 
 (`make study` still renders the committed synthetic page; the real counts are in
-your warehouse and in the Metabase demonstration below — a captured render of
-the page is a BACKLOG row.)
+your warehouse and in the Metabase demonstration below — rendering the page from
+your own reviews is a planned addition.)
 
 Beat 1's rating, channel-gap and stat-row points are **Documented** from public
 sources, and Beat 3 and Beat 4 are **Modeled** from public claim-cost data and
@@ -216,7 +216,7 @@ of the automated checks). The walk is in
 [`study/metabase/DEMONSTRATION.md`](study/metabase/DEMONSTRATION.md); in short:
 
 ```
-make rebuild ROWS=captured && uv run python -m study.metabase export
+make rebuild ROWS=captured && make publish
 cd study/metabase && docker compose up -d
 set -a; . ./.env; set +a                              # your Metabase login, exported
 cd ../.. && uv run python -m study.metabase apply     # reads it from the environment

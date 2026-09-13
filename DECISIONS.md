@@ -496,6 +496,19 @@ Each entry: the surprise, the official-docs check, what we did.
   family row) — the phase reads the four family rows as published and sums
   nothing itself, so the artifact is the table's own figures.
 
+- **Phase 10a — the official Airflow image's default Python is 3.13
+  (2026-09-13).** `apache/airflow:3.3.1` ships Python 3.13 while the project
+  pins 3.12 (`.python-version`, `uv.lock`). Checked against the image's tag
+  list (the docs list a `-pythonX.Y` variant per supported minor); the
+  Dockerfile uses `apache/airflow:3.3.1-python3.12`, so `uv` downloads no
+  interpreter and the container runs the pinned version.
+- **Phase 10a — `airflow standalone`'s simple auth manager warns that the
+  "deployment shape looks like production" (2026-09-13).** The API server
+  binds every interface inside the container, which the warning reads as a
+  public deployment. Checked against the auth manager's docs (the warning is
+  advisory; standalone is the documented laptop shape); the compose publishes
+  the port on the Mac's loopback address only, and the generated admin
+  password stays in the container's log (`docker compose logs`).
 
 ## Appendix — by phase
 
@@ -3587,10 +3600,11 @@ re-pointed at it).
   *Rejected: fixing the literal only in `classify_step` (the site, not the
   class — LESSONS `site-fix`); a global "current target" setting (hidden
   state on the data path).*
-- **The container mounts the repo read-only and owns its `data/`; the tracked
-  numbers-only subtrees are bound in read-only; no `env_file`; the UI on the
-  loopback address.** `dags/docker-compose.yml`: the repo `:ro` at
-  `/opt/friction-ledger`, `data/` a named volume (the DuckDB file, the
+- **The container binds the tracked paths the tasks read, read-only, and owns
+  its `data/`; the tracked numbers-only subtrees are bound in read-only; no
+  `env_file`; the UI on the loopback address.** `dags/docker-compose.yml`: the
+  tracked paths the tasks read, each `:ro` under `/opt/friction-ledger`
+  (amendment A1 below; the first draft bound the whole checkout), `data/` a named volume (the DuckDB file, the
   captures, the decision cache, the confirm stamp and the export land there,
   never in the host's `data/` where the corpus lives), `data/snapshots`,
   `data/damir`, `data/ameli` nested read-only binds so the rebuild reads its
@@ -3615,8 +3629,9 @@ re-pointed at it).
   local-only path (`/dev/null`, `tmpfs`) — named paths only, while the
   credential patterns in `.gitignore` are globs; a `git archive` copy — the
   stale-copy rejection above.* The demonstration was re-run by the developer
-  over the amended compose the same day; the grid and the screenshot's bytes
-  came out identical to the committed capture.
+  over the amended compose the same day; the grid came out identical (five
+  tasks green), so the committed screenshot stands — A1 re-captures only when
+  the grid changes; a fresh capture would differ in its run timestamps.
 - **One container, `airflow standalone`, from a Dockerfile on the image's
   Python-3.12 variant.** Verified live before the stamp (the developer's
   Docker run, 2026-09-13): `apache/airflow:3.3.1` `standalone` runs the
@@ -3639,6 +3654,14 @@ re-pointed at it).
   B5.2's source column stays `pipeline/build.py`: the DAG feeds no number
   (#13). *Rejected: a hand-typed step list in the note (drift); the DAG in
   BACKING's source column (the column names where a number comes from).*
+- **Accepted as-is (review round 1 #8, raised again in round 2 #8): the
+  Metabase entry imports `pipeline.cli` for `resolve_choice` and `Refused`.**
+  Measured, not judged: the entry already imports `pipeline.build` for the
+  input set, which loads `classify`, `ingest`, `models` and `opendata`; the
+  CLI import adds 13 modules, 3 of them the repo's, to a developer-run tool.
+  *Rejected: a new `pipeline/validate.py` holding two guards — a module for
+  two functions fails the duller-way test (architecture-fit), and the guard
+  would then have two homes to drift between.*
 - **Recorded, not fixed here (challenge round 1, #16):** the README's "Running
   it" said `make rebuild ROWS=captured && make study` fills Beat 2 from real
   data, while `make study` renders the frozen synthetic file. The sentence now

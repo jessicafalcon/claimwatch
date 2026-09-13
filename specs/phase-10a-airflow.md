@@ -22,7 +22,7 @@ an offline, CI-checkable core (the DAG file's shape, the stage split, the
 `publish` target, the engine-name constant and its layout test, the compose
 file's mounts) plus a developer-run demonstration (the Airflow run over
 hand-written synthetic reviews, recorded with one captioned screenshot).
-Challenged: 2026-09-13, round 1, spec 4a421afb — rework (1 BLOCKER, 12 should-fix, 4 suggestion, 1 question; all amended: the 10a/10b split, #1–#4, #7, #9, #15, #17 recorded as 10b's seeds; #18 verified live the same day — the image's Python-3.12 variant tag, stack risk 1; re-stamped 2026-09-13 after amendment A1 — invariant 5 restated exactly and Done-when 5's mount clause, the developer's disposition of review round 1 #2/#3, no new challenge round)
+Challenged: 2026-09-13, round 1, spec ffd5553a — rework (1 BLOCKER, 12 should-fix, 4 suggestion, 1 question; all amended: the 10a/10b split, #1–#4, #7, #9, #15, #17 recorded as 10b's seeds; #18 verified live the same day — the image's Python-3.12 variant tag, stack risk 1; re-stamped 2026-09-13 after amendment A1 — invariant 5 restated exactly and Done-when 5's mount clause, the developer's disposition of review round 1 #2/#3, no new challenge round; re-stamped 2026-09-13 after review round 2 — invariant 6's falsifier renamed to the test that reads the README and SPEC.md, A1's claim scoped to the bind sources, invariant 5's older falsifier renamed; the developer's disposition "fix all", no new challenge round)
 
 Four sections marked REQUIRED are mandatory; a spec without them is not
 approvable (CLAUDE.md → Workflow rules).
@@ -179,7 +179,7 @@ The `scrape` task is not in the DONE command: it is the network target
 | 3 | `tests/test_review_drill.py::test_sqlite_export_rating_is_exact_and_row_order_is_stable` (existing — two exports over the same warehouse compare equal as bytes) and `::test_export_refuses_a_missing_mart_by_name` (existing); `tests/test_metabase_apply.py::test_export_command_refuses_rows_outside_the_set_by_name` (the `--rows` closed set, exit 2, nothing built) |
 | 4 | `tests/test_ingest_layout.py::test_no_module_outside_the_seam_spells_an_engine_name` — the literals `"duckdb"`/`"snowflake"` occur in `pipeline/warehouse.py` (and `tests/`) only; a planted `connect("duckdb"` in `build.py` fails it |
 | 4 | `tests/test_warehouse.py::test_local_is_the_duckdb_target` — `LOCAL in TARGETS`, `connect(LOCAL, database=":memory:")` answers `select 1` |
-| 5 | `tests/test_dag.py::test_the_compose_mounts_the_repo_read_only_isolates_data_carries_no_env_file_and_binds_the_ui_locally` — `pyyaml` over `dags/docker-compose.yml`: one service; the repo bind `:ro`; `data/` a named volume; the three tracked subtrees `:ro`; `ROWS: synthetic`; no `env_file`; ports `127.0.0.1:8080:8080`; `UV_PROJECT_ENVIRONMENT`/`UV_CACHE_DIR` not under the mount path |
+| 5 | `tests/test_dag.py::test_the_compose_binds_read_only_isolates_data_carries_no_env_file_and_binds_the_ui_locally` — `pyyaml` over `dags/docker-compose.yml`: one service; the repo bind `:ro`; `data/` a named volume; the three tracked subtrees `:ro`; `ROWS: synthetic`; no `env_file`; ports `127.0.0.1:8080:8080`; `UV_PROJECT_ENVIRONMENT`/`UV_CACHE_DIR` not under the mount path |
 | 5 | `tests/test_dag.py::test_demonstration_doc_and_synthetic_screenshot_exist_and_links_resolve` — the 9g pattern: the doc, its links, the screenshot under `dags/screenshots/`, the caption in the PNG's text chunk; `make check-docs` scans both (a `dags/screenshots/` `.png` entry joins `scripts/review_common.py::BINARY_ASSETS`) |
 | 5 | `dags/DEMONSTRATION.md` — the pasted task list and states; security-reviewer and study-editor read the screenshot |
 
@@ -191,14 +191,19 @@ The `scrape` task is not in the DONE command: it is the network target
 | 2. For every `ROWS` input, the three stages run in order leave, table for table, the counts one whole rebuild leaves, and any stage run again adds no row. | `tests/test_rebuild.py::test_three_stages_in_order_equal_one_whole_rebuild`, `::test_a_stage_run_twice_adds_no_rows` |
 | 3. For every module outside `pipeline/warehouse.py`, the engine is a name imported from the seam, never a literal. | `tests/test_ingest_layout.py::test_no_module_outside_the_seam_spells_an_engine_name` — a planted literal |
 | 4. For every DuckDB target this phase touches (`rebuild` and its stages, `publish`, `idempotency-check`), the run needs no key, no network and no Docker, and its outputs are the pre-phase outputs. | the DONE command with `ANTHROPIC_API_KEY` unset; `tests/test_no_key.py`; `tests/test_beat5.py::test_beat_five_render_is_byte_stable`; CI's `make study` + `git diff --exit-code` |
-| 5. For every run of the container, no captured review is in a table it builds or a screenshot it yields, and no file under the repo is written: the input is `ROWS=synthetic` from the environment and the repo mount is read-only. | `tests/test_dag.py::test_the_compose_mounts_the_repo_read_only_isolates_data_carries_no_env_file_and_binds_the_ui_locally`; `::test_demonstration_doc_and_synthetic_screenshot_exist_and_links_resolve`; `make check-docs` over the PNG text; security-reviewer reads the screenshot |
+| 5. For every run of the container, no captured review is in a table it builds or a screenshot it yields, and no file under the repo is written: the input is `ROWS=synthetic` from the environment and the repo mount is read-only. | `tests/test_dag.py::test_the_compose_binds_read_only_isolates_data_carries_no_env_file_and_binds_the_ui_locally`; `::test_demonstration_doc_and_synthetic_screenshot_exist_and_links_resolve`; `make check-docs` over the PNG text; security-reviewer reads the screenshot |
 | 6. For every text surface that shows the DAG's steps (the page, the README, SPEC.md), the names are the DAG's task ids in the DAG's order. | `tests/test_dag.py::test_the_pages_task_tuple_equals_the_dags_task_ids`; `tests/test_beat5.py::test_b52_note_names_the_five_tasks_in_order`; `tests/test_dag.py::test_the_readme_and_spec_name_the_dags_tasks_in_the_dags_order` (the README's Beat 5 walk and SPEC.md's B5.2 row) |
 
 **Amendment A1 (review round 1, 2026-09-13, security-reviewer #2 and #3) —
 the container reads the tracked tree only.** Invariant 5 restored and made
 exact: *for every run of the container, every path it can read under the
 repo mount is a tracked path or one of the three numbers-only `data/`
-subtrees; no gitignored file of the checkout is readable inside it.* The
+subtrees; no gitignored top-level entry of the checkout is inside the
+mount.* A package bind carries what sits inside that tracked directory —
+the host's bytecode cache and Finder files included, the tracked source's
+own by-products, read-only, holding no credential — and the falsifier
+below pins the bind sources, not their contents (round 2, security-reviewer
+#1). The
 `..:/opt/friction-ledger:ro` bind broke it: the named volume overlaid
 `data/` only, so the root `.env` (the API key and the warehouse credentials),
 `.git/`, `.venv/`, `.claude/settings.local.json` and `.mcp.json` rode into
@@ -273,10 +278,12 @@ screenshot re-captured only if the grid changes; the DAG file is untouched.
   10b lifts the second. *Rejected: fixing the literal only in `classify_step`
   (the site, not the class); a global "current target" setting (hidden state
   on the data path).* Satisfies invariant 3.
-- **The container mounts the repo read-only and owns its `data/`; the tracked
-  numbers-only subtrees are bound in read-only.** The 9g compose mounts only
+- **The container binds the tracked paths the tasks read, read-only, and owns
+  its `data/`; the tracked numbers-only subtrees are bound in read-only.** The 9g compose mounts only
   the export directory so the corpus never reaches a third-party image; here
-  the tasks must read the repo and write a warehouse, so the repo is `:ro`, the
+  the tasks must read the source and write a warehouse, so each tracked path
+  the tasks read is its own `:ro` bind (amendment A1; the first draft bound the
+  whole checkout), the
   writes go to a named volume at `data/`, and the three tracked subtrees the
   rebuild reads (`snapshots`, `damir`, `ameli` — numbers only) are nested
   read-only binds inside it. `uv`'s environment and cache live outside the
@@ -376,7 +383,7 @@ reaches Python unexpanded and single-quoted (`$(call _Q,$(value VAR))`) and is
 |---|---|---|---|---|---|---|
 | `rebuild STAGE=` | → `all` (the whole, today's behaviour) | refused by name, exit 2: not in `all\|load\|clean\|classify` | refused by name, exit 2 (reaches Python as one literal, never a shell word) | validated the same (`resolve_choice`); the recipe reads `$(value STAGE)` | n/a — no confirm gate | `tests/test_makefile.py::test_stage_is_a_closed_set`, `::test_pipeline_variables_reach_python_as_one_literal` (parametrised with `STAGE`), `::test_env_exported_stage_reaches_the_recipe_and_is_validated_in_python` |
 | `publish ROWS=` | → `captured` | refused by name, exit 2 (`resolve_choice` over `INPUTS`, the same guard as `rebuild`) | refused by name | validated the same | n/a | `tests/test_makefile.py::test_publish_passes_rows_unexpanded_as_one_literal`; `tests/test_metabase_apply.py::test_export_command_refuses_rows_outside_the_set_by_name`; `tests/test_review_drill.py::test_export_refuses_a_missing_mart_by_name` |
-| the Airflow container (`dags/docker-compose.yml`) | no `ROWS` in the environment → the DAG loads `captured` from the volume's captures (a company run); the demonstration sets `synthetic` | a `ROWS`/`STAGE` value planted in the compose environment reaches the recipe as one literal and is refused by name in Python, the same path as the command line | same | that IS the mechanism: `ROWS=synthetic` in `environment:` reaches the recipe and is validated; the repo is `:ro`, so no environment value can make a task write a tracked file | the `scrape` task's `make confirm scrape` arms from make's own goal list, the weekly.yml precedent (`$(origin MAKECMDGOALS)` is `default`) | `tests/test_dag.py::test_the_compose_mounts_the_repo_read_only_isolates_data_carries_no_env_file_and_binds_the_ui_locally`; `tests/test_makefile.py::test_confirm_is_a_goal_of_the_same_invocation` (existing) |
+| the Airflow container (`dags/docker-compose.yml`) | no `ROWS` in the environment → the DAG loads `captured` from the volume's captures (a company run); the demonstration sets `synthetic` | a `ROWS`/`STAGE` value planted in the compose environment reaches the recipe as one literal and is refused by name in Python, the same path as the command line | same | that IS the mechanism: `ROWS=synthetic` in `environment:` reaches the recipe and is validated; the repo is `:ro`, so no environment value can make a task write a tracked file | the `scrape` task's `make confirm scrape` arms from make's own goal list, the weekly.yml precedent (`$(origin MAKECMDGOALS)` is `default`) | `tests/test_dag.py::test_the_compose_binds_read_only_isolates_data_carries_no_env_file_and_binds_the_ui_locally`; `tests/test_makefile.py::test_confirm_is_a_goal_of_the_same_invocation` (existing) |
 
 Run twice: a second DAG run is the idempotent rebuild (raw append-only; the
 same synthetic input inserts nothing) and a second `publish` writes identical

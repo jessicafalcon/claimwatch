@@ -136,7 +136,7 @@ Wiring for the hook (local only, `.claude/settings.local.json`, gitignored):
   are fine). Hand this to `study-editor` for prose.
 - **Dependency allowlist** (proposed, ask before any other): `duckdb`
   (Phase 1); `pyyaml`, `httpx` (Phase 2); `anthropic` (Phase 6); `snowflake-connector-
-  python` (Phase 10); dev: `pytest`, `ruff`, `pre-commit`. Airflow and Metabase
+  python` (Phase 10b); dev: `pytest`, `ruff`, `pre-commit`. Airflow and Metabase
   via Docker only. No pandas on a pipeline path.
 
 ### 3.2 `security-reviewer` — this repo's surface

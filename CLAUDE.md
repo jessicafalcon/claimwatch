@@ -307,7 +307,7 @@ study names no insurer as its subject.
   pipeline path — SQL does the work; Python glues (DuckDB + stdlib csv/json).
 - Dependencies: ask before adding ANY package. Pre-approved by phase:
   `duckdb` (1); `pyyaml`, `httpx` (2); `anthropic` (6);
-  `snowflake-connector-python` (10); Airflow and Metabase via Docker only;
+  `snowflake-connector-python` (10b); Airflow and Metabase via Docker only;
   dev: `pytest`, `ruff`, `pre-commit`. Anything else is a STOP-and-ask.
 - SQL: one file per table under `sql/raw/`, `sql/staging/` or `sql/marts/`; the
   header comment names the grain, the provenance columns and the BACKING rows
@@ -639,12 +639,16 @@ branch, `TARGET` threaded through the classify step and the exports, the
 Snowflake run — its spec after 10a merges, seeded by round 1's findings #1–#4,
 #7, #9, #15, #17 (10a's Out of scope). Built and demonstrated: the DAG ran
 green in the container and its captioned screenshot is committed
-(`dags/screenshots/01-dag-run.png`); review round 1 run 2026-09-13, its
-findings being fixed.
+(`dags/screenshots/01-dag-run.png`), and ran again over the amended mounts
+(A1) with the same grid; review round 1 (2026-09-13): twelve findings, ten
+fixed in five commits, #2/#3 by amendment A1, #8 accepted by measurement;
+round 2, the exit review with the coherence audit (2026-09-13): seventeen
+findings, fixed — four correctness commits and one records commit — except the
+image digest, which needs the developer's registry query.
 
 **Next:** Phase 10b (the Snowflake seam and run), after 10a merges — see 10a's
 Out of scope for its seeds; BACKLOG rows 33 and 50 are its triggers.
 
-Open BACKLOG rows: **38**.
+Open BACKLOG rows: **39**.
 
 (Update this section at the end of every working day.)

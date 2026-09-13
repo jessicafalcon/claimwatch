@@ -9,7 +9,7 @@
 #
 # Run (from the repo root):
 #   make rebuild ROWS=captured            # your own corpus, or ROWS=synthetic
-#   uv run python -m study.metabase export   # writes data/metabase/metabase.sqlite
+#   make publish                          # writes data/metabase/metabase.sqlite
 #   cd study/metabase && docker compose up -d
 #   cd ../.. && uv run python -m study.metabase apply   # reads .env
 #   open http://localhost:3000            # drill a theme bar

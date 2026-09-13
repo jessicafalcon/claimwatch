@@ -23,7 +23,7 @@ def test_connect_selects_duckdb():
 
 
 def test_snowflake_target_defers_to_phase_10():
-    with pytest.raises(NotImplementedError, match="Phase 10"):
+    with pytest.raises(NotImplementedError, match="Phase 10b"):
         connect("snowflake")
     # The invariant: the seam imports no snowflake driver in Phase 1.
     src = WAREHOUSE.read_text(encoding="utf-8")

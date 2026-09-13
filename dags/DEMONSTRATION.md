@@ -32,11 +32,12 @@ task names and states only.
 Python-3.12 variant plus `make` and `uv`, running `airflow standalone` — the
 scheduler, the DAG processor, the API server and the executor in one process over Airflow's
 bundled SQLite metadata database. The tracked paths the tasks read (the four
-project files and nine packages) are each mounted read-only, and nothing else
-of the checkout is in the container — not `.env`, not `.git/`, not any
-gitignored file; `data/` is a container-private volume with the three tracked,
-numbers-only subtrees bound read-only inside it; so the `classify` task is the no-key
-run and no credential is in the container. `uv` resolves the project from the
+project files and nine packages) are each mounted read-only, and no other
+top-level entry of the checkout is in the container — not `.env`, not `.git/`,
+not the local tool config (a package's own bytecode cache rides along with the
+package, read-only). `data/` is a container-private volume with the three
+tracked, numbers-only subtrees bound read-only inside it. So the `classify`
+task is the no-key run, and no credential is in the container. `uv` resolves the project from the
 lock into its own environment on the first task (network once).
 
 ## The walk
