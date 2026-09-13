@@ -22,7 +22,7 @@ an offline, CI-checkable core (the DAG file's shape, the stage split, the
 `publish` target, the engine-name constant and its layout test, the compose
 file's mounts) plus a developer-run demonstration (the Airflow run over
 hand-written synthetic reviews, recorded with one captioned screenshot).
-Challenged: 2026-09-13, round 1, spec c8ea25e5 — rework (1 BLOCKER, 12 should-fix, 4 suggestion, 1 question; all amended: the 10a/10b split, #1–#4, #7, #9, #15, #17 recorded as 10b's seeds; #18 verified live the same day — the image's Python-3.12 variant tag, stack risk 1)
+Challenged: 2026-09-13, round 1, spec 4a421afb — rework (1 BLOCKER, 12 should-fix, 4 suggestion, 1 question; all amended: the 10a/10b split, #1–#4, #7, #9, #15, #17 recorded as 10b's seeds; #18 verified live the same day — the image's Python-3.12 variant tag, stack risk 1; re-stamped 2026-09-13 after amendment A1 — invariant 5 restated exactly and Done-when 5's mount clause, the developer's disposition of review round 1 #2/#3, no new challenge round)
 
 Four sections marked REQUIRED are mandatory; a spec without them is not
 approvable (CLAUDE.md → Workflow rules).
