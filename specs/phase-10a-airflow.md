@@ -192,6 +192,44 @@ The `scrape` task is not in the DONE command: it is the network target
 | 5. For every run of the container, no captured review is in a table it builds or a screenshot it yields, and no file under the repo is written: the input is `ROWS=synthetic` from the environment and the repo mount is read-only. | `tests/test_dag.py::test_the_compose_mounts_the_repo_read_only_isolates_data_carries_no_env_file_and_binds_the_ui_locally`; `::test_demonstration_doc_and_synthetic_screenshot_exist_and_links_resolve`; `make check-docs` over the PNG text; security-reviewer reads the screenshot |
 | 6. For every text surface that shows the DAG's steps (the page, the README, SPEC.md), the names are the DAG's task ids in the DAG's order. | `tests/test_dag.py::test_the_pages_task_tuple_equals_the_dags_task_ids`; `tests/test_beat5.py::test_b52_note_names_the_five_tasks_in_order`; `tests/test_readme.py` (the README's Beat 5 walk) |
 
+**Amendment A1 (review round 1, 2026-09-13, security-reviewer #2 and #3) —
+the container reads the tracked tree only.** Invariant 5 restored and made
+exact: *for every run of the container, every path it can read under the
+repo mount is a tracked path or one of the three numbers-only `data/`
+subtrees; no gitignored file of the checkout is readable inside it.* The
+`..:/opt/friction-ledger:ro` bind broke it: the named volume overlaid
+`data/` only, so the root `.env` (the API key and the warehouse credentials),
+`.git/`, `.venv/`, `.claude/settings.local.json` and `.mcp.json` rode into
+the container readable, while the compose's own header and pinned decision 5
+said no credential was mounted, and
+`test_the_compose_mounts_the_repo_read_only…` checked `env_file` and
+`environment:` only. Mechanism: the whole-repo bind is replaced by one
+read-only bind per tracked top-level path the five tasks read — `Makefile`,
+`pyproject.toml`, `uv.lock`, `.python-version`, `pipeline/`, `ingest/`,
+`classify/`, `models/`, `opendata/`, `study/`, `sql/`, `fixtures/`, `dags/`
+— beside the unchanged `data/` volume and its three `:ro` subtrees; nothing
+else exists under the mount, so a gitignored file cannot be there whatever
+its name (`.env*`, `*.pem`, `credentials*` included). Falsified by
+`tests/test_dag.py::test_the_compose_mounts_only_tracked_paths_the_tasks_read`:
+(a) every bind source is a tracked top-level entry of `HEAD` (`git ls-tree`),
+never `..`, `.`, `.claude`, `.github` or a gitignored name; (b) the mounted
+set covers every `ROOT / "<top>"` the source packages read
+(`pipeline/`, `classify/`, `opendata/`, `ingest/`, `models/`, `study/`,
+grepped from the source), every package `model_call_sites` scans
+(`_CODE_PACKAGES`), the packages themselves and the four project files — so
+a new read path outside the mounts names itself. The 9g compose was already
+this shape (the export directory alone); 10a's first draft mounted the tree
+for convenience. *Not taken: overlaying each local-only path with an empty
+mount (`/dev/null` for a file, `tmpfs` for a directory) — five lines, but
+it protects named paths only, and the credential patterns `.gitignore`
+declares are globs (`.env*`, `*.pem`, `credentials*`), so a `.envrc` or a
+`credentials.json` at the root would still be readable: the case, not the
+class; a `git archive` export mounted in its place — a stale copy, the
+rejection of pinned decision 5.* Cost: a new tracked top-level path a task
+reads is one compose line, which the test names. The demonstration is
+re-run by the developer over the amended compose (Docker, never CI) and the
+screenshot re-captured only if the grid changes; the DAG file is untouched.
+
 ## Pinned decisions (do not re-litigate)
 
 - **The DAG is five `BashOperator`s over bare `make` commands, `schedule=None`,
@@ -306,7 +344,10 @@ Freeze: none
   (trigger: a `ROWS=` on `study`, or the README sentence rewritten — one or
   the other); rows 33 and 50 re-pointed at 10b; the count in CLAUDE.md
   updated
-- [ ] LESSONS.md — none until a review round reports a correctness finding; then backtick it and the fix commit writes the row
+- [ ] `LESSONS.md` — the `traceback-at-boundary` row (round 1 #1: the seam's
+  `NotImplementedError` out of `main`; `warehouse.WIRED`) and the `unpinned`
+  row (round 1 #6: invariant 2's pins over `synthetic` only) extended by
+  their fix commits
 - [ ] `CLAUDE.md` — Current status (10a/10b); Commands (`rebuild [STAGE=]`,
   `publish [ROWS=]`); Repo map (`dags/` built); Architecture caption; BACKLOG
   count
