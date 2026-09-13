@@ -223,7 +223,8 @@ def branch_name(root: Path) -> str:
 def spec_for_branch(name: str, root: Path) -> Path | None:
     """`specs/<name>.md` for a phase branch; None for any other branch. A phase
     branch whose spec is absent is refused — its first commit is the spec — and
-    so is a `phase-` name off the shape, never read as "no spec" and run green."""
+    so is a `phase-` name that does not match the phase-branch pattern, never
+    read as "no spec" and run green."""
     if not _PHASE_BRANCH.match(name):
         if name.startswith("phase-"):
             raise Refused(
@@ -241,18 +242,24 @@ def spec_for_branch(name: str, root: Path) -> Path | None:
 
 @dataclass(frozen=True)
 class Inputs:
-    """What the CLI resolved to. `typed` is the one switch for the spec's own
-    two checks: SPEC named on the command line runs them, a derived spec
-    (`branch` set) feeds the fixtures check only."""
+    """What the CLI resolved to. `branch` is set only when the spec was derived
+    from it, so `typed` — SPEC named on the command line — is the one switch
+    for the spec's own two checks; a derived spec feeds the fixtures check only."""
 
     spec: Path | None
     branch: str
     base: str
-    typed: bool
 
-    def spec_origin(self) -> str:
-        """How a refusal names the spec: the typed SPEC, or the branch's own."""
-        return "SPEC" if self.typed else f"the spec of branch {self.branch}"
+    @property
+    def typed(self) -> bool:
+        return not self.branch
+
+    def read_refusal(self, err: str) -> str:
+        """The one line for a spec that did not read, naming where it came
+        from: the typed SPEC, or the branch whose own spec it is."""
+        if self.typed:
+            return f"refusing: SPEC {err}"
+        return f"refusing: the spec of branch {self.branch}, {err}"
 
 
 def resolve_inputs(spec_arg: str, base_arg: str) -> Inputs:
@@ -260,9 +267,9 @@ def resolve_inputs(spec_arg: str, base_arg: str) -> Inputs:
     absent one is the branch's own spec; raises Refused, never a traceback."""
     base = resolve_base(base_arg)
     if spec_arg:
-        return Inputs(resolve_spec(spec_arg, ROOT), "", base, typed=True)
+        return Inputs(resolve_spec(spec_arg, ROOT), "", base)
     branch = branch_name(ROOT)
-    return Inputs(spec_for_branch(branch, ROOT), branch, base, typed=False)
+    return Inputs(spec_for_branch(branch, ROOT), branch, base)
 
 
 def skip_line(spec: Path | None, branch: str) -> str:
@@ -274,6 +281,27 @@ def skip_line(spec: Path | None, branch: str) -> str:
             f"SKIP evidence, records (no SPEC; Freeze: read from {shown(spec, ROOT)})"
         )
     return f"SKIP evidence, records (no SPEC; branch {branch} has no phase spec)"
+
+
+def spec_checks(spec_text: str, diff: set[str]) -> list[tuple[str, bool, str]]:
+    """The spec's two own checks, evidence and records — run only for a typed
+    SPEC: on a phase branch whose only commit is the spec both are red by
+    construction, and that is where `/phase-start` runs the no-SPEC form."""
+    results: list[tuple[str, bool, str]] = []
+    code, ids, out = collected_tests(ROOT)
+    if code != 0:
+        results.append(
+            ("evidence", False, "pytest --collect-only failed:\n" + tail(out))
+        )
+    else:
+        declared, err = make_targets(ROOT)
+        errs = [err] if err else check_evidence(spec_text, ids, declared)
+        results.append(("evidence", not errs, "\n".join(errs)))
+    fails, warns = check_records(spec_text, diff)
+    results.append(
+        ("records", not fails, "\n".join(fails + [f"WARN {w}" for w in warns]))
+    )
+    return results
 
 
 def collected_tests(root: Path) -> tuple[int, set[str], str]:
@@ -325,7 +353,7 @@ def main(argv: list[str] | None = None) -> int:
     if inputs.spec:
         spec_text, err = read_text_or_error(inputs.spec, ROOT)
         if spec_text is None:
-            die(Refused(f"refusing: {inputs.spec_origin()} {err}"))
+            die(Refused(inputs.read_refusal(err)))
 
     results: list[tuple[str, bool, str]] = []
 
@@ -346,20 +374,9 @@ def main(argv: list[str] | None = None) -> int:
     results.extend(range_results)
 
     if inputs.typed:
-        assert spec_text is not None  # a typed SPEC that did not read died above
-        code, ids, out = collected_tests(ROOT)
-        if code != 0:
-            results.append(
-                ("evidence", False, "pytest --collect-only failed:\n" + tail(out))
-            )
-        else:
-            declared, err = make_targets(ROOT)
-            errs = [err] if err else check_evidence(spec_text, ids, declared)
-            results.append(("evidence", not errs, "\n".join(errs)))
-        fails, warns = check_records(spec_text, diff)
-        results.append(
-            ("records", not fails, "\n".join(fails + [f"WARN {w}" for w in warns]))
-        )
+        if spec_text is None:  # a typed SPEC that did not read died above
+            die(Refused(inputs.read_refusal("could not be read")))
+        results.extend(spec_checks(spec_text, diff))
     else:
         print(skip_line(inputs.spec, inputs.branch))
 

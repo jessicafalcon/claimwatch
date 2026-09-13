@@ -503,6 +503,11 @@ def test_the_fail_summary_counts_checks_passed(monkeypatch, tmp_path: Path):
         "ok   records",
     ]
     assert lines[-1] == "review-gate FAILED: 7/8 checks passed"
+    # the two spec checks are one unit main runs only for a typed SPEC
+    assert [r[:2] for r in review_gate.spec_checks(_spec("| 1 | x |"), set())] == [
+        ("evidence", False),
+        ("records", True),
+    ]
 
 
 def test_the_fixtures_verdict_does_not_depend_on_whether_spec_was_typed(
@@ -537,7 +542,9 @@ def test_a_derived_spec_that_does_not_read_is_refused_naming_the_branch(
         review_gate.main([])
     assert exc.value.code == 2
     err = capsys.readouterr().err.strip()
-    assert err.startswith("refusing: the spec of branch phase-0a-x ")
+    assert err.startswith(
+        "refusing: the spec of branch phase-0a-x, specs/phase-0a-x.md: "
+    )
     assert len(err.splitlines()) == 1
     with pytest.raises(SystemExit):
         review_gate.main(["--spec=specs/phase-0a-x.md"])
@@ -643,14 +650,9 @@ def test_the_no_spec_form_reads_the_branch_spec_for_the_fixtures_check_only(
         "collected_tests",
         lambda root: (_ for _ in ()).throw(AssertionError),
     )
-    import io
-    from contextlib import redirect_stdout
-
-    buf = io.StringIO()
-    with redirect_stdout(buf):
-        assert review_gate.main([]) == 0
+    lines = _main_lines([], 0)
     assert seen == ["Freeze: fixtures/ameli/\n"]
-    assert buf.getvalue().splitlines()[0] == review_gate.skip_line(spec, "phase-0a-x")
+    assert lines[0] == review_gate.skip_line(spec, "phase-0a-x")
     assert review_gate.skip_line(spec, "phase-0a-x") == (
         "SKIP evidence, records (no SPEC; Freeze: read from specs/phase-0a-x.md)"
     )
@@ -669,12 +671,13 @@ def test_resolve_inputs_reads_the_branch_only_without_a_spec(root: Path, monkeyp
         review_gate, "branch_name", lambda root: (_ for _ in ()).throw(AssertionError)
     )
     typed = review_gate.resolve_inputs("specs/ok.md", "main")
-    assert typed == review_gate.Inputs(root / "specs/ok.md", "", "main", typed=True)
-    assert typed.spec_origin() == "SPEC"
+    assert typed == review_gate.Inputs(root / "specs/ok.md", "", "main")
+    assert typed.typed and typed.read_refusal("x: no") == "refusing: SPEC x: no"
     monkeypatch.setattr(review_gate, "branch_name", lambda root: "fix/y")
     derived = review_gate.resolve_inputs("", "main")
-    assert derived == review_gate.Inputs(None, "fix/y", "main", typed=False)
-    assert derived.spec_origin() == "the spec of branch fix/y"
+    assert derived == review_gate.Inputs(None, "fix/y", "main")
+    assert not derived.typed
+    assert derived.read_refusal("x: no") == "refusing: the spec of branch fix/y, x: no"
     with pytest.raises(Refused):
         review_gate.resolve_inputs("", "-x")
 
