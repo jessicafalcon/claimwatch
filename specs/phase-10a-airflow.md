@@ -1,4 +1,4 @@
-# Phase 10a — the Airflow DAG (PROPOSED)
+# Phase 10a — the Airflow DAG
 
 Contract for the `phase-10a-airflow` branch. Source: PROJECT_BRIEF.md §9 Phase 10
 ("Wrap the working steps in the one-screen DAG; run once against a Snowflake
@@ -168,13 +168,13 @@ The `scrape` task is not in the DONE command: it is the network target
 | Done-when | Proof (test id / `make` target / output line) |
 |---|---|
 | 1 | `tests/test_dag.py::test_the_dag_is_five_make_tasks_in_the_briefs_order_with_no_logic` — `ast` over `dags/friction_ledger.py`: five `BashOperator` calls, the task-id tuple in order, one `>>` chain, no `def`/`if`/`for`/`try`, no second statement in a `bash_command`, ≤ 40 lines, imports from `airflow`/`datetime` only |
-| 1 | `tests/test_dag.py::test_every_dag_task_runs_one_declared_make_target_with_no_rows_argument` — each `bash_command` is `cd <root> && make <goal…>` whose goals are in `scripts/review_common.py::make_targets`, whose variables are `STAGE` only and in its closed set, and which carries no `ROWS=` |
+| 1 | `tests/test_dag.py::test_every_dag_task_runs_one_declared_make_target_with_no_rows_argument` — each `bash_command` is one `make <goal…>` run with `cwd=REPO` (no `cd`, no `&&`, no `;`) whose goals are in `scripts/review_common.py::make_targets`, whose variables are `STAGE` only and in its closed set, and which carries no `ROWS=` |
 | 1 | `tests/test_dag.py::test_the_pages_task_tuple_equals_the_dags_task_ids` and `tests/test_beat5.py::test_b52_note_names_the_five_tasks_in_order` — `study/text.py::DAG_TASKS` equals the `ast`-read ids; the rendered B5.2 note carries them in order; `make study` + `git diff --exit-code` in CI (the page re-rendered once, committed) |
 | 2 | `tests/test_rebuild.py::test_three_stages_in_order_equal_one_whole_rebuild` — `table_counts` after `load`, `clean`, `classify` equal one `rebuild` + `classify_step` over the same input, table for table (not a sum) |
 | 2 | `tests/test_rebuild.py::test_a_stage_run_twice_adds_no_rows` and `::test_clean_or_classify_before_load_refuses_naming_the_missing_table` |
 | 2 | `tests/test_makefile.py::test_stage_is_a_closed_set` — empty → `all`; `load`/`clean`/`classify` accepted; `../x`, `"; `, `Load`, `all,load` refused by name, exit 2; `::test_pipeline_variables_reach_python_as_one_literal` parametrised with `STAGE`; `::test_env_exported_stage_reaches_the_recipe_and_is_validated_in_python` (the container's mechanism) |
 | 3 | `tests/test_makefile.py::test_publish_passes_rows_unexpanded_as_one_literal` — `make -n publish` shows `python -m study.metabase export --rows=…` only, from both origins |
-| 3 | `tests/test_review_drill.py::test_publish_export_is_byte_identical_on_a_rerun` (new — two exports over the same warehouse compare equal as bytes) and `::test_export_refuses_a_missing_mart_by_name` (existing) |
+| 3 | `tests/test_review_drill.py::test_sqlite_export_rating_is_exact_and_row_order_is_stable` (existing — two exports over the same warehouse compare equal as bytes) and `::test_export_refuses_a_missing_mart_by_name` (existing); `tests/test_metabase_apply.py::test_export_command_refuses_rows_outside_the_set_by_name` (the `--rows` closed set, exit 2, nothing built) |
 | 4 | `tests/test_ingest_layout.py::test_no_module_outside_the_seam_spells_an_engine_name` — the literals `"duckdb"`/`"snowflake"` occur in `pipeline/warehouse.py` (and `tests/`) only; a planted `connect("duckdb"` in `build.py` fails it |
 | 4 | `tests/test_warehouse.py::test_local_is_the_duckdb_target` — `LOCAL in TARGETS`, `connect(LOCAL, database=":memory:")` answers `select 1` |
 | 5 | `tests/test_dag.py::test_the_compose_mounts_the_repo_read_only_isolates_data_carries_no_env_file_and_binds_the_ui_locally` — `pyyaml` over `dags/docker-compose.yml`: one service; the repo bind `:ro`; `data/` a named volume; the three tracked subtrees `:ro`; `ROWS: synthetic`; no `env_file`; ports `127.0.0.1:8080:8080`; `UV_PROJECT_ENVIRONMENT`/`UV_CACHE_DIR` not under the mount path |
@@ -277,7 +277,7 @@ The `scrape` task is not in the DONE command: it is the network target
 - `scripts/review_common.py` — `BINARY_ASSETS` gains `dags/screenshots/` `.png`.
 - `tests/test_dag.py` (new), `tests/test_rebuild.py`, `tests/test_cli.py`,
   `tests/test_makefile.py`, `tests/test_ingest_layout.py`,
-  `tests/test_warehouse.py`, `tests/test_review_drill.py`, `tests/test_beat5.py`,
+  `tests/test_warehouse.py`, `tests/test_metabase_apply.py`, `tests/test_beat5.py`,
   `tests/test_repo_text.py`, `tests/pins.py`; `tests/conftest.py` — `STAGE`
   joins `_scrub_env`; the source-package walkers (`tests/test_number_shapes.py`,
   `tests/test_csv_readers.py`, `scripts/check_pins.py`) — `dags/` joins the
@@ -313,7 +313,8 @@ Freeze: none
 - [ ] BACKING.md — none: B5.2's source stays `pipeline/build.py` (the DAG feeds no number; it is cited in SPEC.md's row text and the page)
 - [ ] `SPEC.md` — B5.2's text names the five tasks in order beside `make rebuild`
 - [ ] `README.md` — Beat 5 and Running it, as under Scope
-- [ ] this spec — the "Delivered" paragraph appended at exit
+- [ ] `docs/PLAN.md` — the Phase 10 row notes the 10a/10b split
+- [ ] `specs/phase-10a-airflow.md` — the "Delivered" paragraph appended at exit
 
 ## Threat model (REQUIRED)
 
@@ -331,7 +332,7 @@ reaches Python unexpanded and single-quoted (`$(call _Q,$(value VAR))`) and is
 | Target | empty | `../x` | `"; ` | env-exported | `$(origin)` | Pinned by |
 |---|---|---|---|---|---|---|
 | `rebuild STAGE=` | → `all` (the whole, today's behaviour) | refused by name, exit 2: not in `all\|load\|clean\|classify` | refused by name, exit 2 (reaches Python as one literal, never a shell word) | validated the same (`resolve_choice`); the recipe reads `$(value STAGE)` | n/a — no confirm gate | `tests/test_makefile.py::test_stage_is_a_closed_set`, `::test_pipeline_variables_reach_python_as_one_literal` (parametrised with `STAGE`), `::test_env_exported_stage_reaches_the_recipe_and_is_validated_in_python` |
-| `publish ROWS=` | → `captured` | refused by name (argparse `choices` = `INPUTS`) | refused by name | validated the same | n/a | `tests/test_makefile.py::test_publish_passes_rows_unexpanded_as_one_literal`; `tests/test_review_drill.py::test_export_refuses_a_missing_mart_by_name` |
+| `publish ROWS=` | → `captured` | refused by name, exit 2 (`resolve_choice` over `INPUTS`, the same guard as `rebuild`) | refused by name | validated the same | n/a | `tests/test_makefile.py::test_publish_passes_rows_unexpanded_as_one_literal`; `tests/test_metabase_apply.py::test_export_command_refuses_rows_outside_the_set_by_name`; `tests/test_review_drill.py::test_export_refuses_a_missing_mart_by_name` |
 | the Airflow container (`dags/docker-compose.yml`) | no `ROWS` in the environment → the DAG loads `captured` from the volume's captures (a company run); the demonstration sets `synthetic` | a `ROWS`/`STAGE` value planted in the compose environment reaches the recipe as one literal and is refused by name in Python, the same path as the command line | same | that IS the mechanism: `ROWS=synthetic` in `environment:` reaches the recipe and is validated; the repo is `:ro`, so no environment value can make a task write a tracked file | the `scrape` task's `make confirm scrape` arms from make's own goal list, the weekly.yml precedent (`$(origin MAKECMDGOALS)` is `default`) | `tests/test_dag.py::test_the_compose_mounts_the_repo_read_only_isolates_data_carries_no_env_file_and_binds_the_ui_locally`; `tests/test_makefile.py::test_confirm_is_a_goal_of_the_same_invocation` (existing) |
 
 Run twice: a second DAG run is the idempotent rebuild (raw append-only; the
