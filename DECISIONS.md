@@ -3491,10 +3491,23 @@ count the same thing.**
   `Inputs` record whose `typed` flag is the one switch for the spec's two
   checks (#2); a derived spec that is not UTF-8 is refused naming its branch,
   not `SPEC` (#1, missed in round 1 — a pre-existing line the derived read
-  made reachable); the fixtures verdict is pinned both ways over one spec
+  made reachable; a wording class, not a wrong output: the refusal fired, one
+  line, exit 2, and only its label named the wrong origin, so no LESSONS row); the fixtures verdict is pinned both ways over one spec
   text (#3, the invariant's own pin); `branch_name`'s happy path and the
   bad-pattern exit through `main` are pinned (#4, #5); the summary test is
   split (#6). Records: this bullet's numbering and the probe's third red
   line (#7); "off the shape" said literally (#8). *Accepted as-is (#9): git's
   last stderr line may carry a local path in a worktree error — no
   credential or personal-data class, the reviewer's own recommendation.*
+- **Review round 3 (2026-09-12, scoped to the round-2 commits): seven
+  findings, none correctness, disposition "fix all".** `Inputs.typed` is a
+  property of `branch` (derived is never empty, typed always is), so an
+  inconsistent record cannot be built (#1); the read refusal joins the origin
+  and the reader's line with a comma, the path once (#2); the docstring says
+  "does not match the phase-branch pattern", the test names keep "off the
+  shape" because the records cite them (#3); one stdout runner in the tests
+  (#4); round 2's #1 is classed as wording above (#5); the spec's two checks
+  moved to `spec_checks` behind an explicit refusal, so the never-a-traceback
+  contract no longer rides on an `assert` stripped under `-O` (#6, the
+  security reviewer's note). The review cap did not apply: rounds 2 and 3
+  reported no correctness finding.
