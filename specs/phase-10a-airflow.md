@@ -280,8 +280,8 @@ The `scrape` task is not in the DONE command: it is the network target
   `tests/test_warehouse.py`, `tests/test_metabase_apply.py`, `tests/test_beat5.py`,
   `tests/test_repo_text.py`, `tests/pins.py`; `tests/conftest.py` — `STAGE`
   joins `_scrub_env`; the source-package walkers (`tests/test_number_shapes.py`,
-  `tests/test_csv_readers.py`, `scripts/check_pins.py`) — `dags/` joins the
-  packages walked.
+  `tests/test_csv_readers.py`) — `dags/` joins the packages walked
+  (`scripts/check_pins.py` already walked it; unchanged).
 - `study/text.py` (`DAG_TASKS`, the B5.2 note's one sentence),
   `study/friction_ledger.html` (re-rendered once, committed).
 - `SPEC.md` (B5.2: the five task names beside the one command — a text change

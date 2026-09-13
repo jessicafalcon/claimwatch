@@ -191,7 +191,8 @@ API key and no network:
 
 - `make rebuild` — raw → cleaned → tagged, then the cost model and simulator.
   `STAGE=load|clean|classify` runs one of its three stages into the same file
-  (the DAG's middle tasks); the default is all three in order.
+  (the DAG's middle tasks `load_raw`, `clean`, `classify`); the default is all
+  three in order.
 - `make study` — render the static HTML study; byte-identical on a rerun. It
   renders the frozen synthetic input, the committed page: a rebuild over your
   captured reviews fills the warehouse, not this page.

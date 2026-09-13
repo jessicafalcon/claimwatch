@@ -30,7 +30,7 @@ task names and states only.
 *Under the hood.* The container ([`Dockerfile`](Dockerfile),
 [`docker-compose.yml`](docker-compose.yml)) is the official Airflow image on its
 Python-3.12 variant plus `make` and `uv`, running `airflow standalone` — the
-scheduler, the DAG processor and the web server in one process over Airflow's
+scheduler, the DAG processor, the API server and the executor in one process over Airflow's
 bundled SQLite metadata database. The repo is mounted read-only; `data/` is a
 container-private volume with the three tracked, numbers-only subtrees bound
 read-only inside it; no `.env` is mounted, so the `classify` task is the no-key

@@ -636,9 +636,10 @@ findings amended; approved 2026-09-13). Phase 10 is split on the ≤ ~6 rule:
 test, the one-container Airflow demonstration; **10b** the seam's Snowflake
 branch, `TARGET` threaded through the classify step and the exports, the
 Snowflake run — its spec after 10a merges, seeded by round 1's findings #1–#4,
-#7, #9, #15, #17 (10a's Out of scope). Built: everything but the developer's
-demonstration run and its screenshot (`dags/screenshots/01-dag-run.png`),
-which `tests/test_dag.py` waits for.
+#7, #9, #15, #17 (10a's Out of scope). Built and demonstrated: the DAG ran
+green in the container and its captioned screenshot is committed
+(`dags/screenshots/01-dag-run.png`); review round 1 run 2026-09-13, its
+findings being fixed.
 
 **Next:** Phase 10b (the Snowflake seam and run), after 10a merges — see 10a's
 Out of scope for its seeds; BACKLOG rows 33 and 50 are its triggers.

@@ -320,8 +320,9 @@ ROW_COUNTS_NOTE = (
     "How good the tagging is — precision and recall on reviews the classifier "
     "never saw — is the classifier-quality table above. One command rebuilds "
     "every number in this study from the raw reviews: `make rebuild`. Run it "
-    "twice and the counts do not move. The same steps, as a scheduler would run "
-    "them, are the one Airflow DAG (`dags/friction_ledger.py`): "
+    "twice and the counts do not move. A scheduler can run those same steps as "
+    "five separate commands in order — that is the one Airflow DAG "
+    "(`dags/friction_ledger.py`): "
     + " → ".join(DAG_TASKS)
-    + " — five commands and no logic of its own."
+    + ", with no logic of its own."
 )
