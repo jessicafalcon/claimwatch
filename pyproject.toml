@@ -11,7 +11,16 @@ dependencies = [
 ]
 # Runtime packages land with their phase (CLAUDE.md → Conventions allowlist):
 # duckdb (Phase 1); pyyaml, httpx (Phase 2); anthropic (Phase 6);
-# snowflake-connector-python (Phase 10b). Nothing before it is needed.
+# snowflake-connector-python (Phase 10b, the `snowflake` optional extra below).
+# Nothing else is needed.
+
+[project.optional-dependencies]
+# The Snowflake connector is an OPTIONAL extra, never a plain dependency: the
+# DuckDB path is the permanent one and a laptop clone downloads no cloud driver
+# it never uses. Installed only for the developer's cloud run
+# (`uv sync --extra snowflake`), never by `make setup`, CI or the suite; the
+# lock file resolves it so `uv sync --locked` stays green (Phase 10b).
+snowflake = ["snowflake-connector-python>=3.12"]
 
 [dependency-groups]
 dev = [

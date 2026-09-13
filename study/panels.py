@@ -30,8 +30,9 @@ from models.guardrail_sim import SIM_SCENARIOS
 from opendata.fee_split import ARTIFACT as FEE_SPLIT_ARTIFACT
 from opendata.fit import ARTIFACT
 from opendata.sources import AMELI_DATASET_URL, DATASET_API
+from pipeline import warehouse
 from pipeline.build import INPUTS
-from pipeline.warehouse import ROOT, default_schema
+from pipeline.warehouse import ROOT
 from study import text
 from study.model import (
     NEUTRAL,
@@ -211,25 +212,14 @@ def _run_id_sql(mart: str) -> str:
     return f"select distinct run_id from {mart} order by run_id"
 
 
-# The catalog probe `_mart_exists` runs — with the engine's schema read, one of
-# the two catalog reads the export runs outside STUDY_QUERIES (no data column,
-# so no review text can leak); a test records every query a render runs and
-# refuses one that is neither (challenge round 2).
-_MART_PROBE = (
-    "select 1 from information_schema.tables where table_schema = ? and table_name = ?"
-)
-
-
 def _mart_exists(conn, mart: str) -> bool:
     # A catalog probe, not a data read (no review text, so it stays outside the
     # column allowlist): a Python-fed mart the classify step never built under
-    # ROWS=none is absent, not empty, and its panel renders "no data yet".
-    # information_schema.tables is portable across DuckDB and Snowflake; the
-    # schema is the engine's own (`warehouse.default_schema`, as the rebuild's
-    # catalog reads do), so a same-named table elsewhere never matches.
-    return (
-        conn.execute(_MART_PROBE, [default_schema(conn), mart]).fetchone() is not None
-    )
+    # ROWS=none is absent, not empty, and its panel renders "no data yet". The
+    # probe is the seam's `warehouse.table_exists` — it reads the engine's own
+    # default schema and folds names, so the catalog query is spelled in the
+    # seam alone and a same-named table elsewhere never matches (Phase 10b).
+    return warehouse.table_exists(conn, mart)
 
 
 STUDY_QUERIES = (

@@ -17,8 +17,8 @@ import argparse
 import sys
 
 from pipeline.build import INPUTS
-from pipeline.cli import Refused, resolve_choice
-from pipeline.warehouse import database_for
+from pipeline.cli import Refused, _refuse_corpus_on_cloud, resolve_choice
+from pipeline.warehouse import LOCAL, WIRED, DriverError, location_for
 from study.metabase.apply import (
     Credentials,
     MetabaseError,
@@ -43,6 +43,14 @@ def main(argv: list[str] | None = None) -> int:
         "validated against the closed set in Python, so `make publish ROWS=` from "
         "either origin is refused by name, never a shell word",
     )
+    export_parser.add_argument(
+        "--target",
+        default="",
+        help="which engine to read the marts from (default: duckdb — the laptop "
+        "file); validated against the seam's WIRED set, so `make publish TARGET=` "
+        "from either origin is refused by name; a corpus input on the cloud "
+        "target is refused (fixture inputs only)",
+    )
     apply_parser = sub.add_parser("apply", help="provision the dashboard (config.yaml)")
     apply_parser.add_argument(
         "--dry-run",
@@ -54,8 +62,10 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.command == "export":
             rows = resolve_choice(args.rows, INPUTS, "captured")
-            path = build_sqlite(duck_db=database_for(rows))
-            print(f"wrote {path} (from ROWS={rows})")
+            target = resolve_choice(args.target, WIRED, LOCAL)
+            _refuse_corpus_on_cloud(target, rows)
+            path = build_sqlite(target, location_for(target, rows))
+            print(f"wrote {path} (from ROWS={rows} on TARGET={target})")
             return 0
         config = load_config()
         if args.dry_run:
@@ -65,7 +75,7 @@ def main(argv: list[str] | None = None) -> int:
         ids = apply(config, client)
         print(f"provisioned: {ids}")
         return 0
-    except (MetabaseError, ExportError, Refused) as error:
+    except (MetabaseError, ExportError, Refused, DriverError) as error:
         print(f"study.metabase: {error}", file=sys.stderr)
         return 2
 

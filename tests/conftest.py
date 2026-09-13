@@ -15,7 +15,25 @@ from pathlib import Path
 
 import pytest
 
-from pipeline.warehouse import database_for
+from pipeline.warehouse import SNOWFLAKE_ENV, database_for
+
+# The make user-variables the Makefile-invoking tests must not inherit, plus
+# every SNOWFLAKE_* credential (read from the seam's own tuple, Phase 10b), so
+# an exported `.env` in the developer's shell can never reach a test: the cloud
+# branch sees no credentials in the suite. `test_cli.py`'s
+# `test_env_scrub_covers_every_snowflake_variable` reads this to prove coverage.
+_MAKE_VARS = (
+    "SPEC",
+    "BASE",
+    "TARGET",
+    "ROWS",
+    "STAGE",
+    "CONFIRM",
+    "SOURCE",
+    "MAKEFLAGS",
+    "MFLAGS",
+)
+SCRUBBED_ENV = _MAKE_VARS + SNOWFLAKE_ENV
 
 
 def _blocked(*_args, **_kwargs):
@@ -24,17 +42,7 @@ def _blocked(*_args, **_kwargs):
 
 @pytest.fixture(autouse=True)
 def _scrub_env(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    for var in (
-        "SPEC",
-        "BASE",
-        "TARGET",
-        "ROWS",
-        "STAGE",
-        "CONFIRM",
-        "SOURCE",
-        "MAKEFLAGS",
-        "MFLAGS",
-    ):
+    for var in SCRUBBED_ENV:
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("UV_OFFLINE", "1")
     yield

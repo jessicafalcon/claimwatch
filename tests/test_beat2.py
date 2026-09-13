@@ -139,17 +139,17 @@ def test_the_cli_binds_the_file_it_builds_to_the_run_id_it_classifies_under(
     monkeypatch.setattr(cli, "connect", lambda target, database: _Conn())
     monkeypatch.setattr(cli, "reviews_per_month", lambda conn: [])
 
-    def _classify(db, rows):
-        calls.append((db, rows))
+    def _classify(location, rows, target):
+        calls.append((location, rows, target))
         return 0
 
     monkeypatch.setattr(cli, "_classify_and_print", _classify)
     for rows in ("synthetic", "samples", "none"):  # captured needs pages on disk
         # `stage=""` is the whole (the CLI's default), the shape `make rebuild`
-        # hands over with no STAGE (10a)
+        # hands over with no STAGE (10a); the default target is the laptop engine
         args = argparse.Namespace(target="", rows=rows, stage="")
         assert cli._do_rebuild(args) == 0
-        assert calls[-1] == (cli.database_for(rows), rows)
+        assert calls[-1] == (cli.database_for(rows), rows, "duckdb")
     # and the classify step writes that very value: over a built warehouse each
     # corpus mart carries run_id = rows (the conftest path mirrors _do_rebuild).
 
@@ -564,10 +564,16 @@ class _Recording:
         return self._conn.execute(sql, *args, **kwargs)
 
 
-# The catalog reads a render runs beside STUDY_QUERIES: the mart probe and the
-# engine's schema (pipeline/warehouse.py::default_schema). Both project no data
-# column; every other query must be a listed study query.
-_CATALOG_READS = frozenset({panels._MART_PROBE, "select current_schema()"})
+# The catalog reads a render runs beside STUDY_QUERIES, now the seam's own (the
+# mart probe is `warehouse.table_exists`, Phase 10b): the schema read and the
+# table listing. Both project no data column; every other query must be a
+# listed study query.
+_CATALOG_READS = frozenset(
+    {
+        "select current_schema()",
+        "select table_name from information_schema.tables where table_schema = ?",
+    }
+)
 
 
 def test_every_query_the_export_runs_is_a_listed_study_query(captured_db):

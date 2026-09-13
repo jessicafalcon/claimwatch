@@ -70,7 +70,6 @@ from opendata.slice import (
 from opendata.sources import AMELI_EXPORT, cache_path, valid_month, valid_year
 from pipeline.build import (
     BUILD_STAGES,
-    CLASSIFY_TARGETS,
     FETCHED_SNAPSHOTS,
     INPUTS,
     StageError,
@@ -86,7 +85,17 @@ from pipeline.build import (
     reviews_per_month,
 )
 from pipeline.label_sample import SHEET, label_sample
-from pipeline.warehouse import LOCAL, ROOT, WIRED, connect, database_for
+from pipeline.warehouse import (
+    CLOUD,
+    CLOUD_FORBIDDEN_INPUTS,
+    LOCAL,
+    ROOT,
+    WIRED,
+    DriverError,
+    connect,
+    database_for,
+    location_for,
+)
 
 # The one binding of the confirmation stamp: under the gitignored data/ root,
 # never tracked, written by `make confirm` and consumed by the next `reset` or
@@ -100,11 +109,27 @@ class Refused(Exception):
 
 def _rel(path):
     """A path shown relative to the repo root when it is under it, else as-is —
-    so a display line never crashes on a path outside ROOT (a test's tmp dir)."""
+    so a display line never crashes on a path outside ROOT (a test's tmp dir) or
+    on a Snowflake schema name (a str, no `relative_to`)."""
     try:
         return path.relative_to(ROOT)
-    except ValueError:
+    except (ValueError, AttributeError):
         return path
+
+
+def _refuse_corpus_on_cloud(target: str, rows: str) -> None:
+    """A corpus input (the real scraped reviews, the frozen samples) on the
+    cloud target is one refusal line, exit 2, before any connection — the trial
+    holds fixture inputs only (Phase 10b invariant 2, brief §2.5). Every
+    target-taking CLI path calls this, so the refusal is the CLI's, never
+    `location_for`'s ValueError as a traceback."""
+    if target == CLOUD and rows in CLOUD_FORBIDDEN_INPUTS:
+        raise Refused(
+            f"refusing: ROWS={rows} on TARGET={CLOUD} — the corpus inputs "
+            f"{CLOUD_FORBIDDEN_INPUTS} are real people's words and never leave the "
+            "laptop (brief §2.5); the cloud demonstration takes fixture inputs "
+            "(synthetic, none) only"
+        )
 
 
 def positive_int(value: str, name: str) -> int:
@@ -239,16 +264,15 @@ STAGES = ("all", *BUILD_STAGES, "classify")
 def _do_rebuild(args: argparse.Namespace) -> int:
     rows = resolve_choice(args.rows, INPUTS, "captured")
     stage = resolve_choice(args.stage, STAGES, "all")
-    # TARGET resolves against the targets this invocation can use: the seam's
-    # WIRED set for a build stage (a declared-but-unwired engine is refused by
-    # name, never the seam's NotImplementedError as a traceback), and the
-    # classify step's own set for any stage that runs it (DuckDB-only until
-    # 10b: never run over the DuckDB file while the variable says otherwise).
-    usable = WIRED if stage in BUILD_STAGES else CLASSIFY_TARGETS
-    target = resolve_choice(args.target, usable, LOCAL)
-    db = database_for(rows)
+    # Every stage resolves TARGET against the seam's WIRED set (both engines
+    # since Phase 10b): a target the seam cannot open is one refusal line naming
+    # the set, never a traceback. The classify step is threaded now, so no
+    # separate set — a corpus input on the cloud target is the one extra refusal.
+    target = resolve_choice(args.target, WIRED, LOCAL)
+    _refuse_corpus_on_cloud(target, rows)
+    location = location_for(target, rows)
     if stage == "classify":
-        return _classify_and_print(db, rows)
+        return _classify_and_print(location, rows, target)
     if (
         stage in ("all", "load")
         and rows == "captured"
@@ -264,11 +288,11 @@ def _do_rebuild(args: argparse.Namespace) -> int:
             "`make confirm scrape` fetches them (developer-run)"
         )
     stages = BUILD_STAGES if stage == "all" else (stage,)
-    for name, n in rebuild(target, rows, stages=stages).items():  # the input's own file
+    for name, n in rebuild(target, rows, stages=stages).items():  # the input's location
         print(f"{name:24} {n}")
     if stage == "load":
         return 0  # staging is the next stage; nothing derived to print yet
-    conn = connect(target, database=db)
+    conn = connect(target, database=location)
     try:
         months = reviews_per_month(conn)
     finally:
@@ -281,10 +305,10 @@ def _do_rebuild(args: argparse.Namespace) -> int:
         print("  (none)")
     if stage == "clean":
         return 0  # the classify step is the next stage
-    return _classify_and_print(db, rows)
+    return _classify_and_print(location, rows, target)
 
 
-def _classify_and_print(db, rows_input: str) -> int:
+def _classify_and_print(location, rows_input: str, target: str = LOCAL) -> int:
     """Run the classify step over the warehouse's `stg_reviews` and print both
     summaries. The step's code and every write live in
     `pipeline.build.classify_step` (the Repo map's home for the classify step),
@@ -298,12 +322,16 @@ def _classify_and_print(db, rows_input: str) -> int:
     itself is offline (it grades stored predictions against the hand answer key —
     no model call)."""
     outcome = classify_step(
-        db, rows_input, cache_path=DECISIONS, decide=make_model_decider()
+        location,
+        rows_input,
+        target=target,
+        cache_path=DECISIONS,
+        decide=make_model_decider(),
     )
     if outcome is None:
         raise StageError(
-            f"STAGE=classify: table 'stg_reviews' is missing in {_rel(db)} — run "
-            "`make rebuild STAGE=clean` first"
+            f"STAGE=classify: table 'stg_reviews' is missing in {_rel(location)} — "
+            "run `make rebuild STAGE=clean` first"
         )
 
     theme_rows = sum(1 for _, label in outcome.rows if label in THEMES)
@@ -634,12 +662,14 @@ def _do_simulate(_args: argparse.Namespace) -> int:
 
 
 def _do_idempotency(args: argparse.Namespace) -> int:
-    # idempotency-check runs the classify step (build.classify_step), which is
-    # DuckDB-only until Phase 10b threads TARGET through it; TARGET=snowflake is
-    # refused with one line here (the seam's WIRED set), not silently counted
-    # against an empty temp file.
+    # idempotency-check rebuilds and runs the classify step twice on TARGET into
+    # a throwaway scratch (`warehouse.scratch`), then diffs the counts; since
+    # Phase 10b the classify path is threaded, so both engines are covered. A
+    # target outside WIRED, or a corpus input on the cloud target, is one refusal
+    # line here (never rebuilt then counted against an empty scratch).
     target = resolve_choice(args.target, WIRED, LOCAL)
     rows = resolve_choice(args.rows, INPUTS, "synthetic")
+    _refuse_corpus_on_cloud(target, rows)
     ok, first, second = idempotency_check(target, rows)
     for name in sorted(set(first) | set(second)):
         a, b = first.get(name), second.get(name)
@@ -656,7 +686,11 @@ def _do_reset(args: argparse.Namespace) -> int:
     # reset handles only the DuckDB file; TARGET=snowflake is refused with one
     # line here, not a traceback from reset() downstream.
     armed = confirmed(args.make_pid)  # consumed first, before any refusal (A9)
-    target = resolve_choice(args.target, WIRED, LOCAL)
+    # reset handles the DuckDB files only — a cloud schema is dropped by the
+    # developer in the console, never by a make target (Phase 10b pinned
+    # decision 3) — so TARGET resolves against the laptop engine alone, and the
+    # cloud target (now in WIRED) is refused by name here, not a traceback.
+    target = resolve_choice(args.target, (LOCAL,), LOCAL)
     if not armed:
         ok = _prompt(
             "Drop every DuckDB file this repo built (the corpus and one per "
@@ -739,6 +773,7 @@ def main(argv: list[str] | None = None) -> int:
         CacheError,
         LabelError,
         StageError,
+        DriverError,
     ) as exc:
         # Every declared refusal a command's library can raise, one line and
         # exit 2, never a traceback: a stored capture off its declared shape
@@ -749,7 +784,9 @@ def main(argv: list[str] | None = None) -> int:
         # decision cache or the answer key off its declared shape or a file
         # the parser cannot read (`rebuild`'s classify step and gate,
         # `classify-eval`); a stage run over a warehouse the earlier stage never
-        # built (10a). A new declared type joins this tuple, never a fresh arm
-        # (fix/csv-reader-boundary, round 2).
+        # built (10a); a Snowflake credential or connect refusal, or a missing
+        # extra (10b), each already one line naming names, never a value or the
+        # driver's message. A new declared type joins this tuple, never a fresh
+        # arm (fix/csv-reader-boundary, round 2).
         print(f"refusing: {exc}", file=sys.stderr)
         return 2

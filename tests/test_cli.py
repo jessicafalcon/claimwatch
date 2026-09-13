@@ -71,48 +71,69 @@ def test_cli_reset_refuses_non_duckdb_target(capsys):
     assert err.startswith("refusing:") and err.count("\n") <= 1
 
 
-def test_cli_idempotency_check_refuses_non_duckdb_target(capsys):
-    """idempotency-check runs the DuckDB-only classify step, so TARGET=snowflake is
-    refused with one line (exit 2) here — never rebuilt into Snowflake then counted
-    against an empty temp DuckDB file (a silent green). Phase 10b threads TARGET
-    through the classify step and lifts this restriction."""
-    code = main(["idempotency-check", "--target=snowflake"])
+def test_cli_idempotency_check_refuses_a_target_outside_wired(capsys):
+    """idempotency-check resolves TARGET against the seam's WIRED set (both
+    engines since Phase 10b); a target outside it (postgres) is one refusal line
+    (exit 2) here, never a rebuild into an unknown engine then counted against an
+    empty scratch (a silent green). Snowflake is now a valid target — its own
+    refusal is the corpus-input and credential checks, pinned elsewhere."""
+    code = main(["idempotency-check", "--target=postgres"])
     assert code == 2
     err = capsys.readouterr().err
-    assert err.startswith("refusing:") and err.count("\n") <= 1
+    assert err.startswith("refusing:") and "'duckdb'" in err and err.count("\n") <= 1
 
 
 @pytest.mark.parametrize("stage", ["all", "load", "clean", "classify"])
 def test_cli_rebuild_refuses_a_target_the_seam_cannot_open(stage, capsys):
     """Every stage of `make rebuild` resolves TARGET against the seam's WIRED
-    set, so TARGET=snowflake is one refusal line (exit 2) before any file is
-    opened: never run over the DuckDB file while the variable says otherwise
-    (the whole, `classify`), never the seam's NotImplementedError as a
-    traceback (`load`, `clean`) — review round 1, #1; Phase 10b wires it."""
-    argv = ["rebuild", "--rows=synthetic", "--target=snowflake", f"--stage={stage}"]
+    set (both engines since Phase 10b), so a target the seam cannot open
+    (postgres) is one refusal line (exit 2) before any warehouse is opened,
+    naming the set — never a traceback (round 1, #1; the CLASSIFY_TARGETS split
+    is gone, so `classify`/`all` resolve against WIRED like the build stages)."""
+    argv = ["rebuild", "--rows=synthetic", "--target=postgres", f"--stage={stage}"]
     code = main(argv)
     assert code == 2
     err = capsys.readouterr().err
     assert err.startswith("refusing:") and "'duckdb'" in err and err.count("\n") <= 1
 
 
-@pytest.mark.parametrize("stage", ["classify", "all"])
-def test_cli_rebuild_resolves_a_classify_stage_against_the_steps_own_set(
-    stage, monkeypatch, capsys
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["rebuild", "--target=snowflake", "--rows=captured", "--stage=all"],
+        ["rebuild", "--target=snowflake", "--rows=captured", "--stage=load"],
+        ["rebuild", "--target=snowflake", "--rows=captured", "--stage=clean"],
+        ["rebuild", "--target=snowflake", "--rows=captured", "--stage=classify"],
+        ["rebuild", "--target=snowflake", "--rows=samples"],
+        ["idempotency-check", "--target=snowflake", "--rows=captured"],
+    ],
+)
+def test_cli_refuses_a_corpus_input_on_the_cloud_target_on_every_path(
+    argv, monkeypatch, capsys
 ):
-    """The classify step opens LOCAL until 10b threads a target through it, so
-    a stage that runs it resolves TARGET against `build.CLASSIFY_TARGETS`, not
-    the seam's WIRED: with a second engine wired, `classify`/`all` still refuse
-    it by name while a build stage hands it to the seam (round 2, #10)."""
-    monkeypatch.setattr(cli, "WIRED", ("duckdb", "snowflake"))
-    code = main(
-        ["rebuild", "--rows=synthetic", "--target=snowflake", f"--stage={stage}"]
-    )
+    """A corpus input (captured, samples) on the cloud target is one refusal
+    line, exit 2, on every target-taking path, before any connection — the trial
+    holds fixture inputs only (Phase 10b invariant 2, brief §2.5). The fake
+    stands ready with credentials, and its `connect` is never called."""
+    from tests import fake_snowflake
+
+    fake = fake_snowflake.install(monkeypatch)
+    code = main(argv)
     assert code == 2
     err = capsys.readouterr().err
-    assert err.startswith("refusing:") and "expected one of ('duckdb',)" in err
-    with pytest.raises(NotImplementedError):  # the build stage reached the seam
-        main(["rebuild", "--rows=synthetic", "--target=snowflake", "--stage=load"])
+    assert err.startswith("refusing:") and "never leave the laptop" in err
+    assert err.count("\n") <= 1
+    assert not any(op == "connect" for op, _, _ in fake.CALLS)
+
+
+def test_env_scrub_covers_every_snowflake_variable():
+    """`_scrub_env` deletes every SNOWFLAKE_* the seam reads (its own tuple), so
+    an exported `.env` in the developer's shell never reaches a test — the cloud
+    branch sees no credentials in the suite (Phase 10b done-when 5)."""
+    from pipeline import warehouse
+    from tests.conftest import SCRUBBED_ENV
+
+    assert set(warehouse.SNOWFLAKE_ENV) <= set(SCRUBBED_ENV)
 
 
 # --- Phase 2 ---

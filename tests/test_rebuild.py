@@ -13,12 +13,11 @@ import pins
 import pytest
 
 from ingest.parsed import PageShapeError
+from pipeline import warehouse
 from pipeline.build import (
     BUILD_STAGES,
     INPUTS,
     StageError,
-    _columns,
-    _table_exists,
     build_derived,
     check_raw_declaration,
     classify_step,
@@ -28,7 +27,12 @@ from pipeline.build import (
     rebuild,
     table_counts,
 )
-from pipeline.warehouse import LOCAL, connect, database_for, default_schema
+from pipeline.warehouse import LOCAL, connect, database_for
+
+# The catalog reads moved into the seam (Phase 10b): the tests read a table's
+# columns and probe existence through `warehouse.columns`/`warehouse.table_exists`.
+_columns = warehouse.columns
+_table_exists = warehouse.table_exists
 
 pytestmark = pytest.mark.slow  # slow: kept out of the fast edit-loop hook
 
@@ -427,6 +431,9 @@ class _ReversedRows:
     def execute(self, *args, **kwargs):
         return _ReversedCursor(self._conn.execute(*args, **kwargs))
 
+    def executescript(self, text):  # run_sql_file goes through the seam now
+        self._conn.executescript(text)
+
 
 class _ReversedCursor:
     def __init__(self, cursor) -> None:
@@ -490,7 +497,9 @@ def test_table_counts_reads_the_default_schema_from_the_engine():
         conn.execute("insert into elsewhere.stray values (1)")
         counts = table_counts(conn)
         assert "stray" not in counts and counts["raw_reviews"] == 0
-        assert default_schema(conn) == "main"  # DuckDB's answer, read, not spelled
+        # DuckDB's own answer, read from the engine, not spelled (the seam's
+        # internal schema read; the catalog fold is pinned in test_snowflake_seam).
+        assert warehouse._default_schema(conn) == "main"
     finally:
         conn.close()
 

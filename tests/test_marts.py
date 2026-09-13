@@ -350,14 +350,9 @@ def test_review_tables_have_no_personal_columns(anchors_db):
     conn = connect("duckdb", database=anchors_db)
     try:
         for table in ("raw_reviews", "stg_reviews"):
-            cols = {
-                r[0]
-                for r in conn.execute(
-                    "select column_name from information_schema.columns "
-                    "where table_schema = ? and table_name = ?",
-                    [warehouse.default_schema(conn), table],
-                ).fetchall()
-            }
+            # the catalog read goes through the seam (Phase 10b); names come
+            # back lower-cased, which DuckDB's already are
+            cols = {name for name, _, _ in warehouse.columns(conn, table)}
             assert cols == expected, table
             assert not (cols & personal), table
     finally:
