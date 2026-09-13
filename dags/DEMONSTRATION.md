@@ -64,4 +64,17 @@ as the opening says); the grid itself shows task names and states, nothing else.
 The image carries the caption *synthetic fixture data — not a study finding* in
 its pixels and in its text metadata, so it says so wherever it travels.
 
+*Capturing it (a developer step, as in the Metabase demonstration).* Screenshot
+the DAG's grid with the five tasks green, add the caption as a text band in the
+pixels (any image editor), then write it into the PNG's own text channel, the
+same `Comment` chunk the Metabase screenshots carry, so the suite's reader and
+`make check-docs` see it:
+
+```
+exiftool -Comment="synthetic fixture data — not a study finding" -overwrite_original dags/screenshots/01-dag-run.png
+```
+
+`tests/test_dag.py` then passes: it reads the doc's alt text and the PNG's text
+chunks for the caption, and stays red until the file lands.
+
 ![The friction_ledger DAG run, five tasks green — synthetic fixture data — not a study finding](screenshots/01-dag-run.png)

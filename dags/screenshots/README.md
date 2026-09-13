@@ -7,4 +7,5 @@ task names and states only; no review text, no address and no host path can
 appear in it.
 
 Capturing it is a developer step (it needs Docker and a running Airflow, which
-CI does not have) — see [`../DEMONSTRATION.md`](../DEMONSTRATION.md) for the walk.
+CI does not have) — see [`../DEMONSTRATION.md`](../DEMONSTRATION.md) for the walk
+and the `exiftool` line that writes the caption into the PNG's text channel.
