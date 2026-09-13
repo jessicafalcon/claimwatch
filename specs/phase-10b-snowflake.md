@@ -14,7 +14,7 @@ of scope records, by 10a's challenge round 1 findings #1–#4, #7, #9, #15 and
 #17, and by BACKLOG rows 33 and 50. Depends on Phase 10a merged (PR #39,
 2026-09-13).
 
-**Status: PROPOSED — do not start until approved.** One new Python
+**Status: APPROVED 2026-09-13 — in progress.** One new Python
 dependency, pre-approved for this phase by CLAUDE.md → Conventions:
 `snowflake-connector-python`, as an **optional extra** `snowflake` in
 `pyproject.toml` (installed by `uv sync --extra snowflake`, never by `make
