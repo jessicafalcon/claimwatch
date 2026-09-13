@@ -24,6 +24,7 @@ CI-checkable core (the seam's second branch proved against a fake driver,
 the threading, the refusals, the layout tests) plus a developer-run
 demonstration (the one Snowflake run over the synthetic fixture, recorded as
 text).
+Challenged: 2026-09-13, round 1, spec 014db324 — approve with amendments (0 BLOCKER, 3 should-fix, 2 suggestion, 1 question; developer disposition "fix all": findings 1/2/3 amended as one provenance-and-determinism reword — done-when 4 scopes byte-identity to a same-target rerun and names cross-engine equality a count-and-value check, done-when 6 records the BACKLOG-33 schema name Documented-by-hand and makes the fake→real trust boundary explicit; finding 5 amended — the credit-spend disclosure in the threat model and the caution line in DEMONSTRATION.md and README; finding 6 amended — stack risk 2 names the direct begin/commit/rollback calls on the wrapped cursor; finding 4 rejected — done-when 1 and 3 stay compound and are reviewed as such, a seam-refactor-only PR would carry no user-visible Done-when and add a merge; no new challenge round)
 
 Four sections marked REQUIRED are mandatory; a spec without them is not
 approvable (CLAUDE.md → Workflow rules).
@@ -150,8 +151,11 @@ Workflow rules); done-when 6 records it.
    opens its connections on `target`; `build.CLASSIFY_TARGETS` is gone and
    the CLI resolves every stage against `WIRED`; `idempotency_check(target,
    rows)` counts on the target; `make publish [TARGET=] [ROWS=]` exports the
-   named target's marts (`study.metabase export --target`), the same bytes for
-   the same input. `make study`, `label-sample` and `classify-eval` stay on
+   named target's marts (`study.metabase export --target`), byte-identical on a
+   rerun of the same (target, input) — cross-engine equality is a count-and-value
+   check in the demonstration, never a byte compare (two engines' float
+   formatting differs; pinned decision 4). `make study`, `label-sample` and
+   `classify-eval` stay on
    the laptop file by contract (the tracked page renders the frozen synthetic
    input; the corpus never leaves the laptop; the eval reads the synthetic
    laptop file). BACKLOG row 50 closes. *Evidence: rows 9, 10, 11.*
@@ -182,9 +186,16 @@ Workflow rules); done-when 6 records it.
    locator, no host, no console screenshot (the console's address bar carries
    the account — the brief's "screenshot" is met by 10a's DAG grid, and the
    deviation is recorded in DECISIONS). BACKLOG row 33 closes with the schema
-   name the engine returned, pinned as the fake driver's answer in the seam
-   test. CI's whole run, `make study` + `git diff --exit-code` included, is
-   the DuckDB-unchanged proof. *Evidence: rows 15, 16.*
+   name the engine returned in the run, recorded Documented-by-hand in the doc;
+   the seam test pins the case-fold logic only, never the engine's schema, so a
+   hand-written fake's answer is never mistaken for the offline closure. The
+   fake (`tests/fake_snowflake.py`) proves the branch's shape offline and the
+   real driver is never in CI, so the five stack-risk unknowns are verified
+   against the official docs in the first hour and, with the run's count table
+   and schema name, recorded Documented-by-hand in DECISIONS → Gotchas (the
+   fake→real trust boundary; brief §2 keeps Snowflake non-load-bearing, so no
+   study number rests on the run). CI's whole run, `make study` + `git diff
+   --exit-code` included, is the DuckDB-unchanged proof. *Evidence: rows 15, 16.*
 
 ## Evidence (REQUIRED)
 
@@ -334,10 +345,12 @@ Workflow rules); done-when 6 records it.
   `tests/test_warehouse.py`, `tests/test_cli.py`, `tests/test_ingest_layout.py`,
   `tests/test_rebuild.py`, `tests/test_makefile.py`,
   `tests/test_metabase_apply.py`, `tests/test_beat2.py`, `tests/pins.py`.
-- `pipeline/DEMONSTRATION.md` (new — the walk and the pasted tables).
+- `pipeline/DEMONSTRATION.md` (new — the walk, the pasted tables, and the
+  credit-spend caution).
 - `README.md` (Running it: the cloud run in one paragraph — the extra, the
-  six names, fixture inputs only, and the one sentence on why a wrapper and
-  an extra rather than an ORM), `CLAUDE.md` (Commands: `TARGET` on the three
+  six names, fixture inputs only, the caution that an exported `.env` lets any
+  process in that shell spend trial credits, and the one sentence on why a
+  wrapper and an extra rather than an ORM), `CLAUDE.md` (Commands: `TARGET` on the three
   targets, `make setup` drops the extra; Conventions allowlist; Repo map;
   Current status; BACKLOG count), `DECISIONS.md`, `BACKLOG.md`,
   `docs/PLAN.md` (§5 row 10: 10b delivered), this spec.
@@ -395,8 +408,11 @@ refuses by name before any socket; the DuckDB path never reads them. What the
 gate does not hold against, stated: a developer's shell with `.env` exported
 lets any process in that shell — an agent's `make rebuild TARGET=snowflake`
 included — reach the trial with the fixture inputs; the corpus refusal
-(invariant 2) bounds what such a run can hold, and the `ask-gate` hook does
-not prompt for it (it prompts for `make confirm`). What the trial holds at
+(invariant 2) bounds the data such a run can hold but not the trial credits it
+spends, and the `ask-gate` hook does not prompt for it (it prompts for `make
+confirm`); `pipeline/DEMONSTRATION.md` and README carry a caution line, and
+stack risk 5 confirms auto-suspend is on so a forgotten warehouse does not bill
+idle time. What the trial holds at
 most: the synthetic fixture's hand-written reviews and the `none` input's
 empty tables, in two schemas, plus a scratch schema during a check.
 
@@ -446,8 +462,10 @@ Agents are selected by diff surface (CLAUDE.md → "Which review agents run").
      option (pinned decision 5).
   2. **Multi-statement files and transactions.** `execute_string` runs each
      `;`-separated statement; confirm it honours `begin transaction` …
-     `commit`/`rollback` across the calls `build.py` makes on one wrapped
-     cursor, and that `create or replace table … as select` with `text`,
+     `commit`/`rollback` — including the direct `conn.execute("begin
+     transaction")`/`commit`/`rollback` calls `build.py` issues on one wrapped
+     cursor with autocommit off, not only the statements inside `execute_string`
+     — and that `create or replace table … as select` with `text`,
      `decimal(2,1)` and a window function runs as written in `sql/`.
   3. **Case-folding and the catalog's spellings.** `information_schema`
      answers upper-cased names; confirm `is_nullable` (`YES`/`NO`),
