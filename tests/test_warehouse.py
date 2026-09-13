@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+from pipeline.build import CLASSIFY_TARGETS
 from pipeline.warehouse import LOCAL, TARGETS, WIRED, connect
 
 WAREHOUSE = Path(__file__).resolve().parent.parent / "pipeline" / "warehouse.py"
@@ -45,6 +46,9 @@ def test_wired_is_exactly_the_targets_connect_opens():
     target outside it is the seam's NotImplementedError — so the set and the
     seam cannot disagree (10b appends `snowflake` to both at once)."""
     assert WIRED == (LOCAL,) and set(WIRED) <= set(TARGETS)
+    assert set(CLASSIFY_TARGETS) <= set(
+        WIRED
+    )  # the classify step's set never outruns the seam
     for target in WIRED:
         connect(target, database=":memory:").close()
     for target in set(TARGETS) - set(WIRED):

@@ -910,6 +910,14 @@ def _review_texts(staged: list[tuple[str, str, str, str]]) -> list[tuple[str, st
     ]
 
 
+# The classify step opens the laptop engine until Phase 10b threads a target
+# through it, so the CLI resolves a TARGET for any stage that runs the step
+# (`classify`, `all`) against this set, not the seam's WIRED: a second wired
+# engine cannot make the step run over the DuckDB file while the variable says
+# otherwise (spec 10a, pinned decision 4; review round 2, #10). 10b lifts it.
+CLASSIFY_TARGETS = (LOCAL,)
+
+
 def classify_step(
     db: str | Path,
     run_id: str,

@@ -70,6 +70,7 @@ from opendata.slice import (
 from opendata.sources import AMELI_EXPORT, cache_path, valid_month, valid_year
 from pipeline.build import (
     BUILD_STAGES,
+    CLASSIFY_TARGETS,
     FETCHED_SNAPSHOTS,
     INPUTS,
     StageError,
@@ -238,11 +239,13 @@ STAGES = ("all", *BUILD_STAGES, "classify")
 def _do_rebuild(args: argparse.Namespace) -> int:
     rows = resolve_choice(args.rows, INPUTS, "captured")
     stage = resolve_choice(args.stage, STAGES, "all")
-    # TARGET resolves against the seam's WIRED set, the targets `connect` can
-    # open today: a declared-but-unwired engine is refused by name here, never
-    # run over the DuckDB file (the classify step is DuckDB-only until 10b)
-    # and never the seam's NotImplementedError as a traceback (`load`/`clean`).
-    target = resolve_choice(args.target, WIRED, LOCAL)
+    # TARGET resolves against the targets this invocation can use: the seam's
+    # WIRED set for a build stage (a declared-but-unwired engine is refused by
+    # name, never the seam's NotImplementedError as a traceback), and the
+    # classify step's own set for any stage that runs it (DuckDB-only until
+    # 10b: never run over the DuckDB file while the variable says otherwise).
+    usable = WIRED if stage in BUILD_STAGES else CLASSIFY_TARGETS
+    target = resolve_choice(args.target, usable, LOCAL)
     db = database_for(rows)
     if stage == "classify":
         return _classify_and_print(db, rows)
