@@ -15,6 +15,7 @@ import pytest
 from ingest.parsed import PageShapeError
 from pipeline.build import (
     BUILD_STAGES,
+    INPUTS,
     StageError,
     _columns,
     _table_exists,
@@ -530,46 +531,64 @@ def test_the_database_file_is_derived_from_the_input_never_named(tmp_path):
 
 
 # --- Phase 10a: the stage split -----------------------------------------------
-def _counts(root: Path) -> dict[str, int]:
-    conn = connect(LOCAL, database=database_for("synthetic", root))
+# Invariant 2 quantifies every ROWS input, so both pins run over all of INPUTS
+# (review round 1, #6): `captured` reads the tracked snapshot CSVs and, here,
+# an empty capture directory — no scraper page, no network.
+def _rebuild(rows: str, root: Path, run_id: str, stages=BUILD_STAGES) -> None:
+    rebuild(
+        LOCAL,
+        rows,
+        stages=stages,
+        root=root,
+        run_id=run_id,
+        cache_dir=root / "no-captures",
+    )
+
+
+def _counts(rows: str, root: Path) -> dict[str, int]:
+    conn = connect(LOCAL, database=database_for(rows, root))
     try:
         return table_counts(conn)
     finally:
         conn.close()
 
 
-def _classify(root: Path, run_id: str) -> None:
-    classify_step(database_for("synthetic", root), run_id, cache_path=root / "c.csv")
+def _classify(rows: str, root: Path, run_id: str) -> None:
+    classify_step(database_for(rows, root), run_id, cache_path=root / "c.csv")
 
 
-def test_three_stages_in_order_equal_one_whole_rebuild(tmp_path):
-    """Invariant 2: `load`, `clean` and the classify step, run one at a time
-    into the same file, leave table for table the counts one whole rebuild plus
-    the classify step leaves — the DAG's middle tasks are the whole, split."""
+@pytest.mark.parametrize("rows", INPUTS)
+def test_three_stages_in_order_equal_one_whole_rebuild(rows, tmp_path):
+    """Invariant 2, for every ROWS input: `load`, `clean` and the classify step,
+    run one at a time into the same file, leave table for table the counts one
+    whole rebuild plus the classify step leaves — the DAG's middle tasks are
+    the whole, split."""
     whole, staged = tmp_path / "whole", tmp_path / "staged"
-    rebuild(LOCAL, "synthetic", root=whole, run_id="r")
-    _classify(whole, "r")
+    _rebuild(rows, whole, "r")
+    _classify(rows, whole, "r")
     assert BUILD_STAGES == ("load", "clean")
     for stage in BUILD_STAGES:
-        rebuild(LOCAL, "synthetic", stages=(stage,), root=staged, run_id="r")
-    _classify(staged, "r")
-    assert _counts(staged) == _counts(whole)
-    for table, n in pins.BEAT5_STAGE_COUNTS.items():
-        assert _counts(staged)[table] == n, table
+        _rebuild(rows, staged, "r", stages=(stage,))
+    _classify(rows, staged, "r")
+    assert _counts(rows, staged) == _counts(rows, whole)
+    if rows == "synthetic":
+        for table, n in pins.BEAT5_STAGE_COUNTS.items():
+            assert _counts(rows, staged)[table] == n, table
 
 
-def test_a_stage_run_twice_adds_no_rows(tmp_path):
-    """Invariant 2: a repeated stage is idempotent like the whole — raw is keyed
-    on the natural key, the marts are replaced."""
+@pytest.mark.parametrize("rows", INPUTS)
+def test_a_stage_run_twice_adds_no_rows(rows, tmp_path):
+    """Invariant 2, for every ROWS input: a repeated stage is idempotent like
+    the whole — raw is keyed on the natural key, the marts are replaced."""
     for stage in BUILD_STAGES:
-        rebuild(LOCAL, "synthetic", stages=(stage,), root=tmp_path, run_id="run-1")
-        once = _counts(tmp_path)
-        rebuild(LOCAL, "synthetic", stages=(stage,), root=tmp_path, run_id="run-2")
-        assert _counts(tmp_path) == once, stage
-    _classify(tmp_path, "run-1")
-    once = _counts(tmp_path)
-    _classify(tmp_path, "run-2")
-    assert _counts(tmp_path) == once
+        _rebuild(rows, tmp_path, "run-1", stages=(stage,))
+        once = _counts(rows, tmp_path)
+        _rebuild(rows, tmp_path, "run-2", stages=(stage,))
+        assert _counts(rows, tmp_path) == once, stage
+    _classify(rows, tmp_path, "run-1")
+    once = _counts(rows, tmp_path)
+    _classify(rows, tmp_path, "run-2")
+    assert _counts(rows, tmp_path) == once
 
 
 def test_clean_or_classify_before_load_refuses_naming_the_missing_table(
