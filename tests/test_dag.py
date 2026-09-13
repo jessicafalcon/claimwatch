@@ -169,6 +169,16 @@ def test_the_pages_task_tuple_equals_the_dags_task_ids():
     assert ids == DAG_TASKS == tuple(COMMANDS)
 
 
+def test_the_readme_and_spec_name_the_dags_tasks_in_the_dags_order():
+    """Invariant 6 over its other two surfaces: the README's Beat 5 walk and
+    SPEC.md's B5.2 row spell the five task ids as typed text, so each carries
+    the file's ids joined the way the page joins them (round 2, #1: the page
+    alone was pinned)."""
+    diagram = " → ".join(op["task_id"].value for op in _operators(_tree()))
+    for doc in ("README.md", "SPEC.md"):
+        assert diagram in repo_text(ROOT / doc), doc
+
+
 def test_the_compose_mounts_the_repo_read_only_isolates_data_carries_no_env_file_and_binds_the_ui_locally():  # noqa: E501 -- the invariant it pins, named whole
     """Invariant 5, by the mounts: the repo is a read-only bind at the DAG's
     root, `data/` is a named volume (never the host's data/), the three tracked
