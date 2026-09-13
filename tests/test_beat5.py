@@ -339,3 +339,13 @@ def test_the_allowlist_and_queries_gain_the_beat_five_marts():
     # B5.2 is gated (reads run_id), B5.1 is not — a repo fact is constant.
     assert "pipeline_row_counts" in panels._CORPUS_MARTS
     assert "determinism_facts" not in panels._CORPUS_MARTS
+
+
+def test_b52_note_names_the_five_tasks_in_order(synthetic_db):
+    """Phase 10a, invariant 6: B5.2's note carries the DAG's five task names in
+    the DAG's order, built from the one tuple the DAG test pins to the file."""
+    from study.text import DAG_TASKS
+
+    section = _section(_html(synthetic_db), "B5.2")
+    assert " → ".join(DAG_TASKS) in section
+    assert "dags/friction_ledger.py" in section

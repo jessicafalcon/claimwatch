@@ -31,7 +31,7 @@ in the middle, and come out on the right as the numbers the study shows.
  (unsolicited voices)  (claim cost distros)  (revenue, fraud savings)
         \                     |                      /
          v                    v                     v
-          scrape -> load_raw -> clean -> classify -> publish     (one Airflow DAG, Phase 10)
+          scrape -> load_raw -> clean -> classify -> publish     (one Airflow DAG: dags/)
                               |
                               v
                   Warehouse (DuckDB by default; Snowflake behind TARGET=)
@@ -116,7 +116,12 @@ Delivered paragraph and `make help`, not here.
   demonstration (the SQLite export, the idempotent applier, `config.yaml`,
   `DEMONSTRATION.md` with synthetic-only screenshots); `study/paraphrases.yaml`
   — the only review text the drill shows.
-- `dags/` *(Phase 10)* — `friction_ledger.py`.
+- `dags/` — `friction_ledger.py` (the one DAG: five BashOperators over `make`,
+  no logic), the one-container Airflow (`Dockerfile`, `docker-compose.yml`:
+  the tracked paths the tasks read mounted read-only and nothing else of the
+  checkout, `data/` a private volume, `ROWS=synthetic` from the environment,
+  no `env_file`), `DEMONSTRATION.md` with its synthetic-only
+  screenshot.
 - `fixtures/` — read-only after Phase 1, each set with a `MANIFEST.sha256`:
   `synthetic/` (hand-written fake reviews), `anchors/` (brief §6 figures,
   seeded as Documented), a hand-written capture set per parsed source in
@@ -161,8 +166,15 @@ cannot say:
   `Freeze:` line and a DECISIONS entry). `slice-ameli` reads a file a person
   saved from a browser at `data/cache/ameli/honoraires.csv`: the host's
   robots file disallows its API and download paths, so there is no fetch.
-- **`make rebuild [TARGET=duckdb] [ROWS=captured|none|synthetic|samples]`** —
-  raw → staging → marts, then the classify step: the rules plus, only when
+- **`make rebuild [TARGET=duckdb] [ROWS=captured|none|synthetic|samples]
+  [STAGE=all|load|clean|classify]`** — raw → staging → marts, then the
+  classify step; `STAGE=` runs one of the three (`load`: the raw DDL and the
+  loads; `clean`: staging, marts and the three key-free writers; `classify`:
+  the classify step) into the input's own file — the DAG's middle tasks — and
+  a stage over a file the earlier stage never built refuses naming the
+  missing table. `TARGET` resolves against `warehouse.WIRED`, the targets the
+  seam can open today (`duckdb` alone until Phase 10b), for every stage, as
+  for `idempotency-check` and `reset`. The classify step: the rules plus, only when
   `ANTHROPIC_API_KEY` is set and only for the reviews the rules left
   `unclassified`, one cached model call each — with no key those reviews stay
   `unclassified` and the run is green. The held-out gate and the theme marts
@@ -174,6 +186,12 @@ cannot say:
   through its real parser; CI). A raw table already in the file must match
   its `sql/raw/` declaration column by column or the rebuild refuses naming
   both sides (`make confirm reset` first).
+- `publish [ROWS=captured]` writes `data/metabase/metabase.sqlite`, the file
+  the Metabase demonstration reads, from the named input's marts — offline,
+  no credentials, byte-identical on a rerun; the DAG's last task. The HTML
+  page is not a publish step (`study` renders the frozen synthetic input).
+  The Airflow container (`dags/docker-compose.yml`) is developer-run, never
+  CI; its `scrape` task is the same `make confirm scrape`.
 - **`make confirm <target>`** arms the destructive or network target that
   follows it in the SAME invocation and nothing else: `reset` (DESTRUCTIVE),
   `scrape [SOURCE=]` (NETWORK: robots.txt first and every page checked
@@ -289,7 +307,7 @@ study names no insurer as its subject.
   pipeline path — SQL does the work; Python glues (DuckDB + stdlib csv/json).
 - Dependencies: ask before adding ANY package. Pre-approved by phase:
   `duckdb` (1); `pyyaml`, `httpx` (2); `anthropic` (6);
-  `snowflake-connector-python` (10); Airflow and Metabase via Docker only;
+  `snowflake-connector-python` (10b); Airflow and Metabase via Docker only;
   dev: `pytest`, `ruff`, `pre-commit`. Anything else is a STOP-and-ask.
 - SQL: one file per table under `sql/raw/`, `sql/staging/` or `sql/marts/`; the
   header comment names the grain, the provenance columns and the BACKING rows
@@ -598,28 +616,39 @@ and remove it). Findings are fixed in the main session or explicitly accepted
 **Merged:** Phases 0a–9i, each with its spec under `specs/` (the Delivered
 paragraph) and its DECISIONS appendix; the last was 9i, the extra-billing
 share from data.ameli's `honoraires` table as one sourced B3.3 row (PR #34,
-2026-09-12). Phase 9 is complete. Off main since, all 2026-09-12:
-`fix/idempotency-classify` (PR #35: the classify step's code moved to
-`pipeline/build.py::classify_step` and run inside `idempotency-check`, so the
-six classify-path tables are in its diff), `tooling/skill-sentences` (PR #36:
-the two skill sentences of the Phase 9i exit audit — DECISIONS → Tooling),
-`fix/csv-reader-boundary` (PR #37: every `csv` reader folds `csv.Error` into
-the refusal it declares and the two DAMIR CLI read paths catch it —
-DECISIONS → Fix; BACKLOG row closed, one opened for the code-craft clause).
+2026-09-12). Phase 9 is complete. The four small PRs off main since, all
+merged 2026-09-12/13: `fix/idempotency-classify` (PR #35: the classify step's
+code moved to `pipeline/build.py::classify_step` and run inside
+`idempotency-check`, so the six classify-path tables are in its diff),
+`tooling/skill-sentences` (PR #36: the two skill sentences of the Phase 9i
+exit audit — DECISIONS → Tooling), `fix/csv-reader-boundary` (PR #37: every
+`csv` reader folds `csv.Error` into the refusal it declares and the two DAMIR
+CLI read paths catch it — DECISIONS → Fix), `fix/review-gate-no-spec` (PR
+#38: the no-`SPEC=` review gate reads a phase branch's own spec for the
+fixtures check, keeps fixtures read-only on any other branch, and both
+summary lines count checks passed over checks run — DECISIONS → Fix; BACKLOG
+row closed).
 
-**In progress:** `fix/review-gate-no-spec` (this branch), the last small PR
-off main before Phase 10: the no-`SPEC=` review gate (BACKLOG "`make
-review-gate` without `SPEC=` is red on a phase branch…") — the no-SPEC form
-reads a phase branch's own spec for the fixtures check, keeps fixtures
-read-only on any other branch, and both summary lines count checks passed
-over checks run.
+**In progress:** `phase-10a-airflow` (this branch): spec
+`specs/phase-10a-airflow.md` (challenged 2026-09-13 round 1 — rework, all
+findings amended; approved 2026-09-13). Phase 10 is split on the ≤ ~6 rule:
+**10a** the five-task DAG over bare `make` commands (`rebuild STAGE=`,
+`publish`), `warehouse.LOCAL` replacing every engine literal with a layout
+test, the one-container Airflow demonstration; **10b** the seam's Snowflake
+branch, `TARGET` threaded through the classify step and the exports, the
+Snowflake run — its spec after 10a merges, seeded by round 1's findings #1–#4,
+#7, #9, #15, #17 (10a's Out of scope). Built and demonstrated: the DAG ran
+green in the container and its captioned screenshot is committed
+(`dags/screenshots/01-dag-run.png`), and ran again over the amended mounts
+(A1) with the same grid; review round 1 (2026-09-13): twelve findings, ten
+fixed in five commits, #2/#3 by amendment A1, #8 accepted by measurement;
+round 2, the exit review with the coherence audit (2026-09-13): seventeen
+findings, fixed — four correctness commits and one records commit — except the
+image digest, which needs the developer's registry query.
 
-**Next:** Phase 10 (the Airflow DAG). Its spec decides how the publish task
-calls `python -m study.metabase export|apply`, which are not `make` targets
-(`docs/PLAN.md` §5 names five `make` tasks), and takes the classify step's
-`TARGET`-awareness for Snowflake (BACKLOG "The classify-step mart writes are
-not warehouse-aware") as its own Done-when item with an invariant.
+**Next:** Phase 10b (the Snowflake seam and run), after 10a merges — see 10a's
+Out of scope for its seeds; BACKLOG rows 33 and 50 are its triggers.
 
-Open BACKLOG rows: **37**.
+Open BACKLOG rows: **39**.
 
 (Update this section at the end of every working day.)

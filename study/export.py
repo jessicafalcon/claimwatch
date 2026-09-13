@@ -31,7 +31,7 @@ import re
 from collections.abc import Callable
 from pathlib import Path
 
-from pipeline.warehouse import ROOT, connect, database_for
+from pipeline.warehouse import LOCAL, ROOT, connect, database_for
 from study.model import (
     NEUTRAL,
     TAGS,
@@ -695,7 +695,7 @@ def write(db: Path | None = None, out: Path | None = None) -> Path:
     both. CI diffs the committed bytes."""
     db = DEFAULT_DB if db is None else db
     out = OUTPUT if out is None else out
-    conn = connect("duckdb", database=db)
+    conn = connect(LOCAL, database=db)
     try:
         page = render(conn)
     finally:

@@ -246,10 +246,14 @@ one place a model makes a decision is a single module, gated against hand labels
   is constant on any input, so the committed page shows the numbers. Tag:
   *Measured*.
 - **B5.2 — Reproducibility.** Row counts at each pipeline stage
-  (`pipeline_row_counts`), the eval scores (B2.4's `classifier_quality`), and the
-  one command that rebuilds everything from raw data (`make rebuild`). Measured
-  behind the corpus gate, like Beat 2 — real counts over a captured input, the
-  fixture-state note over the frozen synthetic input. Tag: *Measured*.
+  (`pipeline_row_counts`), the eval scores (B2.4's `classifier_quality`), the
+  one command that rebuilds everything from raw data (`make rebuild`), and the
+  same steps as a scheduler runs them — the one Airflow DAG,
+  `dags/friction_ledger.py`: scrape → load_raw → clean → classify → publish,
+  shown as a text diagram in the panel's note (its names are the DAG file's
+  own, pinned equal). Measured behind the corpus gate, like Beat 2 — real
+  counts over a captured input, the fixture-state note over the frozen
+  synthetic input. Tag: *Measured*.
 
 ## Glossary
 

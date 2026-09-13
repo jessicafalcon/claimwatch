@@ -307,12 +307,22 @@ ROW_COUNT_STAGES = {
     "stg_reviews": "After removing duplicates",
     "stg_classified_reviews": "Tagged by theme (one row per review × theme)",
 }
+# The one Airflow DAG's five tasks, in the order they run (PROJECT_BRIEF.md §4;
+# `dags/friction_ledger.py`). B5.2's text diagram is built from this tuple and
+# `tests/test_dag.py` pins it equal to the DAG file's task ids, so the page
+# cannot name a step the DAG does not run (Phase 10a).
+DAG_TASKS = ("scrape", "load_raw", "clean", "classify", "publish")
 # B5.2's note: the eval scores live in the classifier-quality panel above (B2.4,
-# not copied here), and the one command that rebuilds everything from raw data.
-# `make rebuild` is named as text, never a live counter.
+# not copied here), the one command that rebuilds everything from raw data, and
+# the DAG that runs the same steps in order. `make rebuild` is named as text,
+# never a live counter.
 ROW_COUNTS_NOTE = (
     "How good the tagging is — precision and recall on reviews the classifier "
     "never saw — is the classifier-quality table above. One command rebuilds "
     "every number in this study from the raw reviews: `make rebuild`. Run it "
-    "twice and the counts do not move."
+    "twice and the counts do not move. A scheduler can run those same steps as "
+    "five separate commands in order — that is the one Airflow DAG "
+    "(`dags/friction_ledger.py`): "
+    + " → ".join(DAG_TASKS)
+    + ", with no logic of its own."
 )

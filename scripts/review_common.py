@@ -147,6 +147,7 @@ def png_text(data: bytes) -> str:
 # not, so a stray image has to be declared here before a scanner accepts it.
 BINARY_ASSETS: tuple[tuple[str, str, Callable[[bytes], str]], ...] = (
     ("study/metabase/screenshots", ".png", png_text),
+    ("dags/screenshots", ".png", png_text),
 )
 
 

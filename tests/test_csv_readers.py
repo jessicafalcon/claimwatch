@@ -40,7 +40,7 @@ from tests import pins
 from tests.repo_text import repo_text
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKAGES = ("ingest", "pipeline", "opendata", "classify", "models", "study")
+PACKAGES = ("ingest", "pipeline", "opendata", "classify", "models", "study", "dags")
 REFUSAL = CSV_UNREADABLE
 URL = "https://ca.trustpilot.com/review/exemple-fictif.com?languages=all"
 STAMP = "2026-09-04T12:00:00"

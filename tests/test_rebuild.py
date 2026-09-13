@@ -14,17 +14,21 @@ import pytest
 
 from ingest.parsed import PageShapeError
 from pipeline.build import (
+    BUILD_STAGES,
+    INPUTS,
+    StageError,
     _columns,
     _table_exists,
     build_derived,
     check_raw_declaration,
+    classify_step,
     content_hash,
     create_raw,
     load_reviews,
     rebuild,
     table_counts,
 )
-from pipeline.warehouse import connect, database_for, default_schema
+from pipeline.warehouse import LOCAL, connect, database_for, default_schema
 
 pytestmark = pytest.mark.slow  # slow: kept out of the fast edit-loop hook
 
@@ -524,3 +528,88 @@ def test_the_database_file_is_derived_from_the_input_never_named(tmp_path):
             load_snapshots(conn, [], "t")  # rows_input is required
     finally:
         conn.close()
+
+
+# --- Phase 10a: the stage split -----------------------------------------------
+# Invariant 2 quantifies every ROWS input, so both pins run over all of INPUTS
+# (review round 1, #6): `captured` reads the tracked snapshot CSVs and, here,
+# an empty capture directory — no scraper page, no network.
+def _rebuild(rows: str, root: Path, run_id: str, stages=BUILD_STAGES) -> None:
+    rebuild(
+        LOCAL,
+        rows,
+        stages=stages,
+        root=root,
+        run_id=run_id,
+        cache_dir=root / "no-captures",
+    )
+
+
+def _counts(rows: str, root: Path) -> dict[str, int]:
+    conn = connect(LOCAL, database=database_for(rows, root))
+    try:
+        return table_counts(conn)
+    finally:
+        conn.close()
+
+
+def _classify(rows: str, root: Path, run_id: str) -> None:
+    classify_step(database_for(rows, root), run_id, cache_path=root / "c.csv")
+
+
+@pytest.mark.parametrize("rows", INPUTS)
+def test_three_stages_in_order_equal_one_whole_rebuild(rows, tmp_path):
+    """Invariant 2, for every ROWS input: `load`, `clean` and the classify step,
+    run one at a time into the same file, leave table for table the counts one
+    whole rebuild plus the classify step leaves — the DAG's middle tasks are
+    the whole, split."""
+    whole, staged = tmp_path / "whole", tmp_path / "staged"
+    _rebuild(rows, whole, "r")
+    _classify(rows, whole, "r")
+    assert BUILD_STAGES == ("load", "clean")
+    for stage in BUILD_STAGES:
+        _rebuild(rows, staged, "r", stages=(stage,))
+    _classify(rows, staged, "r")
+    assert _counts(rows, staged) == _counts(rows, whole)
+    if rows == "synthetic":
+        for table, n in pins.BEAT5_STAGE_COUNTS.items():
+            assert _counts(rows, staged)[table] == n, table
+
+
+@pytest.mark.parametrize("rows", INPUTS)
+def test_a_stage_run_twice_adds_no_rows(rows, tmp_path):
+    """Invariant 2, for every ROWS input: a repeated stage is idempotent like
+    the whole — raw is keyed on the natural key, the marts are replaced."""
+    for stage in BUILD_STAGES:
+        _rebuild(rows, tmp_path, "run-1", stages=(stage,))
+        once = _counts(rows, tmp_path)
+        _rebuild(rows, tmp_path, "run-2", stages=(stage,))
+        assert _counts(rows, tmp_path) == once, stage
+    _classify(rows, tmp_path, "run-1")
+    once = _counts(rows, tmp_path)
+    _classify(rows, tmp_path, "run-2")
+    assert _counts(rows, tmp_path) == once
+
+
+def test_clean_or_classify_before_load_refuses_naming_the_missing_table(
+    tmp_path, monkeypatch, capsys
+):
+    """A stage over a warehouse the earlier stage never built refuses in one
+    line naming the table and the stage that writes it — in the library
+    (`clean`) and at the CLI boundary (`classify`, exit 2), never the engine's
+    own error."""
+    with pytest.raises(StageError, match=r"STAGE=clean: table 'raw_\w+' is missing"):
+        rebuild(LOCAL, "synthetic", stages=("clean",), root=tmp_path)
+    with pytest.raises(ValueError, match="stages"):
+        rebuild(LOCAL, "synthetic", stages=("derive",), root=tmp_path)
+    import pipeline.warehouse as warehouse
+    from pipeline.cli import main
+
+    monkeypatch.setattr(warehouse, "DEFAULT_DB", tmp_path / "cli" / "w.duckdb")
+    assert main(["rebuild", "--rows=synthetic", "--stage=classify"]) == 2
+    err = capsys.readouterr().err
+    assert err.startswith("refusing: STAGE=classify: table 'stg_reviews' is missing")
+    assert err.count("\n") == 1 and "STAGE=clean" in err
+    assert main(["rebuild", "--rows=synthetic", "--stage=clean"]) == 2
+    err = capsys.readouterr().err
+    assert err.startswith("refusing: STAGE=clean: table 'raw_") and err.count("\n") == 1

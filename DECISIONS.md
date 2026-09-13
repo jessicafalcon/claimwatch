@@ -55,8 +55,10 @@ place and never deleted.
 
 - **One seam knows DuckDB from Snowflake; the SQL is identical for both.**
   `pipeline/warehouse.py` (`connect`, `run_sql_file`) is the only database-driver
-  import; DuckDB is the permanent path and Snowflake is the Phase-10
-  demonstration (its connector defers, no import in Phase 1). SQL stays ANSI —
+  import; DuckDB is the permanent path and Snowflake is the Phase-10b
+  demonstration (its connector defers, no import in Phase 1); every caller
+  outside the seam names the engine through `warehouse.LOCAL`, never a
+  literal (Phase 10a). SQL stays ANSI —
   no reader function, no regex, no clock — which is what keeps it portable.
   ([PLAN §4.1](docs/PLAN.md); [Phase 1](#phase-1))
 - **Raw is append-only, idempotent on `(source, external_id, content_hash)`;
@@ -494,6 +496,27 @@ Each entry: the surprise, the official-docs check, what we did.
   family row) — the phase reads the four family rows as published and sums
   nothing itself, so the artifact is the table's own figures.
 
+- **Phase 10a — the base image is pinned by digest, the apt `make` is not
+  (2026-09-13, review round 2, security-reviewer #2).** The `FROM` line
+  carries the tag's image-index digest (`docker buildx imagetools inspect`,
+  the multi-platform index, so the pin holds on amd64 and arm64 alike) beside
+  the readable tag, and `uv` is version-pinned; `apt-get install make` takes
+  what Debian serves, by design — the container is developer-run, never CI,
+  holds no credential and loads no corpus, and `make` here only runs the
+  recipes the suite pins. A moved upstream tag no longer changes the image.
+- **Phase 10a — the official Airflow image's default Python is 3.13
+  (2026-09-13).** `apache/airflow:3.3.1` ships Python 3.13 while the project
+  pins 3.12 (`.python-version`, `uv.lock`). Checked against the image's tag
+  list (the docs list a `-pythonX.Y` variant per supported minor); the
+  Dockerfile uses `apache/airflow:3.3.1-python3.12`, so `uv` downloads no
+  interpreter and the container runs the pinned version.
+- **Phase 10a — `airflow standalone`'s simple auth manager warns that the
+  "deployment shape looks like production" (2026-09-13).** The API server
+  binds every interface inside the container, which the warning reads as a
+  public deployment. Checked against the auth manager's docs (the warning is
+  advisory; standalone is the documented laptop shape); the compose publishes
+  the port on the Mac's loopback address only, and the generated admin
+  password stays in the container's log (`docker compose logs`).
 
 ## Appendix — by phase
 
@@ -3511,3 +3534,143 @@ count the same thing.**
   contract no longer rides on an `assert` stripped under `-O` (#6, the
   security reviewer's note). The review cap did not apply: rounds 2 and 3
   reported no correctness finding.
+
+### Phase 10a
+
+Branch `phase-10a-airflow`, spec `specs/phase-10a-airflow.md`, challenged
+round 1 as the single Phase 10 spec (rework — 1 BLOCKER, 12 should-fix, 4
+suggestion, 1 question; the developer's disposition "fix all", every finding
+applied before the stamp, the question's live check run the same day). The
+brief's Phase 10 is split in two on the ≤ ~6 done-when rule, the way Phases 0,
+3, 5 and 9 were: 10a the Airflow DAG and its demonstration on DuckDB; 10b the
+seam's Snowflake branch, the `TARGET` threading and the Snowflake run, its
+spec after 10a merges and seeded by the round's findings #1–#4, #7, #9, #15,
+#17 (the 10a spec's Out of scope holds the list; BACKLOG rows 33 and 50 are
+re-pointed at it).
+
+- **The DAG is five `BashOperator`s over bare `make` commands, `schedule=None`,
+  one screen; the run's input is the container's environment.** PLAN §2
+  "Airflow contains no logic" adopted verbatim: `dags/friction_ledger.py` is
+  five commands and one chain of arrows, read by the suite with `ast` (Airflow
+  is Docker-only, never imported), pinned to ≤ 40 lines, no function or
+  branch, each command one goal `make help` lists, `STAGE` its only variable
+  and never a `ROWS=` — the demonstration compose sets `ROWS=synthetic` in
+  `environment:`, the Makefile's documented path for an environment value.
+  `schedule=None`: the scheduled scrape in practice is the Actions cron (brief
+  §4.4), and a container left running must not fetch on its own. *Rejected:
+  `ROWS=synthetic` in a `bash_command` (an input choice in the DAG, and a DAG
+  that could never run the corpus); `@weekly` (a second unattended scraper);
+  PythonOperators (logic in the DAG).*
+- **The middle three tasks are `STAGE=` selections of the one `rebuild`.**
+  `rebuild()` takes `stages` over the closed ordered `BUILD_STAGES = ("load",
+  "clean")` — `load` the raw DDL and the loads, `clean` staging, marts and the
+  three key-free writers — and the CLI's `STAGES = ("all", "load", "clean",
+  "classify")` adds the classify step as the third stage and `all` as today's
+  whole. One write path: a stage runs the same functions in the same order as
+  the whole, and `tests/test_rebuild.py` compares the two table for table (a
+  stage boundary drawn elsewhere fails it). A stage over a file the earlier
+  stage never built refuses in one line naming the missing table and the stage
+  that writes it (`StageError`, joining the CLI's declared-refusal tuple).
+  *Rejected: three new `make` targets (three recipes for one function; `make
+  help` and the closed-set tests triple); renaming the tasks to `rebuild` (the
+  brief's five names are the architecture diagram).*
+- **`publish` writes the Metabase SQLite export and nothing else; `apply` stays
+  developer-run; the HTML page is not a publish step.** `make publish [ROWS=]`
+  is one recipe line over `python -m study.metabase export`, whose `--rows`
+  now resolves through the CLI's closed-set guard (an empty value is the
+  corpus; `../x` is refused by name, never argparse's usage text). The export
+  is offline, deterministic and credential-free, so a DAG task can run it
+  unattended; `apply` needs a running Metabase and a login; the page renders
+  the frozen synthetic input by the 9a contract and is a tracked file — and
+  the container cannot write it anyway (below). *Rejected: the DAG calling the
+  module directly (a task that is not a `make` target); `publish` running
+  `apply` when credentials are exported (behaviour that depends on the
+  environment).*
+- **One constant, `warehouse.LOCAL`, replaces every engine literal outside the
+  seam; a layout test pins the class.** The literal `"duckdb"` stood at eight
+  sites (`build.py` ×5, `cli.py` ×2, `label_sample.py`, `study/export.py`,
+  `study/metabase/export.py`) — BACKLOG row 50's shape. Each now imports
+  `LOCAL`, and `tests/test_ingest_layout.py::test_no_module_outside_the_seam_spells_an_engine_name`
+  refuses a string constant equal to an engine name in any module but
+  `pipeline/warehouse.py` (docstrings and comments excepted), so 10b threads
+  `TARGET` by parameter with nothing to grep for. `reset` and
+  `idempotency-check` keep their DuckDB-only closed sets, and so does every
+  stage of `rebuild`: `/preflight` found `TARGET=snowflake STAGE=classify`
+  exiting 0 over the DuckDB file — the `fix/idempotency-classify` scenario
+  again — and review round 1 (#1) found `STAGE=load|clean` (and the whole
+  since Phase 1) letting the seam's `NotImplementedError` out as a traceback.
+  The three sites' `(LOCAL,)` became one name in the seam, `warehouse.WIRED`,
+  the targets `connect` can open today, so 10b appends `snowflake` in one
+  place; `tests/test_warehouse.py::test_wired_is_exactly_the_targets_connect_opens`
+  pins the set to the seam and
+  `tests/test_cli.py::test_cli_rebuild_refuses_a_target_the_seam_cannot_open`
+  pins all four stages.
+  *Rejected: fixing the literal only in `classify_step` (the site, not the
+  class — LESSONS `site-fix`); a global "current target" setting (hidden
+  state on the data path).*
+- **The container binds the tracked paths the tasks read, read-only, and owns
+  its `data/`; the tracked numbers-only subtrees are bound in read-only; no
+  `env_file`; the UI on the loopback address.** `dags/docker-compose.yml`: the
+  tracked paths the tasks read, each `:ro` under `/opt/friction-ledger`
+  (amendment A1 below; the first draft bound the whole checkout), `data/` a named volume (the DuckDB file, the
+  captures, the decision cache, the confirm stamp and the export land there,
+  never in the host's `data/` where the corpus lives), `data/snapshots`,
+  `data/damir`, `data/ameli` nested read-only binds so the rebuild reads its
+  fit and its snapshots, `uv`'s environment and cache outside the mount,
+  `UV_LOCKED=1`, `PYTHONDONTWRITEBYTECODE=1`, ports `127.0.0.1:8080:8080`. So
+  "no tracked file rewritten", "no corpus in the container" and "no key, so
+  the classify task cannot pay" are the mounts, pinned by
+  `tests/test_dag.py`, not sentences. The 9g compose mounts only the export
+  directory for the same reason; here the tasks must read the repo. *Rejected:
+  the whole repo read-write (the first draft — `.env`, `data/cache/` bodies,
+  `*.duckdb` and `.git` handed to the image); a copy of the repo baked into the
+  image (a stale corpus in a layer).* **Amendment A1 (review round 1,
+  2026-09-13, security-reviewer #2/#3):** the read-only whole-repo bind still
+  carried the root `.env`, `.git/`, `.venv/` and the local Claude config into
+  the container readable — the compose test checked `env_file` and
+  `environment:` only. The bind is now one read-only mount per tracked
+  top-level path the five tasks read (the four project files and nine
+  packages), so a gitignored file cannot be inside the mount whatever its
+  name; `tests/test_dag.py::test_the_compose_mounts_only_tracked_paths_the_tasks_read`
+  pins every bind source to `git ls-tree HEAD` and the mounted set to every
+  `ROOT / "<top>"` the source packages read. *Not taken: an empty overlay per
+  local-only path (`/dev/null`, `tmpfs`) — named paths only, while the
+  credential patterns in `.gitignore` are globs; a `git archive` copy — the
+  stale-copy rejection above.* The demonstration was re-run by the developer
+  over the amended compose the same day; the grid came out identical (five
+  tasks green), so the committed screenshot stands — A1 re-captures only when
+  the grid changes; a fresh capture would differ in its run timestamps.
+- **One container, `airflow standalone`, from a Dockerfile on the image's
+  Python-3.12 variant.** Verified live before the stamp (the developer's
+  Docker run, 2026-09-13): `apache/airflow:3.3.1` `standalone` runs the
+  scheduler, the DAG processor and the API server in one process over the
+  bundled SQLite metadata database and executed the example BashOperator DAG
+  green; its default Python is 3.13 while the project pins 3.12, so the tag
+  is `apache/airflow:3.3.1-python3.12`; the image carries no `make` (docs: no
+  `build-essential`) and no `uv`, so the Dockerfile adds `make` by apt as root
+  and `uv==0.12.5` by pip as `airflow`, the documented extension pattern, and
+  creates the `data/` mount point owned by `airflow` so a fresh named volume
+  inherits it. *Rejected: the official multi-service compose (Postgres, Redis,
+  five services for one DAG); Airflow on the host (Conventions: Docker
+  only).*
+- **B5.2 names the five tasks from one tuple.** `study/text.py::DAG_TASKS`
+  builds the panel note's text diagram (`scrape → load_raw → clean → classify
+  → publish`), SPEC.md's B5.2 row and the README's Beat 5 say the same names,
+  and `tests/test_dag.py` pins the tuple equal to the DAG file's task ids, so
+  the page cannot name a step the DAG does not run (challenge round 1, #14).
+  The committed page changed by that one sentence and nothing else. BACKING
+  B5.2's source column stays `pipeline/build.py`: the DAG feeds no number
+  (#13). *Rejected: a hand-typed step list in the note (drift); the DAG in
+  BACKING's source column (the column names where a number comes from).*
+- **Accepted as-is (review round 1 #8, raised again in round 2 #8): the
+  Metabase entry imports `pipeline.cli` for `resolve_choice` and `Refused`.**
+  Measured, not judged: the entry already imports `pipeline.build` for the
+  input set, which loads `classify`, `ingest`, `models` and `opendata`; the
+  CLI import adds 13 modules, 3 of them the repo's, to a developer-run tool.
+  *Rejected: a new `pipeline/validate.py` holding two guards — a module for
+  two functions fails the duller-way test (architecture-fit), and the guard
+  would then have two homes to drift between.*
+- **Recorded, not fixed here (challenge round 1, #16):** the README's "Running
+  it" said `make rebuild ROWS=captured && make study` fills Beat 2 from real
+  data, while `make study` renders the frozen synthetic file. The sentence now
+  says so; a captured render of the page is a new BACKLOG row.

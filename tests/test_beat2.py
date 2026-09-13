@@ -135,14 +135,19 @@ def test_the_cli_binds_the_file_it_builds_to_the_run_id_it_classifies_under(
         def close(self):
             pass
 
-    monkeypatch.setattr(cli, "rebuild", lambda target, rows: {})
+    monkeypatch.setattr(cli, "rebuild", lambda target, rows, stages: {})
     monkeypatch.setattr(cli, "connect", lambda target, database: _Conn())
     monkeypatch.setattr(cli, "reviews_per_month", lambda conn: [])
-    monkeypatch.setattr(
-        cli, "_classify_and_print", lambda db, rows: calls.append((db, rows))
-    )
+
+    def _classify(db, rows):
+        calls.append((db, rows))
+        return 0
+
+    monkeypatch.setattr(cli, "_classify_and_print", _classify)
     for rows in ("synthetic", "samples", "none"):  # captured needs pages on disk
-        args = argparse.Namespace(target="duckdb", rows=rows)
+        # `stage=""` is the whole (the CLI's default), the shape `make rebuild`
+        # hands over with no STAGE (10a)
+        args = argparse.Namespace(target="", rows=rows, stage="")
         assert cli._do_rebuild(args) == 0
         assert calls[-1] == (cli.database_for(rows), rows)
     # and the classify step writes that very value: over a built warehouse each

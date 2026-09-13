@@ -10,6 +10,7 @@ appears — invariant 6 says "all modules"."""
 
 from __future__ import annotations
 
+import ast
 import re
 from pathlib import Path
 
@@ -136,6 +137,78 @@ def test_the_only_clock_is_the_fetch_stamp():
     clock is `ingest/fetch.py::utc_stamp`, which stamps `captured_at` at fetch."""
     hits = _lines_matching(r"datetime\.now\(|\.utcnow\(|time\.time\(|date\.today\(")
     assert set(hits) == {"ingest/fetch.py"}, hits
+
+
+ENGINES = ("duckdb", "snowflake")
+SEAM = "pipeline/warehouse.py"
+
+
+def engine_literals(source: str) -> list[int]:
+    """Line numbers of every string constant that IS an engine name — not a
+    docstring, not a comment, not a substring of a longer sentence."""
+    tree = ast.parse(source)
+    docstrings = {
+        id(node.body[0].value)
+        for node in ast.walk(tree)
+        if isinstance(
+            node, ast.Module | ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef
+        )
+        and node.body
+        and isinstance(node.body[0], ast.Expr)
+        and isinstance(node.body[0].value, ast.Constant)
+    }
+    return [
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Constant)
+        and node.value in ENGINES
+        and id(node) not in docstrings
+    ]
+
+
+def test_no_module_outside_the_seam_spells_an_engine_name():
+    """Portability (Phase 10a, invariant 3): the engine is a name imported from
+    `pipeline/warehouse.py` (`LOCAL`, `TARGETS`), never a literal — so threading
+    a target through a caller is a parameter change with no literal to miss
+    (the BACKLOG row "not warehouse-aware"'s shape, fixed as a class)."""
+    hits = {
+        str(p.relative_to(ROOT)): lines
+        for p in _modules()
+        if p.relative_to(ROOT).as_posix() != SEAM
+        and not is_binary_asset(p)
+        and (lines := engine_literals(repo_text(p)))
+    }
+    assert hits == {}, hits
+    # the guard itself: a planted literal is a hit, a docstring or comment is not
+    assert engine_literals('conn = connect("duckdb", database=db)') == [1]
+    assert (
+        engine_literals('"""duckdb is the laptop engine"""\n# snowflake\nx = 1') == []
+    )
+
+
+_DRIVER_IMPORT = re.compile(r"^\s*(?:import|from)\s+(?:duckdb|snowflake)\b", re.M)
+
+
+def test_no_module_outside_the_seam_imports_a_database_driver():
+    """Portability: the seam's docstring says nothing else imports a database
+    driver, and until round 2 of Phase 10a nothing pinned it — the Metabase
+    export caught `duckdb.Error` by name (10b's seed #4, landed early). The
+    engine's error is `warehouse.DriverError`; the connection is
+    `warehouse.connect`."""
+    hits = {
+        str(p.relative_to(ROOT)): [
+            i
+            for i, line in enumerate(repo_text(p).splitlines(), 1)
+            if _DRIVER_IMPORT.match(line)
+        ]
+        for p in _modules()
+        if p.relative_to(ROOT).as_posix() != SEAM and not is_binary_asset(p)
+    }
+    assert {k: v for k, v in hits.items() if v} == {}, hits
+    assert _DRIVER_IMPORT.search("import duckdb\n") and _DRIVER_IMPORT.search(
+        "from snowflake import x"
+    )
+    assert not _DRIVER_IMPORT.search("from pipeline import warehouse")
 
 
 def test_no_module_spells_an_engines_schema_name():

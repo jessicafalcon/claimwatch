@@ -270,7 +270,7 @@ def test_export_command_routes_rows_to_the_matching_database(monkeypatch):
 
     seen = {}
 
-    def fake_build(duck_db=None):
+    def fake_build(duck_db=None, sqlite_path=None):
         seen["db"] = duck_db
         return Path("x")
 
@@ -281,6 +281,21 @@ def test_export_command_routes_rows_to_the_matching_database(monkeypatch):
     # #1's core promise: the default (no --rows) is the real corpus
     assert entry.main(["export"]) == 0
     assert seen["db"] == database_for("captured")
+
+
+def test_export_command_refuses_rows_outside_the_set_by_name(monkeypatch, capsys):
+    """`export --rows` is validated in Python against the closed set (10a), so a
+    value from either origin of `make publish ROWS=` is one refusal line naming
+    the set, exit 2 — never a shell word, a path or a case-folded match, and
+    nothing is built."""
+    import study.metabase.__main__ as entry
+
+    monkeypatch.setattr(entry, "build_sqlite", lambda **_: pytest.fail("built"))
+    for bad in ("../x", '"; rm', "SYNTHETIC", "prod"):
+        assert entry.main(["export", "--rows", bad]) == 2
+        err = capsys.readouterr().err
+        assert err.startswith("study.metabase: refusing:") and bad in err, err
+        assert err.count("\n") == 1, err
 
 
 def test_dashcards_are_replaced_not_appended_on_reapply():

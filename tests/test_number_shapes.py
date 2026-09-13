@@ -29,7 +29,7 @@ from pathlib import Path
 from ingest.parsed import DECIMAL_SHAPE, count_in_range, is_ascii_decimal_integer
 
 ROOT = Path(__file__).resolve().parents[1]
-PACKAGES = ("ingest", "pipeline", "opendata")
+PACKAGES = ("ingest", "pipeline", "opendata", "dags")
 
 # `float()` belongs only to the shaped-decimal parsers: each matches
 # `DECIMAL_SHAPE` before it calls `float()`, so the string it converts is

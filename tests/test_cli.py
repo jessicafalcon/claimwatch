@@ -74,12 +74,45 @@ def test_cli_reset_refuses_non_duckdb_target(capsys):
 def test_cli_idempotency_check_refuses_non_duckdb_target(capsys):
     """idempotency-check runs the DuckDB-only classify step, so TARGET=snowflake is
     refused with one line (exit 2) here — never rebuilt into Snowflake then counted
-    against an empty temp DuckDB file (a silent green). Phase 10 threads TARGET
+    against an empty temp DuckDB file (a silent green). Phase 10b threads TARGET
     through the classify step and lifts this restriction."""
     code = main(["idempotency-check", "--target=snowflake"])
     assert code == 2
     err = capsys.readouterr().err
     assert err.startswith("refusing:") and err.count("\n") <= 1
+
+
+@pytest.mark.parametrize("stage", ["all", "load", "clean", "classify"])
+def test_cli_rebuild_refuses_a_target_the_seam_cannot_open(stage, capsys):
+    """Every stage of `make rebuild` resolves TARGET against the seam's WIRED
+    set, so TARGET=snowflake is one refusal line (exit 2) before any file is
+    opened: never run over the DuckDB file while the variable says otherwise
+    (the whole, `classify`), never the seam's NotImplementedError as a
+    traceback (`load`, `clean`) — review round 1, #1; Phase 10b wires it."""
+    argv = ["rebuild", "--rows=synthetic", "--target=snowflake", f"--stage={stage}"]
+    code = main(argv)
+    assert code == 2
+    err = capsys.readouterr().err
+    assert err.startswith("refusing:") and "'duckdb'" in err and err.count("\n") <= 1
+
+
+@pytest.mark.parametrize("stage", ["classify", "all"])
+def test_cli_rebuild_resolves_a_classify_stage_against_the_steps_own_set(
+    stage, monkeypatch, capsys
+):
+    """The classify step opens LOCAL until 10b threads a target through it, so
+    a stage that runs it resolves TARGET against `build.CLASSIFY_TARGETS`, not
+    the seam's WIRED: with a second engine wired, `classify`/`all` still refuse
+    it by name while a build stage hands it to the seam (round 2, #10)."""
+    monkeypatch.setattr(cli, "WIRED", ("duckdb", "snowflake"))
+    code = main(
+        ["rebuild", "--rows=synthetic", "--target=snowflake", f"--stage={stage}"]
+    )
+    assert code == 2
+    err = capsys.readouterr().err
+    assert err.startswith("refusing:") and "expected one of ('duckdb',)" in err
+    with pytest.raises(NotImplementedError):  # the build stage reached the seam
+        main(["rebuild", "--rows=synthetic", "--target=snowflake", "--stage=load"])
 
 
 # --- Phase 2 ---
