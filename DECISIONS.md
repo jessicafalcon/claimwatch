@@ -3573,7 +3573,13 @@ re-pointed at it).
   refuses a string constant equal to an engine name in any module but
   `pipeline/warehouse.py` (docstrings and comments excepted), so 10b threads
   `TARGET` by parameter with nothing to grep for. `reset` and
-  `idempotency-check` keep their DuckDB-only closed sets as `(LOCAL,)`.
+  `idempotency-check` keep their DuckDB-only closed sets as `(LOCAL,)`, and
+  so does `rebuild` whenever its invocation runs the classify step (the whole,
+  `STAGE=classify`): `/preflight` found `TARGET=snowflake STAGE=classify`
+  exiting 0 over the DuckDB file — the `fix/idempotency-classify` scenario
+  again — so the set is chosen from the stage, and
+  `tests/test_cli.py::test_cli_rebuild_refuses_non_duckdb_target_where_the_classify_step_runs`
+  pins both stages.
   *Rejected: fixing the literal only in `classify_step` (the site, not the
   class — LESSONS `site-fix`); a global "current target" setting (hidden
   state on the data path).*

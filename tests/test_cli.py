@@ -82,6 +82,21 @@ def test_cli_idempotency_check_refuses_non_duckdb_target(capsys):
     assert err.startswith("refusing:") and err.count("\n") <= 1
 
 
+@pytest.mark.parametrize("stage", ["all", "classify"])
+def test_cli_rebuild_refuses_non_duckdb_target_where_the_classify_step_runs(
+    stage, capsys
+):
+    """The whole `make rebuild` and `STAGE=classify` run the DuckDB-only classify
+    step, so TARGET=snowflake is refused with one line (exit 2) before any file
+    is opened — never run over the DuckDB file while the variable says
+    otherwise (the `idempotency-check` shape; Phase 10b lifts it)."""
+    argv = ["rebuild", "--rows=synthetic", "--target=snowflake", f"--stage={stage}"]
+    code = main(argv)
+    assert code == 2
+    err = capsys.readouterr().err
+    assert err.startswith("refusing:") and "'duckdb'" in err and err.count("\n") <= 1
+
+
 # --- Phase 2 ---
 
 

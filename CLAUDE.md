@@ -171,7 +171,9 @@ cannot say:
   loads; `clean`: staging, marts and the three key-free writers; `classify`:
   the classify step) into the input's own file — the DAG's middle tasks — and
   a stage over a file the earlier stage never built refuses naming the
-  missing table. The classify step: the rules plus, only when
+  missing table. The whole and `STAGE=classify` run the DuckDB-only classify
+  step, so they resolve `TARGET` against `duckdb` alone until Phase 10b, like
+  `idempotency-check`. The classify step: the rules plus, only when
   `ANTHROPIC_API_KEY` is set and only for the reviews the rules left
   `unclassified`, one cached model call each — with no key those reviews stay
   `unclassified` and the run is green. The held-out gate and the theme marts

@@ -236,9 +236,15 @@ STAGES = ("all", *BUILD_STAGES, "classify")
 
 
 def _do_rebuild(args: argparse.Namespace) -> int:
-    target = resolve_choice(args.target, TARGETS, LOCAL)
     rows = resolve_choice(args.rows, INPUTS, "captured")
     stage = resolve_choice(args.stage, STAGES, "all")
+    # The classify step is DuckDB-only until Phase 10b threads TARGET through
+    # it, so an invocation that runs it (the whole, `classify`) resolves TARGET
+    # against (LOCAL,) like `idempotency-check`: refused by name, never run
+    # over the DuckDB file while the variable says otherwise. `load` and
+    # `clean` reach the seam through rebuild(), the full set.
+    engines = TARGETS if stage in BUILD_STAGES else (LOCAL,)
+    target = resolve_choice(args.target, engines, LOCAL)
     db = database_for(rows)
     if stage == "classify":
         return _classify_and_print(db, rows)
