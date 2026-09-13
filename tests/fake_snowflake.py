@@ -37,6 +37,14 @@ _DEFAULTS: dict[str, object] = {
 }
 _STATE: dict[str, object] = dict(_DEFAULTS)
 
+# Tables the run has created, tracked from the DDL text so a full rebuild can
+# run through the fake: `create table` makes one exist (so `_require_raw_tables`
+# and `table_counts` see it), `drop schema` clears them (the scratch drop). This
+# is the only state the fake keeps beyond its recording; columns stay empty, so
+# `check_raw_declaration` compares two empty lists and passes (its real
+# column-drift check is a DuckDB test).
+_CREATED: set[str] = set()
+
 # The connector's own module-level knobs the seam touches.
 paramstyle = "pyformat"
 
@@ -50,6 +58,24 @@ def _norm(sql: str) -> str:
     return " ".join(sql.lower().split())
 
 
+_CREATE = re.compile(
+    r"create (?:or replace |temporary )*table (?:if not exists )?\"?([a-z_][a-z0-9_]*)"
+)
+_DROP = re.compile(r"drop table (?:if exists )?\"?([a-z_][a-z0-9_]*)")
+
+
+def _track(sql: str) -> None:
+    """Update `_CREATED` from a statement's DDL, so the fake reports a table as
+    existing once its create has run and gone after a drop."""
+    q = _norm(sql)
+    for name in _CREATE.findall(q):
+        _CREATED.add(name.upper())
+    for name in _DROP.findall(q):
+        _CREATED.discard(name.upper())
+    if "drop schema" in q:
+        _CREATED.clear()
+
+
 def _answer(sql: str) -> tuple[list[tuple], list[tuple] | None]:
     """Canned (rows, description) for the queries the seam and the classify step
     run; every other statement records and returns nothing."""
@@ -57,7 +83,8 @@ def _answer(sql: str) -> tuple[list[tuple], list[tuple] | None]:
     if q == "select current_schema()":
         return [(_STATE["schema"],)], [("current_schema()",)]
     if "information_schema.tables" in q:
-        return [(t,) for t in _STATE["tables"]], [("table_name",)]
+        names = set(_STATE["tables"]) | _CREATED
+        return [(t,) for t in sorted(names)], [("table_name",)]
     if "information_schema.columns" in q:
         rows = [
             (pos, table, name, kind, nullable)
@@ -101,6 +128,7 @@ class _Cursor:
         CALLS.append(("execute", sql, params))
         if _STATE["execute_error"] is not None:
             raise Error(_STATE["execute_error"])
+        _track(sql)
         self._result, self.description = _answer(sql)
         return self
 
@@ -127,6 +155,7 @@ class _Connection:
         CALLS.append(("execute_string", text, None))
         if _STATE["execute_error"] is not None:
             raise Error(_STATE["execute_error"])
+        _track(text)
 
     def close(self) -> None:
         CALLS.append(("conn.close", None, None))
@@ -158,6 +187,7 @@ def install(monkeypatch, *, credentials: bool = True, **config) -> types.ModuleT
     environment. Returns this module so the test can read `CALLS`."""
     global paramstyle
     CALLS.clear()
+    _CREATED.clear()
     _STATE.clear()
     _STATE.update(_DEFAULTS)
     _STATE.update(config)

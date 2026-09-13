@@ -113,8 +113,10 @@ class _DuckConnection:
 
     def execute(self, sql: str, params: list | None = None):
         try:
-            return self._conn.execute(sql) if params is None else self._conn.execute(
-                sql, params
+            return (
+                self._conn.execute(sql)
+                if params is None
+                else self._conn.execute(sql, params)
             )
         except duckdb.Error as exc:
             raise DriverError(str(exc)) from exc

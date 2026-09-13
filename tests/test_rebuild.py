@@ -23,11 +23,13 @@ from pipeline.build import (
     classify_step,
     content_hash,
     create_raw,
+    idempotency_check,
     load_reviews,
     rebuild,
     table_counts,
 )
 from pipeline.warehouse import LOCAL, connect, database_for
+from tests import fake_snowflake
 
 # The catalog reads moved into the seam (Phase 10b): the tests read a table's
 # columns and probe existence through `warehouse.columns`/`warehouse.table_exists`.
@@ -486,7 +488,7 @@ def test_a_matching_raw_table_passes_and_leaves_no_scratch_table():
 
 def test_table_counts_reads_the_default_schema_from_the_engine():
     """The counts `idempotency-check` diffs are the default schema's tables,
-    the schema named by the engine (`warehouse.default_schema`), not a
+    the schema named by the engine (through the seam's `warehouse.tables`), not a
     literal: a table in another schema is not counted, one in the default
     schema is (round 4, code-reviewer #3)."""
     conn = connect("duckdb", database=":memory:")
@@ -502,6 +504,26 @@ def test_table_counts_reads_the_default_schema_from_the_engine():
         assert warehouse._default_schema(conn) == "main"
     finally:
         conn.close()
+
+
+def test_idempotency_check_counts_on_the_target(monkeypatch):
+    """`idempotency_check` on the cloud target rebuilds and counts on that target
+    (Phase 10b, invariant 6): over the fake, both rebuilds and both count reads
+    land on the fake's connections and no DuckDB file is opened, and the run is
+    green (first == second). The DuckDB call is unchanged (`test_idempotency.py`,
+    existing)."""
+    fake = fake_snowflake.install(monkeypatch)
+    ok, first, second = idempotency_check("snowflake", "synthetic")
+    assert ok and first == second and first  # a non-empty, unchanged count map
+    # both rebuilds opened connections on the fake; the count read is the seam's
+    # table listing, run on the fake, not a DuckDB file
+    assert sum(1 for op, _, _ in fake.CALLS if op == "connect") >= 2
+    listings = [
+        sql
+        for op, sql, _ in fake.CALLS
+        if op == "execute" and sql and "information_schema.tables" in sql
+    ]
+    assert len(listings) >= 2  # table_counts read the catalog on the target twice
 
 
 def test_the_database_file_is_derived_from_the_input_never_named(tmp_path):
