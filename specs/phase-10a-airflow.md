@@ -345,26 +345,26 @@ Freeze: none
 
 ## Record updates (REQUIRED)
 
-- [ ] `DECISIONS.md` — Phase 10a entry (the split and the six pinned decisions
+- [x] `DECISIONS.md` — Phase 10a entry (the split and the six pinned decisions
   with their rejected alternatives; challenge round 1's disposition); Gotchas
   for every Airflow or image surprise the first hour finds
-- [ ] `BACKLOG.md` — rows opened: "`make study` renders the frozen synthetic
+- [x] `BACKLOG.md` — rows opened: "`make study` renders the frozen synthetic
   input while the README's Running it says the captured rebuild fills Beat 2"
   (trigger: a `ROWS=` on `study`, or the README sentence rewritten — one or
   the other); rows 33 and 50 re-pointed at 10b; the count in CLAUDE.md
   updated
-- [ ] `LESSONS.md` — the `traceback-at-boundary` row (round 1 #1: the seam's
+- [x] `LESSONS.md` — the `traceback-at-boundary` row (round 1 #1: the seam's
   `NotImplementedError` out of `main`; `warehouse.WIRED`) and the `unpinned`
   row (round 1 #6: invariant 2's pins over `synthetic` only) extended by
   their fix commits
-- [ ] `CLAUDE.md` — Current status (10a/10b); Commands (`rebuild [STAGE=]`,
+- [x] `CLAUDE.md` — Current status (10a/10b); Commands (`rebuild [STAGE=]`,
   `publish [ROWS=]`); Repo map (`dags/` built); Architecture caption; BACKLOG
   count
-- [ ] BACKING.md — none: B5.2's source stays `pipeline/build.py` (the DAG feeds no number; it is cited in SPEC.md's row text and the page)
-- [ ] `SPEC.md` — B5.2's text names the five tasks in order beside `make rebuild`
-- [ ] `README.md` — Beat 5 and Running it, as under Scope
-- [ ] `docs/PLAN.md` — the Phase 10 row notes the 10a/10b split
-- [ ] `specs/phase-10a-airflow.md` — the "Delivered" paragraph appended at exit
+- [x] BACKING.md — none: B5.2's source stays `pipeline/build.py` (the DAG feeds no number; it is cited in SPEC.md's row text and the page)
+- [x] `SPEC.md` — B5.2's text names the five tasks in order beside `make rebuild`
+- [x] `README.md` — Beat 5 and Running it, as under Scope
+- [x] `docs/PLAN.md` — the Phase 10 row notes the 10a/10b split
+- [x] `specs/phase-10a-airflow.md` — the "Delivered" paragraph appended at exit
 
 ## Threat model (REQUIRED)
 
@@ -491,3 +491,47 @@ Agents are selected by diff surface (CLAUDE.md → "Which review agents run").
   deployed at a company, where the schedule would be set there.
 - **The per-review drill's public address** (BACKLOG, open since 9b) and
   **B2.1 in the HTML page** (BACKLOG, 9g) — untouched.
+
+## Delivered (2026-09-13)
+
+The one Airflow DAG: five `BashOperator`s over bare `make` commands in the
+brief's order — `scrape` (`make confirm scrape`, unchanged), `load_raw`,
+`clean`, `classify` (`make rebuild STAGE=load|clean|classify`, the three
+stages into the input's own file, a stage over a file the earlier stage
+never built refusing by the missing table's name) and `publish` (`make
+publish [ROWS=]`, the Metabase export as a target) — read by the suite with
+`ast`, never imported: no function, branch or input choice under `dags/`,
+the task tuple the page draws pinned to the file's ids and, since round 2,
+the README and SPEC.md too. Every engine literal outside the seam became
+`warehouse.LOCAL` with a layout test; round 1 added `warehouse.WIRED` (the
+targets the seam opens today) so a declared-but-unwired `TARGET` is one
+refusal line on every stage, and round 2 gave the classify step its own set
+(`build.CLASSIFY_TARGETS`, DuckDB-only until 10b) so a second wired engine
+cannot run the step over the DuckDB file. The demonstration: one container
+(`airflow standalone` on the image's Python-3.12 variant plus `make` and
+`uv`), the tracked paths the tasks read each a read-only bind and nothing
+else of the checkout (amendment A1, after security-reviewer #2/#3 found the
+whole-checkout bind carried `.env` and `.git/`; the bind sources are pinned
+to `git ls-tree` and the mounted set to the source's own `ROOT / "<top>"`
+reads), `data/` a private volume with the three numbers-only subtrees
+read-only inside it, no `env_file`, the UI on the loopback address,
+`ROWS=synthetic` from the environment; the DAG ran green twice (before and
+after A1, same grid) and its captioned screenshot is committed with the
+caption in the pixels and the PNG's Comment chunk. Two deviations from the
+spec as first stamped, both recorded and the stamp re-hashed twice: A1
+restated invariant 5 exactly (a tracked path or a numbers-only subtree, and
+nothing else at the top level — a package bind carries its own bytecode
+cache), and invariant 6's falsifier is the test that reads the README and
+SPEC.md, not `test_readme.py`. Two review rounds (twelve findings, then
+seventeen at the exit with the coherence audit; four correctness at the
+exit, all `unpinned` — the page-only invariant-6 pin `9b9c677`, A1's
+falsifier dropping a bare `..` `d91db76`, the seam's driver-import claim
+`49d78fc` (10b's seed #4, landed early), the classify path's set `9a5f101`;
+the rest craft, prose and records, fixed in one batch; the image digest pin
+left to the developer's registry query). Records: DECISIONS (the split, six
+pinned decisions, A1, #8's measurement, two Gotchas), BACKLOG (one row
+opened for `make study`, one for the code-craft sentence; rows 33 and 50
+re-pointed at 10b), LESSONS (`traceback-at-boundary` and `unpinned`
+extended), CLAUDE.md, SPEC B5.2, README Beat 5 and Running it, PLAN §5. 10b
+finds `LOCAL`, `WIRED`, `CLASSIFY_TARGETS`, the two layout tests and every
+target-taking CLI path resolving against the seam.
