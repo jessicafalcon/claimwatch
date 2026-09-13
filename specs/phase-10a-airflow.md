@@ -14,7 +14,7 @@ branch, the `TARGET` threading and the Snowflake run, its spec written after
 10a merges (Out of scope, last section). Depends on Phase 9i merged (PR #34)
 and the four small PRs after it (#35–#38), all on `main` 2026-09-13.
 
-**Status: PROPOSED — do not start until approved.** No new Python dependency:
+**Status: APPROVED 2026-09-13 — in progress.** No new Python dependency:
 the DAG file is read by the suite with `ast`, never imported; Airflow runs via
 Docker only (CLAUDE.md → Conventions), in one container built from the
 official image plus `make` and `uv`. The phase is **non-CI** in the 9g shape:
