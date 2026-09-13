@@ -22,7 +22,7 @@ an offline, CI-checkable core (the DAG file's shape, the stage split, the
 `publish` target, the engine-name constant and its layout test, the compose
 file's mounts) plus a developer-run demonstration (the Airflow run over
 hand-written synthetic reviews, recorded with one captioned screenshot).
-Challenged: 2026-09-13, round 1, spec 974bd83f — rework (1 BLOCKER, 12 should-fix, 4 suggestion, 1 question; all amended: the 10a/10b split, #1–#4, #7, #9, #15, #17 recorded as 10b's seeds; #18's live check is the developer's Docker run before approval)
+Challenged: 2026-09-13, round 1, spec c8ea25e5 — rework (1 BLOCKER, 12 should-fix, 4 suggestion, 1 question; all amended: the 10a/10b split, #1–#4, #7, #9, #15, #17 recorded as 10b's seeds; #18 verified live the same day — the image's Python-3.12 variant tag, stack risk 1)
 
 Four sections marked REQUIRED are mandatory; a spec without them is not
 approvable (CLAUDE.md → Workflow rules).
@@ -141,8 +141,9 @@ The `scrape` task is not in the DONE command: it is the network target
    constant is the same string. *Evidence: rows 9, 10.*
 5. **The demonstration is committed, over synthetic reviews only, and the
    container can neither read the corpus nor write the repo.** `dags/` holds a
-   `Dockerfile` (`FROM apache/airflow:3.3.1`, `make` by apt as root, `uv` by pip
-   as `airflow`, the documented extension pattern) and a one-service
+   `Dockerfile` (`FROM apache/airflow:3.3.1-python3.12` — the official image's
+   Python-3.12 variant, matching `.python-version`; `make` by apt as root, `uv`
+   by pip as `airflow`, the documented extension pattern) and a one-service
    `docker-compose.yml` running `airflow standalone` with: the repo mounted
    **read-only** at a fixed path; `data/` a container-private named volume with
    the three tracked numbers-only subtrees (`data/snapshots/`, `data/damir/`,
@@ -245,7 +246,10 @@ The `scrape` task is not in the DONE command: it is the network target
   (the first draft — `.env`, `data/cache/` bodies, `*.duckdb` and `.git`
   handed to the image); a copy of the repo into the image at build time (a
   stale corpus baked into a layer).* Satisfies invariant 5.
-- **One container, `airflow standalone`, from a two-line Dockerfile.** The
+- **One container, `airflow standalone`, from a two-line Dockerfile on the
+  image's Python-3.12 variant.** The official image's default Python is 3.13
+  (verified 2026-09-13; the project pins 3.12), so the tag is
+  `apache/airflow:3.3.1-python3.12` and `uv` downloads no interpreter. The
   official image has no `make` (docs: no `build-essential`) and no `uv`; the
   documented extension pattern adds an apt package as root and a pip package
   as `airflow`. `standalone` runs the scheduler, the DAG processor, the API
@@ -373,16 +377,18 @@ Agents are selected by diff surface (CLAUDE.md → "Which review agents run").
 - **Stack risk (verify BEFORE the stamp where marked, else in the first hour;
   STOP and report before any workaround — Workflow rules → Stack surprises;
   log under DECISIONS → Gotchas):**
-  1. **Before the stamp — `airflow standalone` in `apache/airflow:3.3.1`.**
-     The 3.3.1 CLI reference lists `standalone` (read 2026-09-13); what to
-     confirm live is that it runs a `BashOperator` task in one container over
-     the bundled SQLite metadata database, that the image's Python satisfies
-     `.python-version` (3.12) so `uv` downloads no interpreter, and that a
-     read-only DAG folder parses. The developer runs it (Docker is theirs):
-     `docker run --rm apache/airflow:3.3.1 bash -c 'python --version; airflow
-     version'`, then `standalone` with one example DAG. If `standalone` is
-     not fit, pinned decision 6 changes to the documented LocalExecutor
-     compose — an amendment before approval, not a first-hour workaround.
+  1. **Verified before the stamp (2026-09-13, the developer's Docker run):**
+     `apache/airflow:3.3.1` `standalone` runs the scheduler, the DAG
+     processor and the API server in one container and executed the
+     `example_bash_operator` DAG's `BashOperator` tasks green (its two
+     designed skips aside). Two findings: the image's default Python is
+     **3.13**, so the Dockerfile uses the `-python3.12` variant tag (done-when
+     5); and the simple auth manager logs a "deployment shape looks like
+     production" warning because the API server binds every interface inside
+     the container — expected, the compose publishes it on the Mac's loopback
+     port only, and the generated admin password stays in the container's log
+     (`docker logs`). Still first-hour: that a read-only DAG folder parses. A
+     taken host port is remapped in the compose, not in the DAG.
   2. **`BashOperator`'s import path.** In Airflow 3 it lives in the standard
      provider (`airflow.providers.standard.operators.bash`), shipped in the
      image; confirm against the running image before pinning the `ast` test's
