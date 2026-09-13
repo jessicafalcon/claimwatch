@@ -3614,8 +3614,9 @@ re-pointed at it).
   `ROOT / "<top>"` the source packages read. *Not taken: an empty overlay per
   local-only path (`/dev/null`, `tmpfs`) — named paths only, while the
   credential patterns in `.gitignore` are globs; a `git archive` copy — the
-  stale-copy rejection above.* The demonstration is re-run by the developer
-  over the amended compose.
+  stale-copy rejection above.* The demonstration was re-run by the developer
+  over the amended compose the same day; the grid and the screenshot's bytes
+  came out identical to the committed capture.
 - **One container, `airflow standalone`, from a Dockerfile on the image's
   Python-3.12 variant.** Verified live before the stamp (the developer's
   Docker run, 2026-09-13): `apache/airflow:3.3.1` `standalone` runs the
