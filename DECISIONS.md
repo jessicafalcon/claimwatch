@@ -54,13 +54,17 @@ place and never deleted.
 **Warehouse**
 
 - **One seam knows DuckDB from Snowflake; the SQL is identical for both.**
-  `pipeline/warehouse.py` (`connect`, `run_sql_file`) is the only database-driver
-  import; DuckDB is the permanent path and Snowflake is the Phase-10b
-  demonstration (its connector defers, no import in Phase 1); every caller
-  outside the seam names the engine through `warehouse.LOCAL`, never a
-  literal (Phase 10a). SQL stays ANSI —
-  no reader function, no regex, no clock — which is what keeps it portable.
-  ([PLAN §4.1](docs/PLAN.md); [Phase 1](#phase-1))
+  `pipeline/warehouse.py` (`connect`, `run_sql_file`, the catalog reads, the
+  credential read) is the only database-driver import, the only spelling of an
+  engine name, `information_schema`/`current_schema` or a `SNOWFLAKE_*` name;
+  both engines return one connection shape and fold their driver's error into
+  `warehouse.DriverError`. DuckDB is the permanent path (no extra, no network);
+  Snowflake is the demonstration engine, wired in Phase 10b as an optional
+  extra imported lazily inside its branch. Every caller outside the seam names
+  the engine through `warehouse.LOCAL` and its location through
+  `warehouse.location_for`, never a literal. SQL stays ANSI — no reader
+  function, no regex, no clock — which is what keeps it portable.
+  ([PLAN §4.1](docs/PLAN.md); [Phase 1](#phase-1), [Phase 10b](#phase-10b))
 - **Raw is append-only, idempotent on `(source, external_id, content_hash)`;
   staging keeps the latest capture.** A re-run of an unchanged review inserts
   nothing, an edited review appends a new row, so "run twice, counts unchanged"
@@ -3674,3 +3678,109 @@ re-pointed at it).
   it" said `make rebuild ROWS=captured && make study` fills Beat 2 from real
   data, while `make study` renders the frozen synthetic file. The sentence now
   says so; a captured render of the page is a new BACKLOG row.
+
+### Phase 10b
+
+Branch `phase-10b-snowflake`, spec `specs/phase-10b-snowflake.md`, challenged
+round 1 (approve with amendments — 0 BLOCKER, 3 should-fix, 2 suggestion, 1
+question; the developer's disposition "fix all": findings 1/2/3 amended as one
+provenance-and-determinism reword, finding 5 the credit-spend disclosure,
+finding 6 the direct-transaction wording in stack risk 2; finding 4 rejected —
+done-when 1 and 3 stay compound, a seam-refactor-only PR would carry no
+user-visible Done-when and add a merge). The second half of the Phase 10 split:
+10a built the DAG, the stage split, `publish` and `warehouse.LOCAL`/`WIRED`;
+this phase wires the seam's second branch and runs it once. BACKLOG rows 33 and
+50 close here.
+
+- **Both branches are thin wrappers with one shape; the seam owns the error
+  type; the connector is an optional extra imported inside its branch.** The
+  DuckDB connection already carries the read shape, so `_DuckConnection` is a
+  thin adapter that folds `duckdb.Error` into a seam-owned `DriverError` and
+  houses the DuckDB-only no-pandas probe; `_SnowflakeConnection` wraps a `qmark`
+  cursor (the placeholders in `build.py` stay `?`), runs a multi-statement file
+  through `execute_string`, and folds `snowflake.connector.Error`. The extra
+  keeps `uv sync --locked`, CI and `make setup` connector-free — the DuckDB path
+  is the permanent one and must not grow a cloud dependency. *Rejected: a
+  `DriverError = (duckdb.Error, snowflake.connector.Error)` tuple (imports the
+  connector on the DuckDB path); the connector as a plain dependency (every
+  laptop clone downloads a cloud driver it never uses); rewriting `build.py`'s
+  placeholders per engine (the SQL would fork).*
+- **Catalog reads are three seam functions with lower-cased answers;
+  `information_schema`/`current_schema` are spelled in the seam only.** Snowflake
+  upper-cases unquoted identifiers, so the compare folds in the seam, once, and
+  every caller (`build.py`'s `_columns`/`_table_exists`/`table_counts`,
+  `study/panels.py`'s mart probe, `label_sample.py`'s staged-table probe,
+  `_staged_review_rows`) becomes a call to `warehouse.tables`/`columns`/
+  `table_exists`. `tests/test_ingest_layout.py::test_no_module_outside_the_seam_queries_the_catalog`
+  refuses the strings elsewhere — the class of BACKLOG row 33, fixed as a guard.
+  *Rejected: quoting every identifier in `sql/` (a rewrite of every file for one
+  engine's folding rule, reader-hostile SQL); a per-engine `table_schema` literal
+  (the row-33 mutation the suite could not see).*
+- **A location per (input, target), from the seam; the cloud holds fixture
+  inputs only; the idempotency scratch is a seam context manager; `reset` stays
+  the DuckDB file.** `location_for` generalises `database_for` (which stays,
+  unchanged, for the laptop-only callers — `study/export.py`, `label_sample.py`,
+  `classify-eval`, the tests): a file per input on DuckDB, the schema
+  `friction_ledger_<input>` per input on Snowflake, and no answer for `captured`
+  or `samples` on the cloud — the refusal the CLI prints on every target-taking
+  path (`_refuse_corpus_on_cloud`, before any connection). `scratch` is a temp
+  directory on DuckDB and a `create schema`/`drop schema` pair on Snowflake
+  (`try`/`finally`, dropped even after an error inside the block), named so it
+  can never equal an input's location. `reset` resolves against `(LOCAL,)`, not
+  the now-two-engine `WIRED`, and refuses the cloud target by name: a `make`
+  target must not drop a cloud schema. *Rejected: one shared schema for every
+  input (10a's `database_for` argument again); a `SNOWFLAKE_SCHEMA` variable (an
+  input's location chosen by the environment); `make confirm reset TARGET=snowflake`
+  dropping the schema (a destructive network act from make).*
+- **`TARGET` threads by parameter through `classify_step`, `idempotency_check`
+  and `publish`; `study`, `label-sample` and `classify-eval` stay on the laptop
+  file.** The classify step's own set (`CLASSIFY_TARGETS`, 10a review round 2
+  #10) existed only to refuse what this phase wires, and goes — the CLI resolves
+  every stage against `WIRED`. BACKLOG row 50 closes: the classify-path writes
+  (the reviews-per-theme table, the three post-classify marts,
+  `pipeline_row_counts`, `classifier_quality`) follow the target, pinned by
+  `tests/test_snowflake_seam.py::test_the_classify_step_writes_land_on_the_target`.
+  The page renders the frozen synthetic input by the 9a contract and is a
+  tracked file (a second engine under it is a second render path for bytes CI
+  diffs); `label-sample` and `classify-eval` read the laptop corpus/eval file.
+  *Rejected: `TARGET` on `study` (a tracked byte-identical page over two engines'
+  float formatting); a global "current target" (hidden state — 10a's rejection).*
+- **Six `SNOWFLAKE_*` strings, read by name in the seam, refused by name;
+  credential-gated, not `confirm`-gated.** The names are the connector's own
+  parameters; `SNOWFLAKE_PASSWORD` carries a password or a programmatic access
+  token — a string either way, so no variable ever names a file a caller opens.
+  A missing required one is one refusal line naming the missing names; a driver
+  refusal names its class and the variables and never relays the driver's
+  message (it can carry the account or host). The path runs when the credentials
+  are exported and refuses when they are not, like the model key: the `confirm`
+  gate is a closed goal set that knows no variable, so gating one `TARGET` value
+  would make the gate value-aware — the design 3a refused. `conftest._scrub_env`
+  covers the names so an exported `.env` cannot reach a test. *Rejected: key-pair
+  authentication (a private key file on disk named by a variable — the
+  path-valued secret refused); `make confirm rebuild TARGET=snowflake` (a
+  value-aware gate).*
+- **The demonstration is text: the count table, the idempotency line, the schema
+  name — no console screenshot.** A Snowflake console screenshot shows the
+  account locator in its address bar and the user in its corner; a terminal
+  screenshot adds nothing to the pasted table and is not diffable. The brief's
+  "screenshot" is met by 10a's committed DAG grid; this is the deviation, one
+  line here. The DuckDB count table for the same input sits beside the run's in
+  `pipeline/DEMONSTRATION.md`, table for table — the "both targets run green" of
+  brief §9, printed. The offline suite proves the seam's shape against a
+  hand-written fake connector (`tests/fake_snowflake.py`); the real driver is
+  never in CI, so the fake→real trust boundary is explicit: the run's counts and
+  schema name are recorded Documented-by-hand, and the five stack-risk unknowns
+  (the trial's login policy, `execute_string` transactions including the direct
+  `begin`/`commit`/`rollback` calls `build.py` issues, the catalog's own
+  spellings, `qmark` binding of a decimal/date/bool, and auto-suspend for
+  credits) are verified against the connector's official docs in the first hour.
+  *Rejected: a redacted console screenshot (a hand edit the reviewers cannot
+  verify); the count tables asserted byte-equal in a test (the cloud is never in
+  the suite).*
+
+**Gotchas (the developer's run fills these):** the connector or dialect
+surprises the first hour finds — the login policy the trial accepts, how
+`execute_string` handles the `begin`/`commit`/`rollback` calls, the catalog's
+`is_nullable`/`data_type` spellings, the `qmark` binding of the raw loaders'
+`select ?` — are recorded here alongside the run's count table and schema name,
+Documented-by-hand, when the developer runs the demonstration.

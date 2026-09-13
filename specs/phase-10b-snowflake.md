@@ -496,3 +496,33 @@ Agents are selected by diff surface (CLAUDE.md → "Which review agents run").
   environment as the demonstration sets `ROWS`. Nothing to build; one
   sentence in `dags/DEMONSTRATION.md` is not needed because the compose
   already documents the environment path.
+
+## Delivered (2026-09-13)
+
+The warehouse seam's second branch, wired and proved offline. Both engines
+return one connection shape (`execute`/`executemany`/`executescript`/`close`)
+and fold their driver's error into `warehouse.DriverError`; the Snowflake
+connector is an optional extra (`uv sync --extra snowflake`) imported lazily
+inside its branch, so the DuckDB path loads no cloud driver and a missing extra
+is one refusal line. The DuckDB-only no-pandas probe moved into the DuckDB
+`executemany`. Catalog reads became three seam functions
+(`tables`/`columns`/`table_exists`), case-folded, so `information_schema`,
+`current_schema` and the six `SNOWFLAKE_*` names live in the seam alone — two
+new layout guards in `tests/test_ingest_layout.py`, the class of BACKLOG row 33.
+`location_for` gives every (input, target) its own location and refuses a corpus
+input on the cloud target; `scratch` is a temp dir on DuckDB and a create/drop
+schema on Snowflake, `reset` stays the DuckDB file. `TARGET` threads by
+parameter through `classify_step`, `idempotency_check` and the Metabase export;
+`CLASSIFY_TARGETS` is gone and every CLI stage resolves against `WIRED`, closing
+BACKLOG row 50. Six credentials read by name in the seam, refused by name, never
+printed, scrubbed from the suite; credential-gated, not `confirm`-gated. The
+whole was proved against `tests/fake_snowflake.py` (a recording fake connector,
+no socket): the qmark cursor, `execute_string`, the error fold, the case-fold,
+`scratch`, the classify-path writes on the target, the credential and driver
+refusals, the corpus refusal on every path. The DuckDB path is byte-for-byte
+10a's — the study page unchanged, the counts unchanged, no extra installed, no
+socket. `pipeline/DEMONSTRATION.md` walks the developer's one cloud run; its
+Snowflake count table and schema name, and the connector/dialect Gotchas of the
+first hour, are recorded Documented-by-hand after the run (the fake→real trust
+boundary; done-when 6). Challenge round 1 approved with amendments (findings
+1/2/3/5/6 amended, 4 rejected); Phase 10 completes when this merges.

@@ -246,7 +246,7 @@ the gate, 0b writes the contracts the gate then verifies.
 | **7 — Findings marts + open data** | Theme share by month / segment, peer comparison, trend; Open DAMIR slice fetched and cached (large files — slice, never commit); fitted cost distributions with the fit shown. | `make check-backing` shows every Beat 1–2 row populated | code-reviewer, functionality-tester |
 | **8 — Cost model + simulator** | §7 formulas as `FORMULAS`; sourced defaults cited in code and BACKING; SLA-timer sim; computed threshold. | `make model` (formulas vs pins) | code-reviewer, functionality-tester |
 | **9 — The study** | Metabase (Docker) dashboards via an idempotent API script, drill-throughs; `make study` HTML export; README in the two-layer voice. | `make study` check mode byte-identical; stranger test recorded | study-editor, coherence-auditor |
-| **10 — Airflow + Snowflake demo** (built as 10a the DAG + 10b Snowflake, the ≤ 6 rule — DECISIONS → Phase 10a) | One-screen DAG of five `make` tasks; `TARGET=snowflake` run once; DuckDB path still green. | `make rebuild TARGET=duckdb` green after the Snowflake run | + security-reviewer (credentials) |
+| **10 — Airflow + Snowflake demo** (built as 10a the DAG + 10b Snowflake, the ≤ 6 rule — DECISIONS → Phase 10a/10b; **10a delivered PR #39, 10b delivered**) | One-screen DAG of five `make` tasks; `TARGET=snowflake` run once; DuckDB path still green. | `make rebuild TARGET=duckdb` green after the Snowflake run | + security-reviewer (credentials) |
 
 Checkpoints where stopping still leaves a coherent project: after 4 (a public
 time series accruing), after 6 (a gated classifier), after 8 (a recomputable
