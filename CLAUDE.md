@@ -145,7 +145,14 @@ cannot say:
 - `review-gate [SPEC=specs/<f>.md] [BASE=main]` runs test + ruff read-only +
   `check-docs` + `check-backing` + fixtures + `check-pins` (every public
   function or class added or changed since BASE is named in a test); one line
-  per check, exit 1 on FAIL, 2 on a refused SPEC/BASE.
+  per check, exit 1 on FAIL, 2 on a refused SPEC/BASE or a `phase-` branch
+  whose spec is absent or whose name does not match the phase-branch pattern. With no `SPEC=` a phase
+  branch's own spec (`specs/<branch>.md`) is read for the fixtures check's
+  `Freeze:` grants only, so that verdict does not depend on whether `SPEC=`
+  was typed; evidence and records run only with `SPEC=` (`/phase-start` runs
+  the no-SPEC form on a branch whose only commit is the spec, where both are
+  red by construction). Any other branch keeps fixtures read-only. Both
+  summary lines count checks passed over checks run.
 - `model`, `simulate` and `study` take no variable and print or render
   byte-identical output on a rerun; CI diffs the committed study page.
   `fit-damir` and `split-ameli` take no variable and rewrite their tracked
@@ -589,21 +596,23 @@ and remove it). Findings are fixed in the main session or explicitly accepted
 ## Current status
 
 **Merged:** Phases 0a–9i, each with its spec under `specs/` (the Delivered
-paragraph) and its DECISIONS appendix; the last were 9i, the extra-billing
+paragraph) and its DECISIONS appendix; the last was 9i, the extra-billing
 share from data.ameli's `honoraires` table as one sourced B3.3 row (PR #34,
-2026-09-12), and `fix/idempotency-classify` (PR #35, 2026-09-12: the classify
-step's code moved to `pipeline/build.py::classify_step` and run inside
-`idempotency-check`, so the six classify-path tables are in its diff). Phase 9
-is complete. Off main since: `tooling/skill-sentences` (PR #36, 2026-09-12:
-the two skill sentences of the Phase 9i exit audit — DECISIONS → Tooling).
+2026-09-12). Phase 9 is complete. Off main since, all 2026-09-12:
+`fix/idempotency-classify` (PR #35: the classify step's code moved to
+`pipeline/build.py::classify_step` and run inside `idempotency-check`, so the
+six classify-path tables are in its diff), `tooling/skill-sentences` (PR #36:
+the two skill sentences of the Phase 9i exit audit — DECISIONS → Tooling),
+`fix/csv-reader-boundary` (PR #37: every `csv` reader folds `csv.Error` into
+the refusal it declares and the two DAMIR CLI read paths catch it —
+DECISIONS → Fix; BACKLOG row closed, one opened for the code-craft clause).
 
-**In progress:** two small PRs off main before Phase 10, one at a time:
-`fix/csv-reader-boundary` (this branch: every `csv` reader folds `csv.Error`
-into the refusal it declares and the two DAMIR CLI read paths catch it —
-DECISIONS → Fix, 2026-09-12; BACKLOG row closed, one opened for the code-craft
-clause), then `fix/` for the
-no-`SPEC=` review gate (BACKLOG "`make review-gate` without `SPEC=` is red on
-a phase branch…").
+**In progress:** `fix/review-gate-no-spec` (this branch), the last small PR
+off main before Phase 10: the no-`SPEC=` review gate (BACKLOG "`make
+review-gate` without `SPEC=` is red on a phase branch…") — the no-SPEC form
+reads a phase branch's own spec for the fixtures check, keeps fixtures
+read-only on any other branch, and both summary lines count checks passed
+over checks run.
 
 **Next:** Phase 10 (the Airflow DAG). Its spec decides how the publish task
 calls `python -m study.metabase export|apply`, which are not `make` targets
@@ -611,6 +620,6 @@ calls `python -m study.metabase export|apply`, which are not `make` targets
 `TARGET`-awareness for Snowflake (BACKLOG "The classify-step mart writes are
 not warehouse-aware") as its own Done-when item with an invariant.
 
-Open BACKLOG rows: **38**.
+Open BACKLOG rows: **37**.
 
 (Update this section at the end of every working day.)

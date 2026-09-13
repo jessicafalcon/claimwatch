@@ -3418,3 +3418,96 @@ wrapped its read in no `try` at all.
   *Rejected: widening the wall's token set with an exception for the error
   type (a denylist edit for one case); catching `Exception` at the CLI (the
   traceback-at-boundary class's opposite failure, a swallowed refusal).*
+
+### Fix — the review gate reads the phase branch's own spec (2026-09-12, branch `fix/review-gate-no-spec`)
+
+Not a phase (no spec; a fix PR from `main`, CLAUDE.md → Git workflow; the
+BACKLOG row "`make review-gate` without `SPEC=` is red on a phase branch…",
+opened by Phase 3a's functionality-tester and triggered at Phase 9i's exit,
+whose first freeze of `fixtures/ameli/` turned the no-SPEC form red on the
+branch). The fix restores this invariant: **the fixtures verdict on a range
+does not depend on whether `SPEC=` was typed — with no `SPEC=` a phase
+branch's own spec is read for the fixtures check's `Freeze:` grants; the
+spec's two own checks (evidence, records) run only when `SPEC=` names it; a
+branch with no phase spec keeps fixtures read-only; and both summary lines
+count the same thing.**
+
+- **The no-SPEC form derives the spec from the branch: `phase-<slug>` →
+  `specs/phase-<slug>.md`, and reads it for the fixtures check only.** The
+  branch name is `git rev-parse --abbrev-ref HEAD` through the shared `run`
+  boundary, parsed to one closed shape (`\Aphase-[0-9]+[a-z]?-[a-z0-9-]+\Z`,
+  which every phase branch since 0a matches); a name that does not start
+  `phase-` — `fix/`, `tooling/`, `docs/`, `main`, a detached `HEAD` — is no
+  spec, and the SKIP line names the branch; a `phase-` name that does not
+  match the pattern is refused by name, never run as "no spec" with a green SKIP line. The derived
+  path goes through `resolve_spec`, the typed form's guard (a file under
+  `specs/`, symlinks resolved), so the two forms cannot read different things.
+  *Rejected: skipping the fixture check with no SPEC (loses the read-only
+  guard on fix branches, where a fixture change has no `Freeze:` line to
+  license it); reading every spec's `Freeze:` lines (a stale grant in an old
+  spec would re-license its fixture forever); running evidence and records
+  from the derived spec too, the round-0 design — see the round-1 bullet.*
+- **A phase branch whose spec file is absent is refused, exit 2, naming the
+  branch and the path; a failed git call, or an exit-0 call that printed no
+  name, is refused naming git's last line.** The first commit on a phase
+  branch is its spec, so a phase branch with none is a workflow error, not a
+  branch with no spec; an empty name read as "no spec" would be the
+  `empty-default` class. `resolve_inputs` is the one seam: a typed SPEC is
+  resolved as given and the branch is never consulted.
+- **Both summary lines print `<passed>/<total> checks passed`.** The FAIL line
+  counted failures and the OK line counted passes, so `2/8` and `8/8` read as
+  the same kind of number and were not. The OK line was pinned and the FAIL
+  line never was — the `unpinned` class; LESSONS extended.
+- **Review round 1 (2026-09-12): eleven findings across four agents, one
+  BLOCKER, disposition "fix all".** The round-0 design ran evidence and
+  records from the derived spec too, so the two forms printed the same eight
+  lines; the code-reviewer and the tester (in a worktree: a fresh
+  `phase-99-probe` branch whose only commit is its spec printed `FAIL
+  evidence`, `FAIL records` and `5/8` — the third red line was `test`, the
+  probe's own artifact: this branch's scripts against main's old summary
+  test) showed that `/phase-start` step 6 runs the
+  no-SPEC form on exactly that branch and reads it as "the branch starts
+  green" — both checks are red there by construction, the spec naming tests
+  not yet written and records not yet touched. `6c295bf` narrows the no-SPEC
+  form to the fixtures check, the BACKLOG row's own ask, with no skill edit
+  (a skill edit rides a `tooling/` branch). *Rejected: a `tooling/` PR
+  changing step 6 to expect evidence and records red at phase start (makes
+  the inherited baseline unreadable: red-by-construction lines beside a real
+  red).* The other correctness commits, one each, numbered by the round's
+  consolidated table: `57b04a5` (#2, a `phase-` name that does not match the
+  pattern refused), `259b997` (#3, the git refusal one line), `f7cc163` (#4,
+  the derived path through `resolve_spec`: a tracked symlink out of `specs/`
+  was followed on one form and refused on the other), `09ab3df` (#5, an
+  empty name refused). Records: the LESSONS `unpinned` row carries the
+  summary-line miscount (#7); the status block says the delivered mechanism
+  (#8). The gate's own pins line then caught the extracted `skip_line`
+  helper unnamed in a test (`bdaa654`).
+- **Review round 2 (2026-09-12): nine findings, none correctness, disposition
+  "fix all" but one.** The tester reran the fresh-branch probe with this
+  branch's test file copied too: the no-SPEC form prints the SKIP line naming
+  the spec and `6/6`, `6/8` with `SPEC=`; the symlink, bad-pattern and
+  empty-name paths each refuse in one line before any check; four mutations
+  each caught by a named test. The craft commit: `resolve_inputs` returns an
+  `Inputs` record whose `typed` flag is the one switch for the spec's two
+  checks (#2); a derived spec that is not UTF-8 is refused naming its branch,
+  not `SPEC` (#1, missed in round 1 — a pre-existing line the derived read
+  made reachable; a wording class, not a wrong output: the refusal fired, one
+  line, exit 2, and only its label named the wrong origin, so no LESSONS row); the fixtures verdict is pinned both ways over one spec
+  text (#3, the invariant's own pin); `branch_name`'s happy path and the
+  bad-pattern exit through `main` are pinned (#4, #5); the summary test is
+  split (#6). Records: this bullet's numbering and the probe's third red
+  line (#7); "off the shape" said literally (#8). *Accepted as-is (#9): git's
+  last stderr line may carry a local path in a worktree error — no
+  credential or personal-data class, the reviewer's own recommendation.*
+- **Review round 3 (2026-09-12, scoped to the round-2 commits): seven
+  findings, none correctness, disposition "fix all".** `Inputs.typed` is a
+  property of `branch` (derived is never empty, typed always is), so an
+  inconsistent record cannot be built (#1); the read refusal joins the origin
+  and the reader's line with a comma, the path once (#2); the docstring says
+  "does not match the phase-branch pattern", the test names keep "off the
+  shape" because the records cite them (#3); one stdout runner in the tests
+  (#4); round 2's #1 is classed as wording above (#5); the spec's two checks
+  moved to `spec_checks` behind an explicit refusal, so the never-a-traceback
+  contract no longer rides on an `assert` stripped under `-O` (#6, the
+  security reviewer's note). The review cap did not apply: rounds 2 and 3
+  reported no correctness finding.

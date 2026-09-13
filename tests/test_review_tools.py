@@ -419,13 +419,14 @@ def test_cli_refusals_are_one_line_exit_2(argv: list[str]):
     assert "Traceback" not in res.stderr
 
 
-def test_gate_prints_one_line_per_check_and_the_total(monkeypatch, tmp_path: Path):
-    """Evidence row 1: the printed shape — `ok   <check>` per check and
-    `review-gate OK: 8/8 checks` with a SPEC, `6/6` without — pinned with every
-    subprocess stubbed green (the real gate runs `make test`, which is this suite)."""
+def _green_gate(monkeypatch, tmp_path: Path) -> Path:
+    """`review_gate.main` with every subprocess stubbed green (the real gate
+    runs `make test`, which is this suite), a spec `specs/s.md`, a phase spec
+    `specs/phase-0a-x.md` with the same text, and the branch `fix/x`."""
     spec = tmp_path / "specs" / "s.md"
     spec.parent.mkdir()
     spec.write_text(_spec("| 1 | `tests/test_a.py::test_x` |"))
+    (tmp_path / "specs" / "phase-0a-x.md").write_text(spec.read_text())
     monkeypatch.setattr(review_gate, "ROOT", tmp_path)
     monkeypatch.setattr(review_gate, "run", lambda cmd, cwd: (0, ""))
     monkeypatch.setattr(review_gate, "make_targets", lambda root: (set(), None))
@@ -435,15 +436,27 @@ def test_gate_prints_one_line_per_check_and_the_total(monkeypatch, tmp_path: Pat
         "collected_tests",
         lambda root: (0, {"tests/test_a.py::test_x"}, ""),
     )
-    monkeypatch.setattr(review_gate, "resolve_spec", lambda arg, root=None: spec)
+    monkeypatch.setattr(review_gate, "branch_name", lambda root: "fix/x")
+    return spec
+
+
+def _main_lines(argv: list[str], code: int) -> list[str]:
     import io
     from contextlib import redirect_stdout
 
     buf = io.StringIO()
     with redirect_stdout(buf):
-        assert review_gate.main(["--spec=specs/s.md"]) == 0
-    lines = buf.getvalue().splitlines()
-    assert lines == [
+        assert review_gate.main(argv) == code
+    return buf.getvalue().splitlines()
+
+
+def test_gate_prints_one_line_per_check_and_the_total(monkeypatch, tmp_path: Path):
+    """Evidence row 1: the printed shape — `ok   <check>` per check and
+    `review-gate OK: 8/8 checks passed` with a SPEC, `6/6` without: on a branch
+    with no phase spec, and on a phase branch, whose own spec is read for the
+    fixtures check only (the SKIP line names it)."""
+    _green_gate(monkeypatch, tmp_path)
+    assert _main_lines(["--spec=specs/s.md"], 0) == [
         "ok   test",
         "ok   lint",
         "ok   docs",
@@ -452,32 +465,221 @@ def test_gate_prints_one_line_per_check_and_the_total(monkeypatch, tmp_path: Pat
         "ok   pins",
         "ok   evidence",
         "ok   records",
-        "review-gate OK: 8/8 checks",
+        "review-gate OK: 8/8 checks passed",
     ]
-    buf = io.StringIO()
-    with redirect_stdout(buf):
-        assert review_gate.main([]) == 0
-    assert buf.getvalue().splitlines() == [
-        "SKIP evidence, records (no SPEC)",
+    six_green = [
         "ok   test",
         "ok   lint",
         "ok   docs",
         "ok   backing",
         "ok   fixtures",
         "ok   pins",
-        "review-gate OK: 6/6 checks",
+        "review-gate OK: 6/6 checks passed",
     ]
-    # a Makefile that did not read is the evidence check's one line, never
-    # "not in the Makefile" for every target the spec names (empty-default)
+    assert _main_lines([], 0) == [
+        "SKIP evidence, records (no SPEC; branch fix/x has no phase spec)",
+        *six_green,
+    ]
+    # a phase branch: its spec is read, the two spec checks still wait for SPEC=
+    monkeypatch.setattr(review_gate, "branch_name", lambda root: "phase-0a-x")
+    assert _main_lines([], 0) == [
+        "SKIP evidence, records (no SPEC; Freeze: read from specs/phase-0a-x.md)",
+        *six_green,
+    ]
+
+
+def test_the_fail_summary_counts_checks_passed(monkeypatch, tmp_path: Path):
+    """Both summary lines count checks passed over checks run; and a Makefile
+    that did not read is the evidence check's one line, never "not in the
+    Makefile" for every target the spec names (empty-default)."""
+    _green_gate(monkeypatch, tmp_path)
     monkeypatch.setattr(
         review_gate, "make_targets", lambda root: (set(), "Makefile: not UTF-8 text")
     )
-    buf = io.StringIO()
-    with redirect_stdout(buf):
-        assert review_gate.main(["--spec=specs/s.md"]) == 1
-    assert (
-        "FAIL evidence\n     Makefile: not UTF-8 text\nok   records\n" in buf.getvalue()
+    lines = _main_lines(["--spec=specs/s.md"], 1)
+    assert lines[6:9] == [
+        "FAIL evidence",
+        "     Makefile: not UTF-8 text",
+        "ok   records",
+    ]
+    assert lines[-1] == "review-gate FAILED: 7/8 checks passed"
+    # the two spec checks are one unit main runs only for a typed SPEC
+    assert [r[:2] for r in review_gate.spec_checks(_spec("| 1 | x |"), set())] == [
+        ("evidence", False),
+        ("records", True),
+    ]
+
+
+def test_the_fixtures_verdict_does_not_depend_on_whether_spec_was_typed(
+    monkeypatch, tmp_path: Path
+):
+    """The BACKLOG row's failure: a fixture in the diff that the branch spec's
+    `Freeze:` line covers is green whether SPEC= was typed or not, and red
+    both ways when no line covers it — the same `check_fixtures` over the same
+    spec text on both forms."""
+    _green_gate(monkeypatch, tmp_path)
+    diff = "fixtures/ameli/x.csv\0fixtures/ameli/MANIFEST.sha256\0"
+    monkeypatch.setattr(review_gate, "run", lambda cmd, cwd: (0, diff))
+    monkeypatch.setattr(review_gate, "branch_name", lambda root: "phase-0a-x")
+    spec = tmp_path / "specs" / "phase-0a-x.md"
+    assert "FAIL fixtures" in _main_lines([], 1)
+    assert "FAIL fixtures" in _main_lines(["--spec=specs/phase-0a-x.md"], 1)
+    spec.write_text("Freeze: fixtures/ameli/\n" + spec.read_text())
+    assert "ok   fixtures" in _main_lines([], 0)
+    assert "ok   fixtures" in _main_lines(["--spec=specs/phase-0a-x.md"], 0)
+
+
+def test_a_derived_spec_that_does_not_read_is_refused_naming_the_branch(
+    monkeypatch, tmp_path: Path, capsys
+):
+    """A spec that is not UTF-8 is one refusal, exit 2, naming where the spec
+    came from: `SPEC` when typed, the branch when derived — a developer who
+    typed no SPEC= is not sent looking for one."""
+    _green_gate(monkeypatch, tmp_path)
+    (tmp_path / "specs" / "phase-0a-x.md").write_bytes(b"\xff\xfe not text")
+    monkeypatch.setattr(review_gate, "branch_name", lambda root: "phase-0a-x")
+    with pytest.raises(SystemExit) as exc:
+        review_gate.main([])
+    assert exc.value.code == 2
+    err = capsys.readouterr().err.strip()
+    assert err.startswith(
+        "refusing: the spec of branch phase-0a-x, specs/phase-0a-x.md: "
     )
+    assert len(err.splitlines()) == 1
+    with pytest.raises(SystemExit):
+        review_gate.main(["--spec=specs/phase-0a-x.md"])
+    assert capsys.readouterr().err.startswith("refusing: SPEC ")
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["fix/x", "tooling/skill-sentences", "main", "HEAD", "-phase-3a-x", "PHASE-3A-X"],
+)
+def test_a_branch_off_the_phase_shape_has_no_spec(root: Path, name: str):
+    """The no-SPEC form derives a spec from one closed branch shape
+    (`phase-<n><letter?>-<slug>`); a name that does not start `phase-` — a fix
+    branch, main, a detached HEAD, a leading dash, a case variant — is no spec,
+    so fixtures stay read-only there and nothing is read from a derived path."""
+    (root / "specs" / "phase-3a-snapshots.md").write_text("# spec\n")
+    assert review_gate.spec_for_branch(name, root) is None
+    assert review_gate.spec_for_branch("phase-3a-snapshots", root) == (
+        root / "specs" / "phase-3a-snapshots.md"
+    )
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "phase-3a-snapshots/extra",
+        "phase-3a snapshots",
+        "phase-3a-../ok",
+        "phase-x-y",
+        "phase-",
+        "phase-3a-",
+    ],
+)
+def test_a_phase_prefixed_name_off_the_shape_is_refused(root: Path, name: str):
+    """A `phase-` name the shape does not match — a trailing segment, a space,
+    a traversal, no number — is refused by name, never run as "no spec" with a
+    green SKIP line: `/review-round` would ask for SPEC= on the same branch."""
+    with pytest.raises(Refused, match=r"starts phase- but is not"):
+        review_gate.spec_for_branch(name, root)
+
+
+def test_a_phase_branch_without_its_spec_is_refused(root: Path, capsys, monkeypatch):
+    """A phase branch's first commit is its spec, so a phase branch with no
+    `specs/<branch>.md` is a refusal naming the branch and the path — exit 2,
+    one line, never a silent run with no spec; a git call that fails is the
+    same refusal naming git's line, never an empty name read as no spec."""
+    with pytest.raises(Refused, match=r"phase-0b-contracts names specs/phase-0b"):
+        review_gate.spec_for_branch("phase-0b-contracts", root)
+    # the derived path gets the typed form's containment: a symlink out of
+    # specs/ is refused on both forms, never read on one and refused on the other
+    (root / "specs" / "phase-0c-link.md").symlink_to(root / "outside.md")
+    with pytest.raises(Refused, match=r"phase-0c-link names .*must be a path under"):
+        review_gate.spec_for_branch("phase-0c-link", root)
+    with pytest.raises(Refused, match=r"cannot read the branch: fatal: not a git"):
+        review_gate.branch_name(root)  # tmp_path is no git repository
+    monkeypatch.setattr(review_gate, "run", lambda cmd, cwd: (128, "a\nb\nfatal: c"))
+    with pytest.raises(
+        Refused, match=r"\Arefusing: cannot read the branch: fatal: c\Z"
+    ):
+        review_gate.branch_name(root)  # a Refused is one line: git's last one
+    monkeypatch.setattr(review_gate, "run", lambda cmd, cwd: (0, " \n"))
+    with pytest.raises(Refused, match=r"git printed an empty name"):
+        review_gate.branch_name(root)  # exit 0 and no name is not "no spec"
+    monkeypatch.setattr(review_gate, "ROOT", root)
+    for name in ("phase-0b-contracts", "phase-x-y"):  # absent spec; off the pattern
+        monkeypatch.setattr(review_gate, "branch_name", lambda root, n=name: n)
+        with pytest.raises(SystemExit) as exc:
+            review_gate.main([])
+        assert exc.value.code == 2
+        out, err = capsys.readouterr()
+        assert out == ""
+        assert len(err.strip().splitlines()) == 1
+        assert name in err
+
+
+def test_branch_name_is_gits_stripped_answer(root: Path, monkeypatch):
+    monkeypatch.setattr(review_gate, "run", lambda cmd, cwd: (0, "phase-3a-x\n"))
+    assert review_gate.branch_name(root) == "phase-3a-x"
+
+
+def test_the_no_spec_form_reads_the_branch_spec_for_the_fixtures_check_only(
+    root: Path, monkeypatch
+):
+    """On a phase branch with no SPEC the fixtures check sees the spec's text
+    (its `Freeze:` grants license a re-frozen fixture, the BACKLOG row's
+    failure), and evidence/records are not run — `/phase-start` runs this form
+    on a branch whose only commit is the spec, where both are red by
+    construction."""
+    spec = root / "specs" / "phase-0a-x.md"
+    spec.write_text("Freeze: fixtures/ameli/\n")
+    seen: list[str | None] = []
+
+    def range_checks(spec_text: str | None, base: str):
+        seen.append(spec_text)
+        return [("fixtures", True, ""), ("pins", True, "")], set()
+
+    monkeypatch.setattr(review_gate, "ROOT", root)
+    monkeypatch.setattr(review_gate, "run", lambda cmd, cwd: (0, ""))
+    monkeypatch.setattr(review_gate, "range_checks", range_checks)
+    monkeypatch.setattr(review_gate, "branch_name", lambda root: "phase-0a-x")
+    monkeypatch.setattr(
+        review_gate,
+        "collected_tests",
+        lambda root: (_ for _ in ()).throw(AssertionError),
+    )
+    lines = _main_lines([], 0)
+    assert seen == ["Freeze: fixtures/ameli/\n"]
+    assert lines[0] == review_gate.skip_line(spec, "phase-0a-x")
+    assert review_gate.skip_line(spec, "phase-0a-x") == (
+        "SKIP evidence, records (no SPEC; Freeze: read from specs/phase-0a-x.md)"
+    )
+    assert review_gate.skip_line(None, "fix/x") == (
+        "SKIP evidence, records (no SPEC; branch fix/x has no phase spec)"
+    )
+
+
+def test_resolve_inputs_reads_the_branch_only_without_a_spec(root: Path, monkeypatch):
+    """A typed SPEC is resolved as given and the branch is never consulted; an
+    absent one goes through the branch — one seam, so the two forms cannot read
+    different specs for the same range."""
+    monkeypatch.setattr(review_gate, "ROOT", root)
+    monkeypatch.setattr(review_gate, "resolve_spec", lambda arg, root: root / arg)
+    monkeypatch.setattr(
+        review_gate, "branch_name", lambda root: (_ for _ in ()).throw(AssertionError)
+    )
+    typed = review_gate.resolve_inputs("specs/ok.md", "main")
+    assert typed == review_gate.Inputs(root / "specs/ok.md", "", "main")
+    assert typed.typed and typed.read_refusal("x: no") == "refusing: SPEC x: no"
+    monkeypatch.setattr(review_gate, "branch_name", lambda root: "fix/y")
+    derived = review_gate.resolve_inputs("", "main")
+    assert derived == review_gate.Inputs(None, "fix/y", "main")
+    assert not derived.typed
+    assert derived.read_refusal("x: no") == "refusing: the spec of branch fix/y, x: no"
+    with pytest.raises(Refused):
+        review_gate.resolve_inputs("", "-x")
 
 
 def test_range_checks_report_a_failed_diff_as_one_fail_and_no_paths(monkeypatch):

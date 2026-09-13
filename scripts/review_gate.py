@@ -1,8 +1,16 @@
 #!/usr/bin/env python3
 """The offline review gate. One process, one line per check, exit 1 on any
-FAIL, 2 on a refused SPEC/BASE, never a traceback. Run via
-`make review-gate [SPEC=specs/<file>.md] [BASE=main]` — the first thing
-`/review-round N` does, before any agent is spawned.
+FAIL, 2 on a refused SPEC/BASE or a phase branch whose spec is absent, never
+a traceback. Run via `make review-gate [SPEC=specs/<file>.md] [BASE=main]` —
+the first thing `/review-round N` does, before any agent is spawned. With no
+SPEC a phase branch's own spec (`phase-<slug>` → `specs/phase-<slug>.md`) is
+read for the fixtures check's `Freeze:` grants only, so the fixtures verdict
+does not depend on whether SPEC was typed; the spec's two own checks
+(evidence, records) run only when SPEC names it — they are red by
+construction on a phase branch whose only commit is the spec, which is where
+`/phase-start` runs the no-SPEC form and expects green. A branch with no
+phase spec (`fix/`, `tooling/`, `docs/`, `main`, a detached HEAD) keeps
+fixtures read-only.
 
   a. test      — `make test` (last 20 lines on red)
   b. lint      — `ruff check` + `ruff format --check` (read-only; never
@@ -13,8 +21,9 @@ FAIL, 2 on a refused SPEC/BASE, never a traceback. Run via
                  unless a `Freeze:` line in the spec covers it exactly:
                  `Freeze: fixtures/<name>/` covers that directory and requires
                  its MANIFEST.sha256 in the diff; `Freeze: fixtures/<path>`
-                 covers that one file. With no --spec any fixture change is a
-                 FAIL (read-only after the phase that froze them)
+                 covers that one file. With no spec (a branch that is not a
+                 phase) any fixture change is a FAIL (read-only after the
+                 phase that froze them)
   e2. pins     — `scripts/check_pins.py` over the same range: every public
                  def added or changed under a code package is named in a
                  test (a new one, in a test file the range changed); a new
@@ -28,6 +37,8 @@ FAIL, 2 on a refused SPEC/BASE, never a traceback. Run via
                  spec's Record updates section is in the diff (FAIL); every
                  record file in the diff NOT on the list is a WARN
 
+The summary line counts checks passed over checks run on both exits.
+
 Nothing here edits, commits or fixes. Not a pytest file (the run-tests hook)."""
 
 from __future__ import annotations
@@ -35,6 +46,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -53,6 +65,7 @@ from review_common import (
     resolve_spec,
     run,
     section,
+    shown,
     tail,
 )
 
@@ -62,6 +75,9 @@ _TICKED = re.compile(r"`([^`\s]+)`")
 # `Freeze: fixtures/<name>/` (a directory) or `Freeze: fixtures/<path>` (one file)
 _FREEZE = re.compile(r"^Freeze: (fixtures/[\w.-]+(?:/[\w.-]+)*/?)\s*$", re.M)
 MANIFEST = "MANIFEST.sha256"
+# A phase branch as the repo names them (`phase-3a-snapshots`): the one shape
+# whose spec the no-SPEC form derives; anything else has no phase spec.
+_PHASE_BRANCH = re.compile(r"\Aphase-[0-9]+[a-z]?-[a-z0-9-]+\Z")
 RECORD_FILES = LIVING_DOCS + RECORD_DOCS + ("PROJECT_BRIEF.md",)
 
 
@@ -192,6 +208,102 @@ def check_fixtures(spec_text: str | None, diff: set[str]) -> list[str]:
     return errors
 
 
+def branch_name(root: Path) -> str:
+    """The checked-out branch (`HEAD` when detached); a failed git call is a
+    refusal naming the cause, never an empty name read as "no spec"."""
+    code, out = run(["git", "rev-parse", "--abbrev-ref", "HEAD"], root)
+    if code != 0:
+        raise Refused(f"refusing: cannot read the branch: {tail(out, 1)}")
+    name = out.strip()
+    if not name:
+        raise Refused("refusing: cannot read the branch: git printed an empty name")
+    return name
+
+
+def spec_for_branch(name: str, root: Path) -> Path | None:
+    """`specs/<name>.md` for a phase branch; None for any other branch. A phase
+    branch whose spec is absent is refused — its first commit is the spec — and
+    so is a `phase-` name that does not match the phase-branch pattern, never
+    read as "no spec" and run green."""
+    if not _PHASE_BRANCH.match(name):
+        if name.startswith("phase-"):
+            raise Refused(
+                f"refusing: branch {name} starts phase- but is not"
+                " phase-<n><letter?>-<slug> (pass SPEC=specs/<file>.md)"
+            )
+        return None
+    rel = f"specs/{name}.md"
+    try:
+        return resolve_spec(rel, root)  # the typed form's guard: a file under specs/
+    except Refused as exc:
+        why = str(exc).removeprefix("refusing: ")
+        raise Refused(f"refusing: branch {name} names {rel}: {why}") from None
+
+
+@dataclass(frozen=True)
+class Inputs:
+    """What the CLI resolved to. `branch` is set only when the spec was derived
+    from it, so `typed` — SPEC named on the command line — is the one switch
+    for the spec's own two checks; a derived spec feeds the fixtures check only."""
+
+    spec: Path | None
+    branch: str
+    base: str
+
+    @property
+    def typed(self) -> bool:
+        return not self.branch
+
+    def read_refusal(self, err: str) -> str:
+        """The one line for a spec that did not read, naming where it came
+        from: the typed SPEC, or the branch whose own spec it is."""
+        if self.typed:
+            return f"refusing: SPEC {err}"
+        return f"refusing: the spec of branch {self.branch}, {err}"
+
+
+def resolve_inputs(spec_arg: str, base_arg: str) -> Inputs:
+    """A typed SPEC is resolved as given and the branch is never consulted; an
+    absent one is the branch's own spec; raises Refused, never a traceback."""
+    base = resolve_base(base_arg)
+    if spec_arg:
+        return Inputs(resolve_spec(spec_arg, ROOT), "", base)
+    branch = branch_name(ROOT)
+    return Inputs(spec_for_branch(branch, ROOT), branch, base)
+
+
+def skip_line(spec: Path | None, branch: str) -> str:
+    """The one line the no-SPEC form prints for the two checks it does not run,
+    naming the spec whose `Freeze:` grants the fixtures check read, or the
+    branch that has none."""
+    if spec is not None:
+        return (
+            f"SKIP evidence, records (no SPEC; Freeze: read from {shown(spec, ROOT)})"
+        )
+    return f"SKIP evidence, records (no SPEC; branch {branch} has no phase spec)"
+
+
+def spec_checks(spec_text: str, diff: set[str]) -> list[tuple[str, bool, str]]:
+    """The spec's two own checks, evidence and records — run only for a typed
+    SPEC: on a phase branch whose only commit is the spec both are red by
+    construction, and that is where `/phase-start` runs the no-SPEC form."""
+    results: list[tuple[str, bool, str]] = []
+    code, ids, out = collected_tests(ROOT)
+    if code != 0:
+        results.append(
+            ("evidence", False, "pytest --collect-only failed:\n" + tail(out))
+        )
+    else:
+        declared, err = make_targets(ROOT)
+        errs = [err] if err else check_evidence(spec_text, ids, declared)
+        results.append(("evidence", not errs, "\n".join(errs)))
+    fails, warns = check_records(spec_text, diff)
+    results.append(
+        ("records", not fails, "\n".join(fails + [f"WARN {w}" for w in warns]))
+    )
+    return results
+
+
 def collected_tests(root: Path) -> tuple[int, set[str], str]:
     """(exit code, collected ids, output). A non-zero code means the suite did
     not collect — the caller FAILs evidence explicitly, never via an empty set."""
@@ -234,15 +346,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--base", default="main")
     args = ap.parse_args(argv)
     try:
-        spec = resolve_spec(args.spec) if args.spec else None
-        base = resolve_base(args.base)
+        inputs = resolve_inputs(args.spec, args.base)
     except Refused as exc:
         die(exc)
     spec_text: str | None = None
-    if spec:
-        spec_text, err = read_text_or_error(spec, ROOT)
+    if inputs.spec:
+        spec_text, err = read_text_or_error(inputs.spec, ROOT)
         if spec_text is None:
-            die(Refused(f"refusing: SPEC {err}"))
+            die(Refused(inputs.read_refusal(err)))
 
     results: list[tuple[str, bool, str]] = []
 
@@ -259,25 +370,15 @@ def main(argv: list[str] | None = None) -> int:
     code, out = run(["make", "check-backing"], ROOT)
     results.append(("backing", code == 0, tail(out)))
 
-    range_results, diff = range_checks(spec_text, base)
+    range_results, diff = range_checks(spec_text, inputs.base)
     results.extend(range_results)
 
-    if spec_text is not None:
-        code, ids, out = collected_tests(ROOT)
-        if code != 0:
-            results.append(
-                ("evidence", False, "pytest --collect-only failed:\n" + tail(out))
-            )
-        else:
-            declared, err = make_targets(ROOT)
-            errs = [err] if err else check_evidence(spec_text, ids, declared)
-            results.append(("evidence", not errs, "\n".join(errs)))
-        fails, warns = check_records(spec_text, diff)
-        results.append(
-            ("records", not fails, "\n".join(fails + [f"WARN {w}" for w in warns]))
-        )
+    if inputs.typed:
+        if spec_text is None:  # a typed SPEC that did not read died above
+            die(Refused(inputs.read_refusal("could not be read")))
+        results.extend(spec_checks(spec_text, diff))
     else:
-        print("SKIP evidence, records (no SPEC)")
+        print(skip_line(inputs.spec, inputs.branch))
 
     failed = 0
     for name, ok, detail in results:
@@ -288,9 +389,9 @@ def main(argv: list[str] | None = None) -> int:
         failed += not ok
     total = len(results)
     if failed:
-        print(f"review-gate FAILED: {failed}/{total} checks")
+        print(f"review-gate FAILED: {total - failed}/{total} checks passed")
         return 1
-    print(f"review-gate OK: {total}/{total} checks")
+    print(f"review-gate OK: {total}/{total} checks passed")
     return 0
 
 
