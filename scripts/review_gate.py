@@ -46,6 +46,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -238,14 +239,30 @@ def spec_for_branch(name: str, root: Path) -> Path | None:
         raise Refused(f"refusing: branch {name} names {rel}: {why}") from None
 
 
-def resolve_inputs(spec_arg: str, base_arg: str) -> tuple[Path | None, str, str]:
-    """(spec, branch, base) from the CLI: a typed SPEC is resolved as given, an
+@dataclass(frozen=True)
+class Inputs:
+    """What the CLI resolved to. `typed` is the one switch for the spec's own
+    two checks: SPEC named on the command line runs them, a derived spec
+    (`branch` set) feeds the fixtures check only."""
+
+    spec: Path | None
+    branch: str
+    base: str
+    typed: bool
+
+    def spec_origin(self) -> str:
+        """How a refusal names the spec: the typed SPEC, or the branch's own."""
+        return "SPEC" if self.typed else f"the spec of branch {self.branch}"
+
+
+def resolve_inputs(spec_arg: str, base_arg: str) -> Inputs:
+    """A typed SPEC is resolved as given and the branch is never consulted; an
     absent one is the branch's own spec; raises Refused, never a traceback."""
     base = resolve_base(base_arg)
     if spec_arg:
-        return resolve_spec(spec_arg, ROOT), "", base
+        return Inputs(resolve_spec(spec_arg, ROOT), "", base, typed=True)
     branch = branch_name(ROOT)
-    return spec_for_branch(branch, ROOT), branch, base
+    return Inputs(spec_for_branch(branch, ROOT), branch, base, typed=False)
 
 
 def skip_line(spec: Path | None, branch: str) -> str:
@@ -301,14 +318,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--base", default="main")
     args = ap.parse_args(argv)
     try:
-        spec, branch, base = resolve_inputs(args.spec, args.base)
+        inputs = resolve_inputs(args.spec, args.base)
     except Refused as exc:
         die(exc)
     spec_text: str | None = None
-    if spec:
-        spec_text, err = read_text_or_error(spec, ROOT)
+    if inputs.spec:
+        spec_text, err = read_text_or_error(inputs.spec, ROOT)
         if spec_text is None:
-            die(Refused(f"refusing: SPEC {err}"))
+            die(Refused(f"refusing: {inputs.spec_origin()} {err}"))
 
     results: list[tuple[str, bool, str]] = []
 
@@ -325,10 +342,11 @@ def main(argv: list[str] | None = None) -> int:
     code, out = run(["make", "check-backing"], ROOT)
     results.append(("backing", code == 0, tail(out)))
 
-    range_results, diff = range_checks(spec_text, base)
+    range_results, diff = range_checks(spec_text, inputs.base)
     results.extend(range_results)
 
-    if args.spec and spec_text is not None:
+    if inputs.typed:
+        assert spec_text is not None  # a typed SPEC that did not read died above
         code, ids, out = collected_tests(ROOT)
         if code != 0:
             results.append(
@@ -343,7 +361,7 @@ def main(argv: list[str] | None = None) -> int:
             ("records", not fails, "\n".join(fails + [f"WARN {w}" for w in warns]))
         )
     else:
-        print(skip_line(spec, branch))
+        print(skip_line(inputs.spec, inputs.branch))
 
     failed = 0
     for name, ok, detail in results:
