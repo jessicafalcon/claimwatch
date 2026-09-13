@@ -611,18 +611,21 @@ fixtures check, keeps fixtures read-only on any other branch, and both
 summary lines count checks passed over checks run — DECISIONS → Fix; BACKLOG
 row closed).
 
-**In progress:** `phase-10-airflow` (this branch): the spec
-`specs/phase-10-airflow.md` (PROPOSED, not yet challenged) is the branch's
-first commit — the five-task DAG over `make` (`rebuild STAGE=`, `publish`),
-the Snowflake branch of the seam behind an optional extra, `TARGET` threaded
-through the classify step and the exports, both demonstration runs over
-synthetic reviews. STOP: `/challenge`, disposition, approval, then build.
+**In progress:** `phase-10a-airflow` (this branch): the spec
+`specs/phase-10a-airflow.md` (PROPOSED; challenged 2026-09-13 round 1 — rework,
+all findings amended) is the branch's only commit. Phase 10 is split on the
+≤ ~6 rule: **10a** the five-task DAG over bare `make` commands (`rebuild
+STAGE=`, `publish`), `warehouse.LOCAL` replacing every engine literal with a
+layout test, the one-container Airflow demonstration (repo mounted read-only,
+`data/` a private volume, `ROWS=synthetic` from the environment, no
+`env_file`); **10b** the seam's Snowflake branch, `TARGET` threaded through
+the classify step and the exports, the Snowflake run — its spec after 10a
+merges, seeded by round 1's findings #1–#4, #7, #9, #15, #17 (10a's Out of
+scope). STOP: the developer's Docker check of `airflow standalone` (10a stack
+risk 1), approval, `/phase-start 10a-airflow`, then build.
 
-**Next:** Phase 10 (the Airflow DAG). Its spec decides how the publish task
-calls `python -m study.metabase export|apply`, which are not `make` targets
-(`docs/PLAN.md` §5 names five `make` tasks), and takes the classify step's
-`TARGET`-awareness for Snowflake (BACKLOG "The classify-step mart writes are
-not warehouse-aware") as its own Done-when item with an invariant.
+**Next:** Phase 10b (the Snowflake seam and run), after 10a merges — see 10a's
+Out of scope for its seeds; BACKLOG rows 33 and 50 are its triggers.
 
 Open BACKLOG rows: **37**.
 
