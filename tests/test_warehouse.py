@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from pipeline.warehouse import LOCAL, TARGETS, connect
+from pipeline.warehouse import LOCAL, TARGETS, WIRED, connect
 
 WAREHOUSE = Path(__file__).resolve().parent.parent / "pipeline" / "warehouse.py"
 
@@ -38,6 +38,18 @@ def test_local_is_the_duckdb_target():
         assert conn.execute("select 1").fetchone()[0] == 1
     finally:
         conn.close()
+
+
+def test_wired_is_exactly_the_targets_connect_opens():
+    """`WIRED` is the CLI's TARGET set: every member opens, and every declared
+    target outside it is the seam's NotImplementedError — so the set and the
+    seam cannot disagree (10b appends `snowflake` to both at once)."""
+    assert WIRED == (LOCAL,) and set(WIRED) <= set(TARGETS)
+    for target in WIRED:
+        connect(target, database=":memory:").close()
+    for target in set(TARGETS) - set(WIRED):
+        with pytest.raises(NotImplementedError):
+            connect(target)
 
 
 def test_unknown_target_is_a_value_error():

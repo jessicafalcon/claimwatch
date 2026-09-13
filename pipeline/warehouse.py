@@ -22,6 +22,12 @@ TARGETS = ("duckdb", "snowflake")
 # 10a; pinned by tests/test_ingest_layout.py), so threading a target
 # through a caller is a parameter change with no literal left to miss.
 LOCAL = TARGETS[0]
+# The targets `connect` can open today: the CLI resolves a `TARGET` it will
+# hand to the seam against this set, so a target the seam declares but has
+# not wired (`snowflake` until Phase 10b) is one refusal line naming the set,
+# never the seam's NotImplementedError as a traceback. 10b appends the second
+# target here and nowhere else (Phase 10a review round 1, #1).
+WIRED = (LOCAL,)
 # The working warehouse lives under data/ (gitignored; `.gitignore` covers
 # `*.duckdb`). Callers pass `database=":memory:"` or a temp path in tests.
 DEFAULT_DB = ROOT / "data" / "friction_ledger.duckdb"

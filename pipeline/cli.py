@@ -85,7 +85,7 @@ from pipeline.build import (
     reviews_per_month,
 )
 from pipeline.label_sample import SHEET, label_sample
-from pipeline.warehouse import LOCAL, ROOT, TARGETS, connect, database_for
+from pipeline.warehouse import LOCAL, ROOT, WIRED, connect, database_for
 
 # The one binding of the confirmation stamp: under the gitignored data/ root,
 # never tracked, written by `make confirm` and consumed by the next `reset` or
@@ -238,13 +238,11 @@ STAGES = ("all", *BUILD_STAGES, "classify")
 def _do_rebuild(args: argparse.Namespace) -> int:
     rows = resolve_choice(args.rows, INPUTS, "captured")
     stage = resolve_choice(args.stage, STAGES, "all")
-    # The classify step is DuckDB-only until Phase 10b threads TARGET through
-    # it, so an invocation that runs it (the whole, `classify`) resolves TARGET
-    # against (LOCAL,) like `idempotency-check`: refused by name, never run
-    # over the DuckDB file while the variable says otherwise. `load` and
-    # `clean` reach the seam through rebuild(), the full set.
-    engines = TARGETS if stage in BUILD_STAGES else (LOCAL,)
-    target = resolve_choice(args.target, engines, LOCAL)
+    # TARGET resolves against the seam's WIRED set, the targets `connect` can
+    # open today: a declared-but-unwired engine is refused by name here, never
+    # run over the DuckDB file (the classify step is DuckDB-only until 10b)
+    # and never the seam's NotImplementedError as a traceback (`load`/`clean`).
+    target = resolve_choice(args.target, WIRED, LOCAL)
     db = database_for(rows)
     if stage == "classify":
         return _classify_and_print(db, rows)
@@ -635,8 +633,9 @@ def _do_simulate(_args: argparse.Namespace) -> int:
 def _do_idempotency(args: argparse.Namespace) -> int:
     # idempotency-check runs the classify step (build.classify_step), which is
     # DuckDB-only until Phase 10b threads TARGET through it; TARGET=snowflake is
-    # refused with one line here, not silently counted against an empty temp file.
-    target = resolve_choice(args.target, (LOCAL,), LOCAL)
+    # refused with one line here (the seam's WIRED set), not silently counted
+    # against an empty temp file.
+    target = resolve_choice(args.target, WIRED, LOCAL)
     rows = resolve_choice(args.rows, INPUTS, "synthetic")
     ok, first, second = idempotency_check(target, rows)
     for name in sorted(set(first) | set(second)):
@@ -654,7 +653,7 @@ def _do_reset(args: argparse.Namespace) -> int:
     # reset handles only the DuckDB file; TARGET=snowflake is refused with one
     # line here, not a traceback from reset() downstream.
     armed = confirmed(args.make_pid)  # consumed first, before any refusal (A9)
-    target = resolve_choice(args.target, (LOCAL,), LOCAL)
+    target = resolve_choice(args.target, WIRED, LOCAL)
     if not armed:
         ok = _prompt(
             "Drop every DuckDB file this repo built (the corpus and one per "
