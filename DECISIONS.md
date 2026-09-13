@@ -496,6 +496,14 @@ Each entry: the surprise, the official-docs check, what we did.
   family row) — the phase reads the four family rows as published and sums
   nothing itself, so the artifact is the table's own figures.
 
+- **Phase 10a — the base image is pinned by digest, the apt `make` is not
+  (2026-09-13, review round 2, security-reviewer #2).** The `FROM` line
+  carries the tag's image-index digest (`docker buildx imagetools inspect`,
+  the multi-platform index, so the pin holds on amd64 and arm64 alike) beside
+  the readable tag, and `uv` is version-pinned; `apt-get install make` takes
+  what Debian serves, by design — the container is developer-run, never CI,
+  holds no credential and loads no corpus, and `make` here only runs the
+  recipes the suite pins. A moved upstream tag no longer changes the image.
 - **Phase 10a — the official Airflow image's default Python is 3.13
   (2026-09-13).** `apache/airflow:3.3.1` ships Python 3.13 while the project
   pins 3.12 (`.python-version`, `uv.lock`). Checked against the image's tag

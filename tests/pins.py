@@ -731,4 +731,10 @@ CSV_FIELD_PAST_DEFAULT_LIMIT_CHARS = 140_000
 # scrape -> load_raw -> clean -> classify -> publish — in a file that fits on
 # one screen. The task names themselves are `study.text.DAG_TASKS`.
 DAG_TASK_COUNT = 5
+# The demonstration image, tag and image-index digest (docker buildx imagetools
+# inspect, developer-run; round 2 #11) — the Dockerfile's FROM line, whole.
+AIRFLOW_IMAGE = (
+    "apache/airflow:3.3.1-python3.12"
+    "@sha256:b01a795dfbd113bbbfdf3ee169b8f27e9a0090ccef105f1a452b3594a11ed316"
+)
 DAG_LINE_CAP = 40

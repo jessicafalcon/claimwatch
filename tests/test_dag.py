@@ -274,7 +274,7 @@ def test_the_dockerfile_pins_the_python312_image_and_returns_to_the_airflow_user
     pinned version, and the file ends as the airflow user."""
     text = repo_text(DOCKERFILE)
     lines = [ln for ln in text.splitlines() if ln and not ln.startswith("#")]
-    assert lines[0] == "FROM apache/airflow:3.3.1-python3.12"
+    assert lines[0] == f"FROM {pins.AIRFLOW_IMAGE}"
     users = [ln for ln in lines if ln.startswith("USER ")]
     assert users == ["USER root", "USER airflow"]
     assert "apt-get install -y --no-install-recommends make" in text
