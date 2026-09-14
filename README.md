@@ -271,3 +271,18 @@ Why a thin wrapper and an optional extra rather than an ORM: one file wraps each
 engine's connection in a single shape, so the SQL files stay identical and
 readable, and a laptop clone carries no cloud driver it never uses. It is the
 plain, standard choice.
+
+## What is planned next
+
+The next round of work is recorded in build order in
+[`docs/FUTURE_WORK.md`](docs/FUTURE_WORK.md): what each open item is, why it is
+worth doing, and what would close it. The near items validate the classifier on
+hand-labelled real reviews (today it is scored on the synthetic answer key), add
+a traditional-insurer comparison group to the theme charts (today every source
+is digital-first), and lead each surface with its finding.
+
+That note also holds one architecture question in full: why the warehouse is
+built as portable SQL with a thin engine wrapper rather than a build tool such
+as dbt, how the same tables would be expressed in dbt, and what dbt would and
+would not change. It is a proposal; each item that is taken up gets its own
+spec before any code moves.
