@@ -3787,15 +3787,16 @@ this phase wires the seam's second branch and runs it once. BACKLOG rows 33 and
 **Gotchas (from the developer's run, 2026-09-13; Documented-by-hand).** The
 demonstration ran green on the first attempt — `rebuild`, `idempotency-check`
 and `publish` on `TARGET=snowflake ROWS=synthetic`, no retries — and the 21-table
-count set matched DuckDB table for table (`pipeline/DEMONSTRATION.md`). Each of
-the five stack-risk unknowns behaved as `tests/fake_snowflake.py` assumed, with
-one operational surprise:
+count set matched DuckDB table for table (`pipeline/DEMONSTRATION.md`). Four of
+the five stack-risk unknowns behaved as `tests/fake_snowflake.py` assumed; the
+fifth — auto-suspend — the fake cannot model (a warehouse billing setting, not a
+protocol behavior), and it was the run's one operational surprise:
 
 - **Login.** Password authentication went straight through — no MFA challenge on
   the trial, the connection returned at once.
 - **Catalog spelling.** The build schema came back lower-case
   (`friction_ledger_synthetic`), not `FRICTION_LEDGER_SYNTHETIC`: the seam quotes
-  its identifiers, so Snowflake keeps the DuckDB spelling rather than up-casing
+  the schema name, so Snowflake keeps the DuckDB spelling rather than up-casing
   it. `is_nullable`/`data_type` folded correctly — the build read every table's
   columns without a miss, so the seam's case-fold on catalog answers is what the
   reads depend on, not the stored case.
@@ -3807,7 +3808,7 @@ one operational surprise:
   decimals correctly — the reviews-per-month dates and the cost-model counts came
   out identical to DuckDB.
 - **Auto-suspend — the one surprise.** The warehouse did NOT auto-suspend after
-  the run (it was created without the parameter and stayed active), so it billed
-  idle credits until suspended by hand. The credit-spend caution in
+  the run and stayed active until it was suspended by hand, so it billed idle
+  credits in between. The credit-spend caution in
   `DEMONSTRATION.md` therefore stands as written: set `auto_suspend` on the
   warehouse, and export the six credentials only for the run.
