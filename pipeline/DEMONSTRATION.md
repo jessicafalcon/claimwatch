@@ -38,7 +38,7 @@ uv sync --extra snowflake
 
 # 2. Export the six credentials (a password or a programmatic access token; no file)
 #    into the shell — see .env.example for the names. Then, for this run only:
-export $(grep -v '^#' .env | xargs)   # or set them however you keep secrets
+set -a; . ./.env; set +a   # export .env for this shell (safe on quoted/spaced values)
 
 # 3. Rebuild the synthetic fixture on Snowflake (all stages; no model key -> the
 #    no-key run: ambiguous reviews stay unclassified, the pipeline is still green)
@@ -58,11 +58,15 @@ Phase 10a's committed DAG grid). The deviation is recorded in DECISIONS.
 
 ## The DuckDB reference — "both targets run green"
 
-The same input on the laptop engine, `make idempotency-check ROWS=synthetic`,
-table for table. The Snowflake run of the same input prints the same counts
-(the SQL is identical; only the connection differs). This table is Measured on
-the laptop; the Snowflake counts and schema name below are Documented-by-hand
-from the developer's run.
+These are row counts of the *synthetic hand-written fixture*, not study
+findings — they show the two engines agree table for table, nothing about real
+reviews. The same input on the laptop engine, `make idempotency-check
+ROWS=synthetic`, table for table. The Snowflake run of the same input prints the
+same counts (the SQL is identical; only the connection differs). This table is
+Measured on the laptop; the Snowflake counts and schema name below are
+Documented-by-hand from the developer's run. The numbers below are the same ones
+`tests/pins.py` pins for the synthetic build, so a future synthetic change that
+moves a count fails a pin before this doc drifts silently.
 
 ```
 cost_curves              164

@@ -100,7 +100,7 @@ make rebuild FIXTURE=synthetic && make idempotency-check
 
 | Done-when | Proof |
 |---|---|
-| 1 | `tests/test_warehouse.py::test_connect_selects_duckdb`, `::test_snowflake_target_defers_to_phase_10`; code-reviewer confirms `pipeline/warehouse.py` is the only database-driver import |
+| 1 | `tests/test_warehouse.py::test_connect_selects_duckdb`, `::test_snowflake_target_defers_to_phase_10` (the defer test was retired in Phase 10b when the branch was wired — see `::test_wired_is_exactly_the_targets_connect_opens`); code-reviewer confirms `pipeline/warehouse.py` is the only database-driver import |
 | 2 | `make rebuild FIXTURE=synthetic` completes; `tests/test_rebuild.py::test_zero_row_rebuild`, `::test_synthetic_stage_counts_match_pins`; functionality-tester runs the DONE command |
 | 3 | `tests/test_provenance.py::test_raw_reviews_has_four_provenance_columns`; `tests/test_rebuild.py::test_staging_keeps_latest_capture`; `tests/test_idempotency.py::test_edited_review_appends_new_row` |
 | 4 | `tests/test_sql_portable.py::test_denylisted_form_is_rejected`, `::test_clock_in_sql_is_rejected` |
@@ -117,7 +117,7 @@ make rebuild FIXTURE=synthetic && make idempotency-check
 | For all files under `sql/`, no DuckDB-only form, no regex, and no `now()`/`current_date`/`current_timestamp` appears. | `tests/test_sql_portable.py::test_denylisted_form_is_rejected`, `::test_clock_in_sql_is_rejected` — a planted `read_csv`/`now()` string fails |
 | For the empty fixture and the synthetic fixture alike, `make rebuild` completes and staging equals dedup(raw). | `tests/test_rebuild.py::test_zero_row_rebuild`, `::test_synthetic_stage_counts_match_pins` |
 | For `fixtures/synthetic/` and `fixtures/anchors/`, every file hashes to its `MANIFEST.sha256`. | `tests/test_fixtures_frozen.py::test_manifests_match` — a byte flip in a fixture fails |
-| For `TARGET=snowflake` in Phase 1, `connect()` raises a clear Phase-10 error and no module imports snowflake at load time. | `tests/test_warehouse.py::test_snowflake_target_defers_to_phase_10` |
+| For `TARGET=snowflake` in Phase 1, `connect()` raises a clear Phase-10 error and no module imports snowflake at load time. | `tests/test_warehouse.py::test_snowflake_target_defers_to_phase_10` (retired in Phase 10b when the branch was wired; the lazy-import property is now `::test_the_duckdb_branch_never_imports_the_connector`) |
 
 ## Pinned decisions (do not re-litigate)
 

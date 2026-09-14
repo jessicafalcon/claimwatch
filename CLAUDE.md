@@ -658,6 +658,6 @@ and 50 close.
 **Next:** the open BACKLOG rows, starting with the Snowflake run's own
 Documented-by-hand records once the developer runs it.
 
-Open BACKLOG rows: **37**.
+Open BACKLOG rows: **38**.
 
 (Update this section at the end of every working day.)

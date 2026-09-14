@@ -3700,7 +3700,13 @@ this phase wires the seam's second branch and runs it once. BACKLOG rows 33 and
   cursor (the placeholders in `build.py` stay `?`), runs a multi-statement file
   through `execute_string`, and folds `snowflake.connector.Error`. The extra
   keeps `uv sync --locked`, CI and `make setup` connector-free — the DuckDB path
-  is the permanent one and must not grow a cloud dependency. *Rejected: a
+  is the permanent one and must not grow a cloud dependency. The extra resolves
+  a large transitive tree in the lock (`snowflake-connector-python` pulls
+  `boto3`, `botocore`, `requests`, `urllib3`, `cryptography`, `pyopenssl`,
+  `pyjwt`, `asn1crypto`, `cffi` and more — network-capable HTTP clients beyond
+  the "network lives in two files" rule); accepted for the developer-only extra,
+  since none of it enters CI, `make setup` or a default clone and the lock pins
+  every version (round 1 security #2). *Rejected: a
   `DriverError = (duckdb.Error, snowflake.connector.Error)` tuple (imports the
   connector on the DuckDB path); the connector as a plain dependency (every
   laptop clone downloads a cloud driver it never uses); rewriting `build.py`'s
