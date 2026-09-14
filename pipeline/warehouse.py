@@ -113,7 +113,14 @@ class _DuckConnection:
     seam's read shape (`execute` returns the connection, which has
     `fetchone`/`fetchall`/`description`), so this is a thin adapter that folds
     `duckdb.Error` into `DriverError`, guards the bulk insert with the
-    no-pandas probe, and runs a multi-statement file in one `execute`."""
+    no-pandas probe, and runs a multi-statement file in one `execute`.
+
+    The folded message is the engine's own `str(exc)` — a review body cannot
+    reach it, because every corpus value is parsed to its column's shape before
+    it is bound (`build.py`: a rating must be in `REVIEW_RATINGS`, a measure fits
+    `decimal(p, s)`, title/body are text into text columns), so a DuckDB
+    conversion error echoing an unvalidated review value cannot arise on this
+    path (round 2 security #2)."""
 
     def __init__(self, conn: duckdb.DuckDBPyConnection) -> None:
         self._conn = conn
@@ -142,7 +149,13 @@ class _DuckConnection:
             raise DriverError(str(exc)) from exc
 
     def close(self) -> None:
-        self._conn.close()
+        # close folds its error like the other methods, so the seam's one error
+        # name holds on teardown too and `scratch`'s cleanup catch covers it
+        # (round 2 code-reviewer #1).
+        try:
+            self._conn.close()
+        except duckdb.Error as exc:
+            raise DriverError(str(exc)) from exc
 
 
 class _SnowflakeConnection:
@@ -180,8 +193,13 @@ class _SnowflakeConnection:
             raise DriverError(str(exc)) from exc
 
     def close(self) -> None:
-        self._cursor.close()
-        self._conn.close()
+        # fold like the other methods, so a close failure is `DriverError` and
+        # `scratch`'s cleanup catch covers it (round 2 code-reviewer #1).
+        try:
+            self._cursor.close()
+            self._conn.close()
+        except _connector_error() as exc:
+            raise DriverError(str(exc)) from exc
 
 
 def _connector():
@@ -253,21 +271,36 @@ def _connect_snowflake(schema: str | None):
     }
     if creds["SNOWFLAKE_ROLE"]:
         kwargs["role"] = creds["SNOWFLAKE_ROLE"]
+    conn = None
     try:
         conn = connector.connect(**kwargs)
         cursor = conn.cursor()
         if schema is not None:
-            safe = _safe_schema(schema)
+            safe = _safe_schema(schema)  # raises DriverError on a bad shape
             cursor.execute(f'create schema if not exists "{safe}"')
             cursor.execute(f'use schema "{safe}"')
     except connector.Error as exc:
+        _close_quietly(conn)  # a failure after connect must not leak the connection
         raise DriverError(
             "TARGET=snowflake: the connector refused (snowflake.connector.Error) "
             "with SNOWFLAKE_ACCOUNT, SNOWFLAKE_USER, SNOWFLAKE_PASSWORD, "
             "SNOWFLAKE_WAREHOUSE and SNOWFLAKE_DATABASE set — check the "
             "credentials, the warehouse and the login policy (no value shown)"
         ) from exc
+    except Exception:  # _safe_schema's DriverError, or any other post-connect failure
+        _close_quietly(conn)
+        raise
     return _SnowflakeConnection(conn, cursor)
+
+
+def _close_quietly(conn) -> None:
+    """Close a raw connector connection if one was opened, swallowing any error —
+    used only on the failure path of `_connect_snowflake`, so a create/use-schema
+    or shape failure after a successful connect never leaks the connection (round
+    2 security #3)."""
+    if conn is not None:
+        with suppress(Exception):
+            conn.close()
 
 
 def database_for(rows: str, root: str | Path | None = None) -> Path:
@@ -286,6 +319,23 @@ def database_for(rows: str, root: str | Path | None = None) -> Path:
     return base.with_name(f"{base.stem}.{rows}{base.suffix}")
 
 
+def _deny_corpus_on_cloud(target: str, rows: str) -> None:
+    """The corpus-refusal backstop shared by every location source in the seam
+    (`location_for`, `scratch`): a corpus input on the cloud target raises, so
+    the trial cannot hold a real review however the location is derived
+    (invariant 2, one text not three — round 2 #6). The user-facing one-line
+    refusal is the CLI's `Refused` (`pipeline/cli.py::_refuse_corpus_on_cloud`,
+    which fires first on every target-taking path); this `ValueError` is the
+    assert-style backstop behind it."""
+    if target == CLOUD and rows in CLOUD_FORBIDDEN_INPUTS:
+        raise ValueError(
+            f"refusing ROWS={rows} on TARGET={CLOUD}: the corpus inputs "
+            f"{CLOUD_FORBIDDEN_INPUTS} are real people's words and never reach the "
+            "cloud / leave the laptop (brief §2.5); the cloud demonstration takes "
+            "fixture inputs (synthetic, none) only"
+        )
+
+
 def location_for(target: str, rows: str, root: str | Path | None = None) -> str | Path:
     """The location one (input, target) pair builds into: the DuckDB file per
     input on the laptop (`database_for`, unchanged), or the Snowflake schema
@@ -294,16 +344,10 @@ def location_for(target: str, rows: str, root: str | Path | None = None) -> str 
     trial cannot hold a real review by construction (invariant 2). `rows` is a
     member of the CLI's closed `INPUTS` set before it arrives here, so it is a
     validated name, never raw user input, when it becomes a schema name."""
+    _deny_corpus_on_cloud(target, rows)
     if target == LOCAL:
         return database_for(rows, root)
     if target == CLOUD:
-        if rows in CLOUD_FORBIDDEN_INPUTS:
-            raise ValueError(
-                f"refusing ROWS={rows} on TARGET={CLOUD}: the corpus inputs "
-                f"{CLOUD_FORBIDDEN_INPUTS} are real people's words and never leave "
-                "the laptop (brief §2.5); the cloud demonstration takes fixture "
-                "inputs (synthetic, none) only"
-            )
         return f"friction_ledger_{rows}"
     raise ValueError(f"unknown TARGET {target!r}; expected one of {TARGETS}")
 
@@ -339,12 +383,8 @@ def scratch(target: str, rows: str) -> Iterator[str | Path]:
     cloud target is refused here too, so the trial cannot hold a real review
     through the scratch path either, not only through `location_for` (invariant
     2 by construction — round 1 code-reviewer #1 / security #1; the corpus-guard
-    class, applied at every location source)."""
-    if target == CLOUD and rows in CLOUD_FORBIDDEN_INPUTS:
-        raise ValueError(
-            f"refusing a scratch for ROWS={rows} on TARGET={CLOUD}: the corpus "
-            f"inputs {CLOUD_FORBIDDEN_INPUTS} never reach the cloud (brief §2.5)"
-        )
+    class, applied at every location source through `_deny_corpus_on_cloud`)."""
+    _deny_corpus_on_cloud(target, rows)
     if target == LOCAL:
         with tempfile.TemporaryDirectory() as tmp:
             yield database_for(rows, tmp)
@@ -354,17 +394,29 @@ def scratch(target: str, rows: str) -> Iterator[str | Path]:
         try:
             yield name
         finally:
-            # best-effort drop; a cleanup DriverError never masks an in-block
-            # error (round 1 code-reviewer #4). A schema left by a failed drop
-            # is the developer's console cleanup (Out of scope).
-            with suppress(DriverError):
-                admin = connect(CLOUD, database=None)
-                try:
-                    admin.execute(f'drop schema if exists "{_safe_schema(name)}"')
-                finally:
-                    admin.close()
+            _drop_scratch_schema(name)
         return
     raise ValueError(f"unknown TARGET {target!r}; expected one of {TARGETS}")
+
+
+def _drop_scratch_schema(name: str) -> None:
+    """Drop a Snowflake scratch schema on exit, best-effort: a `DriverError` here
+    never masks an in-block error (round 1 code-reviewer #4; close() folds now,
+    so a teardown failure is `DriverError` too — round 2 #1), but it is not
+    swallowed silently — one stderr line names the schema left behind so the
+    developer drops it in the console (round 2 security #1)."""
+    try:
+        admin = connect(CLOUD, database=None)
+        try:
+            admin.execute(f'drop schema if exists "{_safe_schema(name)}"')
+        finally:
+            admin.close()
+    except DriverError:
+        print(
+            f"warning: could not drop scratch schema {name!r} — drop it in the "
+            "Snowflake console",
+            file=sys.stderr,
+        )
 
 
 def run_sql_file(conn, path: str | Path) -> None:

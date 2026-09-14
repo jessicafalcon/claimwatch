@@ -108,6 +108,38 @@ def test_a_missing_extra_is_one_refusal_line_through_the_cli(monkeypatch, capsys
     assert "uv sync --extra snowflake" in err and err.count("\n") <= 1
 
 
+def test_the_snowflake_connection_is_opened_autocommit_off(monkeypatch):
+    """`autocommit=False` makes `build.py`'s explicit begin/commit/rollback the
+    transaction unit (stack risk 2, pinned decision 1) — the fake records the
+    connect kwargs (round 2 func-tester #1)."""
+    fake = fake_snowflake.install(monkeypatch)
+    connect(CLOUD, database="friction_ledger_synthetic").close()
+    kwargs = next(k for op, _, k in fake.CALLS if op == "connect")
+    assert kwargs["autocommit"] is False
+
+
+def test_a_schema_name_off_its_shape_is_refused_before_interpolation():
+    """A schema name is shape-checked before it is quoted into DDL (round 2
+    security #4 / func-tester #2): the real names pass, a quote/semicolon does
+    not."""
+    for good in ("friction_ledger_synthetic", "scratch_none_12345"):
+        assert warehouse._safe_schema(good) == good
+    with pytest.raises(warehouse.DriverError, match=r"not \[a-z0-9_\]"):
+        warehouse._safe_schema('a"; drop schema x --')
+
+
+def test_a_credential_refusal_leaves_paramstyle_untouched(monkeypatch):
+    """Credentials are validated before the connector's module-level `paramstyle`
+    is set, so a refusal leaves no side effect (round 2 func-tester #3)."""
+    fake = fake_snowflake.install(monkeypatch, credentials=False)
+    for name in warehouse.SNOWFLAKE_ENV[:-2]:  # set all required but SNOWFLAKE_DATABASE
+        monkeypatch.setenv(name, "v")
+    assert fake.paramstyle == "pyformat"
+    with pytest.raises(warehouse.DriverError):
+        connect(CLOUD, database="friction_ledger_synthetic")
+    assert fake.paramstyle == "pyformat"  # untouched by the refused connect
+
+
 # --- Done-when 2: catalog reads are the seam's and case-folded ----------------
 def test_catalog_answers_are_case_folded_on_both_branches(monkeypatch):
     # The fake answers UPPER (Snowflake's unquoted folding); the seam folds to
