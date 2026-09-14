@@ -95,7 +95,7 @@ def _fact(db: Path, fact: str) -> int:
 # --- Done-when 1: Beat 5 renders both panels ----------------------------------
 def test_beat_five_renders_both_panels(synthetic_db):
     page = _html(synthetic_db)
-    assert "Beat 5 — How this was built, and where the rigor lives" in page
+    assert "Beat 5 — How the study is built" in page
     for pid in pins.BEAT5_PANELS:
         assert f"Evidence: {pid}" in page
     b51 = _section(page, "B5.1")

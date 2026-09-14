@@ -95,7 +95,7 @@ def test_beat_four_renders_all_four_panels(synthetic_db):
     got = {p.id: (p.tag, p.kind) for p in _panels(synthetic_db)}
     assert got == kinds
     page = _html(synthetic_db)
-    assert "Beat 4 — Three small fixes, no system overhaul" in page
+    assert "Beat 4 — Three modest fixes" in page
     for pid in pins.BEAT4_PANELS:
         assert f"Evidence: {pid}" in page
 
