@@ -83,9 +83,11 @@ Delivered paragraph and `make help`, not here.
   fed. A Python-fed mart has a DDL-only `.sql` and one `write_*` function
   in `pipeline/build.py`.
 - `pipeline/` — `warehouse.py` (the one place that knows DuckDB from
-  Snowflake), `build.py` (raw → staging → marts, the classify step, the
-  Python-fed mart writers), `cli.py` (the validating `make` entry),
-  `sql_lint.py` (the portability/clock denylist), `label_sample.py`.
+  Snowflake: both connection wrappers, `DriverError`, the catalog reads, the
+  credentials, `location_for`/`scratch`), `build.py` (raw → staging → marts,
+  the classify step, the Python-fed mart writers), `cli.py` (the validating
+  `make` entry), `sql_lint.py` (the portability/clock denylist),
+  `label_sample.py`, `DEMONSTRATION.md` (the Snowflake run's walk, text).
 - `ingest/` — the scrapers: `sources.py` (every source as one declaration;
   the one place a brand-carrying address may appear), `politeness.py`,
   `robots.py` (RFC 9309), `parsed.py` (what every parser hands back, the
@@ -166,15 +168,18 @@ cannot say:
   `Freeze:` line and a DECISIONS entry). `slice-ameli` reads a file a person
   saved from a browser at `data/cache/ameli/honoraires.csv`: the host's
   robots file disallows its API and download paths, so there is no fetch.
-- **`make rebuild [TARGET=duckdb] [ROWS=captured|none|synthetic|samples]
+- **`make rebuild [TARGET=duckdb|snowflake] [ROWS=captured|none|synthetic|samples]
   [STAGE=all|load|clean|classify]`** — raw → staging → marts, then the
   classify step; `STAGE=` runs one of the three (`load`: the raw DDL and the
   loads; `clean`: staging, marts and the three key-free writers; `classify`:
-  the classify step) into the input's own file — the DAG's middle tasks — and
-  a stage over a file the earlier stage never built refuses naming the
-  missing table. `TARGET` resolves against `warehouse.WIRED`, the targets the
-  seam can open today (`duckdb` alone until Phase 10b), for every stage, as
-  for `idempotency-check` and `reset`. The classify step: the rules plus, only when
+  the classify step) into the input's own location — the DAG's middle tasks — and
+  a stage over a location the earlier stage never built refuses naming the
+  missing table. `TARGET` resolves against `warehouse.WIRED` (both engines since
+  Phase 10b) for every stage, as for `idempotency-check`; a corpus input
+  (`captured`, `samples`) on `snowflake` is refused by name, and the cloud path
+  needs the six `SNOWFLAKE_*` credentials (developer-run). `reset` keeps
+  `TARGET=duckdb` — a cloud schema is dropped in the console, never by a target.
+  The classify step: the rules plus, only when
   `ANTHROPIC_API_KEY` is set and only for the reviews the rules left
   `unclassified`, one cached model call each — with no key those reviews stay
   `unclassified` and the run is green. The held-out gate and the theme marts
@@ -186,9 +191,10 @@ cannot say:
   through its real parser; CI). A raw table already in the file must match
   its `sql/raw/` declaration column by column or the rebuild refuses naming
   both sides (`make confirm reset` first).
-- `publish [ROWS=captured]` writes `data/metabase/metabase.sqlite`, the file
-  the Metabase demonstration reads, from the named input's marts — offline,
-  no credentials, byte-identical on a rerun; the DAG's last task. The HTML
+- `publish [TARGET=duckdb|snowflake] [ROWS=captured]` writes
+  `data/metabase/metabase.sqlite`, the file the Metabase demonstration reads,
+  from the named target's marts — offline and no credentials on `duckdb`,
+  byte-identical on a same-target rerun; the DAG's last task. The HTML
   page is not a publish step (`study` renders the frozen synthetic input).
   The Airflow container (`dags/docker-compose.yml`) is developer-run, never
   CI; its `scrape` task is the same `make confirm scrape`.
@@ -307,8 +313,10 @@ study names no insurer as its subject.
   pipeline path — SQL does the work; Python glues (DuckDB + stdlib csv/json).
 - Dependencies: ask before adding ANY package. Pre-approved by phase:
   `duckdb` (1); `pyyaml`, `httpx` (2); `anthropic` (6);
-  `snowflake-connector-python` (10b); Airflow and Metabase via Docker only;
-  dev: `pytest`, `ruff`, `pre-commit`. Anything else is a STOP-and-ask.
+  `snowflake-connector-python` (10b, landed as the `snowflake` optional extra —
+  `uv sync --extra snowflake`, never in `make setup`, CI or the suite); Airflow
+  and Metabase via Docker only; dev: `pytest`, `ruff`, `pre-commit`. Anything
+  else is a STOP-and-ask.
 - SQL: one file per table under `sql/raw/`, `sql/staging/` or `sql/marts/`; the
   header comment names the grain, the provenance columns and the BACKING rows
   it feeds; lowercase keywords; no `order by` in a table definition; ANSI only
@@ -627,28 +635,29 @@ CLI read paths catch it — DECISIONS → Fix), `fix/review-gate-no-spec` (PR
 #38: the no-`SPEC=` review gate reads a phase branch's own spec for the
 fixtures check, keeps fixtures read-only on any other branch, and both
 summary lines count checks passed over checks run — DECISIONS → Fix; BACKLOG
-row closed).
+row closed). Phase 10a merged next: the one Airflow DAG (five `BashOperator`s
+over bare `make`), the `rebuild STAGE=` split, `publish`, and
+`warehouse.LOCAL`/`WIRED` replacing every engine literal with a layout test —
+DuckDB only (PR #39, 2026-09-13).
 
-**In progress:** `phase-10a-airflow` (this branch): spec
-`specs/phase-10a-airflow.md` (challenged 2026-09-13 round 1 — rework, all
-findings amended; approved 2026-09-13). Phase 10 is split on the ≤ ~6 rule:
-**10a** the five-task DAG over bare `make` commands (`rebuild STAGE=`,
-`publish`), `warehouse.LOCAL` replacing every engine literal with a layout
-test, the one-container Airflow demonstration; **10b** the seam's Snowflake
-branch, `TARGET` threaded through the classify step and the exports, the
-Snowflake run — its spec after 10a merges, seeded by round 1's findings #1–#4,
-#7, #9, #15, #17 (10a's Out of scope). Built and demonstrated: the DAG ran
-green in the container and its captioned screenshot is committed
-(`dags/screenshots/01-dag-run.png`), and ran again over the amended mounts
-(A1) with the same grid; review round 1 (2026-09-13): twelve findings, ten
-fixed in five commits, #2/#3 by amendment A1, #8 accepted by measurement;
-round 2, the exit review with the coherence audit (2026-09-13): seventeen
-findings, fixed — four correctness commits and one records commit — except the
-image digest, which needs the developer's registry query.
+**In progress:** `phase-10b-snowflake` (this branch): spec
+`specs/phase-10b-snowflake.md` (challenged 2026-09-13 round 1 — approve with
+amendments, disposition "fix all"; approved 2026-09-13, spec 014db324). The
+second half of the Phase 10 split: the seam's Snowflake branch wired as an
+optional extra imported lazily, both engines returning one connection shape and
+folding their driver's error into `warehouse.DriverError`; the catalog reads
+(`tables`/`columns`/`table_exists`) and the six `SNOWFLAKE_*` credentials in the
+seam alone; `location_for`/`scratch` giving every (input, target) its own
+location and refusing a corpus input on the cloud; `TARGET` threaded through the
+classify step, the idempotency check and the export (`CLASSIFY_TARGETS` gone).
+Proved offline against a recording fake connector (`tests/fake_snowflake.py`);
+the one Snowflake run is the developer's, recorded as text in
+`pipeline/DEMONSTRATION.md`. Phase 10 completes when 10b merges. BACKLOG rows 33
+and 50 close.
 
-**Next:** Phase 10b (the Snowflake seam and run), after 10a merges — see 10a's
-Out of scope for its seeds; BACKLOG rows 33 and 50 are its triggers.
+**Next:** the open BACKLOG rows, starting with the Snowflake run's own
+Documented-by-hand records once the developer runs it.
 
-Open BACKLOG rows: **39**.
+Open BACKLOG rows: **38**.
 
 (Update this section at the end of every working day.)

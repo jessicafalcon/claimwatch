@@ -262,25 +262,78 @@ def test_urllib_client_maps_a_network_error_to_a_one_line_refusal():
 
 
 def test_export_command_routes_rows_to_the_matching_database(monkeypatch):
-    """`export --rows <input>` reads the database for that input, so the
-    synthetic-screenshot path (ROWS=synthetic) exports the synthetic build, not
-    the captured corpus (round-1 #1)."""
+    """`export --rows <input>` reads the location for that (input, target), so
+    the synthetic-screenshot path (ROWS=synthetic) exports the synthetic build,
+    not the captured corpus (round-1 #1). The default target is the laptop
+    engine and the default input the real corpus (Phase 10b)."""
     import study.metabase.__main__ as entry
     from pipeline.warehouse import database_for
 
     seen = {}
 
-    def fake_build(duck_db=None, sqlite_path=None):
-        seen["db"] = duck_db
+    def fake_build(target, location=None, sqlite_path=None):
+        seen["target"], seen["location"] = target, location
         return Path("x")
 
     monkeypatch.setattr(entry, "build_sqlite", fake_build)
     assert entry.main(["export", "--rows", "synthetic"]) == 0
-    assert seen["db"] == database_for("synthetic")
-    assert seen["db"] != database_for("captured")
-    # #1's core promise: the default (no --rows) is the real corpus
+    assert seen["target"] == "duckdb" and seen["location"] == database_for("synthetic")
+    assert seen["location"] != database_for("captured")
+    # #1's core promise: the default (no --rows) is the real corpus, on DuckDB
     assert entry.main(["export"]) == 0
-    assert seen["db"] == database_for("captured")
+    assert seen["target"] == "duckdb" and seen["location"] == database_for("captured")
+
+
+def test_export_command_refuses_a_target_outside_wired_by_name(monkeypatch, capsys):
+    """`export --target` is validated against the seam's WIRED set (Phase 10b),
+    so a value from either origin of `make publish TARGET=` is one refusal line
+    naming the set, exit 2 — and a corpus input on the cloud target is refused
+    (fixture inputs only). Nothing is built."""
+    import study.metabase.__main__ as entry
+
+    monkeypatch.setattr(entry, "build_sqlite", lambda *_a, **_k: pytest.fail("built"))
+    for bad in ("postgres", "../x", '"; rm', "SNOWFLAKE"):
+        assert entry.main(["export", "--target", bad]) == 2
+        err = capsys.readouterr().err
+        assert err.startswith("study.metabase: refusing:") and bad in err, err
+        assert err.count("\n") == 1, err
+    # a corpus input on the cloud target is refused before any build
+    assert entry.main(["export", "--target", "snowflake", "--rows", "captured"]) == 2
+    assert "never leave the laptop" in capsys.readouterr().err
+
+
+def test_export_reads_the_named_targets_marts(monkeypatch, tmp_path):
+    """`build_sqlite(target, location)` reads the named target's marts: over the
+    Snowflake fake it is the fake's connection that is read (the mart selects are
+    recorded there), and no DuckDB file is opened (Phase 10b, invariant 6)."""
+    from study.metabase.export import EXPORTED_MARTS, build_sqlite
+    from tests import fake_snowflake
+
+    fake = fake_snowflake.install(
+        monkeypatch,
+        mart_columns={mart: ["theme"] for mart, _ in EXPORTED_MARTS},
+        mart_rows={mart: [] for mart, _ in EXPORTED_MARTS},
+    )
+    out = build_sqlite("snowflake", "friction_ledger_synthetic", tmp_path / "m.sqlite")
+    assert out.exists()
+    read_from = {sql for op, sql, _ in fake.CALLS if op == "execute" and sql}
+    for mart, _order in EXPORTED_MARTS:
+        assert any(f"from {mart}" in sql for sql in read_from), mart
+
+
+def test_export_folds_a_forbidden_column_on_the_cloud_target(monkeypatch, tmp_path):
+    """The FORBIDDEN-column guard bites whatever the engine's case: on Snowflake
+    the catalog answers UPPER-cased names, so an upper-cased `BODY`/`TITLE`/
+    `SOURCE_URL` is caught by the export's lower-fold, never leaking review text
+    or a brand address into the reader-facing SQLite (Phase 10b, round 1 #2 — the
+    survived mutation: reverting the fold let an UPPER forbidden column through)."""
+    from study.metabase.export import EXPORTED_MARTS, ExportError, build_sqlite
+    from tests import fake_snowflake
+
+    first_mart = EXPORTED_MARTS[0][0]
+    fake_snowflake.install(monkeypatch, mart_columns={first_mart: ["THEME", "BODY"]})
+    with pytest.raises(ExportError, match="body"):
+        build_sqlite("snowflake", "friction_ledger_synthetic", tmp_path / "leak.sqlite")
 
 
 def test_export_command_refuses_rows_outside_the_set_by_name(monkeypatch, capsys):

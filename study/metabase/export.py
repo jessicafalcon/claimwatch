@@ -69,26 +69,32 @@ def _columns(duck_conn, table: str) -> list[str]:
     return [d[0] for d in cur.description]
 
 
-def _export_table(duck_conn, sqlite_conn, table: str, order_by: str) -> int:
+def _export_table(source_conn, sqlite_conn, table: str, order_by: str) -> int:
     """Copy one mart into SQLite: refuse a forbidden column by name, create the
     table with those columns, insert the rows in `order_by`. Returns the row
-    count."""
-    columns = _columns(duck_conn, table)
-    leaked = sorted(set(columns) & FORBIDDEN_COLUMNS)
+    count. Column names are read in the source engine's own case for the SELECT
+    (so the quoted identifier matches — Snowflake upper-cases unquoted names) but
+    lower-cased for the FORBIDDEN check and the SQLite schema, so the guard bites
+    on both engines and the reader-facing SQLite file is engine-blind (Phase
+    10b; on DuckDB the names are already lower, so the output is unchanged)."""
+    source = _columns(source_conn, table)  # the engine's own case
+    lowered = [c.lower() for c in source]
+    leaked = sorted(set(lowered) & FORBIDDEN_COLUMNS)
     if leaked:
         raise ExportError(
             f"refusing to export {table}: column(s) {leaked} must never reach "
             f"the reader-facing engine (review text / brand address)"
         )
-    cols_sql = ", ".join(f'"{c}"' for c in columns)
-    placeholders = ", ".join("?" for _ in columns)
+    select_sql = ", ".join(f'"{c}"' for c in source)  # SELECT in the engine's case
+    target_sql = ", ".join(f'"{c}"' for c in lowered)  # SQLite in lower, engine-blind
+    placeholders = ", ".join("?" for _ in source)
     sqlite_conn.execute(f'drop table if exists "{table}"')
-    sqlite_conn.execute(f'create table "{table}" ({cols_sql})')
-    rows = duck_conn.execute(
-        f"select {cols_sql} from {table} order by {order_by}"
+    sqlite_conn.execute(f'create table "{table}" ({target_sql})')
+    rows = source_conn.execute(
+        f"select {select_sql} from {table} order by {order_by}"
     ).fetchall()
     sqlite_conn.executemany(
-        f'insert into "{table}" ({cols_sql}) values ({placeholders})',
+        f'insert into "{table}" ({target_sql}) values ({placeholders})',
         [[_cell(v) for v in row] for row in rows],
     )
     return len(rows)
@@ -122,25 +128,27 @@ def _export_paraphrases(sqlite_conn, yaml_path: Path = PARAPHRASES_YAML) -> int:
 
 
 def build_sqlite(
-    duck_db: str | Path | None = None,
+    target: str = warehouse.LOCAL,
+    location: str | Path | None = None,
     sqlite_path: str | Path = DEFAULT_SQLITE,
 ) -> Path:
-    """Build the gitignored SQLite file Metabase reads, from the DuckDB warehouse.
-    A fresh file each run (the existing one is removed first), the marts and the
-    paraphrases written in a fixed order — so the content is the same every time.
-    Returns the SQLite path. Reads the corpus DuckDB by default; a caller (the
-    test) passes its own."""
+    """Build the gitignored SQLite file Metabase reads, from the named target's
+    marts (the DuckDB file, or the Snowflake schema — Phase 10b). A fresh file
+    each run (the existing one is removed first), the marts and the paraphrases
+    written in a fixed order — so a re-export of the same (target, location) is
+    byte-identical. Returns the SQLite path. Reads the corpus DuckDB by default;
+    a caller (the CLI, the test) passes its own target and location."""
     sqlite_path = Path(sqlite_path)
     sqlite_path.parent.mkdir(parents=True, exist_ok=True)
     sqlite_path.unlink(missing_ok=True)
-    duck_conn = warehouse.connect(warehouse.LOCAL, database=duck_db)
+    source_conn = warehouse.connect(target, database=location)
     sqlite_conn = sqlite3.connect(sqlite_path)
     try:
         for table, order_by in EXPORTED_MARTS:
-            _export_table(duck_conn, sqlite_conn, table, order_by)
+            _export_table(source_conn, sqlite_conn, table, order_by)
         _export_paraphrases(sqlite_conn)
         sqlite_conn.commit()
     finally:
         sqlite_conn.close()
-        duck_conn.close()
+        source_conn.close()
     return sqlite_path

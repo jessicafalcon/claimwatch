@@ -1,17 +1,15 @@
-"""The warehouse seam (spec Phase 1, done-when 1). DuckDB now; Snowflake defers
-to Phase 10b and imports nothing. Offline, in-memory."""
+"""The warehouse seam (spec Phase 1, Phase 10b done-when 1). Both engines are
+wired since 10b: DuckDB runs for real (in-memory / temp file), Snowflake through
+the recording fake (`tests/fake_snowflake.py`) — no socket, no real driver. The
+Snowflake branch's detail (the qmark cursor, execute_string, the error fold, the
+catalog fold, the credentials, scratch) is pinned in `test_snowflake_seam.py`."""
 
 from __future__ import annotations
 
-import re
-from pathlib import Path
-
 import pytest
 
-from pipeline.build import CLASSIFY_TARGETS
-from pipeline.warehouse import LOCAL, TARGETS, WIRED, connect
-
-WAREHOUSE = Path(__file__).resolve().parent.parent / "pipeline" / "warehouse.py"
+from pipeline.warehouse import CLOUD, LOCAL, TARGETS, WIRED, connect
+from tests import fake_snowflake
 
 
 def test_connect_selects_duckdb():
@@ -20,14 +18,6 @@ def test_connect_selects_duckdb():
         assert conn.execute("select 1").fetchone()[0] == 1
     finally:
         conn.close()
-
-
-def test_snowflake_target_defers_to_phase_10():
-    with pytest.raises(NotImplementedError, match="Phase 10b"):
-        connect("snowflake")
-    # The invariant: the seam imports no snowflake driver in Phase 1.
-    src = WAREHOUSE.read_text(encoding="utf-8")
-    assert not re.search(r"^\s*(import|from)\s+snowflake\b", src, re.M)
 
 
 def test_local_is_the_duckdb_target():
@@ -41,19 +31,17 @@ def test_local_is_the_duckdb_target():
         conn.close()
 
 
-def test_wired_is_exactly_the_targets_connect_opens():
-    """`WIRED` is the CLI's TARGET set: every member opens, and every declared
-    target outside it is the seam's NotImplementedError — so the set and the
-    seam cannot disagree (10b appends `snowflake` to both at once)."""
-    assert WIRED == (LOCAL,) and set(WIRED) <= set(TARGETS)
-    assert set(CLASSIFY_TARGETS) <= set(
-        WIRED
-    )  # the classify step's set never outruns the seam
-    for target in WIRED:
-        connect(target, database=":memory:").close()
-    for target in set(TARGETS) - set(WIRED):
-        with pytest.raises(NotImplementedError):
-            connect(target)
+def test_wired_is_exactly_the_targets_connect_opens(monkeypatch):
+    """`WIRED` is the CLI's TARGET set and, since Phase 10b, exactly `TARGETS`:
+    every member opens — DuckDB for real, Snowflake through the fake — so the set
+    and the seam cannot disagree (there is no declared-but-unwired target left)."""
+    assert WIRED == TARGETS and TARGETS[1] == CLOUD
+    connect(LOCAL, database=":memory:").close()
+    fake_snowflake.install(monkeypatch)
+    connect(CLOUD, database="friction_ledger_synthetic").close()
+    # the fake recorded a connect and set qmark before it
+    assert ("connect", None, fake_snowflake.CALLS[0][2]) in fake_snowflake.CALLS
+    assert fake_snowflake.paramstyle == "qmark"
 
 
 def test_unknown_target_is_a_value_error():

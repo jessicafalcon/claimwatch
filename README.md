@@ -229,3 +229,28 @@ environment. The drill shows each review's theme, rating, date, segment and plat
 its own words and never a per-review web address — and, per theme, one paraphrased
 example with its public source. The audit trail is the counted rows plus that
 paraphrase, not quoted excerpts.
+
+### The Snowflake run — the same SQL, a cloud database
+
+The study can run once against a cloud database (Snowflake) to show the SQL is
+written once and portable, then confirm the laptop path still passes. It is a
+one-off demonstration, never something the study depends on — a trial expires, so
+nothing load-bearing may sit on it.
+
+Install the connector as an optional extra (`uv sync --extra snowflake`; the
+laptop never downloads it otherwise), set the six `SNOWFLAKE_*` values (account,
+user, password, warehouse, database, and an optional role — see `.env.example`),
+then `make rebuild TARGET=snowflake ROWS=synthetic`, `make idempotency-check
+TARGET=snowflake ROWS=synthetic` and `make publish TARGET=snowflake
+ROWS=synthetic`. Only the fixture inputs (`synthetic`, `none`) run there: the
+scraped reviews and the frozen samples are real people's words and never leave
+the laptop, refused by name on the cloud target. The walk and its output are in
+[`pipeline/DEMONSTRATION.md`](pipeline/DEMONSTRATION.md).
+
+**Caution:** the credentials are read from the environment, so an exported
+`.env` lets any process in that shell — not just you — spend trial credits;
+export them only for the run and keep the warehouse's auto-suspend on.
+
+Why a thin wrapper and an extra rather than an ORM: one file wraps each engine's
+connection in one shape so the SQL files stay identical and readable, and a
+laptop clone carries no cloud driver it never uses — the boring, standard choice.

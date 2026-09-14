@@ -221,6 +221,29 @@ def test_no_module_spells_an_engines_schema_name():
     assert hits == {}, hits
 
 
+def test_no_module_outside_the_seam_queries_the_catalog():
+    """Phase 10b, invariant 1 (the class of BACKLOG row 33): the catalog reads
+    live in the seam alone — every caller reads through `warehouse.tables`,
+    `warehouse.columns` or `warehouse.table_exists`. A planted `information_schema`
+    or `current_schema`, even in a comment, anywhere else fails this."""
+    hits = {
+        k: v
+        for k, v in _lines_matching(r"information_schema|current_schema").items()
+        if k != SEAM
+    }
+    assert hits == {}, hits
+
+
+def test_credential_names_are_read_in_the_seam_only():
+    """Phase 10b done-when 5: the six SNOWFLAKE_* names are read in the seam
+    alone — the layout guard that keeps the model key's `os.environ` reads in
+    `classify/llm.py` extends to `SNOWFLAKE_` here. A planted `SNOWFLAKE_` read
+    in `cli.py` or elsewhere fails this (`.env.example` and `tests/` are not
+    modules, so the placeholders and the fake's helper do not count)."""
+    hits = {k: v for k, v in _lines_matching(r"SNOWFLAKE_").items() if k != SEAM}
+    assert hits == {}, hits
+
+
 def test_the_phase_2_feed_source_is_declared_as_before():
     src = by_name("fr-digital-first")
     assert re.fullmatch(r"[a-z0-9-]+", src.name)

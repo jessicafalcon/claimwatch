@@ -153,7 +153,7 @@ def test_sqlite_export_carries_only_the_allowlist_no_body_title_source_url(tmp_p
     and no exported table carries body/title/source_url."""
     db = _built(tmp_path)
     out = tmp_path / "metabase.sqlite"
-    build_sqlite(duck_db=db, sqlite_path=out)
+    build_sqlite(location=db, sqlite_path=out)
     conn = sqlite3.connect(out)
     try:
         drill_cols = tuple(
@@ -189,7 +189,7 @@ def test_a_forbidden_mart_column_is_refused_by_name(tmp_path):
     finally:
         conn.close()
     with pytest.raises(ExportError, match="body"):
-        build_sqlite(duck_db=db, sqlite_path=tmp_path / "leak.sqlite")
+        build_sqlite(location=db, sqlite_path=tmp_path / "leak.sqlite")
 
 
 def test_sqlite_export_rating_is_exact_and_row_order_is_stable(tmp_path):
@@ -215,8 +215,8 @@ def test_sqlite_export_rating_is_exact_and_row_order_is_stable(tmp_path):
     finally:
         conn.close()
     assert rid is not None
-    a = build_sqlite(duck_db=db, sqlite_path=tmp_path / "a.sqlite")
-    b = build_sqlite(duck_db=db, sqlite_path=tmp_path / "b.sqlite")
+    a = build_sqlite(location=db, sqlite_path=tmp_path / "a.sqlite")
+    b = build_sqlite(location=db, sqlite_path=tmp_path / "b.sqlite")
     conn = sqlite3.connect(a)
     try:
         got = conn.execute(
@@ -267,7 +267,7 @@ def test_export_refuses_a_missing_mart_by_name(tmp_path):
     empty = tmp_path / "empty.duckdb"
     connect("duckdb", database=empty).close()  # a DB with no marts
     with pytest.raises(ExportError, match="review_drill"):
-        build_sqlite(duck_db=empty, sqlite_path=tmp_path / "out.sqlite")
+        build_sqlite(location=empty, sqlite_path=tmp_path / "out.sqlite")
 
 
 def test_review_drill_is_stable_across_a_rebuild(tmp_path):

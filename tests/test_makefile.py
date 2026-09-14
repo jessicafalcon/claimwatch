@@ -183,18 +183,21 @@ def test_env_exported_stage_reaches_the_recipe_and_is_validated_in_python():
     assert "--rows='synthetic'" in _make_n("publish", {}, {"ROWS": "synthetic"})
 
 
-def test_publish_passes_rows_unexpanded_as_one_literal():
+def test_publish_passes_target_and_rows_unexpanded_as_one_literal():
     """`make publish` is one recipe line — the Metabase export for the named
-    input — and nothing else; an empty ROWS reaches Python empty (its default
-    is the corpus, resolved there)."""
-    recipe = "uv run python -m study.metabase export --rows='synthetic'"
+    (target, input) — and nothing else; empty TARGET and ROWS reach Python empty
+    (their defaults, duckdb and the corpus, are resolved there). Since Phase 10b
+    the recipe carries `--target=` too."""
+    recipe = "uv run python -m study.metabase export --target='' --rows='synthetic'"
     out = _make_n("publish", {"ROWS": "synthetic"}, {})
     assert out.strip() == recipe
     # under a parent make (CI's `make test`), still the recipe and nothing else
     assert (
         _make_n("publish", {"ROWS": "synthetic"}, {"MAKELEVEL": "1"}).strip() == recipe
     )
-    assert _make_n("publish", {}, {}).strip().endswith("--rows=''")
+    # both variables from the environment reach the recipe unexpanded, one literal
+    assert "--target='snowflake'" in _make_n("publish", {}, {"TARGET": "snowflake"})
+    assert _make_n("publish", {}, {}).strip().endswith("--target='' --rows=''")
     assert "study export" not in out  # the HTML page is not a publish step
 
 
@@ -214,6 +217,7 @@ def test_rows_outside_the_set_is_refused():
         ("slice-ameli", "YEAR", "--year"),  # 9i: the one new variable target
         ("rebuild", "STAGE", "--stage"),  # 10a
         ("publish", "ROWS", "--rows"),  # 10a
+        ("publish", "TARGET", "--target"),  # 10b
     ],
 )
 def test_pipeline_variables_reach_python_as_one_literal(target, var, flag):

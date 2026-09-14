@@ -65,10 +65,10 @@ check-pins: ## every public def added or changed since BASE is named in a test �
 review-gate: ## offline gate [SPEC=specs/<f>.md] [BASE=main]; with no SPEC a phase branch's spec licenses fixtures only; /review-round runs it first
 	uv run python scripts/review_gate.py $(if $(value SPEC),--spec=$(call _Q,$(value SPEC)),) --base=$(call _Q,$(if $(value BASE),$(value BASE),main))
 
-rebuild: ## build the warehouse from raw [TARGET=duckdb] [ROWS=captured|none|synthetic|samples] [STAGE=all|load|clean|classify] — one stage into the input's own file, or all three in order
+rebuild: ## build the warehouse from raw [TARGET=duckdb|snowflake] [ROWS=captured|none|synthetic|samples] [STAGE=all|load|clean|classify] — one stage into the input's own location, or all three in order; a corpus input on snowflake is refused (fixture inputs only)
 	uv run python -m pipeline rebuild --target=$(call _Q,$(value TARGET)) --rows=$(call _Q,$(value ROWS)) --stage=$(call _Q,$(value STAGE))
 
-idempotency-check: ## rebuild twice, diff per-table row counts (run-twice property) [ROWS=synthetic]
+idempotency-check: ## rebuild twice, diff per-table row counts (run-twice property) [TARGET=duckdb|snowflake] [ROWS=synthetic]
 	uv run python -m pipeline idempotency-check --target=$(call _Q,$(value TARGET)) --rows=$(call _Q,$(value ROWS))
 
 confirm: ## arm reset, scrape or fetch-damir for THIS invocation only: `make confirm reset`, `make confirm scrape`, `make confirm fetch-damir`
@@ -114,5 +114,5 @@ simulate: ## print the guardrail simulator — the three rules, the SLA threshol
 study: ## render the static HTML study to study/friction_ledger.html from the synthetic marts (offline, no variable; CI diffs the committed bytes)
 	uv run python -m study export
 
-publish: ## write the file the Metabase demonstration reads, data/metabase/metabase.sqlite, from the named input's marts [ROWS=captured] (offline, no credentials; the DAG's last task)
-	uv run python -m study.metabase export --rows=$(call _Q,$(value ROWS))
+publish: ## write the file the Metabase demonstration reads, data/metabase/metabase.sqlite, from the named target's marts [TARGET=duckdb|snowflake] [ROWS=captured] (offline for duckdb, no credentials; the DAG's last task)
+	uv run python -m study.metabase export --target=$(call _Q,$(value TARGET)) --rows=$(call _Q,$(value ROWS))

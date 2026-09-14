@@ -21,6 +21,7 @@ import hashlib
 from pathlib import Path
 
 from classify.labels import review_id
+from pipeline import warehouse
 from pipeline.warehouse import LOCAL, ROOT, connect, database_for
 
 SHEET = ROOT / "data" / "label_sample.csv"
@@ -41,11 +42,7 @@ def _staged_reviews(db: Path) -> list[tuple[str, str, str]] | None:
         return None
     conn = connect(LOCAL, database=db)
     try:
-        exists = conn.execute(
-            "select count(*) from information_schema.tables "
-            "where table_name = 'stg_reviews'"
-        ).fetchone()[0]
-        if not exists:
+        if not warehouse.table_exists(conn, "stg_reviews"):
             return None
         rows = conn.execute(
             "select source, external_id, source_url, title, body from stg_reviews"

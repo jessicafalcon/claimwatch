@@ -32,10 +32,7 @@ import ast
 import csv
 import hashlib
 import re
-import sys
 import tempfile
-from collections.abc import Iterator
-from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
@@ -656,36 +653,6 @@ def _statements(sql: str) -> list[str]:
     return [part.strip() for part in _COMMENT.sub("", sql).split(";") if part.strip()]
 
 
-def _columns(conn, table: str) -> list[tuple[str, str, str]]:
-    """(name, type, is_nullable) per column in position order, in the engine's
-    own vocabulary, read from the schema the engine names as its default
-    (`warehouse.default_schema`): a same-named table in another schema is not
-    this one (A8). The position is the catalog's `ordinal_position`, a value
-    read and sorted on here, never the order the engine happens to return
-    rows in (round 5, functionality-tester #1)."""
-    rows = conn.execute(
-        "select ordinal_position, column_name, data_type, is_nullable "
-        "from information_schema.columns "
-        "where table_schema = ? and table_name = ?",
-        [warehouse.default_schema(conn), table],
-    ).fetchall()
-    return [
-        (name, kind, nullable)
-        for _, name, kind, nullable in sorted(rows, key=lambda r: int(r[0]))
-    ]
-
-
-def _table_exists(conn, table: str) -> bool:
-    return (
-        conn.execute(
-            "select count(*) from information_schema.tables "
-            "where table_schema = ? and table_name = ?",
-            [warehouse.default_schema(conn), table],
-        ).fetchone()[0]
-        > 0
-    )
-
-
 def _describe(column: tuple[str, str, str]) -> str:
     name, kind, nullable = column
     return f"{name!r} {kind} {'nullable' if nullable == 'YES' else 'not null'}"
@@ -697,8 +664,8 @@ def check_raw_declaration(conn, path: Path) -> None:
     engine casts into it on insert — 109 half-step ratings rounded on the
     first live run — so the declaration is created as a temporary table under
     a scratch name, both column lists (name, type, nullability, by position)
-    are read back from information_schema in the engine's own words, and the
-    first difference refuses the rebuild naming position, column and both
+    are read back through the seam's catalog reader in the engine's own words,
+    and the first difference refuses the rebuild naming position, column and both
     sides. A table not yet created passes. The file is exactly one statement,
     and only that statement is run for the scratch, so nothing else in a raw
     file can reach the corpus during the check; a table already sitting under
@@ -717,10 +684,10 @@ def check_raw_declaration(conn, path: Path) -> None:
             f"{where_file}: is not one `create table if not exists` statement"
         )
     table = m.group(1)
-    if not _table_exists(conn, table):
+    if not warehouse.table_exists(conn, table):
         return
     scratch = f"declared_{table}"
-    if _table_exists(conn, scratch):
+    if warehouse.table_exists(conn, scratch):
         raise PageShapeError(
             f"{where_file}: a table {scratch!r} already exists in the database "
             "and is not one this repo builds — remove it, then `make rebuild` "
@@ -731,10 +698,10 @@ def check_raw_declaration(conn, path: Path) -> None:
             _CREATE_RAW.sub(f"create temporary table {scratch}", statements[0], count=1)
         )
         try:
-            declared = _columns(conn, scratch)
+            declared = warehouse.columns(conn, scratch)
         finally:
             conn.execute(f"drop table {scratch}")
-        existing = _columns(conn, table)
+        existing = warehouse.columns(conn, table)
     except warehouse.DriverError as exc:
         # The one statement the file holds did not parse as one — a `--` or a
         # `;` inside a literal, say — or the catalog read or the drop failed:
@@ -878,20 +845,21 @@ class ClassifyOutcome:
     graded: bool
 
 
-def _staged_review_rows(db: str | Path) -> list[tuple[str, str, str, str]] | None:
-    """`(source, external_id, title, body)` for every staged review, or None when
-    the warehouse has no `stg_reviews` yet. One read feeds both the identity map
-    and `_review_texts` — the answer key is never touched here."""
-    db = Path(db)
-    if not db.is_file():
+def _staged_review_rows(
+    location: str | Path, *, target: str = LOCAL
+) -> list[tuple[str, str, str, str]] | None:
+    """`(source, external_id, title, body)` for every staged review on `target`,
+    or None when the warehouse has no `stg_reviews` yet. One read feeds both the
+    identity map and `_review_texts` — the answer key is never touched here. On
+    the laptop a location that is no file is None (a clone before any rebuild);
+    on the cloud the schema exists via connect, so the table probe answers. The
+    existence probe is the seam's `warehouse.table_exists`, so no catalog query
+    is spelled here (Phase 10b)."""
+    if target == LOCAL and not Path(location).is_file():
         return None
-    conn = connect(LOCAL, database=db)
+    conn = connect(target, database=location)
     try:
-        exists = conn.execute(
-            "select count(*) from information_schema.tables "
-            "where table_name = 'stg_reviews'"
-        ).fetchone()[0]
-        if not exists:
+        if not warehouse.table_exists(conn, "stg_reviews"):
             return None
         return conn.execute(
             "select source, external_id, title, body from stg_reviews"
@@ -910,34 +878,30 @@ def _review_texts(staged: list[tuple[str, str, str, str]]) -> list[tuple[str, st
     ]
 
 
-# The classify step opens the laptop engine until Phase 10b threads a target
-# through it, so the CLI resolves a TARGET for any stage that runs the step
-# (`classify`, `all`) against this set, not the seam's WIRED: a second wired
-# engine cannot make the step run over the DuckDB file while the variable says
-# otherwise (spec 10a, pinned decision 4; review round 2, #10). 10b lifts it.
-CLASSIFY_TARGETS = (LOCAL,)
-
-
 def classify_step(
-    db: str | Path,
+    location: str | Path,
     run_id: str,
     *,
+    target: str = LOCAL,
     cache_path: str | Path,
     decide: Decide | None = None,
 ) -> ClassifyOutcome | None:
     """Run the combined classifier over `stg_reviews` and fill the classify-path
     tables: `stg_classified_reviews` (the review x theme grain), the three
     `POST_CLASSIFY_MARTS`, `pipeline_row_counts` (B5.2) and — only when the answer
-    key covers the held-out fold — `classifier_quality` (B2.4). Returns the counts
-    and gate scores for the caller to print, or None when there is no `stg_reviews`
-    yet (nothing to classify). The model is reached only through `decide`
-    (None -> rules only, the no-key run); `cache_path` is where the decision cache
-    is read and rewritten, so a throwaway run (idempotency-check) names its own
-    path and touches no tracked cache. Deterministic given the cache; the gate is
-    offline. review_id maps a `(review_id, theme)` row back to `(source,
-    external_id)` in Python, so nothing hashes in SQL, and `run_id` is provenance
-    (byte-stable per input; not in any natural key)."""
-    staged = _staged_review_rows(db)
+    key covers the held-out fold — `classifier_quality` (B2.4). Every connection
+    it opens is on `target` (Phase 10b, BACKLOG row 50 closed: the classify-path
+    writes follow the target like the rest of `rebuild`, no longer the laptop
+    file regardless). Returns the counts and gate scores for the caller to
+    print, or None when there is no `stg_reviews` yet (nothing to classify). The
+    model is reached only through `decide` (None -> rules only, the no-key run);
+    `cache_path` is where the decision cache is read and rewritten, so a
+    throwaway run (idempotency-check) names its own path and touches no tracked
+    cache. Deterministic given the cache; the gate is offline. review_id maps a
+    `(review_id, theme)` row back to `(source, external_id)` in Python, so
+    nothing hashes in SQL, and `run_id` is provenance (byte-stable per input;
+    not in any natural key)."""
+    staged = _staged_review_rows(location, target=target)
     if staged is None:
         return None
     identity = {review_id(s, e): (s, e) for s, e, _, _ in staged}
@@ -953,7 +917,7 @@ def classify_step(
     )
     scores = score_heldout(rows)
     graded = any(s.predicted or s.actual for s in scores)
-    conn = connect(LOCAL, database=db)
+    conn = connect(target, database=location)
     try:
         write_classified_reviews(conn, classified, run_id=run_id)
         build_post_classify_marts(conn)
@@ -1096,41 +1060,16 @@ def _insert_output(conn, scenario: str, formula, value, run_id: str) -> None:
     )
 
 
-@contextmanager
-def _no_pandas_probe() -> Iterator[None]:
-    """Suppress DuckDB's per-value `import pandas` probe for the duration of a bulk
-    insert. Binding a Python value, DuckDB checks whether it is a pandas type by
-    importing pandas; pandas is not installed here (a hard project rule — no pandas
-    on a pipeline path) and Python does not cache a failed import, so the check
-    re-scans `sys.path` on every value — ~4,000 rows × 10 columns per rebuild turns
-    a sub-second write into ~5 s, and every rebuild (and every test that rebuilds)
-    pays it. A sentinel `None` in `sys.modules` makes `import pandas` fail
-    immediately with no path scan; it is set only around the insert and restored
-    after, and the repo never uses DuckDB's dataframe API, so nothing else is
-    affected. DECISIONS → Phase 8b Gotchas."""
-    sentinel = object()
-    previous = sys.modules.get("pandas", sentinel)
-    sys.modules["pandas"] = None  # type: ignore[assignment]
-    try:
-        yield
-    finally:
-        if previous is sentinel:
-            del sys.modules["pandas"]
-        else:
-            sys.modules["pandas"] = previous  # type: ignore[assignment]
-
-
 def _insert_rows(conn, table: str, columns: str, rows: list[list]) -> None:
-    """Insert `rows` into `table` with one `executemany`, under the no-pandas-probe
-    guard. `table` and `columns` are literals from the caller (no user input
-    reaches the SQL); the placeholder count is the columns' arity."""
+    """Insert `rows` into `table` with one `executemany`. `table` and `columns`
+    are literals from the caller (no user input reaches the SQL); the placeholder
+    count is the columns' arity. The DuckDB-only no-pandas-probe guard now lives
+    in the seam's DuckDB `executemany` (Phase 10b), so no engine knowledge is
+    left here."""
     if not rows:
         return
     placeholders = ",".join(["?"] * len(rows[0]))
-    with _no_pandas_probe():
-        conn.executemany(
-            f"insert into {table} ({columns}) values ({placeholders})", rows
-        )
+    conn.executemany(f"insert into {table} ({columns}) values ({placeholders})", rows)
 
 
 def write_sim_marts(conn, inputs: cost_model.ModelInputs, run_id: str) -> None:
@@ -1465,17 +1404,14 @@ def write_pipeline_row_counts(conn, run_id: str) -> None:
 
 def table_counts(conn) -> dict[str, int]:
     """Row count per table in the default schema — the reproducibility signal
-    `idempotency-check` diffs. The schema is the engine's own answer
-    (`warehouse.default_schema`), never a name spelled here."""
-    names = [
-        row[0]
-        for row in conn.execute(
-            "select table_name from information_schema.tables "
-            "where table_schema = ? order by table_name",
-            [warehouse.default_schema(conn)],
-        ).fetchall()
-    ]
-    return {n: conn.execute(f"select count(*) from {n}").fetchone()[0] for n in names}
+    `idempotency-check` diffs. The table names are the seam's (`warehouse.tables`:
+    lower-cased and sorted, read from the engine's own default schema), so the
+    same map compares the same way on both engines and no schema name is spelled
+    here."""
+    return {
+        name: conn.execute(f"select count(*) from {name}").fetchone()[0]
+        for name in warehouse.tables(conn)
+    }
 
 
 def captures_for(
@@ -1584,7 +1520,7 @@ def _require_raw_tables(conn, where: Path) -> None:
     the staging SQL would fail inside the engine with its own message. Refuse
     first, naming the missing table and the stage that writes it."""
     for path in _sql_files("raw"):
-        if not _table_exists(conn, path.stem):
+        if not warehouse.table_exists(conn, path.stem):
             raise StageError(
                 f"STAGE=clean: table {path.stem!r} is missing in {where} — run "
                 "`make rebuild STAGE=load` first"
@@ -1654,6 +1590,7 @@ def rebuild(
     rows: str = "none",
     *,
     stages: tuple[str, ...] = BUILD_STAGES,
+    location: str | Path | None = None,
     root: str | Path | None = None,
     run_id: str | None = None,
     cache_dir: str | Path | None = None,
@@ -1667,18 +1604,21 @@ def rebuild(
     pipeline end to end with zero rows; `synthetic` loads the review fixture
     and the anchors; `samples` loads the anchors and the frozen samples
     through the real parsers. Every input goes through the same guards. The
-    file is always `warehouse.database_for(rows, root)`: a caller names the
-    directory the files live in, never the file an input lands in, so the
-    literal `sample` can exist only in the samples file (A8 (e)). `stages` is
-    which of `BUILD_STAGES` to run, in their fixed order — both by default;
-    `("clean",)` alone over a file `load` never built refuses naming the
-    missing table."""
+    warehouse is `warehouse.location_for(target, rows, root)` — the DuckDB file
+    per input (a caller names the directory, never the file an input lands in,
+    so the literal `sample` can exist only in the samples file, A8 (e)), or the
+    Snowflake schema per input, with a corpus input on the cloud target refused
+    there — unless a caller passes an explicit `location` (the idempotency
+    scratch), which is never an input's own (Phase 10b, invariants 2 and 7).
+    `stages` is which of `BUILD_STAGES` to run, in their fixed order — both by
+    default; `("clean",)` alone over a warehouse `load` never built refuses
+    naming the missing table."""
     if rows not in INPUTS:
         raise ValueError(f"rows input {rows!r} not in {INPUTS}")
     if not stages or any(stage not in BUILD_STAGES for stage in stages):
         raise ValueError(f"stages {stages!r} not within {BUILD_STAGES}")
-    db = warehouse.database_for(rows, root)
-    conn = connect(target, database=db)
+    loc = warehouse.location_for(target, rows, root) if location is None else location
+    conn = connect(target, database=loc)
     try:
         if "load" in stages:
             _load_stage(
@@ -1690,7 +1630,7 @@ def rebuild(
                 fetched_file=fetched_file,
             )
         if "clean" in stages:
-            _require_raw_tables(conn, db)
+            _require_raw_tables(conn, loc)
             _clean_stage(conn, run_id)
         return table_counts(conn)
     finally:
@@ -1713,24 +1653,31 @@ def idempotency_check(
     included, since `rebuild()` alone stops before them. The classify step runs
     rules-only (no model decider, the no-key run) with its decision cache in the
     throwaway directory, so the check is offline and touches no tracked cache.
-    Uses a throwaway file so it depends on no prior state and touches no working
-    db. DuckDB only — threading `TARGET` through the classify step is Phase 10b."""
-    with tempfile.TemporaryDirectory() as tmp:
-        db = warehouse.database_for(rows, tmp)
+    Uses `warehouse.scratch(target, rows)` so it depends on no prior state and
+    touches no working warehouse: a temp DuckDB file, or a create/drop Snowflake
+    schema, never an input's own location (invariant 7). Every connection —
+    both rebuilds, both classify steps, both count reads — is on `target` (Phase
+    10b: the classify path is threaded, so the check covers it on the target
+    engine too)."""
+    with (
+        warehouse.scratch(target, rows) as location,
+        tempfile.TemporaryDirectory() as tmp,
+    ):
         cache = Path(tmp) / "decisions.csv"
 
         def _build_and_count(run_id: str) -> dict[str, int]:
             rebuild(
                 target,
                 rows,
-                root=tmp,
+                location=location,
                 run_id=run_id,
                 cache_dir=cache_dir,
                 manual_file=manual_file,
                 fetched_file=fetched_file,
             )
-            classify_step(db, run_id, cache_path=cache)  # decide=None -> rules only
-            conn = connect(LOCAL, database=db)
+            # decide=None -> rules only, on the target
+            classify_step(location, run_id, target=target, cache_path=cache)
+            conn = connect(target, database=location)
             try:
                 return table_counts(conn)
             finally:
