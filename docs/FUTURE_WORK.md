@@ -197,9 +197,9 @@ pin. Both ride naturally on §3.
 theme-share marts split by one segment only. The study's hypothesis compares
 held-claim complaints across digital-first and traditional segments; without a
 traditional column there is no control arm, and the headline comparison is
-unanswerable. This is the largest single lift below and the highest analytical
-payoff, and it is meaningful only once §3 has validated the classifier on real
-rows.
+unanswerable. This is the largest single lift below and answers the study's
+headline comparison, and it is meaningful only once §3 has validated the
+classifier on real rows.
 
 **What would solve it.** A traditional-segment source declared and captured
 under the existing source-declaration rules, so `theme_share_by_month` and
@@ -218,7 +218,7 @@ the affected SPEC panels state that the comparison waits.
 study's conclusion is not the first thing a reader meets. The value of the
 study is the answer to its questions — whether held-claim complaints are
 growing, how the segments compare, and what a wrongly blocked refund costs —
-not the elegance of the pipeline behind it. Leading with the finding is only
+not the pipeline behind it. Leading with the finding is only
 honest once the finding has a control group (§5) and validated labels (§3)
 behind it; done earlier it would headline a result with no comparison arm.
 
