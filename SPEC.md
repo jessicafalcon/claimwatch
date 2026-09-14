@@ -1,8 +1,8 @@
 # SPEC.md — the study structure
 
-The study is told in five parts, from the customer's chair: what people say in
+The study is told in five parts, from the customer's side: what people say in
 public, the shape of those complaints, what a wrongly held refund costs, three
-small fixes, and how the whole thing was built. This file is the frozen list of
+modest fixes, and how the study is built. This file is the frozen list of
 those parts and the exact charts inside them. Each panel below names two things:
 the kind of evidence it carries, and the `BACKING.md` row (`B<beat>.<n>`) that
 holds its query and its source. Nothing else is a chart in this study.
@@ -34,7 +34,7 @@ names no command that does not exist, and `make check-backing` checks that every
 goes uncited. The master plan is [PROJECT_BRIEF.md](PROJECT_BRIEF.md); the rules
 are [CLAUDE.md](CLAUDE.md).
 
-## Beat 1 — People are telling us what's wrong, in public
+## Beat 1 — The complaints are public and unprompted
 
 Thousands of customers write publicly about refunds that get stuck. This part
 shows that voice: one story in full, then how the segment's public ratings have
@@ -78,7 +78,7 @@ left empty. The day, and a midpoint, are placements, not readings.
   for a second platform's measured figures; the brief's ranges for the studied
   insurer are not placed (BACKLOG).
 
-## Beat 2 — The complaints have a shape
+## Beat 2 — The complaints share a shape
 
 The complaints are not random. They fall into five recurring themes, and this
 part counts how the share of each moves over time and how it differs between
@@ -195,7 +195,7 @@ climbs; friction cost rises with the false positives that same rate creates.
   cost per contact — each with its explore-the-range span drawn, styled apart
   from the sourced rows, never as settled facts. Tag: *Modeled*.
 
-## Beat 4 — Three small fixes, no rebuild required
+## Beat 4 — Three modest fixes
 
 The answer is not a better fraud model; it is three boring rules wrapped around
 the one that already exists. This part shows each fix and what it does to the
@@ -230,7 +230,7 @@ and "both fixes" show the same hold.
   notification, which fixes silent rejections for free. Tag: *Modeled* (Pending;
   a design panel, no number until the outcome log exists).
 
-## Beat 5 — How this was built, and where the rigor lives
+## Beat 5 — How the study is built
 
 The study is built so the same data always produces the same numbers, and a
 language model is used in only one small step. This part states the checkable

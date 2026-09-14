@@ -670,11 +670,11 @@ def _beat_header(title: str) -> str:
 # The beats in render order, each a (header, builder) pair. A new beat adds one
 # row; the render loop and the page do not change (9c–9e).
 _BEATS = (
-    ("Beat 1 — People are telling us what’s wrong, in public", beat1_panels),
-    ("Beat 2 — The complaints have a shape", beat2_panels),
+    ("Beat 1 — The complaints are public and unprompted", beat1_panels),
+    ("Beat 2 — The complaints share a shape", beat2_panels),
     ("Beat 3 — What a wrongly held claim costs", beat3_panels),
-    ("Beat 4 — Three small fixes, no system overhaul", beat4_panels),
-    ("Beat 5 — How this was built, and where the rigor lives", beat5_panels),
+    ("Beat 4 — Three modest fixes", beat4_panels),
+    ("Beat 5 — How the study is built", beat5_panels),
 )
 
 

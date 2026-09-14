@@ -76,14 +76,14 @@ Model parameters follow one rule with nothing in between: **every default is eit
 
 Five beats, told from the customer's chair. The customer is the protagonist; the technology appears only where the story needs credibility.
 
-### Beat 1 — People are telling us what's wrong, in public, by the thousands
+### Beat 1 — The complaints are public and unprompted
 - Hero: one documented case — a parent's ~€340 emergency-room refund put on hold pending extra documents, publicly reported unresolved for months. Show "Day N — claim on hold," where N is frozen at the **last publicly confirmed date** (never a live counter ticking to today; we can't verify daily). Tag: Documented.
 - Chart: the studied segment's public rating trend over time, from our own `platform_snapshots` time series (seeded with verified historical anchors, see §6). Tag: Measured.
 - Chart: the channel gap — ratings on channels the company controls/solicits vs. unsolicited platforms. Tag: Measured.
 - Stat row: one-star share on independent platforms, review counts, company response lag differences. Tag: Measured.
 - Key nuance to state honestly: unsolicited platforms are negatively self-selected samples (companies that stop inviting reviews drift down). The score decline is partly a sampling choice. Naming this bias is part of the study.
 
-### Beat 2 — The complaints have a shape
+### Beat 2 — The complaints share a shape
 - The taxonomy (5 themes, see §5) with paraphrased documented examples. Tag: Documented.
 - **The chart the pipeline exists to produce:** theme share among every classified review over time, per segment (digital-first vs traditional; positive reviews in the denominator, never a theme bar). Tag: Measured (via the gated classifier). Until real, it's tagged Pending — never faked.
 - Peer context: public ratings across the market segment. Tag: Documented (the anchors), Measured for our own points.
@@ -96,14 +96,14 @@ Five beats, told from the customer's chair. The customer is the protagonist; the
 - Business context to explain in plain words: in business-to-business insurance, one employee stuck in a document loop complains to HR, and HR decides renewals. Friction cost compounds through that channel.
 - Tag: Modeled.
 
-### Beat 4 — Three small fixes, no rebuild required
+### Beat 4 — Three modest fixes
 The elegant answer is not a better fraud model. It is a cost function wrapped around the existing one. Each fix is boring on purpose:
 1. **Ask for everything once.** A deterministic rule table computes the complete document list for a claim type + flag reason, requested in one message. Kills the serial document loop. Pure lookup logic.
 2. **Put a clock on every hold.** Every held claim gets a timer. Past the threshold: small low-risk claims auto-release ("pay now, audit after"); large ones auto-escalate to a human. The threshold is computed from the Beat 3 model, not guessed — the study shows the arithmetic.
 3. **Count the mistakes.** Every hold ends as fraud-confirmed or released-clean. Logging that outcome per flag rule yields a false-positive rate per rule — the metric the system otherwise lacks. The same event stream fixes silent rejections for free (it triggers a status notification).
 - The guardrail simulator (on synthetic claims calibrated to real public cost distributions) shows before/after hold durations and moves the Beat 3 curves visibly. Tag: Modeled.
 
-### Beat 5 — How this was built, and where the rigor lives
+### Beat 5 — How the study is built
 - Deterministic backbone, AI at the edges — stated plainly, with the checkable facts: "1 place where a model makes a decision," "100% of formulas displayed next to outputs," "0 numbers without a source or a Modeled label."
 - The reproducibility section: DAG diagram, row counts per stage, eval scores, and the one command that rebuilds everything from raw data.
 
