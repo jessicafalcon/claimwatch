@@ -72,6 +72,8 @@ moves a pinned count fails a pin before this doc drifts; `raw_source_pages` and
 fixture changes.
 
 ```
+channel_gap              6
+classifier_quality       6
 cost_curves              164
 cost_model_outputs        60
 cost_model_params         17
@@ -102,9 +104,29 @@ returned — the close of the BACKLOG row that noted the schema name was
 unpinnable offline):
 
 ```
-schema (engine's current_schema()): <paste the run's own answer here — e.g. friction_ledger_synthetic>
-<paste the count table from `make idempotency-check TARGET=snowflake ROWS=synthetic` here — it should match the DuckDB table above, count for count>
-<paste the idempotency-check result line from the run here>
+schema (engine's current_schema()): friction_ledger_synthetic
+channel_gap              6 -> 6
+classifier_quality       6 -> 6
+cost_curves              164 -> 164
+cost_model_outputs        60 -> 60
+cost_model_params        17 -> 17
+determinism_facts        3 -> 3
+guardrail_sim            4000 -> 4000
+peer_ratings             4 -> 4
+pipeline_row_counts      3 -> 3
+platform_stats           9 -> 9
+rating_trend             8 -> 8
+raw_platform_snapshots   9 -> 9
+raw_reviews              40 -> 40
+raw_source_pages         26 -> 26
+review_drill             39 -> 39
+sla_threshold            60 -> 60
+stg_classified_reviews   39 -> 39
+stg_platform_snapshots   9 -> 9
+stg_reviews              39 -> 39
+theme_share_by_month     10 -> 10
+theme_share_by_segment   7 -> 7
+idempotency-check OK: every row count unchanged on the second rebuild
 ```
 
 ## Why a wrapper and an extra, not an ORM
