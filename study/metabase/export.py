@@ -69,28 +69,32 @@ def _columns(duck_conn, table: str) -> list[str]:
     return [d[0] for d in cur.description]
 
 
-def _export_table(duck_conn, sqlite_conn, table: str, order_by: str) -> int:
+def _export_table(source_conn, sqlite_conn, table: str, order_by: str) -> int:
     """Copy one mart into SQLite: refuse a forbidden column by name, create the
     table with those columns, insert the rows in `order_by`. Returns the row
-    count."""
-    columns = _columns(duck_conn, table)
-    # Case-folded: on Snowflake the catalog answers upper-cased column names, so
-    # a forbidden column must be caught whatever its case (Phase 10b).
-    leaked = sorted({c.lower() for c in columns} & FORBIDDEN_COLUMNS)
+    count. Column names are read in the source engine's own case for the SELECT
+    (so the quoted identifier matches — Snowflake upper-cases unquoted names) but
+    lower-cased for the FORBIDDEN check and the SQLite schema, so the guard bites
+    on both engines and the reader-facing SQLite file is engine-blind (Phase
+    10b; on DuckDB the names are already lower, so the output is unchanged)."""
+    source = _columns(source_conn, table)  # the engine's own case
+    lowered = [c.lower() for c in source]
+    leaked = sorted(set(lowered) & FORBIDDEN_COLUMNS)
     if leaked:
         raise ExportError(
             f"refusing to export {table}: column(s) {leaked} must never reach "
             f"the reader-facing engine (review text / brand address)"
         )
-    cols_sql = ", ".join(f'"{c}"' for c in columns)
-    placeholders = ", ".join("?" for _ in columns)
+    select_sql = ", ".join(f'"{c}"' for c in source)  # SELECT in the engine's case
+    target_sql = ", ".join(f'"{c}"' for c in lowered)  # SQLite in lower, engine-blind
+    placeholders = ", ".join("?" for _ in source)
     sqlite_conn.execute(f'drop table if exists "{table}"')
-    sqlite_conn.execute(f'create table "{table}" ({cols_sql})')
-    rows = duck_conn.execute(
-        f"select {cols_sql} from {table} order by {order_by}"
+    sqlite_conn.execute(f'create table "{table}" ({target_sql})')
+    rows = source_conn.execute(
+        f"select {select_sql} from {table} order by {order_by}"
     ).fetchall()
     sqlite_conn.executemany(
-        f'insert into "{table}" ({cols_sql}) values ({placeholders})',
+        f'insert into "{table}" ({target_sql}) values ({placeholders})',
         [[_cell(v) for v in row] for row in rows],
     )
     return len(rows)

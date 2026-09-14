@@ -33,7 +33,12 @@ _MAKE_VARS = (
     "MAKEFLAGS",
     "MFLAGS",
 )
-SCRUBBED_ENV = _MAKE_VARS + SNOWFLAKE_ENV
+# Every secret the code reads, so a developer's exported `.env` never reaches the
+# suite (round 1 security #3): the model key, the Metabase login, and every
+# SNOWFLAKE_* the seam reads. Sockets are blocked too (`_no_network`), but a
+# no-key test must see no key to test the no-key path honestly.
+_SECRETS = ("ANTHROPIC_API_KEY", "METABASE_URL", "METABASE_USER", "METABASE_PASSWORD")
+SCRUBBED_ENV = _MAKE_VARS + _SECRETS + SNOWFLAKE_ENV
 
 
 def _blocked(*_args, **_kwargs):

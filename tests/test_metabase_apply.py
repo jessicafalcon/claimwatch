@@ -321,6 +321,21 @@ def test_export_reads_the_named_targets_marts(monkeypatch, tmp_path):
         assert any(f"from {mart}" in sql for sql in read_from), mart
 
 
+def test_export_folds_a_forbidden_column_on_the_cloud_target(monkeypatch, tmp_path):
+    """The FORBIDDEN-column guard bites whatever the engine's case: on Snowflake
+    the catalog answers UPPER-cased names, so an upper-cased `BODY`/`TITLE`/
+    `SOURCE_URL` is caught by the export's lower-fold, never leaking review text
+    or a brand address into the reader-facing SQLite (Phase 10b, round 1 #2 — the
+    survived mutation: reverting the fold let an UPPER forbidden column through)."""
+    from study.metabase.export import EXPORTED_MARTS, ExportError, build_sqlite
+    from tests import fake_snowflake
+
+    first_mart = EXPORTED_MARTS[0][0]
+    fake_snowflake.install(monkeypatch, mart_columns={first_mart: ["THEME", "BODY"]})
+    with pytest.raises(ExportError, match="body"):
+        build_sqlite("snowflake", "friction_ledger_synthetic", tmp_path / "leak.sqlite")
+
+
 def test_export_command_refuses_rows_outside_the_set_by_name(monkeypatch, capsys):
     """`export --rows` is validated in Python against the closed set (10a), so a
     value from either origin of `make publish ROWS=` is one refusal line naming

@@ -18,10 +18,11 @@ shape (`execute`/`executemany`/`executescript`/`close`), so `pipeline/build.py`,
 from __future__ import annotations
 
 import os
+import re
 import sys
 import tempfile
 from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from pathlib import Path
 
 import duckdb
@@ -63,6 +64,12 @@ SNOWFLAKE_ENV = (
     "SNOWFLAKE_ROLE",
 )
 _SNOWFLAKE_REQUIRED = SNOWFLAKE_ENV[:-1]  # every name but the optional role
+# The shape a schema name interpolated as a SQL identifier must match: only the
+# characters `location_for`/`scratch` build from the closed INPUTS set and a
+# pid. A value off this shape refuses at the seam rather than being quoted into
+# DDL (round 1 security #4 / code-reviewer #10, defense-in-depth: the identifier
+# cannot be parameterised, so its shape is enforced where it is spelled).
+_SCHEMA_NAME = re.compile(r"\A[a-z0-9_]+\Z")
 
 
 class DriverError(Exception):
@@ -152,9 +159,10 @@ class _SnowflakeConnection:
 
     def execute(self, sql: str, params: list | None = None):
         try:
-            self._cursor.execute(sql, params) if params is not None else (
+            if params is not None:
+                self._cursor.execute(sql, params)
+            else:
                 self._cursor.execute(sql)
-            )
         except _connector_error() as exc:
             raise DriverError(str(exc)) from exc
         return self._cursor
@@ -212,21 +220,36 @@ def _snowflake_credentials() -> dict[str, str]:
     return values
 
 
+def _safe_schema(name: str) -> str:
+    """A schema name about to be interpolated as a SQL identifier, checked
+    against its shape first: it comes from the closed INPUTS set or a pid, so a
+    value off `_SCHEMA_NAME` is a bug (or a future caller passing an unvalidated
+    string), refused here rather than quoted into DDL."""
+    if not _SCHEMA_NAME.fullmatch(name):
+        raise DriverError(f"refusing a schema name that is not [a-z0-9_]+: {name!r}")
+    return name
+
+
 def _connect_snowflake(schema: str | None):
     """Open a `qmark` cursor of the connector against `SNOWFLAKE_DATABASE`, on
     the given schema (created if missing). `schema=None` connects to the
     database default (for `scratch` to drop a schema it can no longer connect
-    into). A connect failure names the class and the variables, never the
-    driver's message (it can carry the account or host)."""
+    into). Credentials are validated (and refused by name) BEFORE the connector's
+    module-level `paramstyle` is touched, so a credential refusal leaves no side
+    effect. `autocommit=False` makes the explicit `begin`/`commit`/`rollback`
+    that `pipeline/build.py` issues the transaction unit (stack risk 2), not the
+    connector's default. A connect failure names the class and the variables,
+    never the driver's message (it can carry the account or host)."""
     connector = _connector()
+    creds = _snowflake_credentials()  # validate before the paramstyle side effect
     connector.paramstyle = "qmark"  # the module-level setting the connector documents
-    creds = _snowflake_credentials()
     kwargs = {
         "account": creds["SNOWFLAKE_ACCOUNT"],
         "user": creds["SNOWFLAKE_USER"],
         "password": creds["SNOWFLAKE_PASSWORD"],
         "warehouse": creds["SNOWFLAKE_WAREHOUSE"],
         "database": creds["SNOWFLAKE_DATABASE"],
+        "autocommit": False,
     }
     if creds["SNOWFLAKE_ROLE"]:
         kwargs["role"] = creds["SNOWFLAKE_ROLE"]
@@ -234,8 +257,9 @@ def _connect_snowflake(schema: str | None):
         conn = connector.connect(**kwargs)
         cursor = conn.cursor()
         if schema is not None:
-            cursor.execute(f'create schema if not exists "{schema}"')
-            cursor.execute(f'use schema "{schema}"')
+            safe = _safe_schema(schema)
+            cursor.execute(f'create schema if not exists "{safe}"')
+            cursor.execute(f'use schema "{safe}"')
     except connector.Error as exc:
         raise DriverError(
             "TARGET=snowflake: the connector refused (snowflake.connector.Error) "
@@ -311,7 +335,16 @@ def scratch(target: str, rows: str) -> Iterator[str | Path]:
     file under it. Snowflake: a uniquely named schema (`scratch_<input>_<pid>`,
     never `friction_ledger_<input>`), created on first connect and dropped on
     exit even after a failure — the drop connects to the database default,
-    since a connection into the schema would recreate it."""
+    since a connection into the schema would recreate it. A corpus input on the
+    cloud target is refused here too, so the trial cannot hold a real review
+    through the scratch path either, not only through `location_for` (invariant
+    2 by construction — round 1 code-reviewer #1 / security #1; the corpus-guard
+    class, applied at every location source)."""
+    if target == CLOUD and rows in CLOUD_FORBIDDEN_INPUTS:
+        raise ValueError(
+            f"refusing a scratch for ROWS={rows} on TARGET={CLOUD}: the corpus "
+            f"inputs {CLOUD_FORBIDDEN_INPUTS} never reach the cloud (brief §2.5)"
+        )
     if target == LOCAL:
         with tempfile.TemporaryDirectory() as tmp:
             yield database_for(rows, tmp)
@@ -321,11 +354,15 @@ def scratch(target: str, rows: str) -> Iterator[str | Path]:
         try:
             yield name
         finally:
-            admin = connect(CLOUD, database=None)
-            try:
-                admin.execute(f'drop schema if exists "{name}"')
-            finally:
-                admin.close()
+            # best-effort drop; a cleanup DriverError never masks an in-block
+            # error (round 1 code-reviewer #4). A schema left by a failed drop
+            # is the developer's console cleanup (Out of scope).
+            with suppress(DriverError):
+                admin = connect(CLOUD, database=None)
+                try:
+                    admin.execute(f'drop schema if exists "{_safe_schema(name)}"')
+                finally:
+                    admin.close()
         return
     raise ValueError(f"unknown TARGET {target!r}; expected one of {TARGETS}")
 

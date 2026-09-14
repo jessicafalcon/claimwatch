@@ -509,9 +509,10 @@ def test_table_counts_reads_the_default_schema_from_the_engine():
 def test_idempotency_check_counts_on_the_target(monkeypatch):
     """`idempotency_check` on the cloud target rebuilds and counts on that target
     (Phase 10b, invariant 6): over the fake, both rebuilds and both count reads
-    land on the fake's connections and no DuckDB file is opened, and the run is
-    green (first == second). The DuckDB call is unchanged (`test_idempotency.py`,
-    existing)."""
+    land on the fake's connections and no DuckDB file is opened. This pins the
+    connection-threading, not idempotency itself — the fake returns 0 for every
+    count, so `first == second` here is trivially true; the run-twice property is
+    the DuckDB test (`test_idempotency.py`) and the real Snowflake run."""
     fake = fake_snowflake.install(monkeypatch)
     ok, first, second = idempotency_check("snowflake", "synthetic")
     assert ok and first == second and first  # a non-empty, unchanged count map

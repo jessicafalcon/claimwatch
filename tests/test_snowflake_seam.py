@@ -92,6 +92,22 @@ def test_a_missing_extra_is_one_refusal_line_naming_the_sync_command(monkeypatch
         connect(CLOUD, database="friction_ledger_synthetic")
 
 
+def test_a_missing_extra_is_one_refusal_line_through_the_cli(monkeypatch, capsys):
+    """The missing-extra refusal reaches the process boundary as one line, exit
+    2 (invariant 4's 'missing extra' arm at the CLI, not only at `connect()` —
+    round 1 code-reviewer #12): no connector installed, credentials set."""
+    import sys
+
+    from pipeline.cli import main
+
+    monkeypatch.setitem(sys.modules, "snowflake", None)
+    fake_snowflake.set_credentials(monkeypatch)
+    code = main(["rebuild", "--target=snowflake", "--rows=synthetic"])
+    assert code == 2
+    err = capsys.readouterr().err
+    assert "uv sync --extra snowflake" in err and err.count("\n") <= 1
+
+
 # --- Done-when 2: catalog reads are the seam's and case-folded ----------------
 def test_catalog_answers_are_case_folded_on_both_branches(monkeypatch):
     # The fake answers UPPER (Snowflake's unquoted folding); the seam folds to
@@ -161,6 +177,23 @@ def test_scratch_creates_and_drops_a_schema_that_is_no_inputs_own(monkeypatch):
     creates = [t for op, t, _ in fake.CALLS if op == "execute" and "create schema" in t]
     drops = [t for op, t, _ in fake.CALLS if op == "execute" and "drop schema" in t]
     assert any(name in c for c in creates) and any(name in d for d in drops)
+
+
+def test_scratch_refuses_a_corpus_input_on_the_cloud_target(monkeypatch):
+    """The corpus-refusal guard lives at every location source, not only the CLI
+    and `location_for`: `scratch(CLOUD, corpus)` refuses before yielding, so the
+    trial cannot hold a real review through the idempotency scratch path either
+    (invariant 2 by construction — round 1 #1). DuckDB scratch takes any input."""
+    fake = fake_snowflake.install(monkeypatch)
+    for rows in warehouse.CLOUD_FORBIDDEN_INPUTS:
+        with (
+            pytest.raises(ValueError, match="never reach the cloud"),
+            warehouse.scratch(CLOUD, rows),
+        ):
+            pass
+        assert not any(op == "connect" for op, _, _ in fake.CALLS)  # nothing connected
+    with warehouse.scratch(LOCAL, "captured"):  # the laptop takes any input
+        pass
 
 
 # --- Done-when 4: the classify step writes land on the target -----------------
