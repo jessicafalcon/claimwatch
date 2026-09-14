@@ -366,7 +366,13 @@ Freeze: none
   hour finds
 - [ ] `BACKLOG.md` — rows 33 and 50 closed (struck + "DONE Phase 10b"); the
   count in CLAUDE.md updated
-- [ ] LESSONS.md — none until a review round reports a correctness finding; then backtick it and the fix commit writes the row
+- [ ] `LESSONS.md` — round 1 reported the `site-fix` class (the corpus guard
+  missed the `scratch` site): that row gains the 10b instance; the
+  `unshaped-input` row's fix/idempotency-classify clause is updated to the
+  renamed idempotency-check test and its 10b closure
+- [ ] `specs/phase-1-schema.md` — the two Evidence/Invariant cites of the
+  retired `test_snowflake_target_defers_to_phase_10` annotated as superseded in
+  10b (a dated annotation of the historical record, not a rewrite)
 - [ ] `CLAUDE.md` — Current status (Phase 10 complete); Commands (`TARGET`
   on `rebuild`, `idempotency-check`, `publish`; the extra; `WIRED` no longer
   "duckdb alone"); Conventions allowlist (10b landed); Repo map
