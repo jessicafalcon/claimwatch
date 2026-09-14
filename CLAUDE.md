@@ -640,7 +640,7 @@ over bare `make`), the `rebuild STAGE=` split, `publish`, and
 `warehouse.LOCAL`/`WIRED` replacing every engine literal with a layout test —
 DuckDB only (PR #39, 2026-09-13).
 
-**In progress:** `phase-10b-snowflake` (this branch): spec
+**Merged:** `phase-10b-snowflake` (PR #40, 2026-09-13): spec
 `specs/phase-10b-snowflake.md` (challenged 2026-09-13 round 1 — approve with
 amendments, disposition "fix all"; approved 2026-09-13, spec 014db324). The
 second half of the Phase 10 split: the seam's Snowflake branch wired as an
@@ -650,14 +650,19 @@ folding their driver's error into `warehouse.DriverError`; the catalog reads
 seam alone; `location_for`/`scratch` giving every (input, target) its own
 location and refusing a corpus input on the cloud; `TARGET` threaded through the
 classify step, the idempotency check and the export (`CLASSIFY_TARGETS` gone).
-Proved offline against a recording fake connector (`tests/fake_snowflake.py`);
-the one Snowflake run is the developer's, recorded as text in
-`pipeline/DEMONSTRATION.md`. Phase 10 completes when 10b merges. BACKLOG rows 33
-and 50 close.
+Proved offline against a recording fake connector (`tests/fake_snowflake.py`).
+Phase 10 is complete. BACKLOG rows 33 and 50 closed.
 
-**Next:** the open BACKLOG rows, starting with the Snowflake run's own
-Documented-by-hand records once the developer runs it.
+**In progress:** `records/snowflake-run` (this branch, off main): the developer
+ran the one Snowflake demonstration — all three targets green, the 21-table count
+set matching DuckDB table for table, schema `friction_ledger_synthetic`; the
+counts, schema name and the five stack-risk Gotchas (auto-suspend the one
+surprise — it did not fire) are Documented-by-hand in `pipeline/DEMONSTRATION.md`
+and `DECISIONS.md` → Phase 10b, and the DuckDB reference table there was corrected
+from 19 to its full 21 rows. BACKLOG row 85 closed.
 
-Open BACKLOG rows: **38**.
+**Next:** the remaining open BACKLOG rows.
+
+Open BACKLOG rows: **37**.
 
 (Update this section at the end of every working day.)
