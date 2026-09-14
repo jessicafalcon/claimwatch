@@ -60,13 +60,16 @@ Phase 10a's committed DAG grid). The deviation is recorded in DECISIONS.
 
 These are row counts of the *synthetic hand-written fixture*, not study
 findings — they show the two engines agree table for table, nothing about real
-reviews. The same input on the laptop engine, `make idempotency-check
-ROWS=synthetic`, table for table. The Snowflake run of the same input prints the
-same counts (the SQL is identical; only the connection differs). This table is
-Measured on the laptop; the Snowflake counts and schema name below are
-Documented-by-hand from the developer's run. The numbers below are the same ones
-`tests/pins.py` pins for the synthetic build, so a future synthetic change that
-moves a count fails a pin before this doc drifts silently.
+reviews. The table below is the laptop engine's, `make idempotency-check
+ROWS=synthetic`. The Snowflake run of the same input *should* print the same
+counts — the SQL is identical, only the connection differs — and the pasted
+output below is what confirms it. This table is Measured on the laptop; the
+Snowflake counts and schema name below are Documented-by-hand from the
+developer's run. Most of these counts are pinned in `tests/pins.py` (the
+review-pipeline, model, simulator and snapshot rows), so a synthetic change that
+moves a pinned count fails a pin before this doc drifts; `raw_source_pages` and
+`theme_share_by_month` are not scalar-pinned, so watch those two by eye when the
+fixture changes.
 
 ```
 cost_curves              164
@@ -99,9 +102,9 @@ returned — the close of the BACKLOG row that noted the schema name was
 unpinnable offline):
 
 ```
-schema (engine's current_schema()): friction_ledger_synthetic   # e.g.; the run's own answer goes here
-<paste the count table from `make idempotency-check TARGET=snowflake ROWS=synthetic` here — it matches the DuckDB table above, count for count>
-idempotency-check OK: every row count unchanged on the second rebuild
+schema (engine's current_schema()): <paste the run's own answer here — e.g. friction_ledger_synthetic>
+<paste the count table from `make idempotency-check TARGET=snowflake ROWS=synthetic` here — it should match the DuckDB table above, count for count>
+<paste the idempotency-check result line from the run here>
 ```
 
 ## Why a wrapper and an extra, not an ORM
